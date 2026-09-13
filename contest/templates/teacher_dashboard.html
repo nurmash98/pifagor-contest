@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Кабинет преподавателя{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12 mb-4 d-flex justify-content-between align-items-center">
+        <h2 class="fw-bold" style="color: #1a1a4b;">👨‍🏫 Кабинет преподавателя</h2>
+    </div>
+
+    <!-- Колонка 1: Требуют проверки -->
+    <div class="col-md-7 mb-4">
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-warning text-dark fw-bold rounded-top-4 py-3">
+                🔥 Ожидают проверки ({{ pending_submissions.count }})
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for sub in pending_submissions %}
+                    <li class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1 fw-bold">{{ sub.student.full_name }} <span class="badge bg-secondary ms-2">{{ sub.student.school_class }}</span></h6>
+                            <small class="text-muted">Задача: {{ sub.task.title }}</small>
+                        </div>
+                        <a href="{% url 'grade_submission' sub.id %}" class="btn btn-primary btn-sm rounded-pill px-3">Проверить</a>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item p-4 text-center text-muted">Ура! Все задачи проверены.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Лидерборд -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white fw-bold py-3">🏆 Топ учеников</div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <tbody>
+                        {% for student in top_students %}
+                        <tr>
+                            <td class="ps-3">{{ forloop.counter }}. {{ student.full_name }}</td>
+                            <td class="text-end pe-3 fw-bold text-success">{{ student.total_score|default:"0" }} баллов</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Колонка 2: Последние проверенные -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-success text-white fw-bold rounded-top-4 py-3">
+                ✅ Недавно проверенные
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for sub in graded_submissions %}
+                    <li class="list-group-item p-3">
+                        <div class="d-flex justify-content-between">
+                            <strong style="color: #1a1a4b;">{{ sub.student.full_name }}</strong>
+                            <span class="badge bg-success">{{ sub.score }}/10</span>
+                        </div>
+                        <div class="text-muted small mt-1">{{ sub.task.title }}</div>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item p-4 text-center text-muted">Пока нет проверенных задач.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Доска задач - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="row gx-4">
+    
+    <!-- Колонка 1: Бэклог (Доступные задачи) -->
+    <div class="col-md-3">
+        <div class="kanban-col">
+            <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center" style="color: #1a1a4b;">
+                Доступные
+                <span class="badge bg-secondary rounded-pill">{{ backlog_tasks.count }}</span>
+            </h5>
+
+            {% for task in backlog_tasks %}
+            <div class="card task-card">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="card-title fw-bold mb-0" style="color: #1a1a4b;">{{ task.title }}</h6>
+                        {% if task.level == 'A' %}
+                            <span class="badge badge-level-A">{{ task.level }}</span>
+                        {% elif task.level == 'B' %}
+                            <span class="badge badge-level-B">{{ task.level }}</span>
+                        {% else %}
+                            <span class="badge badge-level-C">{{ task.level }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="card-text text-muted small mb-3">{{ task.description|truncatewords:12 }}</p>
+                    <a href="{% url 'task_detail' task.id %}" class="btn btn-pifagor-blue btn-sm w-100">
+                        Взять задачу →
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted small mt-4">Все задачи уже в работе или решены</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Колонка 2: В работе -->
+    <div class="col-md-3">
+        <div class="kanban-col" style="background-color: #e3f2fd;">
+            <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-primary">
+                В работе
+                <span class="badge bg-primary rounded-pill">{{ in_progress.count }} / 2</span>
+            </h5>
+
+            {% for sub in in_progress %}
+            <div class="card task-card border-primary">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="card-title fw-bold mb-0" style="color: #1a1a4b;">{{ sub.task.title }}</h6>
+                        {% if sub.task.level == 'A' %}
+                            <span class="badge badge-level-A">{{ sub.task.level }}</span>
+                        {% elif sub.task.level == 'B' %}
+                            <span class="badge badge-level-B">{{ sub.task.level }}</span>
+                        {% else %}
+                            <span class="badge badge-level-C">{{ sub.task.level }}</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="card-text text-muted small mb-3">{{ sub.task.description|truncatewords:10 }}</p>
+
+                    <a href="{% url 'task_detail' sub.task.id %}" class="btn btn-pifagor-green btn-sm w-100">
+                        Перейти к решению →
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted small mt-4">
+                Выберите задачу из каталога или первой колонки
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Колонка 3: На проверке -->
+    <div class="col-md-3">
+        <div class="kanban-col" style="background-color: #fff3cd;">
+            <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-warning">
+                На проверке
+                <span class="badge bg-warning text-dark rounded-pill">{{ testing.count }}</span>
+            </h5>
+
+            {% for sub in testing %}
+            <div class="card task-card border-warning">
+                <div class="card-body p-3 text-center">
+                    <h6 class="card-title fw-bold mb-2" style="color: #1a1a4b;">{{ sub.task.title }}</h6>
+                    <div class="spinner-border text-warning spinner-border-sm mb-2" role="status"></div>
+                    <p class="small text-muted mb-0">Тестирование кода...</p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted small mt-4">Нет задач на проверке</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Колонка 4: Решено -->
+    <div class="col-md-3">
+        <div class="kanban-col" style="background-color: #d4edda;">
+            <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-success">
+                Решено
+                <span class="badge bg-success rounded-pill">{{ done.count }}</span>
+            </h5>
+
+            {% for sub in done %}
+            <div class="card task-card border-success">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title fw-bold mb-0 text-success">{{ sub.task.title }}</h6>
+                        <h5 class="fw-bold mb-0 {% if sub.score >= 8 %}text-success{% elif sub.score >= 5 %}text-warning{% else %}text-danger{% endif %}">
+                            {{ sub.score }}/10
+                        </h5>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">Решено: {{ sub.updated_at|date:"d.m.Y H:i" }}</p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted small mt-4">Пока нет решенных задач</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
