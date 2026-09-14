@@ -22,7 +22,7 @@ def all_tasks_view(request):
     student = get_object_or_404(Student, user=request.user)
 
     level_filter = request.GET.get('level', '')
-    tasks = Task.objects.all()
+    tasks = Task.objects.prefetch_related('tags').all()
     if level_filter in ['A', 'B', 'C']:
         tasks = tasks.filter(level=level_filter)
 

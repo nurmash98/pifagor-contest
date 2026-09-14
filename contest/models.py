@@ -11,6 +11,18 @@ class Student(models.Model):
         return f"{self.full_name} ({self.school_class})"
 
 
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True, verbose_name="Название тега")
+
+    class Meta:
+        verbose_name = "Тег"
+        verbose_name_plural = "Теги"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Task(models.Model):
     LEVEL_CHOICES = [
         ('A', 'Уровень A (Легкий)'),
@@ -23,9 +35,39 @@ class Task(models.Model):
     description = models.TextField(verbose_name="Описание")
     input_example = models.TextField(verbose_name="Пример ввода")
     output_example = models.TextField(verbose_name="Пример вывода")
+    tags = models.ManyToManyField(Tag, related_name='tasks', verbose_name="Теги")
 
     def __str__(self):
         return f"[{self.level}] {self.title}"
+
+
+class Course(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Название курса")
+    description = models.TextField(blank=True, verbose_name="Описание")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Курс"
+        verbose_name_plural = "Курсы"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Topic(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='topics', verbose_name="Курс")
+    name = models.CharField(max_length=200, verbose_name="Название темы")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок отображения")
+    tasks = models.ManyToManyField(Task, blank=True, related_name='topics', verbose_name="Задачи")
+
+    class Meta:
+        verbose_name = "Тема"
+        verbose_name_plural = "Темы"
+        ordering = ['course', 'order', 'name']
+
+    def __str__(self):
+        return f"{self.course.name} — {self.name}"
 
 
 

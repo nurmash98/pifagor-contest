@@ -22,6 +22,14 @@
                 {% endif %}
             </div>
 
+            {% if task.tags.all %}
+            <div class="mb-3">
+                {% for tag in task.tags.all %}
+                <span class="badge bg-light text-dark border me-1">#{{ tag.name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             <h6 class="fw-bold text-muted mt-3 mb-2">Условие задачи:</h6>
             <p class="lh-lg" style="color: #2c3e50;">{{ task.description|linebreaksbr }}</p>
 

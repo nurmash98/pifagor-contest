@@ -53,6 +53,13 @@
                             <div class="text-muted small text-truncate" style="max-width: 400px;">
                                 {{ task.description }}
                             </div>
+                            {% if task.tags.all %}
+                            <div class="mt-1">
+                                {% for tag in task.tags.all %}
+                                <span class="badge bg-light text-dark border me-1">#{{ tag.name }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </td>
                         <td class="text-center">
                             {% if task.level == 'A' %}
