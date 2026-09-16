@@ -352,7 +352,7 @@ def course_manage(request, course_id):
 
 @staff_member_required
 def course_analytics(request, course_id):
-    """Таблица по темам курса: средний балл по классам (не решил — 0 баллов)."""
+    """Список классов -> при выборе класса таблица: ученики x темы, средний балл (не решил — 0 баллов)."""
     course = _get_owned_course_or_none(request, course_id)
     if course is None:
         messages.error(request, 'Это не ваш курс.')
@@ -367,51 +367,48 @@ def course_analytics(request, course_id):
             .values_list('school_class', flat=True).distinct()
         )
 
-    topics = course.topics.prefetch_related('tasks').order_by('order', 'name')
+    selected_class = request.GET.get('class', '').strip()
+    if selected_class not in classes:
+        selected_class = classes[0] if classes else ''
 
-    # Ученики по классам (только релевантные классы)
-    students_by_class = {}
-    for cls in classes:
-        students_by_class[cls] = list(Student.objects.filter(school_class=cls))
+    topics = list(course.topics.prefetch_related('tasks').order_by('order', 'name'))
+    topic_task_ids = [(topic, list(topic.tasks.values_list('id', flat=True))) for topic in topics]
 
-    # Все баллы DONE-решений одним запросом: {(student_id, task_id): score}
-    scores = {
-        (s['student_id'], s['task_id']): s['score']
-        for s in Submission.objects.filter(status='DONE').values('student_id', 'task_id', 'score')
-    }
+    students = []
+    if selected_class:
+        class_students = Student.objects.filter(school_class=selected_class).order_by('full_name')
 
-    rows = []
-    for topic in topics:
-        task_ids = list(topic.tasks.values_list('id', flat=True))
-        cells = []
-        for cls in classes:
-            students = students_by_class.get(cls, [])
-            total_possible = len(students) * len(task_ids)
-            total_score = 0
-            done_count = 0
-            for student in students:
-                for task_id in task_ids:
-                    score = scores.get((student.id, task_id))
-                    if score is not None:
-                        total_score += score
-                        done_count += 1
-            average = round(total_score / total_possible, 1) if total_possible > 0 else 0
-            cells.append({
-                'class_name': cls,
-                'average': average,
-                'done_count': done_count,
-                'total_possible': total_possible,
+        # Все баллы DONE-решений учеников этого класса: {(student_id, task_id): score}
+        scores = {
+            (s['student_id'], s['task_id']): s['score']
+            for s in Submission.objects.filter(
+                status='DONE', student__school_class=selected_class
+            ).values('student_id', 'task_id', 'score')
+        }
+
+        for student in class_students:
+            cells = []
+            overall_total = 0
+            overall_possible = 0
+            for topic, task_ids in topic_task_ids:
+                total = sum(scores.get((student.id, tid), 0) for tid in task_ids)
+                average = round(total / len(task_ids), 1) if task_ids else 0
+                cells.append({'topic': topic, 'average': average})
+                overall_total += total
+                overall_possible += len(task_ids)
+            overall_average = round(overall_total / overall_possible, 1) if overall_possible else 0
+            students.append({
+                'student': student,
+                'cells': cells,
+                'overall_average': overall_average,
             })
-        rows.append({
-            'topic': topic,
-            'task_count': len(task_ids),
-            'cells': cells,
-        })
 
     context = {
         'course': course,
         'classes': classes,
-        'rows': rows,
+        'selected_class': selected_class,
+        'topics': topics,
+        'students': students,
     }
     return render(request, 'course_analytics.html', context)
 
@@ -538,6 +535,90 @@ def task_tags_edit(request, task_id):
         'all_tags': Tag.objects.all(),
         'selected_tag_ids': set(task.tags.values_list('id', flat=True)),
     })
+
+
+@staff_member_required
+def student_list(request):
+    """Полный список всех учеников — доступен любому учителю, вне привязки к его классам."""
+    students = Student.objects.select_related('user').order_by('school_class', 'full_name')
+
+    class_filter = request.GET.get('class', '').strip()
+    if class_filter:
+        students = students.filter(school_class=class_filter)
+
+    q = request.GET.get('q', '').strip()
+    if q:
+        students = students.filter(Q(full_name__icontains=q) | Q(user__username__icontains=q))
+
+    all_classes = (
+        Student.objects.order_by('school_class').values_list('school_class', flat=True).distinct()
+    )
+
+    return render(request, 'student_list.html', {
+        'students': students, 'all_classes': all_classes, 'class_filter': class_filter, 'q': q,
+    })
+
+
+@staff_member_required
+def student_create(request):
+    """Добавление нового ученика (логин, пароль, имя, класс) — доступно любому учителю."""
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        school_class = request.POST.get('school_class', '').strip()
+
+        if not username or not password or not full_name or not school_class:
+            messages.error(request, 'Заполните логин, пароль, имя и класс.')
+        elif User.objects.filter(username=username).exists():
+            messages.error(request, 'Этот логин уже занят.')
+        else:
+            user = User.objects.create_user(username=username, password=password)
+            Student.objects.create(user=user, full_name=full_name, school_class=school_class)
+            messages.success(request, f'Ученик «{full_name}» добавлен.')
+            return redirect('student_list')
+
+    return render(request, 'student_form.html', {'mode': 'create'})
+
+
+@staff_member_required
+def student_edit(request, student_id):
+    """Изменение логина, пароля, имени и класса ученика — доступно любому учителю."""
+    student = get_object_or_404(Student, id=student_id)
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        school_class = request.POST.get('school_class', '').strip()
+
+        if not username or not full_name or not school_class:
+            messages.error(request, 'Заполните логин, имя и класс.')
+        elif User.objects.filter(username=username).exclude(id=student.user_id).exists():
+            messages.error(request, 'Этот логин уже занят другим пользователем.')
+        else:
+            student.user.username = username
+            if password:
+                student.user.set_password(password)
+            student.user.save()
+            student.full_name = full_name
+            student.school_class = school_class
+            student.save()
+            messages.success(request, 'Данные ученика обновлены.')
+            return redirect('student_list')
+
+    return render(request, 'student_form.html', {'mode': 'edit', 'student': student})
+
+
+@staff_member_required
+def student_delete(request, student_id):
+    """Удаление ученика вместе с его аккаунтом и решениями — доступно любому учителю."""
+    student = get_object_or_404(Student, id=student_id)
+    if request.method == 'POST':
+        name = student.full_name
+        student.user.delete()  # каскадом удаляет Student и его Submission
+        messages.success(request, f'Ученик «{name}» удалён.')
+    return redirect('student_list')
 
 
 @login_required

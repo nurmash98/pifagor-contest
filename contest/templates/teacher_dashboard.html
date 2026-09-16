@@ -10,6 +10,7 @@
             {% if teacher %}
                 <span class="text-muted small">Ваши классы: <strong>{{ teacher.classes|default:"не назначены" }}</strong></span>
             {% endif %}
+            <a href="{% url 'student_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">🎓 Ученики</a>
             <a href="{% url 'task_tags_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">🏷 Теги задач</a>
         </div>
     </div>

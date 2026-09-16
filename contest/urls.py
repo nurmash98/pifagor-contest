@@ -42,4 +42,10 @@ urlpatterns = [
     # Управление тегами задач — доступно любому учителю для всех задач
     path('teacher/tasks/', views.task_tags_list, name='task_tags_list'),
     path('teacher/tasks/<int:task_id>/tags/', views.task_tags_edit, name='task_tags_edit'),
+
+    # Управление учениками — доступно любому учителю для всех учеников
+    path('teacher/students/', views.student_list, name='student_list'),
+    path('teacher/students/create/', views.student_create, name='student_create'),
+    path('teacher/students/<int:student_id>/edit/', views.student_edit, name='student_edit'),
+    path('teacher/students/<int:student_id>/delete/', views.student_delete, name='student_delete'),
 ]

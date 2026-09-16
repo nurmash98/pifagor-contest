@@ -7,12 +7,25 @@
     <a href="{% url 'course_manage' course.id %}" class="text-decoration-none text-muted small">← Назад к курсу</a>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
+<div class="row mb-4 align-items-end">
+    <div class="col-md-8">
         <h3 class="fw-bold" style="color: #1a1a4b;">📊 Анализ курса: {{ course.name }}</h3>
         <p class="text-muted small mb-0">
-            Средний балл по каждой теме в разбивке по классам. Если ученик ещё не решил задачу — она считается за 0 баллов.
+            Средний балл каждого ученика по темам курса. Если задача ещё не решена — она считается за 0 баллов.
         </p>
+    </div>
+    <div class="col-md-4">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <label class="form-label fw-semibold mb-0 text-nowrap">Класс:</label>
+            <select name="class" class="form-select" onchange="this.form.submit()">
+                {% for cls in classes %}
+                    <option value="{{ cls }}" {% if cls == selected_class %}selected{% endif %}>{{ cls }}</option>
+                {% empty %}
+                    <option value="">нет классов</option>
+                {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-outline-dark btn-sm">Показать</button></noscript>
+        </form>
     </div>
 </div>
 
@@ -21,37 +34,31 @@
         <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
                 <tr>
-                    <th class="ps-3">Тема</th>
-                    <th class="text-center">Задач</th>
-                    {% for cls in classes %}
-                        <th class="text-center">{{ cls }}</th>
+                    <th class="ps-3">Ученик</th>
+                    {% for topic in topics %}
+                        <th class="text-center">{{ topic.name }}</th>
                     {% endfor %}
+                    <th class="text-center">Средний балл</th>
                 </tr>
             </thead>
             <tbody>
-                {% for row in rows %}
+                {% for row in students %}
                 <tr>
                     <td class="ps-3">
-                        <strong style="color: #1a1a4b;">{{ row.topic.name }}</strong>
+                        <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>
+                        <div class="text-muted small">{{ row.student.user.username }}</div>
                     </td>
-                    <td class="text-center text-muted">{{ row.task_count }}</td>
                     {% for cell in row.cells %}
-                        <td class="text-center">
-                            {% if cell.total_possible > 0 %}
-                                <span class="fw-bold {% if cell.average >= 7 %}text-success{% elif cell.average >= 4 %}text-warning{% else %}text-danger{% endif %}">
-                                    {{ cell.average }}
-                                </span>
-                                <div class="text-muted small">{{ cell.done_count }}/{{ cell.total_possible }} сдано</div>
-                            {% else %}
-                                <span class="text-muted small">нет учеников</span>
-                            {% endif %}
+                        <td class="text-center {% if cell.average >= 7 %}text-success{% elif cell.average >= 4 %}text-warning{% else %}text-danger{% endif %} fw-bold">
+                            {{ cell.average }}
                         </td>
                     {% endfor %}
+                    <td class="text-center fw-bold" style="color: #1a1a4b;">{{ row.overall_average }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{{ classes|length|add:2 }}" class="p-4 text-center text-muted">
-                        В этом курсе пока нет тем.
+                    <td colspan="{{ topics|length|add:2 }}" class="p-4 text-center text-muted">
+                        {% if selected_class %}В классе «{{ selected_class }}» пока нет учеников.{% else %}Классы не найдены.{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -60,7 +67,7 @@
     </div>
 </div>
 
-{% if not classes %}
-<div class="text-muted small mt-3">Классы не найдены — убедитесь, что ученики зарегистрированы и (для учителя) указаны ваши классы.</div>
+{% if not topics %}
+<div class="text-muted small mt-3">В этом курсе пока нет тем.</div>
 {% endif %}
 {% endblock %}

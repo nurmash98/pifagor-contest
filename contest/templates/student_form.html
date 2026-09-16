@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if mode == 'create' %}Новый ученик{% else %}Изменить ученика{% endif %} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'student_list' %}" class="text-decoration-none text-muted small">← Назад к списку учеников</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">
+                {% if mode == 'create' %}Новый ученик{% else %}Изменить ученика{% endif %}
+            </h4>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Логин</label>
+                    <input type="text" name="username" class="form-control"
+                           value="{% if student %}{{ student.user.username }}{% endif %}" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Пароль {% if mode == 'edit' %}<span class="text-muted fw-normal">(оставьте пустым, чтобы не менять)</span>{% endif %}</label>
+                    <input type="text" name="password" class="form-control" {% if mode == 'create' %}required{% endif %}>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Имя и Фамилия</label>
+                    <input type="text" name="full_name" class="form-control"
+                           value="{% if student %}{{ student.full_name }}{% endif %}" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Класс</label>
+                    <input type="text" name="school_class" class="form-control" placeholder="например, 10А"
+                           value="{% if student %}{{ student.school_class }}{% endif %}" required>
+                </div>
+                <button type="submit" class="btn btn-pifagor-green px-4">
+                    {% if mode == 'create' %}Добавить ученика{% else %}Сохранить{% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
