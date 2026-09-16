@@ -351,6 +351,72 @@ def course_manage(request, course_id):
 
 
 @staff_member_required
+def course_analytics(request, course_id):
+    """Таблица по темам курса: средний балл по классам (не решил — 0 баллов)."""
+    course = _get_owned_course_or_none(request, course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+
+    teacher = _teacher_or_none(request)
+    if teacher is not None:
+        classes = teacher.class_list()
+    else:
+        classes = list(
+            Student.objects.order_by('school_class')
+            .values_list('school_class', flat=True).distinct()
+        )
+
+    topics = course.topics.prefetch_related('tasks').order_by('order', 'name')
+
+    # Ученики по классам (только релевантные классы)
+    students_by_class = {}
+    for cls in classes:
+        students_by_class[cls] = list(Student.objects.filter(school_class=cls))
+
+    # Все баллы DONE-решений одним запросом: {(student_id, task_id): score}
+    scores = {
+        (s['student_id'], s['task_id']): s['score']
+        for s in Submission.objects.filter(status='DONE').values('student_id', 'task_id', 'score')
+    }
+
+    rows = []
+    for topic in topics:
+        task_ids = list(topic.tasks.values_list('id', flat=True))
+        cells = []
+        for cls in classes:
+            students = students_by_class.get(cls, [])
+            total_possible = len(students) * len(task_ids)
+            total_score = 0
+            done_count = 0
+            for student in students:
+                for task_id in task_ids:
+                    score = scores.get((student.id, task_id))
+                    if score is not None:
+                        total_score += score
+                        done_count += 1
+            average = round(total_score / total_possible, 1) if total_possible > 0 else 0
+            cells.append({
+                'class_name': cls,
+                'average': average,
+                'done_count': done_count,
+                'total_possible': total_possible,
+            })
+        rows.append({
+            'topic': topic,
+            'task_count': len(task_ids),
+            'cells': cells,
+        })
+
+    context = {
+        'course': course,
+        'classes': classes,
+        'rows': rows,
+    }
+    return render(request, 'course_analytics.html', context)
+
+
+@staff_member_required
 def course_edit(request, course_id):
     """Изменение названия/описания/видимости курса."""
     course = _get_owned_course_or_none(request, course_id)

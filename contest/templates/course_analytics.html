@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Анализ курса: {{ course.name }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'course_manage' course.id %}" class="text-decoration-none text-muted small">← Назад к курсу</a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h3 class="fw-bold" style="color: #1a1a4b;">📊 Анализ курса: {{ course.name }}</h3>
+        <p class="text-muted small mb-0">
+            Средний балл по каждой теме в разбивке по классам. Если ученик ещё не решил задачу — она считается за 0 баллов.
+        </p>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Тема</th>
+                    <th class="text-center">Задач</th>
+                    {% for cls in classes %}
+                        <th class="text-center">{{ cls }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td class="ps-3">
+                        <strong style="color: #1a1a4b;">{{ row.topic.name }}</strong>
+                    </td>
+                    <td class="text-center text-muted">{{ row.task_count }}</td>
+                    {% for cell in row.cells %}
+                        <td class="text-center">
+                            {% if cell.total_possible > 0 %}
+                                <span class="fw-bold {% if cell.average >= 7 %}text-success{% elif cell.average >= 4 %}text-warning{% else %}text-danger{% endif %}">
+                                    {{ cell.average }}
+                                </span>
+                                <div class="text-muted small">{{ cell.done_count }}/{{ cell.total_possible }} сдано</div>
+                            {% else %}
+                                <span class="text-muted small">нет учеников</span>
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ classes|length|add:2 }}" class="p-4 text-center text-muted">
+                        В этом курсе пока нет тем.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if not classes %}
+<div class="text-muted small mt-3">Классы не найдены — убедитесь, что ученики зарегистрированы и (для учителя) указаны ваши классы.</div>
+{% endif %}
+{% endblock %}
