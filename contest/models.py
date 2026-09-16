@@ -74,8 +74,8 @@ class Topic(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название темы")
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок отображения")
     theory_video_url = models.URLField(
-        blank=True, verbose_name="Ссылка на теорию (YouTube)",
-        help_text="Необязательно. Ученик увидит видео в начале темы."
+        blank=True, verbose_name="Видеоурок (ссылка на YouTube)",
+        help_text="Необязательно. Ученик сможет открыть видео отдельной страницей."
     )
     tasks = models.ManyToManyField(Task, blank=True, related_name='topics', verbose_name="Задачи")
 

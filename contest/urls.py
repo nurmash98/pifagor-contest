@@ -20,6 +20,7 @@ urlpatterns = [
     # Курсы
     path('courses/', views.courses_view, name='courses'),
     path('courses/<int:course_id>/', views.course_detail, name='course_detail'),
+    path('courses/topics/<int:topic_id>/video/', views.topic_video, name='topic_video'),
 
     # Авторизация и регистрация
     path('register/', views.register, name='register'),

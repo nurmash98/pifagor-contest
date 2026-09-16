@@ -428,6 +428,22 @@ def topic_edit(request, topic_id):
     })
 
 
+@login_required
+def topic_video(request, topic_id):
+    """Отдельная страница с видеоуроком темы — открывается по клику с страницы курса,
+    чтобы само видео не занимало много места в списке задач."""
+    topic = get_object_or_404(Topic, id=topic_id)
+    course = topic.course
+    if not course.is_visible and not request.user.is_staff:
+        messages.warning(request, 'Этот курс пока недоступен.')
+        return redirect('courses')
+    if not topic.theory_video_url:
+        messages.info(request, 'Для этой темы видеоурок пока не добавлен.')
+        return redirect('course_detail', course_id=course.id)
+
+    return render(request, 'topic_video.html', {'topic': topic, 'course': course})
+
+
 @staff_member_required
 def teacher_dashboard(request):
     """Кабинет преподавателя: очередь на проверку и последние проверенные."""
