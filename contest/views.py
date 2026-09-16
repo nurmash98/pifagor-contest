@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
 
-from .models import Task, Submission, Student, Course, Teacher
+from .models import Task, Submission, Student, Course, Teacher, Topic
 from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -89,7 +89,7 @@ def task_detail(request, task_id):
         submission.save()
 
         messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
-        return redirect('kanban')
+        return redirect('task_detail', task_id=task.id)
 
     context = {
         'task': task,
@@ -300,6 +300,132 @@ def course_detail(request, course_id):
                     task.user_sub = user_submissions.get(task.id)
 
     return render(request, 'course_detail.html', {'course': course, 'topics': topics})
+
+
+def _teacher_or_none(request):
+    return None if request.user.is_superuser else Teacher.objects.filter(user=request.user).first()
+
+
+def _get_owned_course_or_none(request, course_id):
+    """Курс, если текущий пользователь — админ или один из назначенных ему учителей."""
+    course = get_object_or_404(Course, id=course_id)
+    teacher = _teacher_or_none(request)
+    if teacher is not None and not course.teachers.filter(pk=teacher.pk).exists():
+        return None
+    return course
+
+
+@staff_member_required
+def course_create(request):
+    """Учитель (или админ) создаёт новый курс прямо в приложении, без Django admin."""
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if not name:
+            messages.error(request, 'Укажите название курса.')
+        else:
+            teacher = _teacher_or_none(request)
+            course = Course.objects.create(
+                name=name,
+                description=request.POST.get('description', '').strip(),
+                is_visible=request.POST.get('is_visible') == 'on',
+                created_by=teacher,
+            )
+            if teacher is not None:
+                teacher.courses.add(course)
+            messages.success(request, f'Курс «{course.name}» создан. Теперь добавьте темы.')
+            return redirect('course_manage', course_id=course.id)
+
+    return render(request, 'course_form.html', {})
+
+
+@staff_member_required
+def course_manage(request, course_id):
+    """Страница курса для учителя: темы, теория, задачи — без захода в админку."""
+    course = _get_owned_course_or_none(request, course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+
+    topics = course.topics.prefetch_related('tasks').all()
+    return render(request, 'course_manage.html', {'course': course, 'topics': topics})
+
+
+@staff_member_required
+def course_edit(request, course_id):
+    """Изменение названия/описания/видимости курса."""
+    course = _get_owned_course_or_none(request, course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            course.name = name
+        course.description = request.POST.get('description', '').strip()
+        course.is_visible = request.POST.get('is_visible') == 'on'
+        course.save()
+        messages.success(request, 'Курс обновлён.')
+
+    return redirect('course_manage', course_id=course.id)
+
+
+@staff_member_required
+def topic_create(request, course_id):
+    """Добавление темы курса: название, необязательная теория (ссылка на YouTube), задачи."""
+    course = _get_owned_course_or_none(request, course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+
+    all_tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if not name:
+            messages.error(request, 'Укажите название темы.')
+        else:
+            topic = Topic.objects.create(
+                course=course,
+                name=name,
+                order=request.POST.get('order') or 0,
+                theory_video_url=request.POST.get('theory_video_url', '').strip(),
+            )
+            topic.tasks.set(request.POST.getlist('tasks'))
+            messages.success(request, f'Тема «{topic.name}» добавлена.')
+            return redirect('course_manage', course_id=course.id)
+
+    return render(request, 'topic_form.html', {
+        'course': course, 'topic': None, 'all_tasks': all_tasks, 'selected_task_ids': set(),
+    })
+
+
+@staff_member_required
+def topic_edit(request, topic_id):
+    """Редактирование темы: название, теория, порядок, набор задач."""
+    topic = get_object_or_404(Topic, id=topic_id)
+    course = _get_owned_course_or_none(request, topic.course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+
+    all_tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            topic.name = name
+        topic.order = request.POST.get('order') or topic.order
+        topic.theory_video_url = request.POST.get('theory_video_url', '').strip()
+        topic.save()
+        topic.tasks.set(request.POST.getlist('tasks'))
+        messages.success(request, f'Тема «{topic.name}» обновлена.')
+        return redirect('course_manage', course_id=course.id)
+
+    return render(request, 'topic_form.html', {
+        'course': course, 'topic': topic, 'all_tasks': all_tasks,
+        'selected_task_ids': set(topic.tasks.values_list('id', flat=True)),
+    })
 
 
 @staff_member_required

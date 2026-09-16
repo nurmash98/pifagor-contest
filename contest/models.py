@@ -1,3 +1,5 @@
+import re
+
 from django.db import models
 from django.contrib.auth.models import User, Group
 
@@ -71,6 +73,10 @@ class Topic(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='topics', verbose_name="Курс")
     name = models.CharField(max_length=200, verbose_name="Название темы")
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок отображения")
+    theory_video_url = models.URLField(
+        blank=True, verbose_name="Ссылка на теорию (YouTube)",
+        help_text="Необязательно. Ученик увидит видео в начале темы."
+    )
     tasks = models.ManyToManyField(Task, blank=True, related_name='topics', verbose_name="Задачи")
 
     class Meta:
@@ -80,6 +86,13 @@ class Topic(models.Model):
 
     def __str__(self):
         return f"{self.course.name} — {self.name}"
+
+    def youtube_embed_url(self):
+        """URL для встраивания ролика (<iframe>), если ссылка похожа на YouTube."""
+        if not self.theory_video_url:
+            return None
+        match = re.search(r'(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})', self.theory_video_url)
+        return f'https://www.youtube.com/embed/{match.group(1)}' if match else None
 
 
 class Teacher(models.Model):

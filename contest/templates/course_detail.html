@@ -18,6 +18,23 @@
 {% for topic in topics %}
 <div class="card border-0 shadow-sm rounded-4 mb-3">
     <div class="card-header bg-white fw-bold py-3" style="color: #1a1a4b;">{{ topic.name }}</div>
+
+    {% if topic.theory_video_url %}
+    <div class="p-3 border-bottom bg-light">
+        <h6 class="fw-bold text-muted mb-2">📺 Теория</h6>
+        {% if topic.youtube_embed_url %}
+        <div class="ratio ratio-16x9">
+            <iframe src="{{ topic.youtube_embed_url }}" title="Теория: {{ topic.name }}"
+                    allowfullscreen loading="lazy"></iframe>
+        </div>
+        {% else %}
+        <a href="{{ topic.theory_video_url }}" target="_blank" rel="noopener noreferrer" class="fw-semibold" style="color: #008b42;">
+            Смотреть теорию →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <ul class="list-group list-group-flush">
         {% for task in topic.tasks.all %}
         <li class="list-group-item d-flex justify-content-between align-items-center">

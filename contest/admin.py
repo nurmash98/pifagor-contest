@@ -41,7 +41,7 @@ class TopicInline(admin.TabularInline):
     Выбор задач для темы — на отдельной странице темы (кнопка 'Изменить')."""
     model = Topic
     extra = 1
-    fields = ('name', 'order')
+    fields = ('name', 'order', 'theory_video_url')
     show_change_link = True
 
 

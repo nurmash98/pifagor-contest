@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if topic %}Изменить тему{% else %}Новая тема{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'course_manage' course.id %}" class="text-decoration-none text-muted small">← Назад к курсу «{{ course.name }}»</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">
+                {% if topic %}Тема: {{ topic.name }}{% else %}Новая тема{% endif %}
+            </h4>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Название темы</label>
+                        <input type="text" name="name" class="form-control" value="{{ topic.name|default:'' }}" required autofocus>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Порядок</label>
+                        <input type="number" name="order" class="form-control" value="{{ topic.order|default:0 }}" min="0">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Теория — ссылка на YouTube (необязательно)</label>
+                    <input type="url" name="theory_video_url" class="form-control"
+                           value="{{ topic.theory_video_url|default:'' }}"
+                           placeholder="https://www.youtube.com/watch?v=...">
+                    <div class="form-text">Ученик увидит видео в самом начале темы.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Задачи темы</label>
+                    <select name="tasks" class="form-select" multiple size="12">
+                        {% for task in all_tasks %}
+                        <option value="{{ task.id }}" {% if task.id in selected_task_ids %}selected{% endif %}>
+                            [{{ task.level }}] {{ task.title }}{% if task.tags.all %} — {% for tag in task.tags.all %}#{{ tag.name }} {% endfor %}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Удерживайте Ctrl (Cmd на Mac), чтобы выбрать несколько задач.</div>
+                </div>
+
+                <button type="submit" class="btn btn-pifagor-green px-4">
+                    {% if topic %}Сохранить{% else %}Добавить тему{% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

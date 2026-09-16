@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Новый курс{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">Новый курс</h4>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Название курса</label>
+                    <input type="text" name="name" class="form-control" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Описание</label>
+                    <textarea name="description" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-check mb-4">
+                    <input type="checkbox" name="is_visible" class="form-check-input" id="is_visible">
+                    <label class="form-check-label" for="is_visible">Показывать ученикам сразу</label>
+                </div>
+                <button type="submit" class="btn btn-pifagor-green px-4">Создать курс</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
