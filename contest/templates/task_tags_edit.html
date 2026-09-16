@@ -9,10 +9,37 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm rounded-4 p-4">
-            <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ task.title }}</h4>
-            <p class="text-muted small mb-4">Уровень {{ task.level }}</p>
+        <div class="card border-0 shadow-sm rounded-4 p-4 mb-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h4 class="fw-bold mb-0" style="color: #1a1a4b;">{{ task.title }}</h4>
+                {% if task.level == 'A' %}
+                    <span class="badge badge-level-A">Уровень A</span>
+                {% elif task.level == 'B' %}
+                    <span class="badge badge-level-B">Уровень B</span>
+                {% else %}
+                    <span class="badge badge-level-C">Уровень C</span>
+                {% endif %}
+            </div>
 
+            <h6 class="fw-bold text-muted mb-2">Условие задачи:</h6>
+            <p class="mb-3" style="white-space: pre-line;">{{ task.description }}</p>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="bg-light p-2 rounded-3 border">
+                        <span class="fw-bold text-muted small d-block mb-1">Пример ввода:</span>
+                        <code class="text-dark">{{ task.input_example }}</code>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="bg-light p-2 rounded-3 border">
+                        <span class="fw-bold text-muted small d-block mb-1">Пример вывода:</span>
+                        <code class="text-dark">{{ task.output_example }}</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4 p-4">
             <form method="post" class="mb-4">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="set_tags">
