@@ -80,21 +80,27 @@
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Отправка решения</h5>
-            
+
+            {% if cooldown_hours %}
+                <div class="alert alert-info rounded-3">
+                    Эту задачу можно отправлять не чаще одного раза в 24 часа. Повторная отправка будет доступна примерно через {{ cooldown_hours }} ч.
+                </div>
+            {% endif %}
+
             <form method="post" class="d-flex flex-column flex-grow-1">
                 {% csrf_token %}
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
                     <label class="form-label small text-muted fw-semibold">Вставьте ваш исходный код (Python):</label>
-                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3" 
-                              style="min-height: 320px; background-color: #272822; color: #f8f8f2;" 
-                              placeholder="# Напишите ваш код здесь..." required>{{ submission.code|default_if_none:'' }}</textarea>
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3"
+                              style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
+                              placeholder="# Напишите ваш код здесь..." required {% if cooldown_hours %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="small text-muted">
                         Текущий статус: <strong>{{ submission.get_status_display }}</strong>
                     </span>
-                    <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">
+                    <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_hours %}disabled{% endif %}>
                         Отправить решение →
                     </button>
                 </div>

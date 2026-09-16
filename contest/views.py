@@ -1,13 +1,28 @@
+from datetime import timedelta
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.utils import timezone
 
 from .models import Task, Submission, Student, Course, Teacher
 from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
+
+SUBMISSION_COOLDOWN = timedelta(hours=24)
+
+
+def _cooldown_remaining(submission):
+    """Сколько ещё осталось ждать до повторной отправки этой задачи (или None, если можно отправлять)."""
+    if not submission.last_submitted_at:
+        return None
+    elapsed = timezone.now() - submission.last_submitted_at
+    if elapsed >= SUBMISSION_COOLDOWN:
+        return None
+    return SUBMISSION_COOLDOWN - elapsed
 
 
 @login_required
@@ -58,11 +73,19 @@ def task_detail(request, task_id):
             return redirect('all_tasks')
         submission = Submission.objects.create(student=student, task=task, status='IN_PROGRESS')
 
-    # ОБРАБОТКА ОТПРАВКИ КОДА (Ручная проверка)
+    cooldown = _cooldown_remaining(submission)
+
+    # ОБРАБОТКА ОТПРАВКИ КОДА (Ручная проверка) — не чаще одного раза в 24 часа
     if request.method == 'POST':
+        if cooldown:
+            hours_left = int(cooldown.total_seconds() // 3600) + 1
+            messages.warning(request, f'Эту задачу можно отправлять раз в 24 часа. Попробуйте снова через {hours_left} ч.')
+            return redirect('task_detail', task_id=task.id)
+
         code = request.POST.get('code', '')
         submission.code = code
-        submission.status = 'TESTING'  # Отправляем на проверку админу
+        submission.status = 'TESTING'  # Отправляем на проверку преподавателю
+        submission.last_submitted_at = timezone.now()
         submission.save()
 
         messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
@@ -71,6 +94,7 @@ def task_detail(request, task_id):
     context = {
         'task': task,
         'submission': submission,
+        'cooldown_hours': int(cooldown.total_seconds() // 3600) + 1 if cooldown else None,
     }
     return render(request, 'task_detail.html', context)
 
@@ -128,10 +152,17 @@ def submit_code(request, submission_id):
     """Сохранение кода (для быстрой формы в Kanban, если она используется)"""
     if request.method == 'POST':
         submission = get_object_or_404(Submission, id=submission_id, student__user=request.user)
-        code = request.POST.get('code', '')
 
+        cooldown = _cooldown_remaining(submission)
+        if cooldown:
+            hours_left = int(cooldown.total_seconds() // 3600) + 1
+            messages.warning(request, f'Эту задачу можно отправлять раз в 24 часа. Попробуйте снова через {hours_left} ч.')
+            return redirect('kanban')
+
+        code = request.POST.get('code', '')
         submission.code = code
         submission.status = 'TESTING'
+        submission.last_submitted_at = timezone.now()
         submission.save()
 
         messages.success(request, 'Код отправлен на проверку преподавателю!')
@@ -250,13 +281,24 @@ def courses_view(request):
 
 @login_required
 def course_detail(request, course_id):
-    """Темы и задачи внутри одного курса."""
+    """Темы и задачи внутри одного курса — со статусом решения для ученика."""
     course = get_object_or_404(Course, id=course_id)
     if not course.is_visible and not request.user.is_staff:
         messages.warning(request, 'Этот курс пока недоступен.')
         return redirect('courses')
 
-    topics = course.topics.prefetch_related('tasks').all()
+    topics = course.topics.prefetch_related('tasks__tags').all()
+
+    if not request.user.is_staff:
+        student = Student.objects.filter(user=request.user).first()
+        if student:
+            user_submissions = {
+                sub.task_id: sub for sub in Submission.objects.filter(student=student)
+            }
+            for topic in topics:
+                for task in topic.tasks.all():
+                    task.user_sub = user_submissions.get(task.id)
+
     return render(request, 'course_detail.html', {'course': course, 'topics': topics})
 
 

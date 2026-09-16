@@ -29,7 +29,10 @@ class Task(models.Model):
         ('B', 'Уровень B (Средний)'),
         ('C', 'Уровень C (Сложный)'),
     ]
-    test_cases = models.JSONField(default=list, help_text="Список словарей [{'input': '...', 'output': '...'}]")
+    test_cases = models.JSONField(
+        default=list, blank=True,
+        help_text="Список словарей [{'input': '...', 'output': '...'}] — необязательно, можно добавить позже"
+    )
     title = models.CharField(max_length=200, verbose_name="Название задачи")
     level = models.CharField(max_length=1, choices=LEVEL_CHOICES, verbose_name="Уровень")
     description = models.TextField(verbose_name="Описание")
@@ -38,7 +41,12 @@ class Task(models.Model):
     tags = models.ManyToManyField(Tag, related_name='tasks', verbose_name="Теги")
 
     def __str__(self):
-        return f"[{self.level}] {self.title}"
+        label = f"[{self.level}] {self.title}"
+        if self.pk:
+            tag_names = ", ".join(self.tags.values_list('name', flat=True))
+            if tag_names:
+                label = f"{label} ({tag_names})"
+        return label
 
 
 class Course(models.Model):
@@ -125,6 +133,9 @@ class Submission(models.Model):
     code = models.TextField(blank=True, null=True, verbose_name="Код ученика")
     score = models.IntegerField(default=0, verbose_name="Баллы (0-10)")
     teacher_comment = models.TextField(blank=True, null=True, help_text="Комментарий преподавателя")
+    last_submitted_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Последняя отправка на проверку"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
