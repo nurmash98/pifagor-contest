@@ -37,14 +37,31 @@
 
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Задачи темы</label>
-                    <select name="tasks" class="form-select" multiple size="12">
-                        {% for task in all_tasks %}
-                        <option value="{{ task.id }}" {% if task.id in selected_task_ids %}selected{% endif %}>
-                            [{{ task.level }}] {{ task.title }}{% if task.tags.all %} — {% for tag in task.tags.all %}#{{ tag.name }} {% endfor %}{% endif %}
-                        </option>
+
+                    <select id="tagFilterSelect" class="form-select form-select-sm mb-2" style="max-width: 260px;">
+                        <option value="">Фильтр по тегу: все</option>
+                        {% for tag in all_tags %}
+                        <option value="{{ tag.name }}">#{{ tag.name }}</option>
                         {% endfor %}
                     </select>
-                    <div class="form-text">Удерживайте Ctrl (Cmd на Mac), чтобы выбрать несколько задач.</div>
+
+                    <div id="taskChecklist" class="border rounded-3 p-2" style="max-height: 420px; overflow-y: auto;">
+                        {% for task in all_tasks %}
+                        <div class="form-check py-1 task-row" data-tags="|{% for tag in task.tags.all %}{{ tag.name }}|{% endfor %}">
+                            <input class="form-check-input" type="checkbox" name="tasks" value="{{ task.id }}" id="task-{{ task.id }}"
+                                   {% if task.id in selected_task_ids %}checked{% endif %}>
+                            <label class="form-check-label" for="task-{{ task.id }}">
+                                [{{ task.level }}] {{ task.title }}
+                                {% for tag in task.tags.all %}
+                                    <span class="badge bg-light text-dark border ms-1">#{{ tag.name }}</span>
+                                {% endfor %}
+                            </label>
+                        </div>
+                        {% empty %}
+                        <div class="text-muted small p-2">Задач пока нет.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="form-text">Отметьте галочками задачи, которые войдут в тему.</div>
                 </div>
 
                 <button type="submit" class="btn btn-pifagor-green px-4">
@@ -54,4 +71,22 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var filterSelect = document.getElementById('tagFilterSelect');
+    if (!filterSelect) return;
+    filterSelect.addEventListener('change', function () {
+        var tag = this.value;
+        document.querySelectorAll('#taskChecklist .task-row').forEach(function (row) {
+            if (!tag) {
+                row.style.display = '';
+                return;
+            }
+            var tags = row.getAttribute('data-tags') || '';
+            row.style.display = tags.indexOf('|' + tag + '|') !== -1 ? '' : 'none';
+        });
+    });
+})();
+</script>
 {% endblock %}

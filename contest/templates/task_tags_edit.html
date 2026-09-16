@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Теги: {{ task.title }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'task_tags_list' %}" class="text-decoration-none text-muted small">← Назад к списку задач</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ task.title }}</h4>
+            <p class="text-muted small mb-4">Уровень {{ task.level }}</p>
+
+            <form method="post" class="mb-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_tags">
+                <label class="form-label fw-semibold">Теги задачи</label>
+                <div class="border rounded-3 p-2 mb-2" style="max-height: 320px; overflow-y: auto;">
+                    {% for tag in all_tags %}
+                    <div class="form-check py-1">
+                        <input class="form-check-input" type="checkbox" name="tags" value="{{ tag.id }}" id="tag-{{ tag.id }}"
+                               {% if tag.id in selected_tag_ids %}checked{% endif %}>
+                        <label class="form-check-label" for="tag-{{ tag.id }}">#{{ tag.name }}</label>
+                    </div>
+                    {% empty %}
+                    <div class="text-muted small p-2">Тегов пока нет — добавьте первый ниже.</div>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-pifagor-green btn-sm px-3">Сохранить теги</button>
+            </form>
+
+            <hr>
+
+            <form method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_new_tag">
+                <input type="text" name="new_tag" class="form-control" placeholder="Новый тег, например: циклы">
+                <button type="submit" class="btn btn-pifagor-blue px-3">Создать и прикрепить</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
 
-from .models import Task, Submission, Student, Course, Teacher, Topic
+from .models import Task, Submission, Student, Course, Teacher, Topic, Tag
 from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -397,6 +397,7 @@ def topic_create(request, course_id):
 
     return render(request, 'topic_form.html', {
         'course': course, 'topic': None, 'all_tasks': all_tasks, 'selected_task_ids': set(),
+        'all_tags': Tag.objects.all(),
     })
 
 
@@ -425,6 +426,51 @@ def topic_edit(request, topic_id):
     return render(request, 'topic_form.html', {
         'course': course, 'topic': topic, 'all_tasks': all_tasks,
         'selected_task_ids': set(topic.tasks.values_list('id', flat=True)),
+        'all_tags': Tag.objects.all(),
+    })
+
+
+@staff_member_required
+def task_tags_list(request):
+    """Полный список всех задач для управления тегами — доступен любому учителю,
+    вне привязки к его классам или курсам."""
+    tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+
+    level_filter = request.GET.get('level', '')
+    if level_filter in ['A', 'B', 'C']:
+        tasks = tasks.filter(level=level_filter)
+
+    q = request.GET.get('q', '').strip()
+    if q:
+        tasks = tasks.filter(title__icontains=q)
+
+    return render(request, 'task_tags_list.html', {
+        'tasks': tasks, 'level_filter': level_filter, 'q': q,
+    })
+
+
+@staff_member_required
+def task_tags_edit(request, task_id):
+    """Изменение тегов одной задачи — доступно любому учителю для любой задачи."""
+    task = get_object_or_404(Task, id=task_id)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add_new_tag':
+            new_tag_name = request.POST.get('new_tag', '').strip()
+            if new_tag_name:
+                tag, _ = Tag.objects.get_or_create(name=new_tag_name)
+                task.tags.add(tag)
+                messages.success(request, f'Тег «{tag.name}» добавлен к задаче.')
+        else:
+            task.tags.set(request.POST.getlist('tags'))
+            messages.success(request, 'Теги задачи обновлены.')
+        return redirect('task_tags_edit', task_id=task.id)
+
+    return render(request, 'task_tags_edit.html', {
+        'task': task,
+        'all_tags': Tag.objects.all(),
+        'selected_tag_ids': set(task.tags.values_list('id', flat=True)),
     })
 
 

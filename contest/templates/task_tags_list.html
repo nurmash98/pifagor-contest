@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Теги задач - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a>
+</div>
+
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <h3 class="fw-bold" style="color: #1a1a4b;">Теги задач</h3>
+        <p class="text-muted small mb-0">Все задачи в базе — можно добавить, изменить или убрать теги у любой из них.</p>
+    </div>
+    <div class="col-md-6">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск по названию" value="{{ q }}">
+            <select name="level" class="form-select form-select-sm" style="max-width: 160px;">
+                <option value="">Все уровни</option>
+                <option value="A" {% if level_filter == 'A' %}selected{% endif %}>Уровень A</option>
+                <option value="B" {% if level_filter == 'B' %}selected{% endif %}>Уровень B</option>
+                <option value="C" {% if level_filter == 'C' %}selected{% endif %}>Уровень C</option>
+            </select>
+            <button type="submit" class="btn btn-outline-dark btn-sm">Найти</button>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+    <ul class="list-group list-group-flush">
+        {% for task in tasks %}
+        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+            <div>
+                {% if task.level == 'A' %}
+                    <span class="badge badge-level-A me-2">A</span>
+                {% elif task.level == 'B' %}
+                    <span class="badge badge-level-B me-2">B</span>
+                {% else %}
+                    <span class="badge badge-level-C me-2">C</span>
+                {% endif %}
+                <strong style="color: #1a1a4b;">{{ task.title }}</strong>
+                <div class="mt-1">
+                    {% for tag in task.tags.all %}
+                        <span class="badge bg-light text-dark border me-1">#{{ tag.name }}</span>
+                    {% empty %}
+                        <span class="text-muted small">без тегов</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <a href="{% url 'task_tags_edit' task.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить теги</a>
+        </li>
+        {% empty %}
+        <li class="list-group-item p-4 text-center text-muted">Задачи не найдены.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
