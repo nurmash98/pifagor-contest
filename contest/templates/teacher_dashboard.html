@@ -6,6 +6,40 @@
 <div class="row mt-4">
     <div class="col-12 mb-4 d-flex justify-content-between align-items-center">
         <h2 class="fw-bold" style="color: #1a1a4b;">👨‍🏫 Кабинет преподавателя</h2>
+        {% if teacher %}
+            <span class="text-muted small">Ваши классы: <strong>{{ teacher.classes|default:"не назначены" }}</strong></span>
+        {% endif %}
+    </div>
+
+    <!-- Мои курсы -->
+    <div class="col-12 mb-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+                <span>📚 {% if teacher %}Мои курсы{% else %}Все курсы{% endif %} ({{ my_courses.count }})</span>
+                <a href="{% url 'admin:contest_course_add' %}" class="btn btn-pifagor-blue btn-sm rounded-pill px-3">
+                    + Создать курс
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for course in my_courses %}
+                    <li class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong style="color: #1a1a4b;">{{ course.name }}</strong>
+                            {% if course.is_visible %}
+                                <span class="badge bg-success ms-2">Видно ученикам</span>
+                            {% else %}
+                                <span class="badge bg-secondary ms-2">Скрыт</span>
+                            {% endif %}
+                        </div>
+                        <a href="{% url 'admin:contest_course_change' course.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Редактировать</a>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item p-4 text-center text-muted">Курсов пока нет — создайте первый.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
     </div>
 
     <!-- Колонка 1: Требуют проверки -->

@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 
 class Student(models.Model):
@@ -44,6 +44,10 @@ class Task(models.Model):
 class Course(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название курса")
     description = models.TextField(blank=True, verbose_name="Описание")
+    is_visible = models.BooleanField(default=False, verbose_name="Видно ученикам",
+                                      help_text="Пока не включено — курс виден только учителям/админу")
+    created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='created_courses', verbose_name="Кем создан")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -68,6 +72,40 @@ class Topic(models.Model):
 
     def __str__(self):
         return f"{self.course.name} — {self.name}"
+
+
+class Teacher(models.Model):
+    """Профиль учителя. Создаётся только админом (суперпользователем) в Django admin —
+    сами учителя не могут регистрироваться и назначать других учителей."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    full_name = models.CharField(max_length=150, verbose_name="Имя и Фамилия")
+    classes = models.CharField(
+        max_length=255, blank=True,
+        verbose_name="Классы",
+        help_text="Классы этого учителя через запятую, например: 10А, 11Б"
+    )
+    courses = models.ManyToManyField(Course, blank=True, related_name='teachers', verbose_name="Курсы")
+
+    class Meta:
+        verbose_name = "Учитель"
+        verbose_name_plural = "Учителя"
+
+    def __str__(self):
+        return self.full_name
+
+    def class_list(self):
+        """Список классов учителя без пробелов, например ['10А', '11Б']."""
+        return [c.strip() for c in self.classes.split(',') if c.strip()]
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Учитель автоматически получает доступ в админку и нужные права,
+        # чтобы админу не пришлось настраивать это вручную каждый раз.
+        if not self.user.is_staff:
+            self.user.is_staff = True
+            self.user.save(update_fields=['is_staff'])
+        teachers_group, _ = Group.objects.get_or_create(name='Teachers')
+        self.user.groups.add(teachers_group)
 
 
 

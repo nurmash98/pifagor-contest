@@ -17,6 +17,10 @@ urlpatterns = [
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     path('profile/', views.profile_view, name='profile'),
 
+    # Курсы
+    path('courses/', views.courses_view, name='courses'),
+    path('courses/<int:course_id>/', views.course_detail, name='course_detail'),
+
     # Авторизация и регистрация
     path('register/', views.register, name='register'),
     path('login/', views.login_view, name='login'),

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ course.name }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'courses' %}" class="text-decoration-none text-muted small">← Назад к курсам</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-start mb-2">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">{{ course.name }}</h3>
+    {% if request.user.is_staff and not course.is_visible %}
+        <span class="badge bg-secondary">Скрыт от учеников</span>
+    {% endif %}
+</div>
+<p class="text-muted mb-4">{{ course.description|default:"" }}</p>
+
+{% for topic in topics %}
+<div class="card border-0 shadow-sm rounded-4 mb-3">
+    <div class="card-header bg-white fw-bold py-3" style="color: #1a1a4b;">{{ topic.name }}</div>
+    <ul class="list-group list-group-flush">
+        {% for task in topic.tasks.all %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <a href="{% url 'task_detail' task.id %}" class="text-decoration-none fw-semibold" style="color: #1a1a4b;">
+                {{ task.title }}
+            </a>
+            {% if task.level == 'A' %}
+                <span class="badge badge-level-A">Уровень A</span>
+            {% elif task.level == 'B' %}
+                <span class="badge badge-level-B">Уровень B</span>
+            {% else %}
+                <span class="badge badge-level-C">Уровень C</span>
+            {% endif %}
+        </li>
+        {% empty %}
+        <li class="list-group-item text-muted">В этой теме пока нет задач.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% empty %}
+<div class="card border-0 shadow-sm rounded-4 p-5 text-center text-muted">
+    В этом курсе пока нет тем.
+</div>
+{% endfor %}
+{% endblock %}

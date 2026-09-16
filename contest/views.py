@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.models import User
 from django.contrib import messages
 
-from .models import Task, Submission, Student
+from .models import Task, Submission, Student, Course, Teacher
 from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -239,17 +239,50 @@ def logout_view(request):
     return redirect('login')
 
 
+@login_required
+def courses_view(request):
+    """Каталог курсов, видимых ученикам (и открытый учителям/админу для проверки)."""
+    courses = Course.objects.prefetch_related('topics__tasks')
+    if not request.user.is_staff:
+        courses = courses.filter(is_visible=True)
+    return render(request, 'courses.html', {'courses': courses})
+
+
+@login_required
+def course_detail(request, course_id):
+    """Темы и задачи внутри одного курса."""
+    course = get_object_or_404(Course, id=course_id)
+    if not course.is_visible and not request.user.is_staff:
+        messages.warning(request, 'Этот курс пока недоступен.')
+        return redirect('courses')
+
+    topics = course.topics.prefetch_related('tasks').all()
+    return render(request, 'course_detail.html', {'course': course, 'topics': topics})
+
+
 @staff_member_required
 def teacher_dashboard(request):
     """Кабинет преподавателя: очередь на проверку и последние проверенные."""
-    # Задачи, ожидающие проверки
-    pending_submissions = Submission.objects.filter(status='TESTING').order_by('updated_at')
+    teacher = None if request.user.is_superuser else Teacher.objects.filter(user=request.user).first()
 
-    # Уже проверенные задачи (последние 20)
-    graded_submissions = Submission.objects.filter(status='DONE').order_by('-updated_at')[:20]
+    pending_submissions = Submission.objects.filter(status='TESTING')
+    graded_submissions = Submission.objects.filter(status='DONE')
+    students_qs = Student.objects.all()
+    my_courses = Course.objects.all()
 
-    # Лидерборд для учителя (Топ-10)
-    top_students = Student.objects.annotate(
+    if teacher is not None:
+        # Учитель видит только очередь и статистику по своим классам и курсам.
+        class_list = teacher.class_list()
+        pending_submissions = pending_submissions.filter(student__school_class__in=class_list)
+        graded_submissions = graded_submissions.filter(student__school_class__in=class_list)
+        students_qs = students_qs.filter(school_class__in=class_list)
+        my_courses = teacher.courses.all()
+
+    pending_submissions = pending_submissions.order_by('updated_at')
+    graded_submissions = graded_submissions.order_by('-updated_at')[:20]
+
+    # Лидерборд (Топ-10) — по всем ученикам для админа, по своим классам для учителя
+    top_students = students_qs.annotate(
         total_score=Sum('submissions__score', filter=Q(submissions__status='DONE')),
         solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
     ).order_by('-total_score')[:10]
@@ -258,6 +291,8 @@ def teacher_dashboard(request):
         'pending_submissions': pending_submissions,
         'graded_submissions': graded_submissions,
         'top_students': top_students,
+        'teacher': teacher,
+        'my_courses': my_courses,
     }
     return render(request, 'teacher_dashboard.html', context)
 
@@ -266,6 +301,13 @@ def teacher_dashboard(request):
 def grade_submission(request, submission_id):
     """Страница проверки конкретного решения."""
     submission = get_object_or_404(Submission, id=submission_id)
+
+    # Учитель проверяет только заявки своих классов — чужие ему недоступны.
+    if not request.user.is_superuser:
+        teacher = Teacher.objects.filter(user=request.user).first()
+        if teacher is not None and submission.student.school_class not in teacher.class_list():
+            messages.error(request, 'Это не ваш класс — проверка недоступна.')
+            return redirect('teacher_dashboard')
 
     if request.method == 'POST':
         score = request.POST.get('score', 0)
