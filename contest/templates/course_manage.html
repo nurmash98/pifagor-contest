@@ -3,8 +3,9 @@
 {% block title %}{{ course.name }} - управление{% endblock %}
 
 {% block content %}
-<div class="mb-3">
+<div class="mb-3 d-flex justify-content-between align-items-center">
     <a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a>
+    <a href="{% url 'course_analytics' course.id %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📊 Анализ курса</a>
 </div>
 
 <div class="row g-4">
