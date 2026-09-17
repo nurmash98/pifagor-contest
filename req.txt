@@ -2,6 +2,7 @@ asgiref==3.12.1
 Django==6.1.1
 sqlparse==0.6.0
 
-# Продакшен-деплой (сервер): WSGI-сервер и драйвер PostgreSQL
+# Продакшен-деплой (сервер): WSGI-сервер, драйвер PostgreSQL, раздача статики
 gunicorn==23.0.0
 psycopg2-binary==2.9.10
+whitenoise==6.8.2

@@ -51,6 +51,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Отдаёт статику прямо из Gunicorn — нужно для хостингов вроде Render,
+    # где нет отдельного Nginx перед приложением. На Oracle-деплое с Nginx
+    # не мешает: запросы к /static/ там перехватывает сам Nginx раньше.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -95,6 +99,8 @@ if os.environ.get('DJANGO_DB_ENGINE') == 'postgres':
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
             'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            # Некоторые бесплатные Postgres-хостинги (например, Neon) требуют SSL.
+            'OPTIONS': {'sslmode': os.environ.get('POSTGRES_SSLMODE', 'prefer')},
         }
     }
 else:
@@ -143,8 +149,18 @@ USE_TZ = True
 STATIC_URL = 'static/'
 # Статика приложений (например, contest/static/) находится автоматически через
 # AppDirectoriesFinder, отдельная папка static/ в корне проекта не используется.
-# STATIC_ROOT — куда `collectstatic` соберёт все файлы для раздачи Nginx на сервере.
+# STATIC_ROOT — куда `collectstatic` соберёт все файлы для раздачи (Nginx на
+# Oracle-сервере или WhiteNoise на хостингах без отдельного веб-сервера).
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
