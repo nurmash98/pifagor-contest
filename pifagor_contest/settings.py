@@ -19,13 +19,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# Все настройки ниже можно переопределить переменными окружения на сервере,
+# при этом локальная разработка (без переменных окружения) продолжает
+# работать как раньше — с DEBUG=True и базой SQLite.
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-16ns0#0b0k7%xykmhqe(^&3@j8=9sesr8egsmb5=ej!5(3x+7u'
+# На сервере обязательно задайте свой DJANGO_SECRET_KEY через переменную окружения.
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-16ns0#0b0k7%xykmhqe(^&3@j8=9sesr8egsmb5=ej!5(3x+7u',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+# На сервере задайте DJANGO_ALLOWED_HOSTS, например: "1.2.3.4,pifagor.example.com"
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
 
 # Application definition
@@ -72,13 +81,29 @@ WSGI_APPLICATION = 'pifagor_contest.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+#
+# По умолчанию — SQLite (как раньше, для локальной разработки).
+# На сервере задайте DJANGO_DB_ENGINE=postgres и остальные POSTGRES_* переменные,
+# чтобы использовать PostgreSQL (нужен пакет psycopg2-binary из req.txt).
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get('DJANGO_DB_ENGINE') == 'postgres':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'pifagor'),
+            'USER': os.environ.get('POSTGRES_USER', 'pifagor'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -116,7 +141,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+# Статика приложений (например, contest/static/) находится автоматически через
+# AppDirectoriesFinder, отдельная папка static/ в корне проекта не используется.
+# STATIC_ROOT — куда `collectstatic` соберёт все файлы для раздачи Nginx на сервере.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

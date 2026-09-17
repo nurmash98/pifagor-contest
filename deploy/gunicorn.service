@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn daemon for Pifagor Contest
+After=network.target postgresql.service
+
+[Service]
+User=__APP_USER__
+Group=__APP_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/deploy/pifagor.env
+ExecStart=__APP_DIR__/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 pifagor_contest.wsgi:application
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
