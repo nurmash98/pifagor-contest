@@ -17,7 +17,7 @@
             <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ student.full_name }}</h4>
             <p class="text-muted small mb-4">Класс: {{ student.school_class }}</p>
 
-            <!-- Блок статистики со средним баллом -->
+            <!-- Блок статистики: решено задач и общий балл (средний балл не показываем) -->
             <div class="d-flex justify-content-between border-top pt-3 text-center">
                 <div class="px-2">
                     <h4 class="mb-0 fw-bold" style="color: #1a1a4b;">{{ solved_count }}</h4>
@@ -26,12 +26,7 @@
                 <div class="vr"></div>
                 <div class="px-2">
                     <h4 class="mb-0 fw-bold" style="color: #008b42;">{{ total_score }}</h4>
-                    <small class="text-muted" style="font-size: 0.75rem;">Баллов</small>
-                </div>
-                <div class="vr"></div>
-                <div class="px-2">
-                    <h4 class="mb-0 fw-bold text-primary">{{ average_score }}</h4>
-                    <small class="text-muted" style="font-size: 0.75rem;">Ср. балл</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">Общий балл</small>
                 </div>
             </div>
 

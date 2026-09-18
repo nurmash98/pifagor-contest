@@ -6,7 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField
+from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField, F
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -25,17 +25,20 @@ def _grade_of(school_class):
     return match.group() if match else (school_class or '').strip()
 
 
-# Очки в лидерборде за решённую задачу зависят только от её уровня сложности
-# (не от оценки учителя за качество решения): лёгкая — 1, средняя — 2, сложная — 3.
-LEADERBOARD_POINTS_BY_LEVEL = {'A': 1, 'B': 2, 'C': 3}
+# Общий балл в лидерборде = сумма (коэффициент сложности задачи * оценка учителя за неё).
+# Коэффициент зависит от уровня задачи: лёгкая — 1, средняя — 2, сложная — 3.
+LEADERBOARD_COEFFICIENT_BY_LEVEL = {'A': 1, 'B': 2, 'C': 3}
 
-LEADERBOARD_POINTS_CASE = Case(
-    When(submissions__task__level='A', then=Value(LEADERBOARD_POINTS_BY_LEVEL['A'])),
-    When(submissions__task__level='B', then=Value(LEADERBOARD_POINTS_BY_LEVEL['B'])),
-    When(submissions__task__level='C', then=Value(LEADERBOARD_POINTS_BY_LEVEL['C'])),
+LEADERBOARD_COEFFICIENT_CASE = Case(
+    When(submissions__task__level='A', then=Value(LEADERBOARD_COEFFICIENT_BY_LEVEL['A'])),
+    When(submissions__task__level='B', then=Value(LEADERBOARD_COEFFICIENT_BY_LEVEL['B'])),
+    When(submissions__task__level='C', then=Value(LEADERBOARD_COEFFICIENT_BY_LEVEL['C'])),
     default=Value(0),
     output_field=IntegerField(),
 )
+
+# score * коэффициент — очки за одну решённую задачу.
+LEADERBOARD_SCORE_EXPR = F('submissions__score') * LEADERBOARD_COEFFICIENT_CASE
 
 
 def _cooldown_remaining(submission):
@@ -264,22 +267,25 @@ def submit_code(request, submission_id):
 
 @login_required
 def profile_view(request):
-    """Профиль ученика с расчетом среднего балла."""
+    """Профиль ученика: общий балл (как в лидерборде — коэффициент сложности * оценка)
+    и количество решённых задач. Средний балл здесь не показывается."""
     student = get_object_or_404(Student, user=request.user)
 
-    solved_submissions = Submission.objects.filter(student=student, status='DONE').order_by('-updated_at')
+    solved_submissions = Submission.objects.filter(
+        student=student, status='DONE'
+    ).select_related('task').order_by('-updated_at')
 
     solved_count = solved_submissions.count()
-    total_score = sum(sub.score for sub in solved_submissions)
-
-    average_score = round(total_score / solved_count, 1) if solved_count > 0 else 0
+    total_score = sum(
+        sub.score * LEADERBOARD_COEFFICIENT_BY_LEVEL.get(sub.task.level, 0)
+        for sub in solved_submissions
+    )
 
     context = {
         'student': student,
         'solved_submissions': solved_submissions,
         'solved_count': solved_count,
         'total_score': total_score,
-        'average_score': average_score,
     }
     return render(request, 'profile.html', context)
 
@@ -309,10 +315,9 @@ def leaderboard(request):
             scope_label = selected_class or ', '.join(teacher_classes)
             limit = None  # Учитель видит полный список своих классов, без топ-10
 
-    # Очки за решённую задачу зависят от её уровня сложности (1/2/3 — лёгкая/средняя/сложная),
-    # а не от оценки учителя за качество решения (та используется только в анализе по курсу).
+    # Общий балл = сумма (коэффициент сложности задачи * оценка учителя) по всем решённым задачам.
     students_query = Student.objects.annotate(
-        total_score=Sum(LEADERBOARD_POINTS_CASE, filter=Q(submissions__status='DONE')),
+        total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
         solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
     ).order_by('-total_score', '-solved_count')
 
