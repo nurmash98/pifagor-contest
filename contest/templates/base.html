@@ -97,6 +97,16 @@
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav align-items-center gap-2">
 
+                    <!-- Переключатель языка условий задач -->
+                    <li class="nav-item me-2">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Язык условий задач">
+                            <a href="{% url 'set_content_lang' 'ru' %}?back={{ request.get_full_path|urlencode }}"
+                               class="btn btn-outline-secondary {% if content_lang == 'ru' %}active{% endif %}">RU</a>
+                            <a href="{% url 'set_content_lang' 'kk' %}?back={{ request.get_full_path|urlencode }}"
+                               class="btn btn-outline-secondary {% if content_lang == 'kk' %}active{% endif %}">KZ</a>
+                        </div>
+                    </li>
+
                     {% if request.user.is_authenticated %}
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — ПРЕПОДАВАТЕЛЬ (АДМИН) -->

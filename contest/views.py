@@ -46,17 +46,47 @@ def _safe_back_url(request):
     return None
 
 
+def _get_content_lang(request):
+    """Текущий выбранный язык условий задач ('ru' или 'kk'), из сессии пользователя."""
+    lang = request.session.get('content_lang', 'ru')
+    return lang if lang in ('ru', 'kk') else 'ru'
+
+
+def _apply_task_language(tasks, lang):
+    """Проставляет task.display_title/description/input_example/output_example
+    с учётом выбранного языка — если казахского перевода нет, используем русский."""
+    for task in tasks:
+        task.display_title = task.get_display_title(lang)
+        task.display_description = task.get_display_description(lang)
+        task.display_input_example = task.get_display_input_example(lang)
+        task.display_output_example = task.get_display_output_example(lang)
+    return tasks
+
+
+def set_content_lang(request, lang):
+    """Переключатель языка условий задач (RU/KZ) в шапке сайта — сохраняем в сессии
+    и возвращаем пользователя туда, откуда он переключил язык."""
+    if lang in ('ru', 'kk'):
+        request.session['content_lang'] = lang
+    back_url = _safe_back_url(request)
+    return redirect(back_url or 'all_tasks')
+
+
 @login_required
 def all_tasks_view(request):
     """Главная страница: каталог всех задач в виде таблицы.
     Ученику показываем его статус по каждой задаче; преподавателю — тот же каталог
     в режиме просмотра (без статусов решения, которых у него просто нет)."""
     student = Student.objects.filter(user=request.user).first()
+    lang = _get_content_lang(request)
 
     level_filter = request.GET.get('level', '')
     tasks = Task.objects.prefetch_related('tags').all()
     if level_filter in ['A', 'B', 'C']:
         tasks = tasks.filter(level=level_filter)
+
+    tasks = list(tasks)
+    _apply_task_language(tasks, lang)
 
     if student is not None:
         # Привязываем существующие решения ученика к задачам
@@ -86,6 +116,8 @@ def task_detail(request, task_id):
     task = get_object_or_404(Task, id=task_id)
     student = Student.objects.filter(user=request.user).first()
     back_url = _safe_back_url(request)
+    lang = _get_content_lang(request)
+    _apply_task_language([task], lang)
 
     if student is None:
         # Преподаватель/админ — только просмотр условия задачи
@@ -145,16 +177,23 @@ def kanban_board(request):
     if request.user.is_staff:
         return redirect('teacher_dashboard')
     student = get_object_or_404(Student, user=request.user)
+    lang = _get_content_lang(request)
 
     all_tasks = Task.objects.all()
-    submissions = Submission.objects.filter(student=student)
+    submissions = Submission.objects.select_related('task').filter(student=student)
 
+    # Оставляем это QuerySet-ами (не списками), т.к. шаблон вызывает .count на них —
+    # но принудительно вычисляем их один раз, чтобы проставить язык задачам и закешировать результат.
     in_progress = submissions.filter(status='IN_PROGRESS')
     testing = submissions.filter(status='TESTING')
     done = submissions.filter(status='DONE')
+    _apply_task_language(
+        [sub.task for sub in list(in_progress) + list(testing) + list(done)], lang
+    )
 
     active_task_ids = submissions.values_list('task_id', flat=True)
     backlog_tasks = all_tasks.exclude(id__in=active_task_ids)
+    _apply_task_language(list(backlog_tasks), lang)
 
     context = {
         'student': student,
@@ -374,6 +413,9 @@ def course_detail(request, course_id):
         return redirect('courses')
 
     topics = course.topics.prefetch_related('tasks__tags').all()
+    lang = _get_content_lang(request)
+    for topic in topics:
+        _apply_task_language(topic.tasks.all(), lang)
 
     if not request.user.is_staff:
         student = Student.objects.filter(user=request.user).first()

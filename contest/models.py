@@ -42,6 +42,25 @@ class Task(models.Model):
     output_example = models.TextField(verbose_name="Пример вывода")
     tags = models.ManyToManyField(Tag, related_name='tasks', verbose_name="Теги")
 
+    # Казахская версия условия — необязательна. Если не заполнена, сайт
+    # показывает русский текст (переключатель RU/KZ в шапке сайта).
+    title_kk = models.CharField(max_length=200, blank=True, verbose_name="Атауы (қазақша)")
+    description_kk = models.TextField(blank=True, verbose_name="Сипаттамасы (қазақша)")
+    input_example_kk = models.TextField(blank=True, verbose_name="Кіріс мысалы (қазақша)")
+    output_example_kk = models.TextField(blank=True, verbose_name="Шығыс мысалы (қазақша)")
+
+    def get_display_title(self, lang='ru'):
+        return self.title_kk if lang == 'kk' and self.title_kk else self.title
+
+    def get_display_description(self, lang='ru'):
+        return self.description_kk if lang == 'kk' and self.description_kk else self.description
+
+    def get_display_input_example(self, lang='ru'):
+        return self.input_example_kk if lang == 'kk' and self.input_example_kk else self.input_example
+
+    def get_display_output_example(self, lang='ru'):
+        return self.output_example_kk if lang == 'kk' and self.output_example_kk else self.output_example
+
     def __str__(self):
         label = f"[{self.level}] {self.title}"
         if self.pk:

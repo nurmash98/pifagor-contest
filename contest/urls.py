@@ -27,6 +27,9 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
 
+    # Переключатель языка условий задач (RU/KZ)
+    path('lang/<str:lang>/', views.set_content_lang, name='set_content_lang'),
+
 # Кабинет преподавателя
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path('teacher/grade/<int:submission_id>/', views.grade_submission, name='grade_submission'),

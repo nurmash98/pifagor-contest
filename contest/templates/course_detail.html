@@ -43,7 +43,7 @@
                     {% endif %}
                 {% endif %}
                 <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="text-decoration-none fw-semibold" style="color: #1a1a4b;">
-                    {{ task.title }}
+                    {{ task.display_title }}
                 </a>
             </div>
             {% if task.level == 'A' %}

@@ -50,10 +50,10 @@
                         <td class="px-4 text-muted fw-bold">{{ forloop.counter }}</td>
                         <td class="py-3">
                             <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="fw-bold text-decoration-none" style="color: #1a1a4b;">
-                                {{ task.title }}
+                                {{ task.display_title }}
                             </a>
                             <div class="text-muted small text-truncate" style="max-width: 400px;">
-                                {{ task.description }}
+                                {{ task.display_description }}
                             </div>
                             {% if task.tags.all %}
                             <div class="mt-1">
