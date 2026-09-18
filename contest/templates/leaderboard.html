@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
-{% block title %}Лидерборд - Pifagor Contest{% endblock %}
+{% block title %}{% t "Лидерборд" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,26 +9,26 @@
 
         <div class="text-center mb-4 mt-3">
             <h2 class="fw-bold" style="color: #1a1a4b;">
-                🏆 Рейтинг учеников{% if scope_label %} — {{ scope_label }}{% endif %}{% if not is_full_list %} (Топ 10){% endif %}
+                🏆 {% t "Рейтинг учеников" %}{% if scope_label %} — {{ scope_label }}{% endif %}{% if not is_full_list %} ({% t "Топ 10" %}){% endif %}
             </h2>
             <p class="text-muted mb-0">
                 {% if my_grade %}
-                    Сравнение только среди вашей параллели ({{ my_grade }}А, {{ my_grade }}Б и т.д.)
+                    {% t "Сравнение только среди вашей параллели" %} ({{ my_grade }}А, {{ my_grade }}Б {% t "и т.д." %})
                 {% elif is_full_list %}
-                    Все ученики{% if selected_class %} класса {{ selected_class }}{% else %} ваших классов{% endif %}, отсортированы по общему баллу
+                    {% t "Все ученики" %}{% if selected_class %} {% t "класса" %} {{ selected_class }}{% else %} {% t "ваших классов" %}{% endif %}, {% t "отсортированы по общему баллу" %}
                 {% else %}
-                    Ранжирование по общей сумме баллов за все решенные задачи
+                    {% t "Ранжирование по общей сумме баллов за все решенные задачи" %}
                 {% endif %}
             </p>
             <p class="text-muted small mb-0">
-                Общий балл = оценка учителя × коэффициент сложности задачи (лёгкая ×1, средняя ×2, сложная ×3), просуммировано по всем решённым задачам.
+                {% t "Общий балл = оценка учителя × коэффициент сложности задачи (лёгкая ×1, средняя ×2, сложная ×3), просуммировано по всем решённым задачам." %}
             </p>
         </div>
 
         {% if teacher_classes %}
         <div class="text-center mb-4">
             <div class="btn-group shadow-sm" role="group">
-                <a href="{% url 'leaderboard' %}" class="btn btn-outline-dark btn-sm {% if not selected_class %}active{% endif %}">Все классы</a>
+                <a href="{% url 'leaderboard' %}" class="btn btn-outline-dark btn-sm {% if not selected_class %}active{% endif %}">{% t "Все классы" %}</a>
                 {% for cls in teacher_classes %}
                 <a href="{% url 'leaderboard' %}?class={{ cls|urlencode }}" class="btn btn-outline-primary btn-sm {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
                 {% endfor %}
@@ -40,11 +41,11 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead style="background-color: #f4f6f9; color: #1a1a4b;">
                         <tr>
-                            <th class="py-4 text-center" style="width: 10%;">Место</th>
-                            <th class="py-4">Ученик</th>
-                            <th class="py-4 text-center">Класс</th>
-                            <th class="py-4 text-center">Решено задач</th>
-                            <th class="py-4 text-center pe-4">Общий балл</th>
+                            <th class="py-4 text-center" style="width: 10%;">{% t "Место" %}</th>
+                            <th class="py-4">{% t "Ученик" %}</th>
+                            <th class="py-4 text-center">{% t "Класс" %}</th>
+                            <th class="py-4 text-center">{% t "Решено задач" %}</th>
+                            <th class="py-4 text-center pe-4">{% t "Общий балл" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -73,7 +74,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="5" class="text-center py-5 text-muted">
-                                Рейтинг пока пуст. Будьте первым, кто решит задачу!
+                                {% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}
                             </td>
                         </tr>
                         {% endfor %}

@@ -1,15 +1,16 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
-{% block title %}Доска задач - Pifagor Contest{% endblock %}
+{% block title %}{% t "Kanban Доска" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="row gx-4">
-    
+
     <!-- Колонка 1: Бэклог (Доступные задачи) -->
     <div class="col-md-3">
         <div class="kanban-col">
             <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center" style="color: #1a1a4b;">
-                Доступные
+                {% t "Доступные" %}
                 <span class="badge bg-secondary rounded-pill">{{ backlog_tasks.count }}</span>
             </h5>
 
@@ -28,12 +29,12 @@
                     </div>
                     <p class="card-text text-muted small mb-3">{{ task.display_description|truncatewords:12 }}</p>
                     <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-blue btn-sm w-100">
-                        Взять задачу →
+                        {% t "Взять задачу →" %}
                     </a>
                 </div>
             </div>
             {% empty %}
-            <div class="text-center text-muted small mt-4">Все задачи уже в работе или решены</div>
+            <div class="text-center text-muted small mt-4">{% t "Все задачи уже в работе или решены" %}</div>
             {% endfor %}
         </div>
     </div>
@@ -42,7 +43,7 @@
     <div class="col-md-3">
         <div class="kanban-col" style="background-color: #e3f2fd;">
             <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-primary">
-                В работе
+                {% t "В работе" %}
                 <span class="badge bg-primary rounded-pill">{{ in_progress.count }} / 2</span>
             </h5>
 
@@ -63,13 +64,13 @@
                     <p class="card-text text-muted small mb-3">{{ sub.task.display_description|truncatewords:10 }}</p>
 
                     <a href="{% url 'task_detail' sub.task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-green btn-sm w-100">
-                        Перейти к решению →
+                        {% t "Перейти к решению →" %}
                     </a>
                 </div>
             </div>
             {% empty %}
             <div class="text-center text-muted small mt-4">
-                Выберите задачу из каталога или первой колонки
+                {% t "Выберите задачу из каталога или первой колонки" %}
             </div>
             {% endfor %}
         </div>
@@ -79,7 +80,7 @@
     <div class="col-md-3">
         <div class="kanban-col" style="background-color: #fff3cd;">
             <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-warning">
-                На проверке
+                {% t "На проверке" %}
                 <span class="badge bg-warning text-dark rounded-pill">{{ testing.count }}</span>
             </h5>
 
@@ -88,11 +89,11 @@
                 <div class="card-body p-3 text-center">
                     <h6 class="card-title fw-bold mb-2" style="color: #1a1a4b;">{{ sub.task.display_title }}</h6>
                     <div class="spinner-border text-warning spinner-border-sm mb-2" role="status"></div>
-                    <p class="small text-muted mb-0">Тестирование кода...</p>
+                    <p class="small text-muted mb-0">{% t "Тестирование кода..." %}</p>
                 </div>
             </div>
             {% empty %}
-            <div class="text-center text-muted small mt-4">Нет задач на проверке</div>
+            <div class="text-center text-muted small mt-4">{% t "Нет задач на проверке" %}</div>
             {% endfor %}
         </div>
     </div>
@@ -101,7 +102,7 @@
     <div class="col-md-3">
         <div class="kanban-col" style="background-color: #d4edda;">
             <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center text-success">
-                Решено
+                {% t "Решено" %}
                 <span class="badge bg-success rounded-pill">{{ done.count }}</span>
             </h5>
 
@@ -114,11 +115,11 @@
                             {{ sub.score }}/10
                         </h5>
                     </div>
-                    <p class="small text-muted mt-2 mb-0">Решено: {{ sub.updated_at|date:"d.m.Y H:i" }}</p>
+                    <p class="small text-muted mt-2 mb-0">{% t "Решено:" %} {{ sub.updated_at|date:"d.m.Y H:i" }}</p>
                 </div>
             </div>
             {% empty %}
-            <div class="text-center text-muted small mt-4">Пока нет решенных задач</div>
+            <div class="text-center text-muted small mt-4">{% t "Пока нет решенных задач" %}</div>
             {% endfor %}
         </div>
     </div>

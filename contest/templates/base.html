@@ -1,5 +1,6 @@
+{% load ui_i18n %}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -113,35 +114,35 @@
                         {% if request.user.is_staff %}
                             <li class="nav-item me-3">
                                 <a class="btn btn-warning btn-sm fw-bold rounded-pill px-3" href="{% url 'teacher_dashboard' %}">
-                                    <i class="bi bi-briefcase-fill me-1"></i> Кабинет преподавателя
+                                    <i class="bi bi-briefcase-fill me-1"></i> {% t "Кабинет преподавателя" %}
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">Все задачи</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">{% t "Все задачи" %}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">Курсы</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">{% t "Курсы" %}</a>
                             </li>
                             <li class="nav-item me-3">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">Лидерборд</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>
                             </li>
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->
                         {% else %}
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">Все задачи</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">{% t "Все задачи" %}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">Курсы</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">{% t "Курсы" %}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'kanban' %}">Kanban Доска</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'kanban' %}">{% t "Kanban Доска" %}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">Лидерборд</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'profile' %}">Профиль</a>
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'profile' %}">{% t "Профиль" %}</a>
                             </li>
                         {% endif %}
 
@@ -156,16 +157,16 @@
                             </span>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-outline-danger btn-sm rounded-pill px-3" href="{% url 'logout' %}">Выйти</a>
+                            <a class="btn btn-outline-danger btn-sm rounded-pill px-3" href="{% url 'logout' %}">{% t "Выйти" %}</a>
                         </li>
 
                     <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ НЕ АВТОРИЗОВАН -->
                     {% else %}
                         <li class="nav-item">
-                            <a class="btn btn-outline-primary btn-sm rounded-pill px-3 me-2" href="{% url 'login' %}">Войти</a>
+                            <a class="btn btn-outline-primary btn-sm rounded-pill px-3 me-2" href="{% url 'login' %}">{% t "Войти" %}</a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-pifagor-green btn-sm rounded-pill px-3" href="{% url 'register' %}">Регистрация</a>
+                            <a class="btn btn-pifagor-green btn-sm rounded-pill px-3" href="{% url 'register' %}">{% t "Регистрация" %}</a>
                         </li>
                     {% endif %}
                 </ul>

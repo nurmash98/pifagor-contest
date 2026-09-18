@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
 {% block title %}{{ task.display_title }} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="mb-3">
-    <a href="{{ back_url }}" class="text-decoration-none text-muted small">← Назад</a>
+    <a href="{{ back_url }}" class="text-decoration-none text-muted small">← {% t "Назад" %}</a>
 </div>
 
 <div class="row g-4">
@@ -14,11 +15,11 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3 class="fw-bold mb-0" style="color: #1a1a4b;">{{ task.display_title }}</h3>
                 {% if task.level == 'A' %}
-                    <span class="badge badge-level-A px-3 py-2">Уровень A</span>
+                    <span class="badge badge-level-A px-3 py-2">{% t "Уровень A" %}</span>
                 {% elif task.level == 'B' %}
-                    <span class="badge badge-level-B px-3 py-2">Уровень B</span>
+                    <span class="badge badge-level-B px-3 py-2">{% t "Уровень B" %}</span>
                 {% else %}
-                    <span class="badge badge-level-C px-3 py-2">Уровень C</span>
+                    <span class="badge badge-level-C px-3 py-2">{% t "Уровень C" %}</span>
                 {% endif %}
             </div>
 
@@ -30,20 +31,20 @@
             </div>
             {% endif %}
 
-            <h6 class="fw-bold text-muted mt-3 mb-2">Условие задачи:</h6>
+            <h6 class="fw-bold text-muted mt-3 mb-2">{% t "Условие задачи:" %}</h6>
             <p class="lh-lg" style="color: #2c3e50;">{{ task.display_description|linebreaksbr }}</p>
 
             <!-- Примеры входных и выходных данных -->
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
                     <div class="bg-light p-3 rounded-3 border">
-                        <span class="fw-bold text-muted small d-block mb-1">Пример ввода (Input):</span>
+                        <span class="fw-bold text-muted small d-block mb-1">{% t "Пример ввода (Input):" %}</span>
                         <code class="text-dark fs-6">{{ task.display_input_example }}</code>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="bg-light p-3 rounded-3 border">
-                        <span class="fw-bold text-muted small d-block mb-1">Пример вывода (Output):</span>
+                        <span class="fw-bold text-muted small d-block mb-1">{% t "Пример вывода (Output):" %}</span>
                         <code class="text-dark fs-6">{{ task.display_output_example }}</code>
                     </div>
                 </div>
@@ -52,7 +53,7 @@
 
         <!-- Полезные онлайн IDE -->
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
-            <h6 class="fw-bold mb-3" style="color: #1a1a4b;">🛠 Решайте и проверяйте задачи на этих IDE:</h6>
+            <h6 class="fw-bold mb-3" style="color: #1a1a4b;">🛠 {% t "Решайте и проверяйте задачи на этих IDE:" %}</h6>
             <ul class="list-unstyled mb-0">
                 <li class="mb-2">
                     🔹 <a href="https://onecompiler.com/python" target="_blank" rel="noopener noreferrer" class="text-decoration-none fw-semibold" style="color: #008b42;">OneCompiler (onecompiler.com)</a>
@@ -74,8 +75,8 @@
         <div class="alert alert-danger border-0 shadow-sm rounded-4 p-3 d-flex align-items-center" role="alert">
             <div class="fs-3 me-3">⚠️</div>
             <div>
-                <strong class="d-block mb-1">Важно: Честное решение</strong>
-                Чтобы не обманывать себя, не используйте ИИ — за это будут снижены баллы.
+                <strong class="d-block mb-1">{% t "Важно: Честное решение" %}</strong>
+                {% t "Чтобы не обманывать себя, не используйте ИИ — за это будут снижены баллы." %}
             </div>
         </div>
         {% endif %}
@@ -85,36 +86,36 @@
     <div class="col-lg-6">
         {% if readonly %}
             <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
-                <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Просмотр преподавателя</h5>
+                <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Просмотр преподавателя" %}</h5>
                 <p class="text-muted mb-0">
-                    Вы просматриваете задачу как преподаватель. Форма отправки решения доступна только ученикам.
+                    {% t "Вы просматриваете задачу как преподаватель. Форма отправки решения доступна только ученикам." %}
                 </p>
             </div>
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
-            <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Отправка решения</h5>
+            <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
 
             {% if cooldown_hours %}
                 <div class="alert alert-info rounded-3">
-                    Эту задачу можно отправлять не чаще одного раза в 24 часа. Повторная отправка будет доступна примерно через {{ cooldown_hours }} ч.
+                    {% t "Эту задачу можно отправлять не чаще одного раза в 24 часа. Повторная отправка будет доступна примерно через" %} {{ cooldown_hours }} {% t "ч." %}
                 </div>
             {% endif %}
 
             <form method="post" class="d-flex flex-column flex-grow-1">
                 {% csrf_token %}
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
-                    <label class="form-label small text-muted fw-semibold">Вставьте ваш исходный код (Python):</label>
+                    <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="# Напишите ваш код здесь..." required {% if cooldown_hours %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}" required {% if cooldown_hours %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="small text-muted">
-                        Текущий статус: <strong>{{ submission.get_status_display }}</strong>
+                        {% t "Текущий статус:" %} <strong>{% t submission.get_status_display %}</strong>
                     </span>
                     <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_hours %}disabled{% endif %}>
-                        Отправить решение →
+                        {% t "Отправить решение →" %}
                     </button>
                 </div>
             </form>

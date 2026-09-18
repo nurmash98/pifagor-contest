@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
-{% block title %}Все задачи - Pifagor Contest{% endblock %}
+{% block title %}{% t "Все задачи" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="row mb-4 align-items-center">
     <div class="col-md-6">
-        <h3 class="fw-bold" style="color: #1a1a4b;">Каталог задач</h3>
-        <p class="text-muted small mb-0">Выберите задачу из списка для просмотра условий и решения</p>
+        <h3 class="fw-bold" style="color: #1a1a4b;">{% t "Каталог задач" %}</h3>
+        <p class="text-muted small mb-0">{% t "Выберите задачу из списка для просмотра условий и решения" %}</p>
     </div>
 
     <!-- Фильтры по уровням -->
     <div class="col-md-6 text-md-end mt-3 mt-md-0">
         <div class="btn-group shadow-sm" role="group">
-            <a href="{% url 'all_tasks' %}" class="btn btn-outline-dark btn-sm {% if not current_level %}active{% endif %}">Все</a>
-            <a href="{% url 'all_tasks' %}?level=A" class="btn btn-outline-success btn-sm {% if current_level == 'A' %}active{% endif %}">Уровень A</a>
-            <a href="{% url 'all_tasks' %}?level=B" class="btn btn-outline-warning btn-sm {% if current_level == 'B' %}active{% endif %}">Уровень B</a>
-            <a href="{% url 'all_tasks' %}?level=C" class="btn btn-outline-danger btn-sm {% if current_level == 'C' %}active{% endif %}">Уровень C</a>
+            <a href="{% url 'all_tasks' %}" class="btn btn-outline-dark btn-sm {% if not current_level %}active{% endif %}">{% t "Все" %}</a>
+            <a href="{% url 'all_tasks' %}?level=A" class="btn btn-outline-success btn-sm {% if current_level == 'A' %}active{% endif %}">{% t "Уровень A" %}</a>
+            <a href="{% url 'all_tasks' %}?level=B" class="btn btn-outline-warning btn-sm {% if current_level == 'B' %}active{% endif %}">{% t "Уровень B" %}</a>
+            <a href="{% url 'all_tasks' %}?level=C" class="btn btn-outline-danger btn-sm {% if current_level == 'C' %}active{% endif %}">{% t "Уровень C" %}</a>
         </div>
     </div>
 </div>
@@ -36,12 +37,12 @@
                 <thead style="background-color: #f4f6f9; color: #1a1a4b;">
                     <tr>
                         <th class="py-3 px-4" style="width: 5%;">#</th>
-                        <th class="py-3" style="width: 45%;">Название задачи</th>
-                        <th class="py-3 text-center" style="width: 15%;">Уровень</th>
+                        <th class="py-3" style="width: 45%;">{% t "Название задачи" %}</th>
+                        <th class="py-3 text-center" style="width: 15%;">{% t "Уровень" %}</th>
                         {% if not readonly %}
-                        <th class="py-3 text-center" style="width: 15%;">Статус</th>
+                        <th class="py-3 text-center" style="width: 15%;">{% t "Статус" %}</th>
                         {% endif %}
-                        <th class="py-3 text-end px-4" style="width: 20%;">Действие</th>
+                        <th class="py-3 text-end px-4" style="width: 20%;">{% t "Действие" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -65,37 +66,37 @@
                         </td>
                         <td class="text-center">
                             {% if task.level == 'A' %}
-                                <span class="badge badge-level-A px-3 py-1">Уровень A</span>
+                                <span class="badge badge-level-A px-3 py-1">{% t "Уровень A" %}</span>
                             {% elif task.level == 'B' %}
-                                <span class="badge badge-level-B px-3 py-1">Уровень B</span>
+                                <span class="badge badge-level-B px-3 py-1">{% t "Уровень B" %}</span>
                             {% else %}
-                                <span class="badge badge-level-C px-3 py-1">Уровень C</span>
+                                <span class="badge badge-level-C px-3 py-1">{% t "Уровень C" %}</span>
                             {% endif %}
                         </td>
                         {% if not readonly %}
                         <td class="text-center">
                             {% if task.user_sub %}
                                 {% if task.user_sub.status == 'DONE' %}
-                                    <span class="badge bg-success px-3 py-2">Решено ({{ task.user_sub.score }}/10)</span>
+                                    <span class="badge bg-success px-3 py-2">{% t "Решено" %} ({{ task.user_sub.score }}/10)</span>
                                 {% elif task.user_sub.status == 'TESTING' %}
-                                    <span class="badge bg-warning text-dark px-3 py-2">На проверке</span>
+                                    <span class="badge bg-warning text-dark px-3 py-2">{% t "На проверке" %}</span>
                                 {% else %}
-                                    <span class="badge bg-primary px-3 py-2">В работе</span>
+                                    <span class="badge bg-primary px-3 py-2">{% t "В работе" %}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="badge bg-light text-muted border px-3 py-2">Не начато</span>
+                                <span class="badge bg-light text-muted border px-3 py-2">{% t "Не начато" %}</span>
                             {% endif %}
                         </td>
                         {% endif %}
                         <td class="text-end px-4">
                             <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-green btn-sm px-3">
-                                {% if readonly %}Просмотр{% elif task.user_sub %}Просмотр / Решить{% else %}Взять задачу{% endif %}
+                                {% if readonly %}{% t "Просмотр" %}{% elif task.user_sub %}{% t "Просмотр / Решить" %}{% else %}{% t "Взять задачу" %}{% endif %}
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if readonly %}4{% else %}5{% endif %}" class="text-center py-5 text-muted">Задачи не найдены.</td>
+                        <td colspan="{% if readonly %}4{% else %}5{% endif %}" class="text-center py-5 text-muted">{% t "Задачи не найдены." %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

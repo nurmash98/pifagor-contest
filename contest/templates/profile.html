@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
-{% block title %}Мой профиль - Pifagor Contest{% endblock %}
+{% block title %}{% t "Мой профиль" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="row gx-5 mt-3">
@@ -15,24 +16,24 @@
             </div>
 
             <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ student.full_name }}</h4>
-            <p class="text-muted small mb-4">Класс: {{ student.school_class }}</p>
+            <p class="text-muted small mb-4">{% t "Класс:" %} {{ student.school_class }}</p>
 
             <!-- Блок статистики: решено задач и общий балл (средний балл не показываем) -->
             <div class="d-flex justify-content-between border-top pt-3 text-center">
                 <div class="px-2">
                     <h4 class="mb-0 fw-bold" style="color: #1a1a4b;">{{ solved_count }}</h4>
-                    <small class="text-muted" style="font-size: 0.75rem;">Решено</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">{% t "Решено" %}</small>
                 </div>
                 <div class="vr"></div>
                 <div class="px-2">
                     <h4 class="mb-0 fw-bold" style="color: #008b42;">{{ total_score }}</h4>
-                    <small class="text-muted" style="font-size: 0.75rem;">Общий балл</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">{% t "Общий балл" %}</small>
                 </div>
             </div>
 
             <div class="mt-4 border-top pt-3">
                 <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm w-100 rounded-pill">
-                    Выйти из аккаунта
+                    {% t "Выйти из аккаунта" %}
                 </a>
             </div>
         </div>
@@ -41,7 +42,7 @@
     <!-- Правая колонка: История решенных задач -->
     <div class="col-md-8">
         <h4 class="fw-bold mb-4" style="color: #1a1a4b;">
-            <i class="bi bi-clock-history me-2"></i>История решений
+            <i class="bi bi-clock-history me-2"></i>{% t "История решений" %}
         </h4>
 
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
@@ -50,17 +51,17 @@
                 <li class="list-group-item p-4 d-flex justify-content-between align-items-center hover-bg-light transition-all">
                     <div>
                         <h6 class="mb-1 fw-bold" style="color: #1a1a4b;">
-                            {{ sub.task.title }}
+                            {{ sub.task.display_title }}
                             <!-- Бейджик уровня задачи -->
                             {% if sub.task.level == 'A' %}
-                                <span class="badge bg-success ms-2 px-2" style="font-size: 0.7rem;">Уровень A</span>
+                                <span class="badge bg-success ms-2 px-2" style="font-size: 0.7rem;">{% t "Уровень A" %}</span>
                             {% elif sub.task.level == 'B' %}
-                                <span class="badge bg-warning text-dark ms-2 px-2" style="font-size: 0.7rem;">Уровень B</span>
+                                <span class="badge bg-warning text-dark ms-2 px-2" style="font-size: 0.7rem;">{% t "Уровень B" %}</span>
                             {% else %}
-                                <span class="badge bg-danger ms-2 px-2" style="font-size: 0.7rem;">Уровень C</span>
+                                <span class="badge bg-danger ms-2 px-2" style="font-size: 0.7rem;">{% t "Уровень C" %}</span>
                             {% endif %}
                         </h6>
-                        <small class="text-muted">Проверено преподавателем: {{ sub.updated_at|date:"d.m.Y H:i" }}</small>
+                        <small class="text-muted">{% t "Проверено преподавателем:" %} {{ sub.updated_at|date:"d.m.Y H:i" }}</small>
                     </div>
 
                     <div class="text-end">
@@ -74,7 +75,7 @@
                         </span>
                         {% if sub.teacher_comment %}
                             <div class="mt-3 p-3 bg-light border-start border-4 border-info rounded-end">
-                                <small class="fw-bold text-info"><i class="bi bi-chat-left-text me-1"></i> Комментарий преподавателя:</small>
+                                <small class="fw-bold text-info"><i class="bi bi-chat-left-text me-1"></i> {% t "Комментарий преподавателя:" %}</small>
                                 <p class="mb-0 mt-1 small text-muted">{{ sub.teacher_comment }}</p>
                             </div>
                         {% endif %}
@@ -83,10 +84,10 @@
                 {% empty %}
                 <li class="list-group-item p-5 text-center text-muted">
                     <div class="fs-1 mb-3">📭</div>
-                    <h5>Вы пока не решили ни одной задачи</h5>
-                    <p class="small mb-4">После того как преподаватель проверит ваш код, результаты появятся здесь.</p>
+                    <h5>{% t "Вы пока не решили ни одной задачи" %}</h5>
+                    <p class="small mb-4">{% t "После того как преподаватель проверит ваш код, результаты появятся здесь." %}</p>
                     <a href="{% url 'all_tasks' %}" class="btn btn-primary rounded-pill px-4">
-                        Перейти к задачам
+                        {% t "Перейти к задачам" %}
                     </a>
                 </li>
                 {% endfor %}
