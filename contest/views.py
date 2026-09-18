@@ -319,7 +319,7 @@ def leaderboard(request):
     students_query = Student.objects.annotate(
         total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
         solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
-    ).order_by('-total_score', '-solved_count')
+    ).filter(solved_count__gt=0).order_by('-total_score', '-solved_count')
 
     if my_grade is not None:
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
