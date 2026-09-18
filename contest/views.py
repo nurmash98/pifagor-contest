@@ -6,7 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -23,6 +23,19 @@ def _grade_of(school_class):
     """Параллель ученика — числовая часть класса без буквы: '7А' -> '7', '10Б' -> '10'."""
     match = re.match(r'\d+', (school_class or '').strip())
     return match.group() if match else (school_class or '').strip()
+
+
+# Очки в лидерборде за решённую задачу зависят только от её уровня сложности
+# (не от оценки учителя за качество решения): лёгкая — 1, средняя — 2, сложная — 3.
+LEADERBOARD_POINTS_BY_LEVEL = {'A': 1, 'B': 2, 'C': 3}
+
+LEADERBOARD_POINTS_CASE = Case(
+    When(submissions__task__level='A', then=Value(LEADERBOARD_POINTS_BY_LEVEL['A'])),
+    When(submissions__task__level='B', then=Value(LEADERBOARD_POINTS_BY_LEVEL['B'])),
+    When(submissions__task__level='C', then=Value(LEADERBOARD_POINTS_BY_LEVEL['C'])),
+    default=Value(0),
+    output_field=IntegerField(),
+)
 
 
 def _cooldown_remaining(submission):
@@ -296,9 +309,10 @@ def leaderboard(request):
             scope_label = selected_class or ', '.join(teacher_classes)
             limit = None  # Учитель видит полный список своих классов, без топ-10
 
-    # Используем submissions__score, как было в ваших моделях
+    # Очки за решённую задачу зависят от её уровня сложности (1/2/3 — лёгкая/средняя/сложная),
+    # а не от оценки учителя за качество решения (та используется только в анализе по курсу).
     students_query = Student.objects.annotate(
-        total_score=Sum('submissions__score', filter=Q(submissions__status='DONE')),
+        total_score=Sum(LEADERBOARD_POINTS_CASE, filter=Q(submissions__status='DONE')),
         solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
     ).order_by('-total_score', '-solved_count')
 
@@ -320,13 +334,8 @@ def leaderboard(request):
 
     students = []
     for student_row in students_list:
-        total = student_row.total_score or 0
-        solved = student_row.solved_count or 0
-        avg_score = round(total / solved, 1) if solved > 0 else 0
-
-        student_row.calc_total_score = total
-        student_row.calc_solved_count = solved
-        student_row.calc_average_score = avg_score
+        student_row.calc_total_score = student_row.total_score or 0
+        student_row.calc_solved_count = student_row.solved_count or 0
         students.append(student_row)
 
     return render(request, 'leaderboard.html', {

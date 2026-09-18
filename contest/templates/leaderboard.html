@@ -19,6 +19,9 @@
                     Ранжирование по общей сумме баллов за все решенные задачи
                 {% endif %}
             </p>
+            <p class="text-muted small mb-0">
+                Баллы за решённую задачу зависят от её уровня: лёгкая — 1, средняя — 2, сложная — 3.
+            </p>
         </div>
 
         {% if teacher_classes %}
@@ -41,7 +44,6 @@
                             <th class="py-4">Ученик</th>
                             <th class="py-4 text-center">Класс</th>
                             <th class="py-4 text-center">Решено задач</th>
-                            <th class="py-4 text-center">Средний балл</th>
                             <th class="py-4 text-center pe-4">Общий балл</th>
                         </tr>
                     </thead>
@@ -64,18 +66,13 @@
                             <td class="text-center fw-semibold">
                                 {{ student.calc_solved_count }}
                             </td>
-                            <td class="text-center">
-                                <span class="badge bg-primary px-3 py-2 fs-6">
-                                    {{ student.calc_average_score }} / 10
-                                </span>
-                            </td>
                             <td class="text-center pe-4 fw-bold fs-5" style="color: #008b42;">
                                 {{ student.calc_total_score }}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="5" class="text-center py-5 text-muted">
                                 Рейтинг пока пуст. Будьте первым, кто решит задачу!
                             </td>
                         </tr>
