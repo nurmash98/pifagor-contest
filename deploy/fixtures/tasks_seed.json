@@ -60,7 +60,9 @@
       "input_example": "-22 7",
       "output_example": "Спим дальше",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -73,7 +75,9 @@
       "input_example": "35 4",
       "output_example": "Каждому: 8, Остаток: 3",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        3
+      ]
     }
   },
   {
@@ -86,7 +90,9 @@
       "input_example": "2 1",
       "output_example": "2100",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        3
+      ]
     }
   },
   {
@@ -99,7 +105,9 @@
       "input_example": "120",
       "output_example": "Лаги, кикаем",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -112,7 +120,9 @@
       "input_example": "2015",
       "output_example": "Слишком молод",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -125,7 +135,9 @@
       "input_example": "070",
       "output_example": "Заезжай",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -138,7 +150,9 @@
       "input_example": "64",
       "output_example": "Готовься лучше",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -166,7 +180,9 @@
       "input_example": "1500",
       "output_example": "Пополни на 1090 тг",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -179,7 +195,9 @@
       "input_example": "1",
       "output_example": "1600",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -192,7 +210,9 @@
       "input_example": "42000",
       "output_example": "37000",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -205,7 +225,9 @@
       "input_example": "15",
       "output_example": "Включен режим энергосбережения",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -218,7 +240,9 @@
       "input_example": "1420",
       "output_example": "1500",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        3
+      ]
     }
   },
   {
@@ -231,7 +255,9 @@
       "input_example": "30",
       "output_example": "15",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -244,7 +270,9 @@
       "input_example": "1500",
       "output_example": "Комфорт",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -257,7 +285,9 @@
       "input_example": "12000",
       "output_example": "10800",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -270,7 +300,9 @@
       "input_example": "82",
       "output_example": "Серебро",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -283,7 +315,9 @@
       "input_example": "45000",
       "output_example": "Одобрено. Платеж: 15000 тг/мес",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -296,7 +330,9 @@
       "input_example": "2",
       "output_example": "Алматы",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -309,7 +345,9 @@
       "input_example": "234",
       "output_example": "Открыто",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -322,7 +360,9 @@
       "input_example": "0",
       "output_example": "23",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -335,7 +375,9 @@
       "input_example": "Камень Ножницы",
       "output_example": "Игрок 1 победил",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        7
+      ]
     }
   },
   {
@@ -348,7 +390,9 @@
       "input_example": "200",
       "output_example": "2000000",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -361,7 +405,9 @@
       "input_example": "12",
       "output_example": "5",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        3
+      ]
     }
   },
   {
@@ -374,7 +420,9 @@
       "input_example": "2024",
       "output_example": "Високосный",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -387,7 +435,9 @@
       "input_example": "4000 6000 3000",
       "output_example": "10000",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -400,7 +450,9 @@
       "input_example": "87012345678",
       "output_example": "OK",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        7
+      ]
     }
   },
   {
@@ -413,7 +465,9 @@
       "input_example": "5",
       "output_example": "2500",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -426,7 +480,9 @@
       "input_example": "6000",
       "output_example": "4500",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -439,7 +495,9 @@
       "input_example": "1800",
       "output_example": "Круток: 11\\nГарант есть!",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -452,7 +510,9 @@
       "input_example": "85",
       "output_example": "36000 тг",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -465,7 +525,9 @@
       "input_example": "10 28 14",
       "output_example": "M",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -478,7 +540,9 @@
       "input_example": "5 4 5",
       "output_example": "Обычная стипендия",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -491,7 +555,9 @@
       "input_example": "17500",
       "output_example": "Танцпол",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -504,7 +570,9 @@
       "input_example": "38",
       "output_example": "Боковое верхнее",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -517,7 +585,9 @@
       "input_example": "071105",
       "output_example": "Год: 2007, Месяц: 11, День: 5",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        7
+      ]
     }
   },
   {
@@ -530,7 +600,9 @@
       "input_example": "Расстояние: 3000, Минут: 20",
       "output_example": "Автобус",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -543,7 +615,9 @@
       "input_example": "8 14 12 20",
       "output_example": "Пересекаются",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
     }
   },
   {
@@ -556,7 +630,2259 @@
       "input_example": "1500 4200 800 (цена: 3500)",
       "output_example": "Платит друг 2",
       "test_cases": [],
-      "tags": []
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 47,
+    "fields": {
+      "title": "Таблица умножения",
+      "level": "A",
+      "description": "Дано число N. С помощью цикла for выведите произведения N на числа от 1 до 10, каждое на отдельной строке.",
+      "input_example": "7",
+      "output_example": "7\n14\n21\n28\n35\n42\n49\n56\n63\n70",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 48,
+    "fields": {
+      "title": "Сумма первых N чисел",
+      "level": "A",
+      "description": "Дано число N. Выведите сумму всех целых чисел от 1 до N (используя цикл for).",
+      "input_example": "5",
+      "output_example": "15",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 49,
+    "fields": {
+      "title": "Факториал числа",
+      "level": "A",
+      "description": "Дано число N. Выведите N! (факториал), посчитанный с помощью цикла for.",
+      "input_example": "5",
+      "output_example": "120",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 50,
+    "fields": {
+      "title": "Считаем квадраты",
+      "level": "A",
+      "description": "Дано число N. Выведите квадраты чисел от 1 до N, каждый на отдельной строке.",
+      "input_example": "4",
+      "output_example": "1\n4\n9\n16",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 51,
+    "fields": {
+      "title": "Обратный отсчёт",
+      "level": "A",
+      "description": "Дано число N. Выведите числа от N до 1 в порядке убывания, а затем слово `Пуск!`.",
+      "input_example": "3",
+      "output_example": "3\n2\n1\nПуск!",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 52,
+    "fields": {
+      "title": "Сумма чётных чисел",
+      "level": "A",
+      "description": "Дано число N. Найдите сумму всех чётных чисел от 1 до N включительно.",
+      "input_example": "10",
+      "output_example": "30",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 53,
+    "fields": {
+      "title": "Лестница из звёздочек",
+      "level": "A",
+      "description": "Дано число N. Выведите N строк, где в i-й строке ровно i символов `*`.",
+      "input_example": "4",
+      "output_example": "*\n**\n***\n****",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 54,
+    "fields": {
+      "title": "Сколько отличников",
+      "level": "A",
+      "description": "Вводится N оценок учеников через пробел. Посчитайте, сколько среди них пятёрок (5).",
+      "input_example": "5 4 5 3 5",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 55,
+    "fields": {
+      "title": "Малая таблица умножения",
+      "level": "A",
+      "description": "Дано число N (от 1 до 9). Выведите таблицу умножения этого числа от 1 до 5, каждое значение на отдельной строке.",
+      "input_example": "3",
+      "output_example": "3\n6\n9\n12\n15",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 56,
+    "fields": {
+      "title": "Стоимость абонемента с подорожанием",
+      "level": "A",
+      "description": "Абонемент в фитнес-клуб на 1 месяц стоит 8000 тг, и с каждым следующим месяцем цена растёт на 500 тг. Дано число месяцев N. Посчитайте (циклом for) общую сумму, которую заплатит клиент за N месяцев подряд.",
+      "input_example": "3",
+      "output_example": "25500",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 57,
+    "fields": {
+      "title": "Сумма собственных делителей",
+      "level": "B",
+      "description": "Дано число N. Найдите сумму всех его делителей, не считая самого числа (переберите циклом for от 1 до N-1).",
+      "input_example": "12",
+      "output_example": "16",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 58,
+    "fields": {
+      "title": "Простое число?",
+      "level": "B",
+      "description": "Дано число N (>1). С помощью цикла for проверьте, является ли оно простым. Выведите `Простое` или `Составное`.",
+      "input_example": "17",
+      "output_example": "Простое",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 59,
+    "fields": {
+      "title": "НОД перебором",
+      "level": "B",
+      "description": "Даны два числа A и B. Найдите их НОД, перебирая циклом for все числа от 1 до минимального из них.",
+      "input_example": "12 18",
+      "output_example": "6",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 60,
+    "fields": {
+      "title": "Средний балл класса",
+      "level": "B",
+      "description": "Вводятся оценки учеников через пробел. Посчитайте средний балл, округлив до десятых (используйте цикл for для суммирования).",
+      "input_example": "5 4 5 4",
+      "output_example": "4.5",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 61,
+    "fields": {
+      "title": "Число Армстронга",
+      "level": "B",
+      "description": "Трёхзначное число называется числом Армстронга, если сумма кубов его цифр равна самому числу. Проверьте число N (переберите его цифры циклом for). Выведите `Да` или `Нет`.",
+      "input_example": "153",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 62,
+    "fields": {
+      "title": "Максимум без max()",
+      "level": "B",
+      "description": "Вводится N чисел через пробел. Найдите максимальное, не используя встроенную функцию max() — переберите циклом for.",
+      "input_example": "3 8 2 9 4",
+      "output_example": "9",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 63,
+    "fields": {
+      "title": "Кого больше в классе",
+      "level": "B",
+      "description": "Вводится список из `М` (мальчик) и `Д` (девочка) через пробел. Посчитайте, кого больше, и выведите `Мальчиков больше`, `Девочек больше` или `Поровну`.",
+      "input_example": "М Д Д М Д",
+      "output_example": "Девочек больше",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 64,
+    "fields": {
+      "title": "Скидка на пирожки за количество",
+      "level": "B",
+      "description": "Пирожок стоит 250 тг. Начиная с 6-го пирожка, на каждый следующий действует скидка 20%. Дано количество пирожков N. Посчитайте (циклом for по каждому пирожку) итоговую сумму.",
+      "input_example": "7",
+      "output_example": "1650",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 65,
+    "fields": {
+      "title": "Разворот числа",
+      "level": "B",
+      "description": "Дано число N. Разверните его \"задом наперёд\", перебирая цифры циклом for.",
+      "input_example": "4821",
+      "output_example": "1284",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 66,
+    "fields": {
+      "title": "Количество гласных в предложении",
+      "level": "B",
+      "description": "Дано предложение. Посчитайте количество гласных букв (а, о, у, ы, и, э, е, ё, ю, я), перебирая строку циклом for.",
+      "input_example": "Привет мир",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 67,
+    "fields": {
+      "title": "Простые числа в диапазоне",
+      "level": "C",
+      "description": "Даны два числа A и B. Выведите через пробел все простые числа в диапазоне [A, B].",
+      "input_example": "10 20",
+      "output_example": "11 13 17 19",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 68,
+    "fields": {
+      "title": "Сумма факториалов",
+      "level": "C",
+      "description": "Дано число N. Найдите сумму 1! + 2! + 3! + ... + N!.",
+      "input_example": "5",
+      "output_example": "153",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 69,
+    "fields": {
+      "title": "Строка треугольника Паскаля",
+      "level": "C",
+      "description": "Дано число N (номер строки, начиная с 0). Выведите N-ю строку треугольника Паскаля через пробел (вычислите биномиальные коэффициенты циклом for).",
+      "input_example": "4",
+      "output_example": "1 4 6 4 1",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 70,
+    "fields": {
+      "title": "Шифр Цезаря",
+      "level": "C",
+      "description": "Дана строка (строчные латинские буквы) и число сдвига K через пробел. Зашифруйте строку сдвигом каждой буквы на K позиций по алфавиту (циклом for), с переходом по кругу (после z снова a).",
+      "input_example": "abc 2",
+      "output_example": "cde",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 71,
+    "fields": {
+      "title": "НОД списка чисел",
+      "level": "C",
+      "description": "Вводится несколько чисел через пробел. Найдите их общий НОД, применяя алгоритм Евклида по очереди к каждому числу в цикле for.",
+      "input_example": "12 18 24",
+      "output_example": "6",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 72,
+    "fields": {
+      "title": "Самое частое число",
+      "level": "C",
+      "description": "Вводится набор чисел через пробел. Найдите число, которое встречается чаще всего (если таких несколько — выведите наименьшее из них).",
+      "input_example": "1 2 2 3 3 1 1",
+      "output_example": "1",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 73,
+    "fields": {
+      "title": "Сумма главной диагонали матрицы",
+      "level": "C",
+      "description": "Дана квадратная матрица NxN, вводится по одной строке чисел на каждой строке ввода. Найдите сумму элементов главной диагонали.",
+      "input_example": "1 2 3\n4 5 6\n7 8 9",
+      "output_example": "15",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 74,
+    "fields": {
+      "title": "Совершенное число",
+      "level": "C",
+      "description": "Число называется совершенным, если сумма его делителей (кроме самого числа) равна самому числу. Проверьте число N циклом for. Выведите `Да` или `Нет`.",
+      "input_example": "28",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 75,
+    "fields": {
+      "title": "Разложение на простые множители",
+      "level": "C",
+      "description": "Дано число N. Разложите его на простые множители и выведите их через `*` (по возрастанию).",
+      "input_example": "60",
+      "output_example": "2*2*3*5",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 76,
+    "fields": {
+      "title": "Треугольник из чисел",
+      "level": "C",
+      "description": "Дано число N. Выведите N строк, в каждой i-й строке числа от 1 до i через пробел.",
+      "input_example": "4",
+      "output_example": "1\n1 2\n1 2 3\n1 2 3 4",
+      "test_cases": [],
+      "tags": [
+        5
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 77,
+    "fields": {
+      "title": "Сумма цифр числа",
+      "level": "A",
+      "description": "Дано число N. Найдите сумму его цифр, используя цикл while.",
+      "input_example": "1234",
+      "output_example": "10",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 78,
+    "fields": {
+      "title": "Количество цифр числа",
+      "level": "A",
+      "description": "Дано число N. Посчитайте, сколько в нём цифр (циклом while, делением на 10).",
+      "input_example": "4820",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 79,
+    "fields": {
+      "title": "Разворот числа (while)",
+      "level": "A",
+      "description": "Дано число N. Разверните его, используя цикл while.",
+      "input_example": "5921",
+      "output_example": "1295",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 80,
+    "fields": {
+      "title": "Целочисленное деление вычитанием",
+      "level": "A",
+      "description": "Дано число N и делитель D. Сколько раз можно вычесть D из N, пока N не станет меньше D? (то есть целочисленное деление через цикл while)",
+      "input_example": "20 6",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 81,
+    "fields": {
+      "title": "Сколько дней копить",
+      "level": "A",
+      "description": "У Вани S тенге, каждый день он откладывает по D тенге. Сколько дней (циклом while) нужно ждать, чтобы накопить хотя бы 100000 тенге?",
+      "input_example": "40000 5000",
+      "output_example": "12",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 82,
+    "fields": {
+      "title": "Обратный отсчёт ракеты",
+      "level": "A",
+      "description": "Дано число N. Используя цикл while, выведите отсчёт от N до 1, а затем слово `Пуск!`.",
+      "input_example": "3",
+      "output_example": "3\n2\n1\nПуск!",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 83,
+    "fields": {
+      "title": "Сколько раз делится на 2",
+      "level": "A",
+      "description": "Дано чётное число N. Посчитайте, сколько раз его можно поделить на 2 нацело, пока не получится нечётное число (циклом while).",
+      "input_example": "48",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 84,
+    "fields": {
+      "title": "Первая цифра числа",
+      "level": "A",
+      "description": "Дано число N. Найдите его первую (старшую) цифру, используя цикл while.",
+      "input_example": "4821",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 85,
+    "fields": {
+      "title": "Сколько минут можно проговорить",
+      "level": "A",
+      "description": "На счету S тенге, минута разговора стоит 15 тг. Сколько полных минут (циклом while, вычитая по 15) можно проговорить?",
+      "input_example": "100",
+      "output_example": "6",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 86,
+    "fields": {
+      "title": "Сумма оценок до нуля",
+      "level": "A",
+      "description": "Ученик вводит свои оценки одну за другой, пока не введёт 0 (конец ввода). Посчитайте сумму всех оценок до нуля.",
+      "input_example": "4 5 3 0",
+      "output_example": "12",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 87,
+    "fields": {
+      "title": "НОД по алгоритму Евклида",
+      "level": "B",
+      "description": "Даны два числа A и B. Найдите их НОД классическим алгоритмом Евклида на цикле while (a, b = b, a % b).",
+      "input_example": "48 18",
+      "output_example": "6",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 88,
+    "fields": {
+      "title": "Двоичная система счисления",
+      "level": "B",
+      "description": "Дано число N. Переведите его в двоичную систему счисления, используя цикл while (деление на 2 и запоминание остатков).",
+      "input_example": "13",
+      "output_example": "1101",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 89,
+    "fields": {
+      "title": "Гипотеза Коллатца",
+      "level": "B",
+      "description": "Дано число N. Посчитайте, сколько шагов нужно, чтобы получить 1 по правилам: чётное число делим на 2, нечётное — умножаем на 3 и прибавляем 1.",
+      "input_example": "6",
+      "output_example": "8",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 90,
+    "fields": {
+      "title": "Погашение кредита фиксированным платежом",
+      "level": "B",
+      "description": "Взят кредит S тенге. Каждый месяц гасится F тенге фиксированного платежа. Сколько месяцев (циклом while) нужно, чтобы полностью погасить долг?",
+      "input_example": "100000 15000",
+      "output_example": "7",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 91,
+    "fields": {
+      "title": "Число-палиндром",
+      "level": "B",
+      "description": "Дано число N. Проверьте (циклом while, разворачивая число), является ли оно палиндромом. Выведите `Да` или `Нет`.",
+      "input_example": "12321",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 92,
+    "fields": {
+      "title": "Сумма ряда до превышения",
+      "level": "B",
+      "description": "Начиная с 1, суммируйте числа 1+2+3+... пока сумма не превысит N. Выведите итоговую сумму и последнее добавленное число в формате `Сумма: X, Число: Y`.",
+      "input_example": "20",
+      "output_example": "Сумма: 21, Число: 6",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 93,
+    "fields": {
+      "title": "Сокращение дроби",
+      "level": "B",
+      "description": "Даны числитель A и знаменатель B. Сократите дробь, разделив оба на их НОД (циклом while по алгоритму Евклида). Выведите в формате `A/B`.",
+      "input_example": "12 18",
+      "output_example": "2/3",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 94,
+    "fields": {
+      "title": "Автомат с монетами",
+      "level": "B",
+      "description": "Автомат принимает монеты по 50 тг одну за другой, пока сумма не наберётся хотя бы 200 тг (стоимость банки). Вводится последовательность монет через пробел, их может быть больше, чем нужно. Программа (цикл while) должна остановиться, как только наберёт нужную сумму, и вывести, сколько монет было использовано.",
+      "input_example": "50 50 50 50 50",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 95,
+    "fields": {
+      "title": "Наибольшая степень двойки",
+      "level": "B",
+      "description": "Дано число N. Найдите наибольшую степень двойки (2^k), которая не превышает N, используя цикл while (умножая на 2).",
+      "input_example": "100",
+      "output_example": "64",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 96,
+    "fields": {
+      "title": "Цифровой корень",
+      "level": "B",
+      "description": "Дано число N. Если оно больше 9, посчитайте сумму его цифр и повторите (циклом while), пока не останется одна цифра. Выведите итоговую цифру.",
+      "input_example": "9875",
+      "output_example": "2",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 97,
+    "fields": {
+      "title": "Разложение на простые множители (while)",
+      "level": "C",
+      "description": "Дано число N. Разложите его на простые множители, используя цикл while, и выведите их через `*`.",
+      "input_example": "84",
+      "output_example": "2*2*3*7",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 98,
+    "fields": {
+      "title": "Быстрое возведение в степень",
+      "level": "C",
+      "description": "Даны основание A и показатель степени N. Вычислите A^N, используя цикл while с последовательным умножением (без оператора **).",
+      "input_example": "3 4",
+      "output_example": "81",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 99,
+    "fields": {
+      "title": "НОК двух чисел",
+      "level": "C",
+      "description": "Даны A и B. Найдите их НОК по формуле A*B/НОД(A,B), где НОД считается циклом while.",
+      "input_example": "4 6",
+      "output_example": "12",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 100,
+    "fields": {
+      "title": "НОД трёх чисел",
+      "level": "C",
+      "description": "Даны три числа. Найдите их общий НОД, применяя алгоритм Евклида дважды (циклами while).",
+      "input_example": "12 18 24",
+      "output_example": "6",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 101,
+    "fields": {
+      "title": "Подбор надёжного пароля",
+      "level": "C",
+      "description": "Пользователь вводит пароли, пока не введёт пароль длиной от 8 символов и содержащий хотя бы одну цифру (проверка в цикле while). Дана последовательность попыток через запятую. Выведите, с какой попытки (по счёту) пароль подошёл.",
+      "input_example": "abc, password, pass1234",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 102,
+    "fields": {
+      "title": "Угадай число за N попыток",
+      "level": "C",
+      "description": "Загадано число X. Вводится последовательность попыток через пробел. Программа (цикл while) должна остановиться на первой попытке, равной X, и вывести номер этой попытки. Если такой попытки нет — `Не угадано`.",
+      "input_example": "Загадано: 7, Попытки: 3 5 9 7 2",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 103,
+    "fields": {
+      "title": "Сумма до отрицательного числа",
+      "level": "C",
+      "description": "Пользователь вводит числа одно за другим, пока не введёт отрицательное. Посчитайте сумму всех введённых положительных чисел (циклом while).",
+      "input_example": "10 20 5 -1",
+      "output_example": "35",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 104,
+    "fields": {
+      "title": "Возведение в степень по модулю",
+      "level": "C",
+      "description": "Даны A, N и M. Вычислите (A^N) mod M, используя цикл while с последовательным умножением и взятием остатка на каждом шаге.",
+      "input_example": "3 5 7",
+      "output_example": "5",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 105,
+    "fields": {
+      "title": "Наименьшее число с заданной суммой цифр",
+      "level": "C",
+      "description": "Дано число S (от 1 до 20). Найдите наименьшее натуральное число, сумма цифр которого равна S (подбор циклом while, начиная с 1).",
+      "input_example": "11",
+      "output_example": "29",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 106,
+    "fields": {
+      "title": "Обратный отсчёт до простого числа",
+      "level": "C",
+      "description": "Дано число N. Начиная с N и уменьшая на 1, найдите первое простое число, которое встретится (цикл while). Выведите его.",
+      "input_example": "20",
+      "output_example": "19",
+      "test_cases": [],
+      "tags": [
+        6
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 107,
+    "fields": {
+      "title": "Погода для похода",
+      "level": "A",
+      "description": "Если температура выше 20 градусов и нет дождя (вводится да/нет), выведите `Идём в поход`, иначе `Остаёмся дома`.",
+      "input_example": "25 нет",
+      "output_example": "Идём в поход",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 108,
+    "fields": {
+      "title": "Проходной балл",
+      "level": "A",
+      "description": "Проходной балл на грант — 90. Если балл ученика больше или равен 90 — `Грант`, иначе `Платное`.",
+      "input_example": "88",
+      "output_example": "Платное",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 109,
+    "fields": {
+      "title": "Возрастное ограничение фильма",
+      "level": "A",
+      "description": "Фильм имеет ограничение 16+. Дан возраст зрителя. Если меньше 16 — `Вход воспрещен`, иначе `Проходите`.",
+      "input_example": "15",
+      "output_example": "Вход воспрещен",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 110,
+    "fields": {
+      "title": "Чётность суммы",
+      "level": "A",
+      "description": "Даны два числа. Если их сумма чётная — `Чётная`, иначе `Нечётная`.",
+      "input_example": "3 5",
+      "output_example": "Чётная",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 111,
+    "fields": {
+      "title": "Сравнение двух чисел",
+      "level": "A",
+      "description": "Даны два числа A и B. Выведите, какое из них больше (`A больше` или `B больше`), или `Равны`, если они одинаковы.",
+      "input_example": "7 3",
+      "output_example": "A больше",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 112,
+    "fields": {
+      "title": "Хватит ли денег на такси",
+      "level": "A",
+      "description": "Поездка стоит 900 тг. Дан баланс на карте. Если хватает — `Едем`, иначе — `Идём пешком`.",
+      "input_example": "750",
+      "output_example": "Идём пешком",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 113,
+    "fields": {
+      "title": "Нужно ли включать свет",
+      "level": "A",
+      "description": "Датчик показывает уровень освещённости (число от 0 до 100). Если меньше 30 — `Включить свет`, иначе — `Свет не нужен`.",
+      "input_example": "20",
+      "output_example": "Включить свет",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 114,
+    "fields": {
+      "title": "Определяем сезон",
+      "level": "A",
+      "description": "Дан номер месяца (1-12). Если 12, 1 или 2 — `Зима`; 3,4,5 — `Весна`; 6,7,8 — `Лето`; 9,10,11 — `Осень`.",
+      "input_example": "7",
+      "output_example": "Лето",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 115,
+    "fields": {
+      "title": "Хватит ли мест в автобусе",
+      "level": "A",
+      "description": "В автобусе K свободных мест. Хочет сесть N человек. Если мест хватает — `Все поместились`, иначе — выведите, сколько человек останется ждать следующий автобус.",
+      "input_example": "5 8",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 116,
+    "fields": {
+      "title": "Победитель забега",
+      "level": "A",
+      "description": "Даны результаты (время в секундах) двух бегунов. Победил тот, у кого время меньше. Выведите `Бегун 1 победил` или `Бегун 2 победил`.",
+      "input_example": "12.5 11.8",
+      "output_example": "Бегун 2 победил",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 117,
+    "fields": {
+      "title": "Категория ИМТ",
+      "level": "B",
+      "description": "Индекс массы тела ИМТ = вес / (рост в метрах)^2. Если ИМТ < 18.5 — `Недостаток веса`, от 18.5 до 25 — `Норма`, выше 25 — `Избыток веса`. Даны вес (кг) и рост (см).",
+      "input_example": "70 175",
+      "output_example": "Норма",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 118,
+    "fields": {
+      "title": "Скидка постоянного клиента",
+      "level": "B",
+      "description": "Если сумма покупки больше 20000 тг — скидка 15%, если больше 10000 — скидка 7%, иначе скидки нет. Дана сумма покупки.",
+      "input_example": "15000",
+      "output_example": "13950",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 119,
+    "fields": {
+      "title": "Определяем вид треугольника по сторонам",
+      "level": "B",
+      "description": "Даны три стороны треугольника. Если все стороны равны — `Равносторонний`, если хотя бы две равны — `Равнобедренный`, иначе — `Разносторонний`.",
+      "input_example": "5 5 8",
+      "output_example": "Равнобедренный",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 120,
+    "fields": {
+      "title": "Багажный тариф авиакомпании",
+      "level": "B",
+      "description": "Бесплатный лимит багажа — 23 кг. За каждый килограмм сверху — доплата 2000 тг, но если багаж больше 32 кг, багаж не принимают вообще (`Не принимается`). Дан вес багажа.",
+      "input_example": "27",
+      "output_example": "8000",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 121,
+    "fields": {
+      "title": "Оценка по баллам",
+      "level": "B",
+      "description": "90-100: `5`, 75-89: `4`, 50-74: `3`, меньше 50: `2`. Дан балл (0-100).",
+      "input_example": "81",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 122,
+    "fields": {
+      "title": "Одобрение кредита",
+      "level": "B",
+      "description": "Если доход больше 300000 тг и возраст от 21 до 60 — `Кредит одобрен`. Иначе — `Отказ`. Даны доход и возраст.",
+      "input_example": "350000 25",
+      "output_example": "Кредит одобрен",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 123,
+    "fields": {
+      "title": "Такси с ночным тарифом",
+      "level": "B",
+      "description": "Днём (с 6 до 22 часов) поездка стоит 150 тг/км, ночью — 220 тг/км. Дано время (час, от 0 до 23) и расстояние в км.",
+      "input_example": "23 10",
+      "output_example": "2200",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 124,
+    "fields": {
+      "title": "Существование треугольника",
+      "level": "B",
+      "description": "Даны три стороны. Треугольник существует, если сумма любых двух сторон больше третьей. Выведите `Существует` или `Не существует`.",
+      "input_example": "1 2 10",
+      "output_example": "Не существует",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 125,
+    "fields": {
+      "title": "Выбор выгодного тарифа связи",
+      "level": "B",
+      "description": "Тариф A: 3000 тг за безлимит. Тариф B: 50 тг/минуту без абонплаты. Дано ожидаемое количество минут разговора в месяц. Выведите, какой тариф выгоднее (`Тариф A` или `Тариф B`); если стоимости равны — считать выгоднее `Тариф A`.",
+      "input_example": "50",
+      "output_example": "Тариф B",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 126,
+    "fields": {
+      "title": "Юбилейный год школы",
+      "level": "B",
+      "description": "Школа основана в 1995 году. Год считается юбилейным, если количество лет со дня основания кратно 10 или кратно 25. Дан текущий год. Выведите количество лет и `Юбилей!` или `Обычный год` в формате `X лет, СТАТУС`.",
+      "input_example": "2025",
+      "output_example": "30 лет, Юбилей!",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 127,
+    "fields": {
+      "title": "Скидка и НДС по цепочке",
+      "level": "C",
+      "description": "Товар стоит P тенге без учёта налога. Сначала применяется скидка 10%, если цена больше 50000, затем начисляется НДС 12%. Посчитайте итоговую цену (округлить до целого).",
+      "input_example": "60000",
+      "output_example": "60480",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 128,
+    "fields": {
+      "title": "Категория водительских прав",
+      "level": "C",
+      "description": "Категория B — для авто до 3500 кг. От 3500 до 7500 кг — категория C. Больше 7500 кг — категория D, но только если мест больше 8, иначе тоже категория C. Даны масса ТС (кг) и количество мест.",
+      "input_example": "8000 30",
+      "output_example": "D",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 129,
+    "fields": {
+      "title": "Прогрессивный налог",
+      "level": "C",
+      "description": "Первые 100000 тг дохода не облагаются налогом. С суммы от 100000 до 500000 — налог 10%. Со всего свыше 500000 — 20% (только с суммы сверх 500000), плюс налог с предыдущей ступени. Дан доход.",
+      "input_example": "600000",
+      "output_example": "60000",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 130,
+    "fields": {
+      "title": "Сезонная надбавка к зарплате",
+      "level": "C",
+      "description": "Если месяц зимний (12, 1, 2) — надбавка 15% к зарплате, если стаж больше 5 лет — дополнительно ещё +5%. Даны месяц, зарплата и стаж (лет).",
+      "input_example": "1 200000 6",
+      "output_example": "240000",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 131,
+    "fields": {
+      "title": "Вид треугольника по углам",
+      "level": "C",
+      "description": "Даны три угла треугольника (сумма всегда 180). Если есть угол 90 — `Прямоугольный`, если есть угол больше 90 — `Тупоугольный`, иначе — `Остроугольный`.",
+      "input_example": "90 45 45",
+      "output_example": "Прямоугольный",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 132,
+    "fields": {
+      "title": "Бонусы за поездки в такси",
+      "level": "C",
+      "description": "За каждую поездку начисляется 5% от суммы бонусами, но если это 10-я поездка за месяц или позже — бонус увеличивается до 10%. Даны номер поездки и сумма.",
+      "input_example": "10 2000",
+      "output_example": "200",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 133,
+    "fields": {
+      "title": "Проверка даты на корректность",
+      "level": "C",
+      "description": "Дан день, месяц и год. Определите, является ли эта дата существующей (учтите количество дней в месяце и високосный февраль). Выведите `Корректная дата` или `Некорректная дата`.",
+      "input_example": "29 2 2024",
+      "output_example": "Корректная дата",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 134,
+    "fields": {
+      "title": "Виновник ДТП на светофоре",
+      "level": "C",
+      "description": "Если сигнал светофора для водителя A красный — виноват водитель A. Если оба ехали на зелёный, виноват тот, кто ехал сзади (дано: 1 или 2). Дан сигнал для A (`красный`/`зелёный`) и номер того, кто ехал сзади.",
+      "input_example": "красный 2",
+      "output_example": "Виноват водитель A",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 135,
+    "fields": {
+      "title": "Оплата связи с перерасходом по ступеням",
+      "level": "C",
+      "description": "Пакет включает 500 минут за 4000 тг. Каждая минута сверх пакета стоит 15 тг, но если перерасход больше 200 минут, минуты сверх этих 200 стоят по 10 тг. Дано количество использованных минут.",
+      "input_example": "850",
+      "output_example": "8500",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 136,
+    "fields": {
+      "title": "Группа риска по нескольким факторам",
+      "level": "C",
+      "description": "Пациент в группе риска, если (возраст > 60 И курит) ИЛИ (ИМТ > 30). Даны возраст, курит (да/нет), вес и рост (для ИМТ, в см).",
+      "input_example": "65 да 80 170",
+      "output_example": "Группа риска",
+      "test_cases": [],
+      "tags": [
+        4
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 137,
+    "fields": {
+      "title": "Площадь прямоугольника",
+      "level": "A",
+      "description": "Даны длина и ширина прямоугольника. Найдите его площадь.",
+      "input_example": "5 3",
+      "output_example": "15",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 138,
+    "fields": {
+      "title": "Периметр квадрата",
+      "level": "A",
+      "description": "Дана сторона квадрата. Найдите периметр.",
+      "input_example": "6",
+      "output_example": "24",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 139,
+    "fields": {
+      "title": "Цельсии в Фаренгейты",
+      "level": "A",
+      "description": "Дана температура в градусах Цельсия. Переведите в Фаренгейты по формуле F = C*9/5+32.",
+      "input_example": "20",
+      "output_example": "68.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 140,
+    "fields": {
+      "title": "Сдача в магазине",
+      "level": "A",
+      "description": "Покупка стоит P тенге, покупатель дал N тенге. Посчитайте сдачу.",
+      "input_example": "1200 2000",
+      "output_example": "800",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 141,
+    "fields": {
+      "title": "Средний чек",
+      "level": "A",
+      "description": "Даны суммы трёх чеков. Найдите их среднее значение.",
+      "input_example": "1000 2000 1500",
+      "output_example": "1500.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 142,
+    "fields": {
+      "title": "Минуты в часы и минуты",
+      "level": "A",
+      "description": "Дано количество минут. Переведите в формат `часы:минуты`.",
+      "input_example": "125",
+      "output_example": "2:5",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 143,
+    "fields": {
+      "title": "Стоимость поездки на такси",
+      "level": "A",
+      "description": "Посадка стоит 300 тг, далее 100 тг за км. Дано расстояние в км.",
+      "input_example": "5",
+      "output_example": "800",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 144,
+    "fields": {
+      "title": "Сумма и разность двух чисел",
+      "level": "A",
+      "description": "Даны два числа. Выведите их сумму и разность через пробел.",
+      "input_example": "10 4",
+      "output_example": "14 6",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 145,
+    "fields": {
+      "title": "Объём коробки",
+      "level": "A",
+      "description": "Даны длина, ширина и высота коробки. Найдите объём.",
+      "input_example": "2 3 4",
+      "output_example": "24",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 146,
+    "fields": {
+      "title": "Скорость по расстоянию и времени",
+      "level": "A",
+      "description": "Даны расстояние (км) и время (часы). Найдите скорость (км/ч).",
+      "input_example": "180 3",
+      "output_example": "60.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 147,
+    "fields": {
+      "title": "Обмен валюты",
+      "level": "B",
+      "description": "1 доллар = 480 тенге. Дана сумма в долларах. Переведите в тенге.",
+      "input_example": "25",
+      "output_example": "12000",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 148,
+    "fields": {
+      "title": "Проценты по вкладу за год",
+      "level": "B",
+      "description": "Вклад S тенге под 14% годовых. Посчитайте, сколько тенге будет через год (с учётом процентов), округлив до целого.",
+      "input_example": "100000",
+      "output_example": "114000",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 149,
+    "fields": {
+      "title": "Средняя скорость на маршруте",
+      "level": "B",
+      "description": "Маршрут состоит из двух участков: первый — расстояние D1 за время T1, второй — D2 за время T2 (часы). Найдите среднюю скорость на всём маршруте.",
+      "input_example": "60 1 90 2",
+      "output_example": "50.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 150,
+    "fields": {
+      "title": "Разложение суммы на купюры",
+      "level": "B",
+      "description": "Дана сумма в тенге (кратная 1000). Посчитайте, сколько купюр по 10000 тг потребуется по максимуму, и остаток отдельно купюрами по 1000, в формате `10000: X, 1000: Y`.",
+      "input_example": "47000",
+      "output_example": "10000: 4, 1000: 7",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 151,
+    "fields": {
+      "title": "Расчёт ИМТ",
+      "level": "B",
+      "description": "Даны вес (кг) и рост (м). Посчитайте индекс массы тела ИМТ = вес / рост^2, округлив до одного знака после запятой.",
+      "input_example": "68 1.7",
+      "output_example": "23.5",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 152,
+    "fields": {
+      "title": "Квадратные метры в сотки",
+      "level": "B",
+      "description": "Дана площадь в квадратных метрах. Переведите в сотки (1 сотка = 100 кв.м.).",
+      "input_example": "650",
+      "output_example": "6.5",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 153,
+    "fields": {
+      "title": "Сложные проценты за 2 года",
+      "level": "B",
+      "description": "Вклад S тенге под P% годовых (сложный процент). Посчитайте сумму через 2 года, округлив до целого.",
+      "input_example": "100000 10",
+      "output_example": "121000",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 154,
+    "fields": {
+      "title": "Кинетическая энергия",
+      "level": "B",
+      "description": "По формуле E = m*v^2/2 посчитайте кинетическую энергию тела. Даны масса (кг) и скорость (м/с).",
+      "input_example": "10 4",
+      "output_example": "80.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 155,
+    "fields": {
+      "title": "Зарплата после налога",
+      "level": "B",
+      "description": "Зарплата S тенге, ИПН составляет 10%. Посчитайте зарплату на руки.",
+      "input_example": "200000",
+      "output_example": "180000.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 156,
+    "fields": {
+      "title": "Байты в мегабайты",
+      "level": "B",
+      "description": "Дано количество байт. Переведите в мегабайты (1 МБ = 1024*1024 байт), округлив до двух знаков после запятой.",
+      "input_example": "5242880",
+      "output_example": "5.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 157,
+    "fields": {
+      "title": "Площадь по формуле Герона",
+      "level": "C",
+      "description": "Даны три стороны треугольника. Найдите его площадь по формуле Герона, округлив до одного знака.",
+      "input_example": "3 4 5",
+      "output_example": "6.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 158,
+    "fields": {
+      "title": "Расстояние между городами по координатам",
+      "level": "C",
+      "description": "Даны координаты (x1,y1) и (x2,y2) двух городов на карте. Найдите расстояние между ними по формуле Евклида, округлив до одного знака.",
+      "input_example": "0 0 3 4",
+      "output_example": "5.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 159,
+    "fields": {
+      "title": "Упрощённый аннуитетный платёж",
+      "level": "C",
+      "description": "Ежемесячный платёж по кредиту = (сумма кредита) / (срок в месяцах) * (1 + ставка/100). Даны сумма, срок (мес) и ставка (%). Округлите до целого.",
+      "input_example": "1200000 12 20",
+      "output_example": "120000",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 160,
+    "fields": {
+      "title": "Дата через N дней (упрощённый календарь)",
+      "level": "C",
+      "description": "Дан день, месяц и количество дней N, которое нужно прибавить. Все месяцы условно считать по 30 дней. Найдите итоговый день и месяц в формате `день месяц`.",
+      "input_example": "25 3 10",
+      "output_example": "5 4",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 161,
+    "fields": {
+      "title": "Время в другом часовом поясе",
+      "level": "C",
+      "description": "Дано время в формате часы (0-23) в городе A и разница в часовых поясах (может быть отрицательной). Найдите время в городе B (0-23), с учётом перехода через полночь.",
+      "input_example": "22 5",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 162,
+    "fields": {
+      "title": "Вклад с ежегодным довложением",
+      "level": "C",
+      "description": "Вклад S тенге под P% годовых. В начале каждого следующего года (кроме первого) довкладывается ещё D тенге перед начислением процентов. Посчитайте сумму через 2 года.",
+      "input_example": "100000 10 20000",
+      "output_example": "143000",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 163,
+    "fields": {
+      "title": "Итоговая оценка по средневзвешенному баллу",
+      "level": "C",
+      "description": "Итоговая оценка = 0.3*(баллы за домашки) + 0.3*(баллы за контрольные) + 0.4*(экзамен). Все баллы от 0 до 100. Посчитайте итоговый балл, округлив до целого.",
+      "input_example": "80 70 90",
+      "output_example": "81",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 164,
+    "fields": {
+      "title": "Объём цилиндра",
+      "level": "C",
+      "description": "Даны радиус основания и высота цилиндра. Найдите объём по формуле V = π*r^2*h (π ≈ 3.14159), округлите до одного знака.",
+      "input_example": "3 5",
+      "output_example": "141.4",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 165,
+    "fields": {
+      "title": "Скорость из км/ч в м/с",
+      "level": "C",
+      "description": "Дана скорость в км/ч. Переведите в м/с, округлив до двух знаков.",
+      "input_example": "90",
+      "output_example": "25.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 166,
+    "fields": {
+      "title": "Такси на компанию с делением счёта",
+      "level": "C",
+      "description": "Такси стоит 500 тг посадка + 120 тг/км, сумма делится поровну между K пассажирами. Даны расстояние и количество пассажиров.",
+      "input_example": "10 4",
+      "output_example": "425.0",
+      "test_cases": [],
+      "tags": [
+        3
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 167,
+    "fields": {
+      "title": "Длина имени",
+      "level": "A",
+      "description": "Дано имя. Выведите количество букв в нём.",
+      "input_example": "Нурсултан",
+      "output_example": "9",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 168,
+    "fields": {
+      "title": "Заглавные буквы",
+      "level": "A",
+      "description": "Дано слово. Выведите его заглавными буквами.",
+      "input_example": "алматы",
+      "output_example": "АЛМАТЫ",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 169,
+    "fields": {
+      "title": "Первая и последняя буква",
+      "level": "A",
+      "description": "Дано слово. Выведите его первую и последнюю буквы через пробел.",
+      "input_example": "школа",
+      "output_example": "ш а",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 170,
+    "fields": {
+      "title": "Склеиваем имя и фамилию",
+      "level": "A",
+      "description": "Даны имя и фамилия отдельно. Склейте их через пробел в одну строку.",
+      "input_example": "Айгерим Сериковна",
+      "output_example": "Айгерим Сериковна",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 171,
+    "fields": {
+      "title": "Переворот слова",
+      "level": "A",
+      "description": "Дано слово. Выведите его в обратном порядке.",
+      "input_example": "питон",
+      "output_example": "нотип",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 172,
+    "fields": {
+      "title": "Количество определённой буквы",
+      "level": "A",
+      "description": "Дано слово и буква. Посчитайте, сколько раз буква встречается в слове.",
+      "input_example": "программирование о",
+      "output_example": "2",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 173,
+    "fields": {
+      "title": "Замена буквы на цифру",
+      "level": "A",
+      "description": "Дано слово. Замените все буквы `о` на `0` (ноль).",
+      "input_example": "молоко",
+      "output_example": "м0л0к0",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 174,
+    "fields": {
+      "title": "Строчные буквы",
+      "level": "A",
+      "description": "Дано слово в любом регистре. Приведите его к строчным буквам.",
+      "input_example": "АСТАНА",
+      "output_example": "астана",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 175,
+    "fields": {
+      "title": "Есть ли буква в слове?",
+      "level": "A",
+      "description": "Дано слово и буква. Проверьте, есть ли эта буква в слове. Выведите `Да` или `Нет`.",
+      "input_example": "казахстан а",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 176,
+    "fields": {
+      "title": "Повторение строки",
+      "level": "A",
+      "description": "Дано слово и число N. Повторите слово N раз подряд без пробелов.",
+      "input_example": "ха 3",
+      "output_example": "хахаха",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 177,
+    "fields": {
+      "title": "Количество слов в предложении",
+      "level": "B",
+      "description": "Дано предложение. Посчитайте количество слов в нём (слова разделены пробелами).",
+      "input_example": "Мама мыла раму",
+      "output_example": "3",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 178,
+    "fields": {
+      "title": "Проверка на палиндром",
+      "level": "B",
+      "description": "Дано слово. Проверьте, является ли оно палиндромом (читается одинаково в обе стороны). Выведите `Да` или `Нет`.",
+      "input_example": "шалаш",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 179,
+    "fields": {
+      "title": "Инициалы",
+      "level": "B",
+      "description": "Даны имя и фамилия. Выведите инициалы в формате `Фамилия И.`",
+      "input_example": "Асель Нурланова",
+      "output_example": "Нурланова А.",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 180,
+    "fields": {
+      "title": "Самое длинное слово",
+      "level": "B",
+      "description": "Дано предложение. Найдите самое длинное слово в нём.",
+      "input_example": "Я люблю программирование",
+      "output_example": "программирование",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 181,
+    "fields": {
+      "title": "Убираем лишние пробелы по краям",
+      "level": "B",
+      "description": "Дана строка с лишними пробелами в начале и конце. Уберите их.",
+      "input_example": "   привет   ",
+      "output_example": "привет",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 182,
+    "fields": {
+      "title": "Замена слова в предложении",
+      "level": "B",
+      "description": "Дано предложение. Замените все слова `кот` на `пёс`.",
+      "input_example": "мой кот и кот соседа",
+      "output_example": "мой пёс и пёс соседа",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 183,
+    "fields": {
+      "title": "Разделяем ФИО",
+      "level": "B",
+      "description": "Дана строка с полным ФИО через пробел (Фамилия Имя Отчество). Выведите фамилию и имя в формате `Фамилия: X, Имя: Y`.",
+      "input_example": "Ахметов Ерлан Болатович",
+      "output_example": "Фамилия: Ахметов, Имя: Ерлан",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 184,
+    "fields": {
+      "title": "Проверка формата email",
+      "level": "B",
+      "description": "Дан адрес электронной почты. Проверьте, содержит ли он символ `@` и точку `.` после него. Выведите `Похоже на email` или `Не похоже`.",
+      "input_example": "aigerim@mail.ru",
+      "output_example": "Похоже на email",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 185,
+    "fields": {
+      "title": "Гласные и согласные",
+      "level": "B",
+      "description": "Дано слово (только русские буквы). Посчитайте отдельно количество гласных и согласных букв в формате `Гласные: X, Согласные: Y`.",
+      "input_example": "программа",
+      "output_example": "Гласные: 3, Согласные: 6",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 186,
+    "fields": {
+      "title": "Формат номера телефона",
+      "level": "B",
+      "description": "Дан номер из 11 цифр без пробелов (например 87071234567). Отформатируйте его в вид `+7 (707) 123-45-67`.",
+      "input_example": "87071234567",
+      "output_example": "+7 (707) 123-45-67",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 187,
+    "fields": {
+      "title": "Замена гласных на звёздочки",
+      "level": "C",
+      "description": "Дано слово. Замените в нём все гласные буквы (а, о, у, и, е) на звёздочку `*`.",
+      "input_example": "программирование",
+      "output_example": "пр*гр*мм*р*в*н**",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 188,
+    "fields": {
+      "title": "Количество уникальных букв",
+      "level": "C",
+      "description": "Дано слово. Посчитайте количество уникальных (не повторяющихся) букв в нём.",
+      "input_example": "казахстан",
+      "output_example": "7",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 189,
+    "fields": {
+      "title": "Буквы на чётных позициях",
+      "level": "C",
+      "description": "Дано слово. Выведите только буквы, стоящие на чётных позициях (считая с 1).",
+      "input_example": "абвгдеё",
+      "output_example": "бге",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 190,
+    "fields": {
+      "title": "Аббревиатура организации",
+      "level": "C",
+      "description": "Дано название организации из нескольких слов. Составьте аббревиатуру из первых букв каждого слова (заглавными).",
+      "input_example": "Назарбаев Интеллектуальная Школа",
+      "output_example": "НИШ",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 191,
+    "fields": {
+      "title": "Проверка на анаграмму",
+      "level": "C",
+      "description": "Даны два слова. Проверьте, являются ли они анаграммами (состоят из одних и тех же букв, но в разном порядке). Выведите `Да` или `Нет`.",
+      "input_example": "апельсин спаниель",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 192,
+    "fields": {
+      "title": "Сжатие строки (RLE)",
+      "level": "C",
+      "description": "Дана строка из повторяющихся букв. Сожмите её в формат «буква+количество» (например, aaabbc -> a3b2c1).",
+      "input_example": "aaabbc",
+      "output_example": "a3b2c1",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 193,
+    "fields": {
+      "title": "Все ли гласные встречаются",
+      "level": "C",
+      "description": "Дано предложение. Проверьте, встречаются ли в нём все гласные буквы а, о, у, и, е хотя бы по одному разу. Выведите `Да` или `Нет`.",
+      "input_example": "у меня есть апельсин и огурец",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 194,
+    "fields": {
+      "title": "Самая длинная серия одинаковых букв",
+      "level": "C",
+      "description": "Дана строка. Найдите длину самой длинной последовательности подряд идущих одинаковых букв.",
+      "input_example": "aaabbbbcc",
+      "output_example": "4",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 195,
+    "fields": {
+      "title": "Слова в обратном порядке",
+      "level": "C",
+      "description": "Дано предложение. Переставьте слова в обратном порядке (последнее слово становится первым), не меняя буквы в самих словах.",
+      "input_example": "мама мыла раму",
+      "output_example": "раму мыла мама",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
+    }
+  },
+  {
+    "model": "contest.task",
+    "pk": 196,
+    "fields": {
+      "title": "Проверка вложенности скобок",
+      "level": "C",
+      "description": "Дана строка из символов `(` и `)`. Проверьте, правильно ли расставлены скобки (каждой открывающей соответствует закрывающая, без нарушения порядка). Выведите `Да` или `Нет`.",
+      "input_example": "(()())",
+      "output_example": "Да",
+      "test_cases": [],
+      "tags": [
+        7
+      ]
     }
   }
 ]
