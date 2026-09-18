@@ -2,3 +2,5 @@
 deploy/pifagor.env
 venv/
 staticfiles/
+__pycache__/
+*.pyc
