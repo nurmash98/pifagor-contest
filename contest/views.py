@@ -316,10 +316,13 @@ def leaderboard(request):
             limit = None  # Учитель видит полный список своих классов, без топ-10
 
     # Общий балл = сумма (коэффициент сложности задачи * оценка учителя) по всем решённым задачам.
+    # При равном общем балле сравниваем по количеству ПОЛНОСТЬЮ решённых задач — тех,
+    # где учитель поставил максимальную оценку (10 баллов), а не любых проверенных.
     students_query = Student.objects.annotate(
         total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
-        solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
-    ).filter(solved_count__gt=0).order_by('-total_score', '-solved_count')
+        solved_count=Count('submissions', filter=Q(submissions__status='DONE')),
+        perfect_count=Count('submissions', filter=Q(submissions__status='DONE', submissions__score=10)),
+    ).filter(solved_count__gt=0).order_by('-total_score', '-perfect_count', '-solved_count')
 
     if my_grade is not None:
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
@@ -341,6 +344,7 @@ def leaderboard(request):
     for student_row in students_list:
         student_row.calc_total_score = student_row.total_score or 0
         student_row.calc_solved_count = student_row.solved_count or 0
+        student_row.calc_perfect_count = student_row.perfect_count or 0
         students.append(student_row)
 
     return render(request, 'leaderboard.html', {
