@@ -235,12 +235,15 @@ def profile_view(request):
 @login_required
 def leaderboard(request):
     """Лидерборд. Ученик видит топ-10 своей параллели (например, все 7-е классы вместе,
-    независимо от буквы). Учитель видит топ-10 только своих классов (по списку в его профиле).
+    независимо от буквы). Учитель видит ВСЕХ учеников своих классов (без ограничения топ-10),
+    с фильтром по конкретному классу (по списку классов в его профиле).
     Админ (суперпользователь) без своего класса видит топ-10 по всей школе."""
     student = Student.objects.filter(user=request.user).first()
     my_grade = None
-    class_filter = None
     scope_label = None
+    teacher_classes = None
+    selected_class = ''
+    limit = 10
 
     if student is not None:
         my_grade = _grade_of(student.school_class)
@@ -248,9 +251,11 @@ def leaderboard(request):
     elif not request.user.is_superuser:
         teacher = Teacher.objects.filter(user=request.user).first()
         if teacher is not None:
-            class_filter = teacher.class_list()
-            if class_filter:
-                scope_label = ', '.join(class_filter)
+            teacher_classes = teacher.class_list()
+            requested_class = request.GET.get('class', '').strip()
+            selected_class = requested_class if requested_class in teacher_classes else ''
+            scope_label = selected_class or ', '.join(teacher_classes)
+            limit = None  # Учитель видит полный список своих классов, без топ-10
 
     # Используем submissions__score, как было в ваших моделях
     students_query = Student.objects.annotate(
@@ -262,12 +267,20 @@ def leaderboard(request):
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
         # а нужна именно числовая параллель без буквы.
         students_query = [s for s in students_query if _grade_of(s.school_class) == my_grade]
-    elif class_filter is not None:
-        # Учитель — только его классы, точное совпадение (например "10А", "11Б")
-        students_query = [s for s in students_query if s.school_class in class_filter]
+    elif teacher_classes is not None:
+        if selected_class:
+            # Учитель выбрал конкретный класс из фильтра
+            students_query = [s for s in students_query if s.school_class == selected_class]
+        else:
+            # Без фильтра — все ученики всех классов учителя (точное совпадение, например "10А", "11Б")
+            students_query = [s for s in students_query if s.school_class in teacher_classes]
+
+    students_list = list(students_query)
+    if limit is not None:
+        students_list = students_list[:limit]
 
     students = []
-    for student_row in list(students_query)[:10]:
+    for student_row in students_list:
         total = student_row.total_score or 0
         solved = student_row.solved_count or 0
         avg_score = round(total / solved, 1) if solved > 0 else 0
@@ -281,6 +294,9 @@ def leaderboard(request):
         'students': students,
         'my_grade': my_grade,
         'scope_label': scope_label,
+        'teacher_classes': teacher_classes,
+        'selected_class': selected_class,
+        'is_full_list': limit is None,
     })
 
 
