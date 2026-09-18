@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Task, Submission, Tag, Course, Topic, Teacher
+from .models import Student, Task, Submission, Tag, Course, Topic, Teacher, ClassBonus
 
 
 def _teacher_of(request):
@@ -124,3 +124,13 @@ class SubmissionAdmin(admin.ModelAdmin):
     list_filter = ('status', 'task__level')
     search_fields = ('student__full_name', 'task__title')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(ClassBonus)
+class ClassBonusAdmin(admin.ModelAdmin):
+    # В основном ставится кнопками на странице лидерборда — здесь просмотр/удаление
+    # для админа (например, если учитель ошибся или нужно всё почистить).
+    list_display = ('school_class', 'points', 'given_by', 'comment', 'created_at')
+    list_filter = ('school_class',)
+    search_fields = ('school_class', 'comment')
+    readonly_fields = ('created_at',)

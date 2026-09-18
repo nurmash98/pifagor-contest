@@ -12,11 +12,26 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
 
-from .models import Task, Submission, Student, Course, Teacher, Topic, Tag
+from .models import Task, Submission, Student, Course, Teacher, Topic, Tag, ClassBonus
 from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
+
+# Баллы, которыми учитель может поощрить/наказать целый класс за атмосферу на уроке —
+# без какой-либо строгой методики, просто когда учителю хочется. Обычные значения ±1/±2,
+# редкие (особо запомнившийся в любую сторону урок) — ±6/±7.
+CLASS_BONUS_PRESETS = [
+    (2, '+2 · Имба-урок, класс был на волне'),
+    (1, '+1 · Было комфортно работать'),
+    (-1, '-1 · Не очень комфортно было'),
+    (-2, '-2 · Вайб не тот, полный кринж'),
+    (7, '+7 · Редко: влюбился в класс на весь урок'),
+    (6, '+6 · Редко: почти влюбился в класс'),
+    (-6, '-6 · Редко: почти совсем не понравилось'),
+    (-7, '-7 · Редко: вообще не понравилось, как сидели'),
+]
+CLASS_BONUS_ALLOWED_VALUES = {points for points, _ in CLASS_BONUS_PRESETS}
 
 
 def _grade_of(school_class):
@@ -39,6 +54,29 @@ LEADERBOARD_COEFFICIENT_CASE = Case(
 
 # score * коэффициент — очки за одну решённую задачу.
 LEADERBOARD_SCORE_EXPR = F('submissions__score') * LEADERBOARD_COEFFICIENT_CASE
+
+
+def _class_leaderboard_rows(school_classes):
+    """Рейтинг классов: средний балл (округлённый до целого) по ВСЕМ ученикам класса
+    + бонусные баллы, которые классу вручную поставил учитель за атмосферу на уроке.
+    school_classes — классы, которые нужно включить в таблицу (одной параллели)."""
+    rows = []
+    for cls in school_classes:
+        students_in_class = Student.objects.filter(school_class=cls).annotate(
+            total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
+        )
+        scores = [student.total_score or 0 for student in students_in_class]
+        avg_score = round(sum(scores) / len(scores)) if scores else 0
+        bonus = ClassBonus.objects.filter(school_class=cls).aggregate(total=Sum('points'))['total'] or 0
+        rows.append({
+            'school_class': cls,
+            'student_count': len(scores),
+            'avg_score': avg_score,
+            'bonus': bonus,
+            'total': avg_score + bonus,
+        })
+    rows.sort(key=lambda row: row['total'], reverse=True)
+    return rows
 
 
 def _cooldown_remaining(submission):
@@ -351,6 +389,35 @@ def leaderboard(request):
         student_row.calc_solved_count = student_row.perfect_count or 0
         students.append(student_row)
 
+    # ---- Рейтинг классов этой параллели (или параллелей, если у учителя классы из
+    # разных параллелей / у админа нет выбранного фильтра) ----
+    all_school_classes = list(
+        Student.objects.order_by('school_class').values_list('school_class', flat=True).distinct()
+    )
+
+    if my_grade is not None:
+        relevant_grades = [my_grade]
+    elif teacher_classes is not None:
+        if selected_class:
+            relevant_grades = [_grade_of(selected_class)]
+        else:
+            relevant_grades = sorted({_grade_of(c) for c in teacher_classes})
+    else:
+        # Суперпользователь без выбранного класса — показываем рейтинг по каждой параллели школы.
+        relevant_grades = sorted({_grade_of(c) for c in all_school_classes})
+
+    class_leaderboards = []
+    for grade in relevant_grades:
+        classes_in_grade = sorted({c for c in all_school_classes if _grade_of(c) == grade})
+        if classes_in_grade:
+            class_leaderboards.append({'grade': grade, 'rows': _class_leaderboard_rows(classes_in_grade)})
+
+    # Классы, которым текущий пользователь (учитель/админ) может ставить бонусные баллы.
+    can_add_class_bonus = request.user.is_staff
+    bonus_classes = teacher_classes if teacher_classes is not None else (
+        all_school_classes if request.user.is_superuser else []
+    )
+
     return render(request, 'leaderboard.html', {
         'students': students,
         'my_grade': my_grade,
@@ -358,7 +425,46 @@ def leaderboard(request):
         'teacher_classes': teacher_classes,
         'selected_class': selected_class,
         'is_full_list': limit is None,
+        'class_leaderboards': class_leaderboards,
+        'can_add_class_bonus': can_add_class_bonus,
+        'bonus_classes': bonus_classes,
+        'class_bonus_presets': CLASS_BONUS_PRESETS,
     })
+
+
+@staff_member_required
+def add_class_bonus(request):
+    """Учитель (или админ) ставит целому классу бонусные/штрафные баллы за атмосферу
+    на уроке — вручную, кнопкой на странице лидерборда. Никакой методики: баллы
+    ставятся просто когда учителю хочется. Учитель может ставить баллы только
+    своим классам; админ (суперпользователь) — любому классу школы."""
+    if request.method != 'POST':
+        return redirect('leaderboard')
+
+    school_class = request.POST.get('school_class', '').strip()
+    comment = request.POST.get('comment', '').strip()
+    try:
+        points = int(request.POST.get('points', ''))
+    except (TypeError, ValueError):
+        points = None
+
+    teacher = _teacher_or_none(request)
+    allowed_classes = teacher.class_list() if teacher is not None else None
+
+    back_url = _safe_back_url(request)
+
+    if points not in CLASS_BONUS_ALLOWED_VALUES:
+        messages.error(request, 'Некорректное количество баллов.')
+    elif not school_class or (allowed_classes is not None and school_class not in allowed_classes):
+        messages.error(request, 'Вы можете ставить баллы только своим классам.')
+    else:
+        ClassBonus.objects.create(
+            school_class=school_class, points=points, given_by=teacher, comment=comment,
+        )
+        sign = '+' if points > 0 else ''
+        messages.success(request, f'Классу {school_class} начислено {sign}{points} балл(ов).')
+
+    return redirect(back_url or 'leaderboard')
 
 
 def register(request):

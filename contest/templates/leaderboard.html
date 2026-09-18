@@ -83,6 +83,109 @@
             </div>
         </div>
 
+        {% if class_leaderboards %}
+        <div class="mt-5">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h3 class="fw-bold mb-0" style="color: #1a1a4b;">
+                    🏫 {% t "Рейтинг классов параллели" %}
+                </h3>
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" data-bs-toggle="collapse" data-bs-target="#classBonusCriteria">
+                    <i class="bi bi-question-circle me-1"></i>{% t "Узнать критерии" %}
+                </button>
+            </div>
+
+            <div class="collapse mb-4" id="classBonusCriteria">
+                <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+                    <p class="mb-2">{% t "Итог класса = средний балл всех его учеников (округлённый до целого) + баллы, которые классу поставил учитель за атмосферу на уроке." %}</p>
+                    <p class="fw-bold mb-2">{% t "Как учитель ставит баллы классу:" %}</p>
+                    <ul class="mb-2">
+                        <li>{% t "+2 · Имба-урок, класс был на волне" %}</li>
+                        <li>{% t "+1 · Было комфортно работать" %}</li>
+                        <li>{% t "-1 · Не очень комфортно было" %}</li>
+                        <li>{% t "-2 · Вайб не тот, полный кринж" %}</li>
+                        <li>{% t "+6 / +7 · Редко: почти влюбился / влюбился в класс на весь урок" %}</li>
+                        <li>{% t "-6 / -7 · Редко: почти совсем / вообще не понравилось, как сидели" %}</li>
+                    </ul>
+                    <p class="text-muted small mb-0">{% t "Никакой строгой методики — учитель ставит баллы классу просто когда ему хочется. Это про вайб на уроке, а не про оценки." %}</p>
+                </div>
+            </div>
+
+            {% for board in class_leaderboards %}
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-4">
+                <div class="card-header bg-white fw-bold py-3" style="color: #1a1a4b;">
+                    {% t "Параллель" %} {{ board.grade }}
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead style="background-color: #f4f6f9; color: #1a1a4b;">
+                            <tr>
+                                <th class="py-3 text-center" style="width: 10%;">{% t "Место" %}</th>
+                                <th class="py-3">{% t "Класс" %}</th>
+                                <th class="py-3 text-center">{% t "Средний балл" %}</th>
+                                <th class="py-3 text-center">{% t "Баллы учителя" %}</th>
+                                <th class="py-3 text-center pe-4">{% t "Итого" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in board.rows %}
+                            <tr class="{% if forloop.counter <= 3 %}bg-light{% endif %}">
+                                <td class="text-center fw-bold">
+                                    {% if forloop.counter == 1 %}🥇
+                                    {% elif forloop.counter == 2 %}🥈
+                                    {% elif forloop.counter == 3 %}🥉
+                                    {% else %}<span class="text-muted">{{ forloop.counter }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 fw-bold" style="color: #1a1a4b;">{{ row.school_class }}</td>
+                                <td class="text-center">{{ row.avg_score }}</td>
+                                <td class="text-center {% if row.bonus > 0 %}text-success{% elif row.bonus < 0 %}text-danger{% endif %}">
+                                    {% if row.bonus > 0 %}+{% endif %}{{ row.bonus }}
+                                </td>
+                                <td class="text-center pe-4 fw-bold fs-5" style="color: #008b42;">{{ row.total }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">{% t "Пока нет данных для рейтинга классов." %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if can_add_class_bonus and bonus_classes %}
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
+                <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Начислить баллы классу" %}</h5>
+                <form method="post" action="{% url 'add_class_bonus' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="back" value="{{ request.get_full_path }}">
+                    <div class="row g-2 align-items-center mb-3">
+                        <div class="col-auto">
+                            <select name="school_class" class="form-select form-select-sm" required>
+                                {% for cls in bonus_classes %}
+                                <option value="{{ cls }}">{{ cls }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto flex-grow-1">
+                            <input type="text" name="comment" class="form-control form-control-sm" placeholder="{% t 'Комментарий (необязательно)' %}">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for points, label in class_bonus_presets %}
+                        <button type="submit" name="points" value="{{ points }}"
+                                class="btn btn-sm rounded-pill {% if points > 0 %}btn-outline-success{% else %}btn-outline-danger{% endif %}">
+                            {% t label %}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
     </div>
 </div>
 {% endblock %}

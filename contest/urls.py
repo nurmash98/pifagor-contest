@@ -15,6 +15,7 @@ urlpatterns = [
 
     # Рейтинг и профиль
     path('leaderboard/', views.leaderboard, name='leaderboard'),
+    path('leaderboard/class-bonus/', views.add_class_bonus, name='add_class_bonus'),
     path('profile/', views.profile_view, name='profile'),
 
     # Курсы

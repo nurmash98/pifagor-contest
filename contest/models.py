@@ -151,6 +151,29 @@ class Teacher(models.Model):
 
 
 
+class ClassBonus(models.Model):
+    """Баллы, которые учитель вручную ставит целому классу — за атмосферу/вайб на уроке.
+    Это НЕ про успеваемость (та считается по решённым задачам) — учитель ставит баллы
+    просто когда ему хочется, без какой-либо строгой методики или обязательных условий."""
+    school_class = models.CharField(max_length=10, verbose_name="Класс")
+    points = models.IntegerField(verbose_name="Баллы")
+    given_by = models.ForeignKey(
+        'Teacher', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='class_bonuses', verbose_name="Кто поставил"
+    )
+    comment = models.CharField(max_length=255, blank=True, verbose_name="Комментарий")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Баллы классу"
+        verbose_name_plural = "Баллы классам"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        sign = '+' if self.points > 0 else ''
+        return f"{self.school_class}: {sign}{self.points}"
+
+
 class Submission(models.Model):
     STATUS_CHOICES = [
         ('TODO', 'В Бэклоге'),
