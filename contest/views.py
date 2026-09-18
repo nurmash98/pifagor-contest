@@ -267,15 +267,18 @@ def submit_code(request, submission_id):
 
 @login_required
 def profile_view(request):
-    """Профиль ученика: общий балл (как в лидерборде — коэффициент сложности * оценка)
-    и количество решённых задач. Средний балл здесь не показывается."""
+    """Профиль ученика: общий балл (как в лидерборде — коэффициент сложности * оценка за
+    КАЖДУЮ проверенную задачу) и количество РЕШЁННЫХ задач — тех, где оценка 10/10
+    (а не любых проверенных). Средний балл здесь не показывается."""
     student = get_object_or_404(Student, user=request.user)
 
+    # Вся история проверенных задач (для списка "История решений" — с любой оценкой).
     solved_submissions = Submission.objects.filter(
         student=student, status='DONE'
     ).select_related('task').order_by('-updated_at')
 
-    solved_count = solved_submissions.count()
+    # "Решено" — только задачи, где оценка максимальная (10/10).
+    solved_count = solved_submissions.filter(score=10).count()
     total_score = sum(
         sub.score * LEADERBOARD_COEFFICIENT_BY_LEVEL.get(sub.task.level, 0)
         for sub in solved_submissions
@@ -315,14 +318,15 @@ def leaderboard(request):
             scope_label = selected_class or ', '.join(teacher_classes)
             limit = None  # Учитель видит полный список своих классов, без топ-10
 
-    # Общий балл = сумма (коэффициент сложности задачи * оценка учителя) по всем решённым задачам.
-    # При равном общем балле сравниваем по количеству ПОЛНОСТЬЮ решённых задач — тех,
-    # где учитель поставил максимальную оценку (10 баллов), а не любых проверенных.
+    # Общий балл = сумма (коэффициент сложности задачи * оценка учителя) по КАЖДОЙ проверенной
+    # задаче. «Решено» — это только задачи с оценкой 10/10 (perfect_count), а не любые
+    # проверенные (graded_count используем лишь чтобы не показывать тех, кто ничего не
+    # отправлял или ещё ничего не проверено).
     students_query = Student.objects.annotate(
         total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
-        solved_count=Count('submissions', filter=Q(submissions__status='DONE')),
+        graded_count=Count('submissions', filter=Q(submissions__status='DONE')),
         perfect_count=Count('submissions', filter=Q(submissions__status='DONE', submissions__score=10)),
-    ).filter(solved_count__gt=0).order_by('-total_score', '-perfect_count', '-solved_count')
+    ).filter(graded_count__gt=0).order_by('-total_score', '-perfect_count', '-graded_count')
 
     if my_grade is not None:
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
@@ -343,8 +347,8 @@ def leaderboard(request):
     students = []
     for student_row in students_list:
         student_row.calc_total_score = student_row.total_score or 0
-        student_row.calc_solved_count = student_row.solved_count or 0
-        student_row.calc_perfect_count = student_row.perfect_count or 0
+        # "Решено задач" в таблице — это perfect_count (оценка 10/10), не graded_count.
+        student_row.calc_solved_count = student_row.perfect_count or 0
         students.append(student_row)
 
     return render(request, 'leaderboard.html', {
