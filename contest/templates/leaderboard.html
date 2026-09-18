@@ -7,8 +7,16 @@
     <div class="col-lg-10">
 
         <div class="text-center mb-5 mt-3">
-            <h2 class="fw-bold" style="color: #1a1a4b;">🏆 Рейтинг учеников (Топ 10)</h2>
-            <p class="text-muted">Ранжирование по общей сумме баллов за все решенные задачи</p>
+            <h2 class="fw-bold" style="color: #1a1a4b;">
+                🏆 Рейтинг учеников{% if my_grade %} — {{ my_grade }} классы{% endif %} (Топ 10)
+            </h2>
+            <p class="text-muted">
+                {% if my_grade %}
+                    Сравнение только среди вашей параллели ({{ my_grade }}А, {{ my_grade }}Б и т.д.)
+                {% else %}
+                    Ранжирование по общей сумме баллов за все решенные задачи
+                {% endif %}
+            </p>
         </div>
 
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">

@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -13,6 +14,12 @@ from .forms import StudentRegistrationForm
 from django.contrib.admin.views.decorators import staff_member_required
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
+
+
+def _grade_of(school_class):
+    """Параллель ученика — числовая часть класса без буквы: '7А' -> '7', '10Б' -> '10'."""
+    match = re.match(r'\d+', (school_class or '').strip())
+    return match.group() if match else (school_class or '').strip()
 
 
 def _cooldown_remaining(submission):
@@ -192,26 +199,36 @@ def profile_view(request):
     return render(request, 'profile.html', context)
 
 
+@login_required
 def leaderboard(request):
-    """Лидерборд: Топ-10 учеников с общим и средним баллом."""
+    """Лидерборд: Топ-10 учеников той же параллели (например, все 7-е классы вместе,
+    независимо от буквы). Ученик видит только свою параллель."""
+    student = Student.objects.filter(user=request.user).first()
+    my_grade = _grade_of(student.school_class) if student else None
+
     # Используем submissions__score, как было в ваших моделях
     students_query = Student.objects.annotate(
         total_score=Sum('submissions__score', filter=Q(submissions__status='DONE')),
         solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
-    ).order_by('-total_score', '-solved_count')[:10]
+    ).order_by('-total_score', '-solved_count')
+
+    if my_grade is not None:
+        # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
+        # а нужна именно числовая параллель без буквы.
+        students_query = [s for s in students_query if _grade_of(s.school_class) == my_grade]
 
     students = []
-    for student in students_query:
-        total = student.total_score or 0
-        solved = student.solved_count or 0
+    for student_row in list(students_query)[:10]:
+        total = student_row.total_score or 0
+        solved = student_row.solved_count or 0
         avg_score = round(total / solved, 1) if solved > 0 else 0
 
-        student.calc_total_score = total
-        student.calc_solved_count = solved
-        student.calc_average_score = avg_score
-        students.append(student)
+        student_row.calc_total_score = total
+        student_row.calc_solved_count = solved
+        student_row.calc_average_score = avg_score
+        students.append(student_row)
 
-    return render(request, 'leaderboard.html', {'students': students})
+    return render(request, 'leaderboard.html', {'students': students, 'my_grade': my_grade})
 
 
 def register(request):
