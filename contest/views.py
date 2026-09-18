@@ -1,7 +1,10 @@
 import re
 from datetime import timedelta
+from urllib.parse import quote
 
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
@@ -32,43 +35,71 @@ def _cooldown_remaining(submission):
     return SUBMISSION_COOLDOWN - elapsed
 
 
+def _safe_back_url(request):
+    """Достаём ?back=... из запроса и проверяем, что это безопасная локальная ссылка,
+    чтобы кнопка 'Назад' вела туда, откуда пользователь пришёл (каталог, курс, Kanban)."""
+    raw_back = request.GET.get('back') or request.POST.get('back')
+    if raw_back and url_has_allowed_host_and_scheme(
+        raw_back, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return raw_back
+    return None
+
+
 @login_required
 def all_tasks_view(request):
-    """Главная страница: каталог всех задач в виде таблицы."""
-
-    # Если это преподаватель (админ) — отправляем его в кабинет учителя
-    if request.user.is_staff:
-        return redirect('teacher_dashboard')
-
-    # Если это обычный ученик — показываем каталог задач
-    student = get_object_or_404(Student, user=request.user)
+    """Главная страница: каталог всех задач в виде таблицы.
+    Ученику показываем его статус по каждой задаче; преподавателю — тот же каталог
+    в режиме просмотра (без статусов решения, которых у него просто нет)."""
+    student = Student.objects.filter(user=request.user).first()
 
     level_filter = request.GET.get('level', '')
     tasks = Task.objects.prefetch_related('tags').all()
     if level_filter in ['A', 'B', 'C']:
         tasks = tasks.filter(level=level_filter)
 
-    # Привязываем существующие решения ученика к задачам
-    user_submissions = {
-        sub.task_id: sub
-        for sub in Submission.objects.filter(student=student)
-    }
-
-    for task in tasks:
-        task.user_sub = user_submissions.get(task.id)
+    if student is not None:
+        # Привязываем существующие решения ученика к задачам
+        user_submissions = {
+            sub.task_id: sub
+            for sub in Submission.objects.filter(student=student)
+        }
+        for task in tasks:
+            task.user_sub = user_submissions.get(task.id)
+    else:
+        for task in tasks:
+            task.user_sub = None
 
     context = {
         'tasks': tasks,
         'current_level': level_filter,
+        'readonly': student is None,
     }
     return render(request, 'all_tasks.html', context)
 
 
 @login_required
 def task_detail(request, task_id):
-    """Детальная страница задачи и ручная отправка на проверку преподавателю."""
-    student = get_object_or_404(Student, user=request.user)
+    """Детальная страница задачи и ручная отправка на проверку преподавателю.
+    Преподаватель тоже может открыть любую задачу — но только для просмотра,
+    без формы отправки решения (у него нет своих посылок)."""
     task = get_object_or_404(Task, id=task_id)
+    student = Student.objects.filter(user=request.user).first()
+    back_url = _safe_back_url(request)
+
+    if student is None:
+        # Преподаватель/админ — только просмотр условия задачи
+        context = {
+            'task': task,
+            'submission': None,
+            'cooldown_hours': None,
+            'back_url': back_url or reverse('all_tasks'),
+            'readonly': True,
+        }
+        return render(request, 'task_detail.html', context)
+
+    task_url = reverse('task_detail', args=[task.id])
+    task_url_with_back = f'{task_url}?back={quote(back_url, safe="")}' if back_url else task_url
 
     submission = Submission.objects.filter(student=student, task=task).first()
 
@@ -77,7 +108,7 @@ def task_detail(request, task_id):
         active_count = Submission.objects.filter(student=student, status='IN_PROGRESS').count()
         if active_count >= 2:
             messages.warning(request, 'Вы не можете взять более 2 задач одновременно. Завершите текущие задачи!')
-            return redirect('all_tasks')
+            return redirect(back_url or 'all_tasks')
         submission = Submission.objects.create(student=student, task=task, status='IN_PROGRESS')
 
     cooldown = _cooldown_remaining(submission)
@@ -87,7 +118,7 @@ def task_detail(request, task_id):
         if cooldown:
             hours_left = int(cooldown.total_seconds() // 3600) + 1
             messages.warning(request, f'Эту задачу можно отправлять раз в 24 часа. Попробуйте снова через {hours_left} ч.')
-            return redirect('task_detail', task_id=task.id)
+            return redirect(task_url_with_back)
 
         code = request.POST.get('code', '')
         submission.code = code
@@ -96,12 +127,14 @@ def task_detail(request, task_id):
         submission.save()
 
         messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
-        return redirect('task_detail', task_id=task.id)
+        return redirect(task_url_with_back)
 
     context = {
         'task': task,
         'submission': submission,
         'cooldown_hours': int(cooldown.total_seconds() // 3600) + 1 if cooldown else None,
+        'back_url': back_url or reverse('all_tasks'),
+        'readonly': False,
     }
     return render(request, 'task_detail.html', context)
 
@@ -201,10 +234,23 @@ def profile_view(request):
 
 @login_required
 def leaderboard(request):
-    """Лидерборд: Топ-10 учеников той же параллели (например, все 7-е классы вместе,
-    независимо от буквы). Ученик видит только свою параллель."""
+    """Лидерборд. Ученик видит топ-10 своей параллели (например, все 7-е классы вместе,
+    независимо от буквы). Учитель видит топ-10 только своих классов (по списку в его профиле).
+    Админ (суперпользователь) без своего класса видит топ-10 по всей школе."""
     student = Student.objects.filter(user=request.user).first()
-    my_grade = _grade_of(student.school_class) if student else None
+    my_grade = None
+    class_filter = None
+    scope_label = None
+
+    if student is not None:
+        my_grade = _grade_of(student.school_class)
+        scope_label = f'{my_grade} классы'
+    elif not request.user.is_superuser:
+        teacher = Teacher.objects.filter(user=request.user).first()
+        if teacher is not None:
+            class_filter = teacher.class_list()
+            if class_filter:
+                scope_label = ', '.join(class_filter)
 
     # Используем submissions__score, как было в ваших моделях
     students_query = Student.objects.annotate(
@@ -216,6 +262,9 @@ def leaderboard(request):
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
         # а нужна именно числовая параллель без буквы.
         students_query = [s for s in students_query if _grade_of(s.school_class) == my_grade]
+    elif class_filter is not None:
+        # Учитель — только его классы, точное совпадение (например "10А", "11Б")
+        students_query = [s for s in students_query if s.school_class in class_filter]
 
     students = []
     for student_row in list(students_query)[:10]:
@@ -228,7 +277,11 @@ def leaderboard(request):
         student_row.calc_average_score = avg_score
         students.append(student_row)
 
-    return render(request, 'leaderboard.html', {'students': students, 'my_grade': my_grade})
+    return render(request, 'leaderboard.html', {
+        'students': students,
+        'my_grade': my_grade,
+        'scope_label': scope_label,
+    })
 
 
 def register(request):
@@ -262,7 +315,7 @@ def register(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('all_tasks')
+        return redirect('teacher_dashboard' if request.user.is_staff else 'all_tasks')
 
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -275,7 +328,7 @@ def login_view(request):
             next_url = request.GET.get('next')
             if next_url:
                 return redirect(next_url)
-            return redirect('all_tasks')
+            return redirect('teacher_dashboard' if user.is_staff else 'all_tasks')
         else:
             return render(request, 'login.html', {'error': 'Неверный логин или пароль'})
 

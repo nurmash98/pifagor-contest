@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="mb-3">
-    <a href="{% url 'all_tasks' %}" class="text-decoration-none text-muted small">← Назад к каталогу задач</a>
+    <a href="{{ back_url }}" class="text-decoration-none text-muted small">← Назад</a>
 </div>
 
 <div class="row g-4">
@@ -69,6 +69,7 @@
             </ul>
         </div>
 
+        {% if not readonly %}
         <!-- Предупреждение об ИИ -->
         <div class="alert alert-danger border-0 shadow-sm rounded-4 p-3 d-flex align-items-center" role="alert">
             <div class="fs-3 me-3">⚠️</div>
@@ -77,10 +78,19 @@
                 Чтобы не обманывать себя, не используйте ИИ — за это будут снижены баллы.
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Правая колонка: Форма отправки решения -->
     <div class="col-lg-6">
+        {% if readonly %}
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
+                <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Просмотр преподавателя</h5>
+                <p class="text-muted mb-0">
+                    Вы просматриваете задачу как преподаватель. Форма отправки решения доступна только ученикам.
+                </p>
+            </div>
+        {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Отправка решения</h5>
 
@@ -109,6 +119,7 @@
                 </div>
             </form>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

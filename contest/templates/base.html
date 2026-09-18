@@ -106,8 +106,14 @@
                                     <i class="bi bi-briefcase-fill me-1"></i> Кабинет преподавателя
                                 </a>
                             </li>
-                            <li class="nav-item me-3">
+                            <li class="nav-item">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">Все задачи</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">Курсы</a>
+                            </li>
+                            <li class="nav-item me-3">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">Лидерборд</a>
                             </li>
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->

@@ -27,7 +27,7 @@
                         {% endif %}
                     </div>
                     <p class="card-text text-muted small mb-3">{{ task.description|truncatewords:12 }}</p>
-                    <a href="{% url 'task_detail' task.id %}" class="btn btn-pifagor-blue btn-sm w-100">
+                    <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-blue btn-sm w-100">
                         Взять задачу →
                     </a>
                 </div>
@@ -62,7 +62,7 @@
 
                     <p class="card-text text-muted small mb-3">{{ sub.task.description|truncatewords:10 }}</p>
 
-                    <a href="{% url 'task_detail' sub.task.id %}" class="btn btn-pifagor-green btn-sm w-100">
+                    <a href="{% url 'task_detail' sub.task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-green btn-sm w-100">
                         Перейти к решению →
                     </a>
                 </div>

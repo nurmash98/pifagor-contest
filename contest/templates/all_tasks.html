@@ -38,7 +38,9 @@
                         <th class="py-3 px-4" style="width: 5%;">#</th>
                         <th class="py-3" style="width: 45%;">Название задачи</th>
                         <th class="py-3 text-center" style="width: 15%;">Уровень</th>
+                        {% if not readonly %}
                         <th class="py-3 text-center" style="width: 15%;">Статус</th>
+                        {% endif %}
                         <th class="py-3 text-end px-4" style="width: 20%;">Действие</th>
                     </tr>
                 </thead>
@@ -47,7 +49,7 @@
                     <tr>
                         <td class="px-4 text-muted fw-bold">{{ forloop.counter }}</td>
                         <td class="py-3">
-                            <a href="{% url 'task_detail' task.id %}" class="fw-bold text-decoration-none" style="color: #1a1a4b;">
+                            <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="fw-bold text-decoration-none" style="color: #1a1a4b;">
                                 {{ task.title }}
                             </a>
                             <div class="text-muted small text-truncate" style="max-width: 400px;">
@@ -70,6 +72,7 @@
                                 <span class="badge badge-level-C px-3 py-1">Уровень C</span>
                             {% endif %}
                         </td>
+                        {% if not readonly %}
                         <td class="text-center">
                             {% if task.user_sub %}
                                 {% if task.user_sub.status == 'DONE' %}
@@ -83,15 +86,16 @@
                                 <span class="badge bg-light text-muted border px-3 py-2">Не начато</span>
                             {% endif %}
                         </td>
+                        {% endif %}
                         <td class="text-end px-4">
-                            <a href="{% url 'task_detail' task.id %}" class="btn btn-pifagor-green btn-sm px-3">
-                                {% if task.user_sub %}Просмотр / Решить{% else %}Взять задачу{% endif %}
+                            <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-green btn-sm px-3">
+                                {% if readonly %}Просмотр{% elif task.user_sub %}Просмотр / Решить{% else %}Взять задачу{% endif %}
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">Задачи не найдены.</td>
+                        <td colspan="{% if readonly %}4{% else %}5{% endif %}" class="text-center py-5 text-muted">Задачи не найдены.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
