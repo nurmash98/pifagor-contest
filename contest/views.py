@@ -900,7 +900,6 @@ def teacher_dashboard(request):
 
     pending_submissions = Submission.objects.filter(status='TESTING')
     graded_submissions = Submission.objects.filter(status='DONE')
-    students_qs = Student.objects.all()
     my_courses = Course.objects.all()
 
     if teacher is not None:
@@ -908,22 +907,14 @@ def teacher_dashboard(request):
         class_list = teacher.class_list()
         pending_submissions = pending_submissions.filter(student__school_class__in=class_list)
         graded_submissions = graded_submissions.filter(student__school_class__in=class_list)
-        students_qs = students_qs.filter(school_class__in=class_list)
         my_courses = teacher.courses.all()
 
     pending_submissions = pending_submissions.order_by('updated_at')
     graded_submissions = graded_submissions.order_by('-updated_at')[:20]
 
-    # Лидерборд (Топ-10) — по всем ученикам для админа, по своим классам для учителя
-    top_students = students_qs.annotate(
-        total_score=Sum('submissions__score', filter=Q(submissions__status='DONE')),
-        solved_count=Count('submissions', filter=Q(submissions__status='DONE'))
-    ).order_by('-total_score')[:10]
-
     context = {
         'pending_submissions': pending_submissions,
         'graded_submissions': graded_submissions,
-        'top_students': top_students,
         'teacher': teacher,
         'my_courses': my_courses,
     }

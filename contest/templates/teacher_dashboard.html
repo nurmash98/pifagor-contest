@@ -48,7 +48,7 @@
 
     <!-- Колонка 1: Требуют проверки -->
     <div class="col-md-7 mb-4">
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card border-0 shadow-sm rounded-4">
             <div class="card-header bg-warning text-dark fw-bold rounded-top-4 py-3">
                 🔥 Ожидают проверки ({{ pending_submissions.count }})
             </div>
@@ -66,23 +66,6 @@
                     <li class="list-group-item p-4 text-center text-muted">Ура! Все задачи проверены.</li>
                     {% endfor %}
                 </ul>
-            </div>
-        </div>
-        
-        <!-- Лидерборд -->
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-header bg-white fw-bold py-3">🏆 Топ учеников</div>
-            <div class="card-body p-0">
-                <table class="table table-hover mb-0">
-                    <tbody>
-                        {% for student in top_students %}
-                        <tr>
-                            <td class="ps-3">{{ forloop.counter }}. {{ student.full_name }}</td>
-                            <td class="text-end pe-3 fw-bold text-success">{{ student.total_score|default:"0" }} баллов</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>

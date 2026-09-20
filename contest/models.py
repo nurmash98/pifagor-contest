@@ -61,6 +61,12 @@ class Task(models.Model):
     def get_display_output_example(self, lang='ru'):
         return self.output_example_kk if lang == 'kk' and self.output_example_kk else self.output_example
 
+    class Meta:
+        # Задачи по умолчанию отсортированы по уровню (легкие → сложные), затем по названию.
+        # Это автоматически сортирует задачи ВЕЗДЕ, где они выводятся без своего явного
+        # order_by — каталог задач, список задач внутри темы курса и т.п.
+        ordering = ['level', 'title']
+
     def __str__(self):
         label = f"[{self.level}] {self.title}"
         if self.pk:
