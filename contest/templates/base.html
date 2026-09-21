@@ -202,12 +202,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     {% if request.user.is_authenticated %}
-    <!-- Автовыход по бездействию: если 10 минут не было никакой активности (мышь,
+    <!-- Автовыход по бездействию: если 60 минут не было никакой активности (мышь,
          клавиатура, скролл, тач) — перекидываем на выход. Таймер сбрасывается при
          любой активности, так что активная работа не прерывается. -->
     <script>
     (function () {
-        var IDLE_LIMIT_MS = 10 * 60 * 1000; // 10 минут
+        var IDLE_LIMIT_MS = 60 * 60 * 1000; // 60 минут
         var logoutUrl = '{% url "logout" %}';
         var idleTimer = null;
 
