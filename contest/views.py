@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timedelta
 from urllib.parse import quote
@@ -14,9 +15,11 @@ from django.utils import timezone
 
 from .models import Task, Submission, Student, Course, Teacher, Topic, Tag, ClassBonus
 from .forms import StudentRegistrationForm
+from .ai_review import run_ai_review, is_configured as ai_review_is_configured
 from django.contrib.admin.views.decorators import staff_member_required
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
+logger = logging.getLogger(__name__)
 
 # Баллы, которыми учитель может поощрить/наказать целый класс за атмосферу на уроке —
 # без какой-либо строгой методики, просто когда учителю хочется. Обычные значения ±1/±2;
@@ -97,6 +100,40 @@ def _safe_back_url(request):
     ):
         return raw_back
     return None
+
+
+def _ai_review_is_stale(submission):
+    """Нужно ли (пере)запускать ИИ-проверку: ещё не пробовали ни разу, либо ученик
+    отправил код заново после последней попытки (last_submitted_at обновился)."""
+    if submission.ai_checked_at is None:
+        return True
+    if submission.last_submitted_at and submission.last_submitted_at > submission.ai_checked_at:
+        return True
+    return False
+
+
+def _refresh_ai_review(submission):
+    """Запускает ИИ-проверку решения и сохраняет результат прямо в отправке — только
+    подсказка (score/feedback/plagiarism_note), официальный балл преподаватель всё
+    равно ставит сам. ai_checked_at ставится ВСЕГДА (успех или нет), чтобы не повторять
+    попытку на каждой загрузке страницы, если она уже не удалась; ai_reviewed_at — только
+    при успехе. Никогда не бросает исключение наружу (вызывается уже ПОСЛЕ
+    submission.save() с новым кодом — не должно мешать ученику отправить решение)."""
+    try:
+        result = run_ai_review(submission)
+    except Exception:
+        logger.exception('Непредвиденная ошибка ИИ-проверки решения #%s', submission.pk)
+        result = {'available': False}
+
+    submission.ai_checked_at = timezone.now()
+    update_fields = ['ai_checked_at']
+    if result.get('available'):
+        submission.ai_score = result.get('score')
+        submission.ai_feedback = result.get('feedback', '')
+        submission.ai_plagiarism_note = result.get('plagiarism_note', '')
+        submission.ai_reviewed_at = timezone.now()
+        update_fields += ['ai_score', 'ai_feedback', 'ai_plagiarism_note', 'ai_reviewed_at']
+    submission.save(update_fields=update_fields)
 
 
 def _get_content_lang(request):
@@ -210,6 +247,7 @@ def task_detail(request, task_id):
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
         submission.save()
+        _refresh_ai_review(submission)
 
         messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
         return redirect(task_url_with_back)
@@ -296,6 +334,7 @@ def submit_code(request, submission_id):
         submission.status = 'TESTING'
         submission.last_submitted_at = timezone.now()
         submission.save()
+        _refresh_ai_review(submission)
 
         messages.success(request, 'Код отправлен на проверку преподавателю!')
 
@@ -944,4 +983,13 @@ def grade_submission(request, submission_id):
         messages.success(request, f'Оценка {score}/10 сохранена. Ученик получит ваш комментарий!')
         return redirect('teacher_dashboard')
 
-    return render(request, 'grade_submission.html', {'submission': submission})
+    # Подстраховка: если ИИ-проверка ещё не бегала для этой отправки (например, решение
+    # существует с тех пор, как эта функция появилась, либо предыдущая попытка не
+    # прошла) — пробуем прямо сейчас, перед тем как показать страницу учителю.
+    if ai_review_is_configured() and _ai_review_is_stale(submission):
+        _refresh_ai_review(submission)
+
+    return render(request, 'grade_submission.html', {
+        'submission': submission,
+        'ai_configured': ai_review_is_configured(),
+    })

@@ -93,6 +93,26 @@
             </div>
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
+            {% if submission.ai_reviewed_at %}
+            <div class="alert alert-info rounded-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>🤖 {% t "Подсказка от ИИ" %}</strong>
+                    {% if submission.ai_score is not None %}
+                        <span class="badge bg-primary">{{ submission.ai_score }}/10</span>
+                    {% endif %}
+                </div>
+                {% if submission.ai_feedback %}
+                    <p class="small mb-2">{{ submission.ai_feedback }}</p>
+                {% endif %}
+                {% if submission.ai_plagiarism_note %}
+                    <div class="alert alert-warning small mb-2 py-2 px-3">
+                        ⚠️ <strong>{% t "Похоже на готовое решение из интернета:" %}</strong> {{ submission.ai_plagiarism_note }}
+                    </div>
+                {% endif %}
+                <p class="text-muted small mb-0">{% t "Это подсказка ИИ, не финальная оценка — её ставит преподаватель." %}</p>
+            </div>
+            {% endif %}
+
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
 
             {% if cooldown_hours %}

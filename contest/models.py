@@ -200,5 +200,25 @@ class Submission(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Автоматическая ИИ-проверка при отправке решения — ПОДСКАЗКА ученику и преподавателю,
+    # не официальная оценка. Официальный балл всё равно ставит преподаватель вручную (см. score
+    # выше). Считается один раз на каждую отправку кода — ai_reviewed_at сравнивается с
+    # last_submitted_at, чтобы понять, устарела ли проверка после того как ученик отправил
+    # код заново (contest/ai_review.py).
+    ai_score = models.IntegerField(null=True, blank=True, verbose_name="Оценка ИИ (подсказка, не финальная)")
+    ai_feedback = models.TextField(blank=True, verbose_name="Обратная связь от ИИ")
+    ai_plagiarism_note = models.TextField(
+        blank=True, verbose_name="Заметка ИИ о найденном похожем решении (GitHub/интернет)"
+    )
+    ai_reviewed_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Когда прошла ИИ-проверка (успешно)"
+    )
+    ai_checked_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Когда была последняя ПОПЫТКА ИИ-проверки",
+        help_text="Ставится при любой попытке (успешной или нет) — чтобы не повторять "
+                  "проверку на каждой загрузке страницы, если она уже не удалась.",
+    )
+
     def __str__(self):
         return f"{self.student.full_name} - {self.task.title} ({self.status})"
