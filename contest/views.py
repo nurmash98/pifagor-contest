@@ -175,6 +175,17 @@ def all_tasks_view(request):
     if level_filter in ['A', 'B', 'C']:
         tasks = tasks.filter(level=level_filter)
 
+    # Фильтр по тегу — доступен и ученикам, и преподавателям (общий каталог задач).
+    tag_id_raw = request.GET.get('tag', '')
+    selected_tag_id = None
+    if tag_id_raw:
+        try:
+            selected_tag_id = int(tag_id_raw)
+        except (TypeError, ValueError):
+            selected_tag_id = None
+    if selected_tag_id:
+        tasks = tasks.filter(tags__id=selected_tag_id)
+
     tasks = list(tasks)
     _apply_task_language(tasks, lang)
 
@@ -193,6 +204,8 @@ def all_tasks_view(request):
     context = {
         'tasks': tasks,
         'current_level': level_filter,
+        'current_tag': selected_tag_id,
+        'all_tags': Tag.objects.all(),
         'readonly': student is None,
     }
     return render(request, 'all_tasks.html', context)

@@ -13,13 +13,26 @@
     <!-- Фильтры по уровням -->
     <div class="col-md-6 text-md-end mt-3 mt-md-0">
         <div class="btn-group shadow-sm" role="group">
-            <a href="{% url 'all_tasks' %}" class="btn btn-outline-dark btn-sm {% if not current_level %}active{% endif %}">{% t "Все" %}</a>
-            <a href="{% url 'all_tasks' %}?level=A" class="btn btn-outline-success btn-sm {% if current_level == 'A' %}active{% endif %}">{% t "Уровень A" %}</a>
-            <a href="{% url 'all_tasks' %}?level=B" class="btn btn-outline-warning btn-sm {% if current_level == 'B' %}active{% endif %}">{% t "Уровень B" %}</a>
-            <a href="{% url 'all_tasks' %}?level=C" class="btn btn-outline-danger btn-sm {% if current_level == 'C' %}active{% endif %}">{% t "Уровень C" %}</a>
+            <a href="{% url 'all_tasks' %}{% if current_tag %}?tag={{ current_tag }}{% endif %}" class="btn btn-outline-dark btn-sm {% if not current_level %}active{% endif %}">{% t "Все" %}</a>
+            <a href="{% url 'all_tasks' %}?level=A{% if current_tag %}&tag={{ current_tag }}{% endif %}" class="btn btn-outline-success btn-sm {% if current_level == 'A' %}active{% endif %}">{% t "Уровень A" %}</a>
+            <a href="{% url 'all_tasks' %}?level=B{% if current_tag %}&tag={{ current_tag }}{% endif %}" class="btn btn-outline-warning btn-sm {% if current_level == 'B' %}active{% endif %}">{% t "Уровень B" %}</a>
+            <a href="{% url 'all_tasks' %}?level=C{% if current_tag %}&tag={{ current_tag }}{% endif %}" class="btn btn-outline-danger btn-sm {% if current_level == 'C' %}active{% endif %}">{% t "Уровень C" %}</a>
         </div>
     </div>
 </div>
+
+{% if all_tags %}
+<!-- Фильтр по тегам — общий для учеников и преподавателей -->
+<div class="mb-4 d-flex flex-wrap align-items-center gap-2">
+    <span class="text-muted small fw-semibold me-1">🏷 {% t "Теги:" %}</span>
+    <a href="{% url 'all_tasks' %}{% if current_level %}?level={{ current_level }}{% endif %}"
+       class="btn btn-outline-secondary btn-sm rounded-pill {% if not current_tag %}active{% endif %}">{% t "Все теги" %}</a>
+    {% for tag in all_tags %}
+    <a href="{% url 'all_tasks' %}?tag={{ tag.id }}{% if current_level %}&level={{ current_level }}{% endif %}"
+       class="btn btn-outline-secondary btn-sm rounded-pill {% if current_tag == tag.id %}active{% endif %}">#{{ tag.name }}</a>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% if messages %}
     {% for message in messages %}
