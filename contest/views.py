@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timedelta
 from urllib.parse import quote
@@ -14,7 +15,10 @@ from django.utils import timezone
 
 from .models import Task, Submission, Student, Course, Teacher, Topic, Tag, ClassBonus
 from .forms import StudentRegistrationForm
+from .autotest import run_autotests
 from django.contrib.admin.views.decorators import staff_member_required
+
+logger = logging.getLogger(__name__)
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
 
@@ -86,6 +90,37 @@ def _cooldown_remaining(submission):
     if elapsed >= SUBMISSION_COOLDOWN:
         return None
     return SUBMISSION_COOLDOWN - elapsed
+
+
+def _autotest_is_stale(submission):
+    """Нужно ли (пере)запускать автотесты: ещё не пробовали ни разу, либо ученик
+    отправил код заново после последнего прогона (last_submitted_at обновился)."""
+    if submission.autotest_checked_at is None:
+        return True
+    if submission.last_submitted_at and submission.last_submitted_at > submission.autotest_checked_at:
+        return True
+    return False
+
+
+def _refresh_autotests(submission):
+    """Прогоняет код ученика через тест-кейсы задачи (contest/autotest.py) и сохраняет
+    результат прямо в отправке — это ПОДСКАЗКА, официальный балл всё равно ставит
+    преподаватель. Никогда не бросает исключение наружу — не должно мешать ученику
+    отправить решение, даже если сам прогон тестов почему-то упал."""
+    try:
+        result = run_autotests(submission.task, submission.code or '')
+    except Exception:
+        logger.exception('Непредвиденная ошибка автотестов решения #%s', submission.pk)
+        result = {'available': False}
+
+    submission.autotest_checked_at = timezone.now()
+    update_fields = ['autotest_checked_at']
+    if result.get('available'):
+        submission.autotest_passed = result.get('passed')
+        submission.autotest_total = result.get('total')
+        submission.autotest_results = result.get('results', [])
+        update_fields += ['autotest_passed', 'autotest_total', 'autotest_results']
+    submission.save(update_fields=update_fields)
 
 
 def _safe_back_url(request):
@@ -223,6 +258,8 @@ def task_detail(request, task_id):
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
         submission.save()
+        if task.test_cases:
+            _refresh_autotests(submission)
 
         messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
         return redirect(task_url_with_back)
@@ -309,6 +346,8 @@ def submit_code(request, submission_id):
         submission.status = 'TESTING'
         submission.last_submitted_at = timezone.now()
         submission.save()
+        if submission.task.test_cases:
+            _refresh_autotests(submission)
 
         messages.success(request, 'Код отправлен на проверку преподавателю!')
 
@@ -956,5 +995,11 @@ def grade_submission(request, submission_id):
 
         messages.success(request, f'Оценка {score}/10 сохранена. Ученик получит ваш комментарий!')
         return redirect('teacher_dashboard')
+
+    # Подстраховка: если автотесты ещё не бегали для этой отправки (например, решение
+    # существует с тех пор, как эта функция появилась) — прогоняем прямо сейчас,
+    # перед тем как показать страницу учителю.
+    if submission.task.test_cases and _autotest_is_stale(submission):
+        _refresh_autotests(submission)
 
     return render(request, 'grade_submission.html', {'submission': submission})

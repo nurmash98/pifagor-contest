@@ -93,6 +93,29 @@
             </div>
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
+            {% if submission.autotest_checked_at and submission.autotest_total %}
+            <div class="alert {% if submission.autotest_passed == submission.autotest_total %}alert-success{% else %}alert-warning{% endif %} rounded-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>🧪 {% t "Автотесты" %}</strong>
+                    <span class="badge {% if submission.autotest_passed == submission.autotest_total %}bg-success{% else %}bg-secondary{% endif %}">{{ submission.autotest_passed }}/{{ submission.autotest_total }}</span>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    {% for r in submission.autotest_results %}
+                        {% if r.ok %}
+                            <span class="badge bg-success">{{ forloop.counter }} ✓</span>
+                        {% elif r.error == 'timeout' %}
+                            <span class="badge bg-dark" title="{% t 'Превышено время выполнения' %}">{{ forloop.counter }} ⏱</span>
+                        {% elif r.error == 'memory' %}
+                            <span class="badge bg-dark" title="{% t 'Превышена память' %}">{{ forloop.counter }} 💾</span>
+                        {% else %}
+                            <span class="badge bg-danger">{{ forloop.counter }} ✗</span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <p class="text-muted small mb-0">{% t "Это автоматическая проверка по тестам, не финальная оценка — её ставит преподаватель." %}</p>
+            </div>
+            {% endif %}
+
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
 
             {% if cooldown_hours %}

@@ -200,5 +200,19 @@ class Submission(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Автоматический прогон кода ученика против Task.test_cases при отправке —
+    # ПОДСКАЗКА ученику и преподавателю, не официальная оценка (её всё равно
+    # ставит преподаватель вручную, см. score выше). Смотрите contest/autotest.py.
+    autotest_passed = models.IntegerField(null=True, blank=True, verbose_name="Автотесты: пройдено")
+    autotest_total = models.IntegerField(null=True, blank=True, verbose_name="Автотесты: всего")
+    autotest_results = models.JSONField(
+        default=list, blank=True,
+        verbose_name="Автотесты: детали по каждому тесту",
+        help_text="[{'ok': bool, 'error': None|'timeout'|'memory'|str, 'expected': str, 'actual': str}, ...]",
+    )
+    autotest_checked_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Когда прошёл последний прогон автотестов",
+    )
+
     def __str__(self):
         return f"{self.student.full_name} - {self.task.title} ({self.status})"

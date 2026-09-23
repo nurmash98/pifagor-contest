@@ -120,10 +120,11 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
-    list_display = ('student', 'task', 'status', 'score', 'updated_at')
+    list_display = ('student', 'task', 'status', 'score', 'autotest_passed', 'autotest_total', 'updated_at')
     list_filter = ('status', 'task__level')
     search_fields = ('student__full_name', 'task__title')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'autotest_passed', 'autotest_total',
+                       'autotest_results', 'autotest_checked_at')
 
 
 @admin.register(ClassBonus)

@@ -41,6 +41,50 @@
 
                 <h6 class="fw-bold">Присланный код:</h6>
                 <pre class="bg-dark text-light p-3 rounded-3 mt-2" style="font-family: monospace; overflow-x: auto;"><code>{{ submission.code }}</code></pre>
+
+                {% if submission.autotest_checked_at and submission.autotest_total %}
+                <div class="mt-4">
+                    <h6 class="fw-bold d-flex align-items-center gap-2">
+                        🧪 Автотесты
+                        <span class="badge {% if submission.autotest_passed == submission.autotest_total %}bg-success{% else %}bg-secondary{% endif %}">
+                            {{ submission.autotest_passed }}/{{ submission.autotest_total }}
+                        </span>
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Результат</th>
+                                    <th>Ожидалось</th>
+                                    <th>Получено</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in submission.autotest_results %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+                                        {% if r.ok %}
+                                            <span class="badge bg-success">Пройден</span>
+                                        {% elif r.error == 'timeout' %}
+                                            <span class="badge bg-dark">Таймаут (&gt;1с)</span>
+                                        {% elif r.error == 'memory' %}
+                                            <span class="badge bg-dark">Память (&gt;256МБ)</span>
+                                        {% else %}
+                                            <span class="badge bg-danger" title="{{ r.error }}">Ошибка</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><code class="small">{{ r.expected|truncatechars:80 }}</code></td>
+                                    <td><code class="small">{{ r.actual|truncatechars:80|default:"—" }}</code></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small mb-0">Это автоматическая проверка по тестам задачи — подсказка, не финальная оценка.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
