@@ -214,5 +214,48 @@ class Submission(models.Model):
         null=True, blank=True, verbose_name="Когда прошёл последний прогон автотестов",
     )
 
+    # Была ли хоть одна попытка проверена учителем. Нужна отдельно от status: когда ученик
+    # отправляет новую попытку после проверки, status снова TESTING (чтобы учитель увидел её
+    # в очереди), но лучшая оценка за прошлые попытки должна продолжать считаться в
+    # лидерборде/профиле. score выше — это ИТОГОВАЯ оценка = максимум среди всех попыток.
+    is_graded = models.BooleanField(default=False, verbose_name="Проверено хотя бы раз")
+
+    def save(self, *args, **kwargs):
+        if self.status == 'DONE':
+            self.is_graded = True
+        super().save(*args, **kwargs)
+
+    def recalc_final_score(self):
+        """Итоговая оценка = максимальная среди всех проверенных попыток."""
+        best = self.attempts.filter(score__isnull=False).aggregate(best=models.Max('score'))['best']
+        if best is not None:
+            self.score = best
+            self.is_graded = True
+        return self.score
+
     def __str__(self):
         return f"{self.student.full_name} - {self.task.title} ({self.status})"
+
+
+class Attempt(models.Model):
+    """Одна отправка кода учеником по задаче (попытка) — с оценкой и комментарием учителя
+    именно за эту попытку. Итоговая оценка по задаче (Submission.score) — лучшая из них."""
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='attempts')
+    number = models.PositiveIntegerField(verbose_name="Номер попытки")
+    code = models.TextField(blank=True, verbose_name="Код")
+    submitted_at = models.DateTimeField(verbose_name="Отправлено")
+    score = models.IntegerField(null=True, blank=True, verbose_name="Оценка (0-10)")
+    teacher_comment = models.TextField(blank=True, verbose_name="Комментарий учителя")
+    graded_at = models.DateTimeField(null=True, blank=True, verbose_name="Проверено")
+
+    class Meta:
+        verbose_name = "Попытка"
+        verbose_name_plural = "Попытки"
+        ordering = ['-number']
+
+    @property
+    def is_graded(self):
+        return self.score is not None
+
+    def __str__(self):
+        return f"Попытка #{self.number} — {self.submission}"

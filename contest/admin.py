@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Task, Submission, Tag, Course, Topic, Teacher, ClassBonus
+from .models import Student, Task, Submission, Attempt, Tag, Course, Topic, Teacher, ClassBonus
 
 
 def _teacher_of(request):
@@ -118,8 +118,18 @@ class StudentAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'school_class')
     search_fields = ('full_name', 'school_class')
 
+class AttemptInline(admin.TabularInline):
+    """История попыток по задаче (только просмотр — оценки ставятся на странице проверки)."""
+    model = Attempt
+    extra = 0
+    can_delete = False
+    fields = ('number', 'submitted_at', 'score', 'teacher_comment', 'graded_at')
+    readonly_fields = fields
+
+
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
+    inlines = [AttemptInline]
     list_display = ('student', 'task', 'status', 'score', 'autotest_passed', 'autotest_total', 'updated_at')
     list_filter = ('status', 'task__level')
     search_fields = ('student__full_name', 'task__title')

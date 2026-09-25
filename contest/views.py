@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.utils import timezone
 
-from .models import Task, Submission, Student, Course, Teacher, Topic, Tag, ClassBonus
+from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests
 from django.contrib.admin.views.decorators import staff_member_required
@@ -22,6 +22,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 logger = logging.getLogger(__name__)
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
+
+# Сколько задач ученик может держать "В работе" одновременно (Kanban).
+MAX_ACTIVE_TASKS = 5
 
 # Вход: после стольких неверных попыток подряд логин блокируется на LOGIN_LOCKOUT_SECONDS
 # (без проверки пароля — чтобы многократные нажатия "Войти" не грузили CPU).
@@ -72,7 +75,7 @@ def _class_leaderboard_rows(school_classes):
     rows = []
     for cls in school_classes:
         students_in_class = Student.objects.filter(school_class=cls).annotate(
-            total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
+            total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__is_graded=True)),
         )
         scores = [student.total_score or 0 for student in students_in_class]
         avg_score = round(sum(scores) / len(scores)) if scores else 0
@@ -106,6 +109,17 @@ def _autotest_is_stale(submission):
     if submission.last_submitted_at and submission.last_submitted_at > submission.autotest_checked_at:
         return True
     return False
+
+
+def _record_attempt(submission):
+    """Сохраняет только что отправленный код как новую попытку (история попыток по задаче)."""
+    last = submission.attempts.order_by('-number').first()
+    return Attempt.objects.create(
+        submission=submission,
+        number=(last.number + 1) if last else 1,
+        code=submission.code or '',
+        submitted_at=submission.last_submitted_at or timezone.now(),
+    )
 
 
 def _refresh_autotests(submission):
@@ -245,8 +259,8 @@ def task_detail(request, task_id):
     # Если задача еще не взята в работу
     if not submission:
         active_count = Submission.objects.filter(student=student, status='IN_PROGRESS').count()
-        if active_count >= 2:
-            messages.warning(request, 'Вы не можете взять более 2 задач одновременно. Завершите текущие задачи!')
+        if active_count >= MAX_ACTIVE_TASKS:
+            messages.warning(request, f'Вы не можете взять более {MAX_ACTIVE_TASKS} задач одновременно. Завершите текущие задачи!')
             return redirect(back_url or 'all_tasks')
         submission = Submission.objects.create(student=student, task=task, status='IN_PROGRESS')
 
@@ -264,6 +278,7 @@ def task_detail(request, task_id):
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
         submission.save()
+        _record_attempt(submission)
         if task.test_cases:
             _refresh_autotests(submission)
 
@@ -273,6 +288,7 @@ def task_detail(request, task_id):
     context = {
         'task': task,
         'submission': submission,
+        'attempts': submission.attempts.all(),
         'cooldown_hours': int(cooldown.total_seconds() // 3600) + 1 if cooldown else None,
         'back_url': back_url or reverse('all_tasks'),
         'readonly': False,
@@ -322,9 +338,9 @@ def take_task(request, task_id):
         task = get_object_or_404(Task, id=task_id)
 
         active_count = Submission.objects.filter(student=student, status='IN_PROGRESS').count()
-        if active_count >= 2:
+        if active_count >= MAX_ACTIVE_TASKS:
             messages.warning(request,
-                             'Вы не можете взять более 2 задач одновременно. Завершите текущие задачи на Kanban-доске!')
+                             f'Вы не можете взять более {MAX_ACTIVE_TASKS} задач одновременно. Завершите текущие задачи на Kanban-доске!')
             return redirect('all_tasks')
 
         Submission.objects.get_or_create(
@@ -352,6 +368,7 @@ def submit_code(request, submission_id):
         submission.status = 'TESTING'
         submission.last_submitted_at = timezone.now()
         submission.save()
+        _record_attempt(submission)
         if submission.task.test_cases:
             _refresh_autotests(submission)
 
@@ -369,7 +386,7 @@ def profile_view(request):
 
     # Вся история проверенных задач (для списка "История решений" — с любой оценкой).
     solved_submissions = Submission.objects.filter(
-        student=student, status='DONE'
+        student=student, is_graded=True
     ).select_related('task').order_by('-updated_at')
 
     # "Решено" — только задачи, где оценка максимальная (10/10).
@@ -418,9 +435,9 @@ def leaderboard(request):
     # проверенные (graded_count используем лишь чтобы не показывать тех, кто ничего не
     # отправлял или ещё ничего не проверено).
     students_query = Student.objects.annotate(
-        total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__status='DONE')),
-        graded_count=Count('submissions', filter=Q(submissions__status='DONE')),
-        perfect_count=Count('submissions', filter=Q(submissions__status='DONE', submissions__score=10)),
+        total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__is_graded=True)),
+        graded_count=Count('submissions', filter=Q(submissions__is_graded=True)),
+        perfect_count=Count('submissions', filter=Q(submissions__is_graded=True, submissions__score=10)),
     ).filter(graded_count__gt=0).order_by('-total_score', '-perfect_count', '-graded_count')
 
     if my_grade is not None:
@@ -716,7 +733,7 @@ def course_analytics(request, course_id):
         scores = {
             (s['student_id'], s['task_id']): s['score']
             for s in Submission.objects.filter(
-                status='DONE', student__school_class=selected_class
+                is_graded=True, student__school_class=selected_class
             ).values('student_id', 'task_id', 'score')
         }
 
@@ -1011,16 +1028,43 @@ def grade_submission(request, submission_id):
             messages.error(request, 'Это не ваш класс — проверка недоступна.')
             return redirect('teacher_dashboard')
 
+    # Оцениваем самую свежую ещё не проверенную попытку; если все уже проверены —
+    # последнюю (повторная проверка/исправление оценки).
+    grading_attempt = (
+        submission.attempts.filter(score__isnull=True).order_by('-number').first()
+        or submission.attempts.order_by('-number').first()
+    )
+
     if request.method == 'POST':
-        score = request.POST.get('score', 0)
+        try:
+            score = max(0, min(10, int(request.POST.get('score', ''))))
+        except (TypeError, ValueError):
+            messages.error(request, 'Оценка должна быть числом от 0 до 10.')
+            return redirect('grade_submission', submission_id=submission.id)
         comment = request.POST.get('comment', '')
 
-        submission.score = int(score)
+        if grading_attempt is None:
+            # Старая отправка без истории попыток — заводим попытку из текущего кода.
+            grading_attempt = Attempt.objects.create(
+                submission=submission, number=1, code=submission.code or '',
+                submitted_at=submission.last_submitted_at or submission.updated_at,
+            )
+        grading_attempt.score = score
+        grading_attempt.teacher_comment = comment
+        grading_attempt.graded_at = timezone.now()
+        grading_attempt.save()
+
+        # Итоговая оценка по задаче = максимум среди всех проверенных попыток.
+        final_score = submission.recalc_final_score()
         submission.teacher_comment = comment
         submission.status = 'DONE'
         submission.save()
 
-        messages.success(request, f'Оценка {score}/10 сохранена. Ученик получит ваш комментарий!')
+        messages.success(
+            request,
+            f'Оценка {score}/10 за попытку #{grading_attempt.number} сохранена. '
+            f'Итоговая оценка (лучшая из попыток): {final_score}/10.'
+        )
         return redirect('teacher_dashboard')
 
     # Подстраховка: если автотесты ещё не бегали для этой отправки (например, решение
@@ -1029,4 +1073,8 @@ def grade_submission(request, submission_id):
     if submission.task.test_cases and _autotest_is_stale(submission):
         _refresh_autotests(submission)
 
-    return render(request, 'grade_submission.html', {'submission': submission})
+    return render(request, 'grade_submission.html', {
+        'submission': submission,
+        'grading_attempt': grading_attempt,
+        'attempts': submission.attempts.all(),
+    })
