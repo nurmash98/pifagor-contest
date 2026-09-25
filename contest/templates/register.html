@@ -47,7 +47,7 @@
                 <div class="card auth-card p-4 bg-white">
                     <h4 class="fw-bold text-center mb-4" style="color: #1a1a4b;">{% t "Регистрация" %}</h4>
 
-                    <form method="post">
+                    <form method="post" id="register-form">
                         {% csrf_token %}
 
                         {% if form.non_field_errors %}
@@ -58,14 +58,23 @@
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small">{% t field.label %}</label>
                                 {{ field }}
-                                {% if field.errors %}
-                                    <div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>
-                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small mt-1">{% t error %}</div>
+                                {% endfor %}
                             </div>
                         {% endfor %}
 
-                        <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3 my-3">{% t "Зарегистрироваться" %}</button>
+                        <button type="submit" id="register-btn" class="btn btn-pifagor-green w-100 py-2 rounded-3 my-3">{% t "Зарегистрироваться" %}</button>
                     </form>
+                    <!-- Кнопка блокируется сразу после первого нажатия, пока сервер создаёт аккаунт —
+                         повторные клики не отправляют лишние запросы. -->
+                    <script>
+                    document.getElementById('register-form').addEventListener('submit', function () {
+                        var btn = document.getElementById('register-btn');
+                        btn.disabled = true;
+                        btn.textContent = '{% t "Регистрируем..." %}';
+                    });
+                    </script>
 
                     <div class="text-center">
                         <a href="{% url 'login' %}" class="small text-decoration-none fw-semibold" style="color: #1a1a4b;">

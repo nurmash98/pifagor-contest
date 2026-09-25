@@ -12,6 +12,7 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus
@@ -30,6 +31,9 @@ MAX_ACTIVE_TASKS = 5
 # (без проверки пароля — чтобы многократные нажатия "Войти" не грузили CPU).
 LOGIN_MAX_FAILED = 5
 LOGIN_LOCKOUT_SECONDS = 60
+# Регистрация: повторные нажатия с тем же логином в течение этого времени не создают
+# аккаунт заново, а отправляют на страницу входа.
+REGISTER_LOCK_SECONDS = 30
 
 # Баллы, которыми учитель может поощрить/наказать целый класс за атмосферу на уроке —
 # без какой-либо строгой методики, просто когда учителю хочется. Обычные значения ±1/±2;
@@ -553,15 +557,35 @@ def register(request):
             full_name = form.cleaned_data['full_name']
             school_class = form.cleaned_data['school_class']
 
+            # Защита от многократного нажатия "Зарегистрироваться": первый запрос по этому
+            # логину берёт "замок" на REGISTER_LOCK_SECONDS. Повторные клики в это время
+            # не создают аккаунт заново и не хешируют пароль (это самое тяжёлое по CPU),
+            # а сразу отправляют на страницу входа — аккаунт уже создан (или создаётся
+            # прямо сейчас первым запросом).
+            lock_key = 'register_lock:' + username.strip().lower()
+            if not cache.add(lock_key, 1, REGISTER_LOCK_SECONDS):
+                messages.info(request, 'Аккаунт уже создан. Войдите со своим логином и паролем.')
+                return redirect(f"{reverse('login')}?username={quote(username)}")
+
             if User.objects.filter(username=username).exists():
+                cache.delete(lock_key)  # логин занят кем-то другим — это не повторный клик
                 form.add_error('username', 'Этот логин уже занят. Придумайте другой.')
             else:
-                user = User.objects.create_user(username=username, password=password)
-                Student.objects.create(
-                    user=user,
-                    full_name=full_name,
-                    school_class=school_class
-                )
+                try:
+                    with transaction.atomic():
+                        user = User.objects.create_user(username=username, password=password)
+                        Student.objects.create(
+                            user=user,
+                            full_name=full_name,
+                            school_class=school_class
+                        )
+                except IntegrityError:
+                    # Два запроса проскочили одновременно — аккаунт уже создал другой из них.
+                    messages.info(request, 'Аккаунт уже создан. Войдите со своим логином и паролем.')
+                    return redirect(f"{reverse('login')}?username={quote(username)}")
+                except Exception:
+                    cache.delete(lock_key)  # аккаунт не создан — не мешаем повторить попытку
+                    raise
                 auth_login(request, user)
                 return redirect('all_tasks')
     else:
@@ -610,7 +634,8 @@ def login_view(request):
         context['error'] = 'Неверный логин или пароль'
         return render(request, 'login.html', context)
 
-    return render(request, 'login.html')
+    # ?username= — подставляем логин (например, после повторного нажатия на регистрации).
+    return render(request, 'login.html', {'username': (request.GET.get('username') or '')[:150]})
 
 
 def logout_view(request):
