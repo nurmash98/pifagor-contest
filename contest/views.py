@@ -11,6 +11,7 @@ from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField, F
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.core.cache import cache
 from django.utils import timezone
 
 from .models import Task, Submission, Student, Course, Teacher, Topic, Tag, ClassBonus
@@ -21,6 +22,11 @@ from django.contrib.admin.views.decorators import staff_member_required
 logger = logging.getLogger(__name__)
 
 SUBMISSION_COOLDOWN = timedelta(hours=24)
+
+# Вход: после стольких неверных попыток подряд логин блокируется на LOGIN_LOCKOUT_SECONDS
+# (без проверки пароля — чтобы многократные нажатия "Войти" не грузили CPU).
+LOGIN_MAX_FAILED = 5
+LOGIN_LOCKOUT_SECONDS = 60
 
 # Баллы, которыми учитель может поощрить/наказать целый класс за атмосферу на уроке —
 # без какой-либо строгой методики, просто когда учителю хочется. Обычные значения ±1/±2;
@@ -547,24 +553,45 @@ def register(request):
     return render(request, 'register.html', {'form': form})
 
 
+def _login_fail_key(username):
+    return 'login_fail:' + (username or '').strip().lower()
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('teacher_dashboard' if request.user.is_staff else 'all_tasks')
 
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
+        context = {'username': username}
 
-        user = authenticate(request, username=username, password=password)
+        # Защита от "долбёжки" кнопки Войти: после LOGIN_MAX_FAILED неверных попыток
+        # подряд для этого логина — LOGIN_LOCKOUT_SECONDS просто отказываем, даже НЕ
+        # проверяя пароль. Проверка пароля (хеширование) — самая дорогая по CPU операция
+        # при входе, поэтому пачка повторных попыток больше не нагружает сервер.
+        # Считаем по логину, а не по IP: у всей школы обычно один внешний IP,
+        # и блокировка по IP заблокировала бы сразу всех учеников.
+        fail_key = _login_fail_key(username)
+        if cache.get(fail_key, 0) >= LOGIN_MAX_FAILED:
+            context['error'] = 'Слишком много неудачных попыток. Подождите минуту и попробуйте снова.'
+            return render(request, 'login.html', context, status=429)
+
+        user = authenticate(request, username=username, password=password) if username and password else None
 
         if user is not None:
+            cache.delete(fail_key)
             auth_login(request, user)
             next_url = request.GET.get('next')
-            if next_url:
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+            ):
                 return redirect(next_url)
             return redirect('teacher_dashboard' if user.is_staff else 'all_tasks')
-        else:
-            return render(request, 'login.html', {'error': 'Неверный логин или пароль'})
+
+        cache.set(fail_key, cache.get(fail_key, 0) + 1, LOGIN_LOCKOUT_SECONDS)
+        context['error'] = 'Неверный логин или пароль'
+        return render(request, 'login.html', context)
 
     return render(request, 'login.html')
 

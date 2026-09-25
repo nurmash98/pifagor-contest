@@ -48,21 +48,30 @@
                     <h4 class="fw-bold text-center mb-4" style="color: #1a1a4b;">{% t "Вход в систему" %}</h4>
 
                     {% if error %}
-                        <div class="alert alert-danger py-2 small rounded-3">{{ error }}</div>
+                        <div class="alert alert-danger py-2 small rounded-3">{% t error %}</div>
                     {% endif %}
 
-                    <form method="post">
+                    <form method="post" id="login-form">
                         {% csrf_token %}
                         <div class="mb-3">
                             <label class="form-label fw-semibold small">{% t "Логин" %}</label>
-                            <input type="text" name="username" class="form-control rounded-3" placeholder="{% t 'Ваш логин' %}" required>
+                            <input type="text" name="username" class="form-control rounded-3" placeholder="{% t 'Ваш логин' %}" value="{{ username|default:'' }}" required>
                         </div>
                         <div class="mb-4">
                             <label class="form-label fw-semibold small">{% t "Пароль" %}</label>
                             <input type="password" name="password" class="form-control rounded-3" placeholder="{% t 'Ваш пароль' %}" required>
                         </div>
-                        <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3 mb-3">{% t "Войти" %}</button>
+                        <button type="submit" id="login-btn" class="btn btn-pifagor-green w-100 py-2 rounded-3 mb-3">{% t "Войти" %}</button>
                     </form>
+                    <!-- Кнопка блокируется сразу после первого нажатия, пока сервер отвечает —
+                         повторные клики больше не отправляют десятки одинаковых запросов. -->
+                    <script>
+                    document.getElementById('login-form').addEventListener('submit', function () {
+                        var btn = document.getElementById('login-btn');
+                        btn.disabled = true;
+                        btn.textContent = '{% t "Входим..." %}';
+                    });
+                    </script>
 
                     <div class="text-center">
                         <a href="{% url 'register' %}" class="small text-decoration-none fw-semibold" style="color: #1a1a4b;">
