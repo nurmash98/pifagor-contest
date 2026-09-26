@@ -134,7 +134,7 @@
                     <div class="mb-4">
                         <label class="form-label fw-bold">Балл (от 0 до 10)</label>
                         <input type="number" name="score" class="form-control form-control-lg text-center fw-bold text-primary"
-                               value="{{ grading_attempt.score|default_if_none:'' }}" min="0" max="10" required>
+                               value="{% if grading_attempt.is_graded %}{{ grading_attempt.score }}{% else %}10{% endif %}" min="0" max="10" required>
                     </div>
 
                     <div class="mb-4">
