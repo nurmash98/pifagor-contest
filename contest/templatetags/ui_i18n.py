@@ -207,6 +207,12 @@ UI_TRANSLATIONS = {
 }
 
 
+@register.filter
+def example_newlines(value):
+    """В старых примерах задач перенос строки записан текстом "\\n" — показываем как перенос."""
+    return (value or '').replace('\\n', '\n')
+
+
 @register.simple_tag(takes_context=True)
 def t(context, text):
     """Переводит text на казахский, если в шапке сайта выбран язык KZ.

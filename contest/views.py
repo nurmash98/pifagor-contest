@@ -208,8 +208,9 @@ def _apply_task_language(tasks, lang):
     for task in tasks:
         task.display_title = task.get_display_title(lang)
         task.display_description = task.get_display_description(lang)
-        task.display_input_example = task.get_display_input_example(lang)
-        task.display_output_example = task.get_display_output_example(lang)
+        # В старых примерах перенос строки записан текстом "\\n" — показываем как настоящий перенос.
+        task.display_input_example = task.get_display_input_example(lang).replace('\\n', '\n')
+        task.display_output_example = task.get_display_output_example(lang).replace('\\n', '\n')
     return tasks
 
 

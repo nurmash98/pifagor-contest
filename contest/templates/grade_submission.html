@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load ui_i18n %}
 
 {% block title %}Проверка решения{% endblock %}
 
@@ -30,11 +31,11 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <span class="fw-bold text-muted small d-block mb-1">Пример ввода:</span>
-                            <code class="text-dark">{{ submission.task.input_example }}</code>
+                            <code class="text-dark" style="white-space: pre-wrap;">{{ submission.task.input_example|example_newlines }}</code>
                         </div>
                         <div class="col-md-6">
                             <span class="fw-bold text-muted small d-block mb-1">Пример вывода:</span>
-                            <code class="text-dark">{{ submission.task.output_example }}</code>
+                            <code class="text-dark" style="white-space: pre-wrap;">{{ submission.task.output_example|example_newlines }}</code>
                         </div>
                     </div>
                 </div>
