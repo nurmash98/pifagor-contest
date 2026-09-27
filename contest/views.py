@@ -1013,6 +1013,16 @@ def topic_video(request, topic_id):
     return render(request, 'topic_video.html', {'topic': topic, 'course': course})
 
 
+def _pending_queue(user):
+    """Очередь решений на проверку для этого учителя (только его классы; админ — все),
+    в том же порядке, что и в кабинете преподавателя: сначала самые давние."""
+    teacher = None if user.is_superuser else Teacher.objects.filter(user=user).first()
+    pending = Submission.objects.filter(status='TESTING')
+    if teacher is not None:
+        pending = pending.filter(student__school_class__in=teacher.class_list())
+    return pending.order_by('updated_at')
+
+
 @staff_member_required
 def teacher_dashboard(request):
     """Кабинет преподавателя: очередь на проверку и последние проверенные."""
@@ -1090,6 +1100,14 @@ def grade_submission(request, submission_id):
             f'Оценка {score}/10 за попытку #{grading_attempt.number} сохранена. '
             f'Итоговая оценка (лучшая из попыток): {final_score}/10.'
         )
+
+        # Кнопка "Проверить следующего": сохраняем и сразу открываем следующее решение
+        # из очереди (текущее уже DONE, поэтому в очередь не попадает).
+        if request.POST.get('next'):
+            next_submission = _pending_queue(request.user).first()
+            if next_submission is not None:
+                return redirect('grade_submission', submission_id=next_submission.id)
+            messages.info(request, 'Очередь проверки пуста — все решения проверены.')
         return redirect('teacher_dashboard')
 
     # Подстраховка: если автотесты ещё не бегали для этой отправки (например, решение
@@ -1102,4 +1120,6 @@ def grade_submission(request, submission_id):
         'submission': submission,
         'grading_attempt': grading_attempt,
         'attempts': submission.attempts.all(),
+        # Сколько решений в очереди останется после этого (без текущего).
+        'queue_left': _pending_queue(request.user).exclude(id=submission.id).count(),
     })

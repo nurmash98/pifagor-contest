@@ -143,9 +143,18 @@
                                   placeholder="Например: Отличный алгоритм, но постарайся давать переменным понятные имена.">{{ grading_attempt.teacher_comment|default:"" }}</textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-success btn-lg w-100 rounded-pill">
-                        Сохранить и завершить
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success flex-fill rounded-pill py-2">
+                            Сохранить и завершить
+                        </button>
+                        <button type="submit" name="next" value="1" class="btn btn-primary flex-fill rounded-pill py-2">
+                            Проверить следующего →
+                        </button>
+                    </div>
+                    <p class="text-muted small text-center mt-2 mb-0">
+                        Обе кнопки сохраняют оценку.
+                        {% if queue_left %}В очереди ещё: <strong>{{ queue_left }}</strong>.{% else %}Это последнее решение в очереди.{% endif %}
+                    </p>
                 </form>
             </div>
         </div>
