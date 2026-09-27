@@ -43,9 +43,10 @@ urlpatterns = [
     path('teacher/courses/<int:course_id>/topics/add/', views.topic_create, name='topic_create'),
     path('teacher/topics/<int:topic_id>/edit/', views.topic_edit, name='topic_edit'),
 
-    # Управление тегами задач — доступно любому учителю для всех задач
+    # Задачи: любой учитель может редактировать любую задачу (условие, пример, тесты, теги)
     path('teacher/tasks/', views.task_tags_list, name='task_tags_list'),
-    path('teacher/tasks/<int:task_id>/tags/', views.task_tags_edit, name='task_tags_edit'),
+    path('teacher/tasks/<int:task_id>/edit/', views.task_edit, name='task_edit'),
+    path('teacher/tasks/<int:task_id>/tags/', views.task_tags_edit, name='task_tags_edit'),  # старый адрес
 
     # Управление учениками — доступно любому учителю для всех учеников
     path('teacher/students/', views.student_list, name='student_list'),

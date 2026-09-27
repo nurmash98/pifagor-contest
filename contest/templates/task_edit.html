@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Редактирование: {{ task.title }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex justify-content-between">
+    <a href="{% url 'task_tags_list' %}" class="text-decoration-none text-muted small">← Назад к задачам</a>
+    <a href="{% url 'task_detail' task.id %}" class="text-decoration-none small" target="_blank">Посмотреть, как видит ученик ↗</a>
+</div>
+
+<form method="post">
+{% csrf_token %}
+<div class="row g-4">
+    <!-- Условие и пример -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold mb-0" style="color: #1a1a4b;">Условие задачи</h4>
+                {% if task.level == 'A' %}<span class="badge badge-level-A">Уровень A</span>
+                {% elif task.level == 'B' %}<span class="badge badge-level-B">Уровень B</span>
+                {% else %}<span class="badge badge-level-C">Уровень C</span>{% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Название</label>
+                <input type="text" name="title" class="form-control" value="{{ v.title }}" maxlength="200" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Условие</label>
+                <textarea name="description" class="form-control" rows="6" required>{{ v.description }}</textarea>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Пример ввода</label>
+                    <textarea name="input_example" class="form-control font-monospace" rows="3" required>{{ v.input_example }}</textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Пример вывода</label>
+                    <textarea name="output_example" class="form-control font-monospace" rows="3" required>{{ v.output_example }}</textarea>
+                </div>
+            </div>
+
+            <details class="mt-4">
+                <summary class="fw-semibold small">🇰🇿 Казахская версия (необязательно)</summary>
+                <div class="mt-3">
+                    <div class="mb-3">
+                        <label class="form-label small">Атауы</label>
+                        <input type="text" name="title_kk" class="form-control" value="{{ v.title_kk }}" maxlength="200">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Сипаттамасы</label>
+                        <textarea name="description_kk" class="form-control" rows="5">{{ v.description_kk }}</textarea>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Кіріс мысалы</label>
+                            <textarea name="input_example_kk" class="form-control font-monospace" rows="2">{{ v.input_example_kk }}</textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Шығыс мысалы</label>
+                            <textarea name="output_example_kk" class="form-control font-monospace" rows="2">{{ v.output_example_kk }}</textarea>
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">Если поле пустое — ученикам с языком KZ показывается русский текст.</p>
+                </div>
+            </details>
+        </div>
+
+        <!-- Теги -->
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3" style="color: #1a1a4b;">🏷 Теги</h5>
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                {% for tag in all_tags %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="tags" value="{{ tag.id }}" id="tag-{{ tag.id }}"
+                           {% if tag.id in selected_tag_ids %}checked{% endif %}>
+                    <label class="form-check-label" for="tag-{{ tag.id }}">#{{ tag.name }}</label>
+                </div>
+                {% empty %}
+                <div class="text-muted small">Тегов пока нет — добавьте первый ниже.</div>
+                {% endfor %}
+            </div>
+            <input type="text" name="new_tag" class="form-control form-control-sm" placeholder="Новый тег (необязательно), например: циклы">
+        </div>
+    </div>
+
+    <!-- Тесты -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4 sticky-top" style="top: 1rem;">
+            <h5 class="fw-bold mb-1" style="color: #1a1a4b;">🧪 Тесты для автопроверки</h5>
+            <p class="text-muted small mb-3">
+                Код ученика запускается с каждым «Вводом» и сравнивается с «Выводом».
+                Балл: доля пройденных тестов из 10 (при 5 тестах — 2 балла за тест).
+                Пробелы, переносы строк и регистр букв при сравнении не важны.
+                Пустая строка теста не сохраняется; если тестов нет — задачу проверяет учитель вручную.
+                Ученики ожидаемый вывод не видят.
+            </p>
+
+            <div id="tests">
+                {% for t in test_rows %}
+                <div class="test-row border rounded-3 p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-semibold test-num">Тест {{ forloop.counter }}</span>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0 remove-test">✕ удалить</button>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <textarea name="test_input" class="form-control form-control-sm font-monospace" rows="2" placeholder="Ввод">{{ t.input }}</textarea>
+                        </div>
+                        <div class="col-6">
+                            <textarea name="test_output" class="form-control form-control-sm font-monospace" rows="2" placeholder="Ожидаемый вывод">{{ t.output }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-test" class="btn btn-outline-secondary btn-sm w-100 mb-3">+ Добавить тест</button>
+
+            <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">Сохранить задачу</button>
+            <p class="text-muted small mt-2 mb-0">Изменения применяются к следующим отправкам — уже выставленные оценки не пересчитываются.</p>
+        </div>
+    </div>
+</div>
+</form>
+
+<script>
+(function () {
+    var box = document.getElementById('tests');
+    var MAX = {{ max_tests }};
+    function renumber() {
+        box.querySelectorAll('.test-num').forEach(function (el, i) { el.textContent = 'Тест ' + (i + 1); });
+    }
+    box.addEventListener('click', function (e) {
+        if (!e.target.classList.contains('remove-test')) return;
+        var row = e.target.closest('.test-row');
+        if (box.querySelectorAll('.test-row').length > 1) { row.remove(); }
+        else { row.querySelectorAll('textarea').forEach(function (t) { t.value = ''; }); }
+        renumber();
+    });
+    document.getElementById('add-test').addEventListener('click', function () {
+        var rows = box.querySelectorAll('.test-row');
+        if (rows.length >= MAX) { alert('Не больше ' + MAX + ' тестов на задачу.'); return; }
+        var copy = rows[rows.length - 1].cloneNode(true);
+        copy.querySelectorAll('textarea').forEach(function (t) { t.value = ''; });
+        box.appendChild(copy);
+        renumber();
+    });
+})();
+</script>
+{% endblock %}

@@ -29,11 +29,12 @@ class TaskAdmin(admin.ModelAdmin):
         return ", ".join(tag.name for tag in obj.tags.all()) or "—"
 
     def get_readonly_fields(self, request, obj=None):
-        # У учителей (не у админа) есть доступ только к тегам задачи —
-        # остальные поля задачи защищены от изменений.
+        # Учителя могут менять условие, примеры, тесты и теги (удобнее — на странице
+        # «Задачи» в кабинете преподавателя). Уровень сложности меняет только админ:
+        # от него зависит коэффициент в лидерборде.
         if request.user.is_superuser:
             return ()
-        return ('title', 'level', 'description', 'input_example', 'output_example', 'test_cases')
+        return ('level',)
 
 
 class TopicInline(admin.TabularInline):

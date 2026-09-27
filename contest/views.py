@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus
 from .forms import StudentRegistrationForm
-from .autotest import run_autotests
+from .autotest import run_autotests, MAX_TEST_CASES
 from django.contrib.admin.views.decorators import staff_member_required
 
 logger = logging.getLogger(__name__)
@@ -920,26 +920,83 @@ def task_tags_list(request):
 
 @staff_member_required
 def task_tags_edit(request, task_id):
-    """Изменение тегов одной задачи — доступно любому учителю для любой задачи."""
+    """Старый адрес страницы тегов — теперь всё редактируется на одной странице задачи."""
+    return redirect('task_edit', task_id=task_id)
+
+
+def _clean_text(value):
+    """Текст из формы: переносы строк браузера (\\r\\n) -> \\n."""
+    return (value or '').replace('\r\n', '\n').replace('\r', '\n')
+
+
+def _tests_from_post(post):
+    """Тест-кейсы из формы: пары полей test_input/test_output (в том же порядке).
+    Строку, где пусты и ввод, и вывод, пропускаем (пустой вывод сам по себе допустим —
+    бывают задачи, где в каком-то случае ничего не нужно печатать)."""
+    tests = []
+    for inp, out in zip(post.getlist('test_input'), post.getlist('test_output')):
+        inp, out = _clean_text(inp), _clean_text(out).strip()
+        if inp.strip() or out:
+            tests.append({'input': inp, 'output': out})
+    return tests
+
+
+@staff_member_required
+def task_edit(request, task_id):
+    """Редактирование задачи учителем (любой учитель, любая задача): условие, пример
+    ввода/вывода, казахская версия, тест-кейсы для автопроверки и теги."""
     task = get_object_or_404(Task, id=task_id)
+    text_fields = ['title', 'description', 'input_example', 'output_example',
+                   'title_kk', 'description_kk', 'input_example_kk', 'output_example_kk']
+    required = {'title': 'Название', 'description': 'Условие',
+                'input_example': 'Пример ввода', 'output_example': 'Пример вывода'}
 
     if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'add_new_tag':
+        values = {f: _clean_text(request.POST.get(f, '')) for f in text_fields}
+        values['title'] = values['title'].strip()
+        tests = _tests_from_post(request.POST)
+        errors = [f'Поле «{label}» не может быть пустым.' for f, label in required.items()
+                  if not values[f].strip()]
+        if len(tests) > MAX_TEST_CASES:
+            errors.append(f'Не больше {MAX_TEST_CASES} тестов на задачу.')
+        if values['title'] and Task.objects.filter(title=values['title']).exclude(id=task.id).exists():
+            errors.append('Задача с таким названием уже есть.')
+
+        if not errors:
+            for f in text_fields:
+                setattr(task, f, values[f])
+            task.test_cases = tests
+            task.save()
+            task.tags.set(request.POST.getlist('tags'))
             new_tag_name = request.POST.get('new_tag', '').strip()
             if new_tag_name:
                 tag, _ = Tag.objects.get_or_create(name=new_tag_name)
                 task.tags.add(tag)
-                messages.success(request, f'Тег «{tag.name}» добавлен к задаче.')
-        else:
-            task.tags.set(request.POST.getlist('tags'))
-            messages.success(request, 'Теги задачи обновлены.')
-        return redirect('task_tags_edit', task_id=task.id)
+            messages.success(
+                request,
+                f'Задача «{task.title}» сохранена. Тестов: {len(tests)}. '
+                'Новые тесты применяются к следующим отправкам — старые оценки не меняются.'
+            )
+            return redirect('task_edit', task_id=task.id)
 
-    return render(request, 'task_tags_edit.html', {
+        for e in errors:
+            messages.error(request, e)
+        form_values, selected_tag_ids = values, {int(t) for t in request.POST.getlist('tags') if t.isdigit()}
+    else:
+        form_values = {f: getattr(task, f) for f in text_fields}
+        tests = list(task.test_cases or [])
+        selected_tag_ids = set(task.tags.values_list('id', flat=True))
+
+    # Всегда показываем хотя бы 5 строк для тестов (пустые можно просто не заполнять).
+    test_rows = tests + [{'input': '', 'output': ''}] * max(0, 5 - len(tests))
+
+    return render(request, 'task_edit.html', {
         'task': task,
+        'v': form_values,
+        'test_rows': test_rows,
         'all_tags': Tag.objects.all(),
-        'selected_tag_ids': set(task.tags.values_list('id', flat=True)),
+        'selected_tag_ids': selected_tag_ids,
+        'max_tests': MAX_TEST_CASES,
     })
 
 
