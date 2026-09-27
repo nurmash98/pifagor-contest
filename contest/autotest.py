@@ -47,6 +47,24 @@ OUTPUT_PREVIEW_LIMIT = 2000  # сколько символов вывода со
 MAX_TEST_CASES = 20  # разумный потолок, даже если в test_cases случайно окажется больше
 
 
+def _tokens_match(a, b):
+    if a.lower() == b.lower():
+        return True
+    try:
+        x, y = float(a), float(b)
+    except ValueError:
+        return False
+    return abs(x - y) <= 1e-6 * max(1.0, abs(y))
+
+
+def outputs_match(actual, expected):
+    """Сравнение вывода ученика с ожидаемым — не придираемся к мелочам оформления:
+    лишние пробелы/переносы строк не важны, регистр букв не важен, числа сравниваются
+    как числа (7 == 7.0, 6.50 == 6.5). Слова, знаки препинания и сами числа — важны."""
+    a, e = (actual or '').split(), (expected or '').split()
+    return len(a) == len(e) and all(_tokens_match(x, y) for x, y in zip(a, e))
+
+
 def _limit_resources():
     """Выполняется в дочернем процессе (preexec_fn) перед запуском кода ученика."""
     if not HAS_RESOURCE:
@@ -128,7 +146,7 @@ def run_autotests(task, code):
             expected = str(case.get('output', ''))
             stdin_text = str(case.get('input', ''))
             actual, error = _run_one(code, stdin_text)
-            ok = error is None and actual.strip() == expected.strip()
+            ok = error is None and outputs_match(actual, expected)
             if ok:
                 passed += 1
             results.append({

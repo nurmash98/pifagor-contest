@@ -128,9 +128,9 @@ def _record_attempt(submission):
 
 def _refresh_autotests(submission):
     """Прогоняет код ученика через тест-кейсы задачи (contest/autotest.py) и сохраняет
-    результат прямо в отправке — это ПОДСКАЗКА, официальный балл всё равно ставит
-    преподаватель. Никогда не бросает исключение наружу — не должно мешать ученику
-    отправить решение, даже если сам прогон тестов почему-то упал."""
+    результат прямо в отправке. Возвращает результат прогона (dict из run_autotests).
+    Никогда не бросает исключение наружу — не должно мешать ученику отправить решение,
+    даже если сам прогон тестов почему-то упал."""
     try:
         result = run_autotests(submission.task, submission.code or '')
     except Exception:
@@ -145,6 +145,44 @@ def _refresh_autotests(submission):
         submission.autotest_results = result.get('results', [])
         update_fields += ['autotest_passed', 'autotest_total', 'autotest_results']
     submission.save(update_fields=update_fields)
+    return result
+
+
+def autotest_score(passed, total):
+    """Балл по автотестам: доля пройденных тестов из 10 (для 5 тестов — по 2 балла за тест:
+    5/5 → 10, 4/5 → 8, 3/5 → 6, 2/5 → 4, 1/5 → 2, 0/5 → 0)."""
+    if not total:
+        return 0
+    return int(10 * passed / total + 0.5)
+
+
+def _submit_attempt(submission):
+    """Всё, что происходит после сохранения нового кода: попытка в истории, автотесты и —
+    если у задачи есть тесты — сразу оценка по ним. Итоговая оценка по задаче остаётся
+    лучшей из всех попыток; учитель может потом исправить автоматическую оценку.
+    Возвращает текст сообщения для ученика."""
+    attempt = _record_attempt(submission)
+    if not submission.task.test_cases:
+        return 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.'
+
+    result = _refresh_autotests(submission)
+    if not result.get('available'):
+        # Тесты не смогли запуститься — оставляем решение на ручную проверку учителем.
+        return 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.'
+
+    passed, total = result['passed'], result['total']
+    attempt.score = autotest_score(passed, total)
+    attempt.auto_graded = True
+    attempt.tests_passed, attempt.tests_total = passed, total
+    attempt.graded_at = timezone.now()
+    attempt.save()
+
+    final_score = submission.recalc_final_score()
+    submission.teacher_comment = ''
+    submission.status = 'DONE'
+    submission.save()
+    return (f'Код проверен автоматически: пройдено тестов {passed} из {total} — '
+            f'{attempt.score} баллов. Итоговая оценка по задаче (лучшая из попыток): {final_score}/10.')
 
 
 def _safe_back_url(request):
@@ -282,11 +320,7 @@ def task_detail(request, task_id):
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
         submission.save()
-        _record_attempt(submission)
-        if task.test_cases:
-            _refresh_autotests(submission)
-
-        messages.success(request, 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.')
+        messages.success(request, _submit_attempt(submission))
         return redirect(task_url_with_back)
 
     context = {
@@ -372,11 +406,7 @@ def submit_code(request, submission_id):
         submission.status = 'TESTING'
         submission.last_submitted_at = timezone.now()
         submission.save()
-        _record_attempt(submission)
-        if submission.task.test_cases:
-            _refresh_autotests(submission)
-
-        messages.success(request, 'Код отправлен на проверку преподавателю!')
+        messages.success(request, _submit_attempt(submission))
 
     return redirect('kanban')
 
@@ -1086,6 +1116,7 @@ def grade_submission(request, submission_id):
             )
         grading_attempt.score = score
         grading_attempt.teacher_comment = comment
+        grading_attempt.auto_graded = False  # учитель поставил/исправил оценку вручную
         grading_attempt.graded_at = timezone.now()
         grading_attempt.save()
 

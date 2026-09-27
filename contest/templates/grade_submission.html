@@ -55,7 +55,7 @@
                                 <tr>
                                     <td>{{ a.number }}</td>
                                     <td class="small">{{ a.submitted_at|date:"d.m.Y H:i" }}</td>
-                                    <td>{% if a.is_graded %}<span class="badge bg-success">{{ a.score }}/10</span>{% else %}<span class="badge bg-warning text-dark">Не проверена</span>{% endif %}</td>
+                                    <td>{% if a.is_graded %}<span class="badge bg-success">{{ a.score }}/10</span>{% if a.auto_graded %} <span class="small text-muted">авто, {{ a.tests_passed }}/{{ a.tests_total }}</span>{% endif %}{% else %}<span class="badge bg-warning text-dark">Не проверена</span>{% endif %}</td>
                                     <td class="small">{{ a.teacher_comment|default:"—"|truncatechars:80 }}</td>
                                     <td>
                                         <details>
@@ -111,7 +111,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-muted small mb-0">Это автоматическая проверка по тестам задачи — подсказка, не финальная оценка.</p>
+                    <p class="text-muted small mb-0">Оценка за попытку по тестам: 2 балла за каждый пройденный тест (5/5 = 10). Вы можете исправить её вручную.</p>
                 </div>
                 {% endif %}
             </div>
@@ -124,7 +124,7 @@
             <div class="card-body p-4">
                 <h5 class="fw-bold mb-1">Выставить оценку</h5>
                 <p class="text-muted small mb-4">
-                    {% if grading_attempt %}Попытка #{{ grading_attempt.number }}{% if grading_attempt.is_graded %} (уже оценена — оценка будет исправлена){% endif %}{% endif %}
+                    {% if grading_attempt %}Попытка #{{ grading_attempt.number }}{% if grading_attempt.auto_graded %} — оценена автоматически: тестов {{ grading_attempt.tests_passed }}/{{ grading_attempt.tests_total }} → {{ grading_attempt.score }}/10. Можно исправить.{% elif grading_attempt.is_graded %} (уже оценена — оценка будет исправлена){% endif %}{% endif %}
                     {% if submission.is_graded %}<br>Текущая итоговая оценка: <strong>{{ submission.score }}/10</strong> — лучшая из попыток.{% endif %}
                 </p>
 

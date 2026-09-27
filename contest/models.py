@@ -247,6 +247,10 @@ class Attempt(models.Model):
     score = models.IntegerField(null=True, blank=True, verbose_name="Оценка (0-10)")
     teacher_comment = models.TextField(blank=True, verbose_name="Комментарий учителя")
     graded_at = models.DateTimeField(null=True, blank=True, verbose_name="Проверено")
+    # Оценка выставлена автоматически по автотестам (а не учителем вручную).
+    auto_graded = models.BooleanField(default=False, verbose_name="Оценено автоматически")
+    tests_passed = models.IntegerField(null=True, blank=True, verbose_name="Тестов пройдено")
+    tests_total = models.IntegerField(null=True, blank=True, verbose_name="Тестов всего")
 
     class Meta:
         verbose_name = "Попытка"

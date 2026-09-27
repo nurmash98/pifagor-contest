@@ -75,6 +75,9 @@
                         {% endif %}
                     </div>
                     <div class="text-muted small">{{ a.submitted_at|date:"d.m.Y H:i" }}</div>
+                    {% if a.auto_graded %}
+                        <div class="mt-1 small">🧪 {% t "Автопроверка: пройдено тестов" %} {{ a.tests_passed }}/{{ a.tests_total }}</div>
+                    {% endif %}
                     {% if a.teacher_comment %}
                         <div class="mt-2 small">
                             <span class="fw-semibold">{% t "Комментарий преподавателя:" %}</span> {{ a.teacher_comment }}
@@ -151,11 +154,14 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-                <p class="text-muted small mb-0">{% t "Это автоматическая проверка по тестам, не финальная оценка — её ставит преподаватель." %}</p>
+                <p class="text-muted small mb-0">{% t "За каждый пройденный тест — 2 балла (5 из 5 = 10). Преподаватель может изменить оценку." %}</p>
             </div>
             {% endif %}
 
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
+            {% if task.test_cases %}
+                <p class="small text-muted mb-3">🧪 {% t "Решение проверяется автоматически на тестах, балл выставляется сразу: за каждый пройденный тест — 2 балла (5 из 5 = 10)." %}</p>
+            {% endif %}
 
             {% if cooldown_hours %}
                 <div class="alert alert-info rounded-3">
