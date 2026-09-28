@@ -14,8 +14,10 @@
         {% if topic.youtube_embed_url %}
         <div class="ratio ratio-16x9 shadow-sm rounded-4 overflow-hidden">
             <iframe src="{{ topic.youtube_embed_url }}" title="Видеоурок: {{ topic.name }}"
-                    allowfullscreen loading="lazy"></iframe>
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
+        <a href="{{ topic.theory_video_url }}" target="_blank" rel="noopener noreferrer" class="d-inline-block mt-2 small">Открыть на YouTube ↗</a>
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
             <p class="mb-3">Не получилось встроить видео по этой ссылке.</p>

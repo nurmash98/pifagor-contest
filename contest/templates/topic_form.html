@@ -14,7 +14,7 @@
                 {% if topic %}Тема: {{ topic.name }}{% else %}Новая тема{% endif %}
             </h4>
 
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
@@ -32,7 +32,27 @@
                     <input type="url" name="theory_video_url" class="form-control"
                            value="{{ topic.theory_video_url|default:'' }}"
                            placeholder="https://www.youtube.com/watch?v=...">
-                    <div class="form-text">Ученик сможет открыть его отдельной страницей из темы.</div>
+                    <div class="form-text">Ученик смотрит видео прямо на странице курса, в блоке «Видеоурок».</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Теория — HTML-файл (необязательно)</label>
+                    {% if topic.theory_filename %}
+                    <div class="d-flex align-items-center gap-3 mb-2 small">
+                        <span>📖 Сейчас загружено: <strong>{{ topic.theory_filename }}</strong></span>
+                        <a href="{% url 'topic_theory' topic.id %}" target="_blank" rel="noopener">Посмотреть ↗</a>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" name="remove_theory" value="1" id="remove_theory">
+                            <label class="form-check-label" for="remove_theory">Удалить теорию</label>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="theory_file" class="form-control" accept=".html,.htm,text/html">
+                    <div class="form-text">
+                        Файл .html (до 2 МБ). Ученик откроет его в блоке «Теория» внутри темы.
+                        {% if topic.theory_filename %}Новый файл заменит текущий.{% endif %}
+                        Картинки лучше вставлять ссылками или прямо в файл — отдельные файлы рядом с HTML не загружаются.
+                    </div>
                 </div>
 
                 <div class="mb-4">

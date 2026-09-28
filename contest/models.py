@@ -102,6 +102,10 @@ class Topic(models.Model):
         blank=True, verbose_name="Видеоурок (ссылка на YouTube)",
         help_text="Необязательно. Ученик сможет открыть видео отдельной страницей."
     )
+    # Теория — HTML-файл, который загружает учитель. Храним его содержимое прямо в базе
+    # (а не файлом на диске): на Render диск стирается при каждом деплое.
+    theory_html = models.TextField(blank=True, verbose_name="Теория (HTML)")
+    theory_filename = models.CharField(max_length=255, blank=True, verbose_name="Имя файла теории")
     tasks = models.ManyToManyField(Task, blank=True, related_name='topics', verbose_name="Задачи")
 
     class Meta:
@@ -116,8 +120,8 @@ class Topic(models.Model):
         """URL для встраивания ролика (<iframe>), если ссылка похожа на YouTube."""
         if not self.theory_video_url:
             return None
-        match = re.search(r'(?:v=|youtu\.be/|embed/)([A-Za-z0-9_-]{11})', self.theory_video_url)
-        return f'https://www.youtube.com/embed/{match.group(1)}' if match else None
+        match = re.search(r'(?:v=|youtu\.be/|embed/|shorts/|live/)([A-Za-z0-9_-]{11})', self.theory_video_url)
+        return f'https://www.youtube.com/embed/{match.group(1)}?rel=0' if match else None
 
 
 class Teacher(models.Model):

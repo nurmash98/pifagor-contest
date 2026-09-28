@@ -19,6 +19,8 @@ from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, 
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests, MAX_TEST_CASES
 from django.contrib.admin.views.decorators import staff_member_required
+from django.http import Http404, HttpResponse
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 logger = logging.getLogger(__name__)
 
@@ -691,7 +693,8 @@ def course_detail(request, course_id):
         messages.warning(request, 'Этот курс пока недоступен.')
         return redirect('courses')
 
-    topics = course.topics.prefetch_related('tasks__tags').all()
+    # theory_html (до 2 МБ на тему) на странице курса не нужен — только признак, что он есть.
+    topics = course.topics.prefetch_related('tasks__tags').defer('theory_html')
     lang = _get_content_lang(request)
     for topic in topics:
         _apply_task_language(topic.tasks.all(), lang)
@@ -753,7 +756,7 @@ def course_manage(request, course_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    topics = course.topics.prefetch_related('tasks').all()
+    topics = course.topics.prefetch_related('tasks').defer('theory_html')
     return render(request, 'course_manage.html', {'course': course, 'topics': topics})
 
 
@@ -855,13 +858,18 @@ def topic_create(request, course_id):
         if not name:
             messages.error(request, 'Укажите название темы.')
         else:
-            topic = Topic.objects.create(
+            topic = Topic(
                 course=course,
                 name=name,
                 order=request.POST.get('order') or 0,
                 theory_video_url=request.POST.get('theory_video_url', '').strip(),
             )
+            error = _apply_theory_upload(request, topic)
+            topic.save()
             topic.tasks.set(request.POST.getlist('tasks'))
+            if error:
+                messages.error(request, f'Тема «{topic.name}» добавлена, но теория не загружена: {error}')
+                return redirect('topic_edit', topic_id=topic.id)
             messages.success(request, f'Тема «{topic.name}» добавлена.')
             return redirect('course_manage', course_id=course.id)
 
@@ -869,6 +877,50 @@ def topic_create(request, course_id):
         'course': course, 'topic': None, 'all_tasks': all_tasks, 'selected_task_ids': set(),
         'all_tags': Tag.objects.all(),
     })
+
+
+THEORY_MAX_BYTES = 2 * 1024 * 1024  # 2 МБ на HTML-файл теории
+
+
+def _apply_theory_upload(request, topic):
+    """Загрузка/удаление HTML-файла теории из формы темы. Возвращает текст ошибки или None."""
+    if request.POST.get('remove_theory'):
+        topic.theory_html, topic.theory_filename = '', ''
+    upload = request.FILES.get('theory_file')
+    if not upload:
+        return None
+    name = upload.name or 'theory.html'
+    if not name.lower().endswith(('.html', '.htm')):
+        return 'Теория должна быть файлом .html или .htm.'
+    if upload.size > THEORY_MAX_BYTES:
+        return 'Файл теории слишком большой (максимум 2 МБ).'
+    raw = upload.read()
+    for encoding in ('utf-8-sig', 'cp1251'):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        return 'Не удалось прочитать файл теории — сохраните его в кодировке UTF-8.'
+    topic.theory_html, topic.theory_filename = text, name[:255]
+    return None
+
+
+@login_required
+@xframe_options_sameorigin
+def topic_theory(request, topic_id):
+    """HTML-теория темы. Показывается в песочнице (CSP sandbox, без allow-same-origin):
+    даже если в загруженном файле есть скрипты, они работают с «чужого» происхождения и
+    не видят сессию/cookie сайта. Открывается внутри страницы курса или в новой вкладке."""
+    topic = get_object_or_404(Topic, id=topic_id)
+    if not topic.course.is_visible and not request.user.is_staff:
+        raise Http404
+    if not topic.theory_html:
+        raise Http404
+    response = HttpResponse(topic.theory_html, content_type='text/html; charset=utf-8')
+    response['Content-Security-Policy'] = 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox'
+    return response
 
 
 @staff_member_required
@@ -888,8 +940,12 @@ def topic_edit(request, topic_id):
             topic.name = name
         topic.order = request.POST.get('order') or topic.order
         topic.theory_video_url = request.POST.get('theory_video_url', '').strip()
+        error = _apply_theory_upload(request, topic)
         topic.save()
         topic.tasks.set(request.POST.getlist('tasks'))
+        if error:
+            messages.error(request, f'Тема сохранена, но теория не загружена: {error}')
+            return redirect('topic_edit', topic_id=topic.id)
         messages.success(request, f'Тема «{topic.name}» обновлена.')
         return redirect('course_manage', course_id=course.id)
 

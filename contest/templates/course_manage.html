@@ -48,6 +48,9 @@
                         {% if topic.theory_video_url %}
                             <span class="badge bg-info text-dark ms-2">🎬 Видеоурок</span>
                         {% endif %}
+                        {% if topic.theory_filename %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">📖 Теория</span>
+                        {% endif %}
                         <div class="text-muted small">Задач: {{ topic.tasks.count }}</div>
                     </div>
                     <a href="{% url 'topic_edit' topic.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Редактировать</a>
