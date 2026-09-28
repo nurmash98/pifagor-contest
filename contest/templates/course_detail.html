@@ -42,20 +42,16 @@
         </div>
     </details>
 
-    <!-- Теория -->
-    <details class="topic-part border-top px-3 py-2" data-part="theory">
-        <summary class="fw-semibold py-1" style="cursor: pointer; color: #1a1a4b;">📖 {% t "Теория" %}</summary>
-        <div class="pb-2">
-            {% if topic.theory_filename %}
-                <iframe data-src="{% url 'topic_theory' topic.id %}" title="{{ topic.name }}"
-                        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-                        class="w-100 border rounded-3 mt-2 bg-white" style="height: 70vh;"></iframe>
-                <a href="{% url 'topic_theory' topic.id %}" target="_blank" rel="noopener" class="d-inline-block mt-2 small">{% t "Открыть теорию в новой вкладке ↗" %}</a>
-            {% else %}
-                <p class="text-muted small mb-0 mt-1">{% t "Теория пока не добавлена." %}</p>
-            {% endif %}
-        </div>
-    </details>
+    <!-- Теория: не раскрывается внутри страницы — открывается кнопкой в новой вкладке -->
+    <div class="border-top px-3 py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-semibold py-1" style="color: #1a1a4b;">📖 {% t "Теория" %}</span>
+        {% if topic.theory_filename %}
+            <a href="{% url 'topic_theory' topic.id %}" target="_blank" rel="noopener"
+               class="btn btn-outline-primary btn-sm rounded-pill px-3">{% t "Открыть теорию ↗" %}</a>
+        {% else %}
+            <span class="text-muted small">{% t "Теория пока не добавлена." %}</span>
+        {% endif %}
+    </div>
 
     <!-- Задачи -->
     <details class="topic-part border-top px-3 py-2" data-part="tasks">
@@ -100,7 +96,7 @@
 {% endfor %}
 
 <script>
-// Видео и теория загружаются только когда ученик раскрывает блок (страница не тормозит
+// Видео загружается только когда ученик раскрывает блок (страница не тормозит
 // из-за десятков плееров). При сворачивании видеоурока плеер выгружается — звук не играет в фоне.
 document.querySelectorAll('details.topic-part').forEach(function (part) {
     part.addEventListener('toggle', function () {
