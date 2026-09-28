@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт задач из JSON - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'task_tags_list' %}" class="text-decoration-none text-muted small">← Назад к задачам</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-1" style="color: #1a1a4b;">⬆ Импорт задач из JSON</h4>
+            <p class="text-muted small mb-4">
+                Загрузите файл .json или вставьте текст. Можно сразу много задач (до {{ max_tasks }}).
+                Если хоть в одной задаче ошибка — ничего не импортируется, сайт покажет, что исправить.
+            </p>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <label class="form-label fw-semibold small">JSON-файл</label>
+                <input type="file" name="json_file" class="form-control mb-3" accept=".json,application/json">
+                <label class="form-label fw-semibold small">…или вставьте JSON сюда</label>
+                <textarea name="json_text" class="form-control font-monospace small mb-3" rows="12" placeholder='[{"title": "...", "level": "A", ...}]'>{{ pasted }}</textarea>
+                <button type="submit" class="btn btn-pifagor-green px-4">Импортировать</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3" style="color: #1a1a4b;">Формат</h5>
+            <ul class="small mb-3">
+                <li><code>title</code>, <code>level</code> (<code>A</code>/<code>B</code>/<code>C</code>), <code>description</code>, <code>input_example</code>, <code>output_example</code> — обязательно.</li>
+                <li><code>test_cases</code> — тесты для автопроверки (до {{ max_tests }}), по желанию. Без тестов задачу проверяет учитель.</li>
+                <li><code>tags</code> — список тегов, новые создаются сами.</li>
+                <li><code>title_kk</code>, <code>description_kk</code>, <code>input_example_kk</code>, <code>output_example_kk</code> — казахская версия, по желанию.</li>
+                <li>Задачи с названием, которое уже есть на сайте, не принимаются. Лишние поля (например <code>id</code>, <code>hint</code>) просто игнорируются.</li>
+                <li>Перенос строки внутри текста — <code>\n</code>. Ответы лучше делать на английском или числами, одинаковыми для RU и KZ.</li>
+            </ul>
+            <h6 class="fw-bold small">Пример</h6>
+<pre class="bg-light border rounded-3 p-3 small mb-0" style="white-space: pre-wrap;">[
+  {
+    "title": "Сумма двух чисел",
+    "level": "A",
+    "description": "Даны два числа, каждое на отдельной строке. Выведите их сумму.",
+    "input_example": "2\n3",
+    "output_example": "5",
+    "tags": ["input/output"],
+    "test_cases": [
+      {"input": "1\n1", "output": "2"},
+      {"input": "10\n-4", "output": "6"},
+      {"input": "0\n0", "output": "0"},
+      {"input": "100\n200", "output": "300"},
+      {"input": "-5\n-5", "output": "-10"}
+    ],
+    "title_kk": "Екі санның қосындысы",
+    "description_kk": "Екі сан берілген, әрқайсысы жаңа жолда. Олардың қосындысын шығарыңыз."
+  }
+]</pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

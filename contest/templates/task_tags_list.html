@@ -13,6 +13,10 @@
         <p class="text-muted small mb-0">Все задачи ({{ tasks|length }}). Нажмите на задачу, чтобы изменить условие, пример, тесты или теги.</p>
     </div>
     <div class="col-md-6">
+        <div class="d-flex gap-2 justify-content-md-end mb-2">
+            <a href="{% url 'task_create' %}" class="btn btn-pifagor-green btn-sm rounded-pill px-3">+ Новая задача</a>
+            <a href="{% url 'task_import' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">⬆ Импорт из JSON</a>
+        </div>
         <form method="get" class="d-flex gap-2">
             <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск по названию" value="{{ q }}">
             <select name="level" class="form-select form-select-sm" style="max-width: 160px;">

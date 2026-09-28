@@ -1,11 +1,13 @@
 {% extends 'base.html' %}
 
-{% block title %}Редактирование: {{ task.title }} - Pifagor Contest{% endblock %}
+{% block title %}{% if is_new %}Новая задача{% else %}Редактирование: {{ task.title }}{% endif %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="mb-3 d-flex justify-content-between">
     <a href="{% url 'task_tags_list' %}" class="text-decoration-none text-muted small">← Назад к задачам</a>
+    {% if not is_new %}
     <a href="{% url 'task_detail' task.id %}" class="text-decoration-none small" target="_blank">Посмотреть, как видит ученик ↗</a>
+    {% endif %}
 </div>
 
 <form method="post">
@@ -15,8 +17,15 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-bold mb-0" style="color: #1a1a4b;">Условие задачи</h4>
-                {% if task.level == 'A' %}<span class="badge badge-level-A">Уровень A</span>
+                <h4 class="fw-bold mb-0" style="color: #1a1a4b;">{% if is_new %}Новая задача{% else %}Условие задачи{% endif %}</h4>
+                {% if is_new %}
+                    <select name="level" class="form-select form-select-sm" style="max-width: 190px;" required>
+                        <option value="">Уровень…</option>
+                        <option value="A" {% if v.level == 'A' %}selected{% endif %}>A — лёгкая (×1)</option>
+                        <option value="B" {% if v.level == 'B' %}selected{% endif %}>B — средняя (×2)</option>
+                        <option value="C" {% if v.level == 'C' %}selected{% endif %}>C — сложная (×3)</option>
+                    </select>
+                {% elif task.level == 'A' %}<span class="badge badge-level-A">Уровень A</span>
                 {% elif task.level == 'B' %}<span class="badge badge-level-B">Уровень B</span>
                 {% else %}<span class="badge badge-level-C">Уровень C</span>{% endif %}
             </div>
@@ -116,7 +125,7 @@
             </div>
             <button type="button" id="add-test" class="btn btn-outline-secondary btn-sm w-100 mb-3">+ Добавить тест</button>
 
-            <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">Сохранить задачу</button>
+            <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">{% if is_new %}Создать задачу{% else %}Сохранить задачу{% endif %}</button>
             <p class="text-muted small mt-2 mb-0">Изменения применяются к следующим отправкам — уже выставленные оценки не пересчитываются.</p>
         </div>
     </div>

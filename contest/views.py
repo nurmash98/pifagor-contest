@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import timedelta
@@ -998,30 +999,38 @@ def _tests_from_post(post):
     return tests
 
 
-@staff_member_required
-def task_edit(request, task_id):
-    """Редактирование задачи учителем (любой учитель, любая задача): условие, пример
-    ввода/вывода, казахская версия, тест-кейсы для автопроверки и теги."""
-    task = get_object_or_404(Task, id=task_id)
-    text_fields = ['title', 'description', 'input_example', 'output_example',
-                   'title_kk', 'description_kk', 'input_example_kk', 'output_example_kk']
-    required = {'title': 'Название', 'description': 'Условие',
-                'input_example': 'Пример ввода', 'output_example': 'Пример вывода'}
+TASK_TEXT_FIELDS = ['title', 'description', 'input_example', 'output_example',
+                    'title_kk', 'description_kk', 'input_example_kk', 'output_example_kk']
+TASK_REQUIRED_FIELDS = {'title': 'Название', 'description': 'Условие',
+                        'input_example': 'Пример ввода', 'output_example': 'Пример вывода'}
+TASK_LEVELS = ('A', 'B', 'C')
+
+
+def _task_form(request, task):
+    """Общая форма задачи: создание (task ещё не сохранён) и редактирование.
+    Условие, пример ввода/вывода, казахская версия, тесты для автопроверки, теги.
+    Уровень выбирается только при создании — у существующей задачи его меняет админ
+    (от уровня зависит коэффициент в лидерборде)."""
+    is_new = task.pk is None
 
     if request.method == 'POST':
-        values = {f: _clean_text(request.POST.get(f, '')) for f in text_fields}
+        values = {f: _clean_text(request.POST.get(f, '')) for f in TASK_TEXT_FIELDS}
         values['title'] = values['title'].strip()
         tests = _tests_from_post(request.POST)
-        errors = [f'Поле «{label}» не может быть пустым.' for f, label in required.items()
+        errors = [f'Поле «{label}» не может быть пустым.' for f, label in TASK_REQUIRED_FIELDS.items()
                   if not values[f].strip()]
+        level = request.POST.get('level', '') if is_new else task.level
+        if is_new and level not in TASK_LEVELS:
+            errors.append('Выберите уровень задачи (A, B или C).')
         if len(tests) > MAX_TEST_CASES:
             errors.append(f'Не больше {MAX_TEST_CASES} тестов на задачу.')
-        if values['title'] and Task.objects.filter(title=values['title']).exclude(id=task.id).exists():
+        if values['title'] and Task.objects.filter(title=values['title']).exclude(pk=task.pk).exists():
             errors.append('Задача с таким названием уже есть.')
 
         if not errors:
-            for f in text_fields:
+            for f in TASK_TEXT_FIELDS:
                 setattr(task, f, values[f])
+            task.level = level
             task.test_cases = tests
             task.save()
             task.tags.set(request.POST.getlist('tags'))
@@ -1029,31 +1038,153 @@ def task_edit(request, task_id):
             if new_tag_name:
                 tag, _ = Tag.objects.get_or_create(name=new_tag_name)
                 task.tags.add(tag)
-            messages.success(
-                request,
-                f'Задача «{task.title}» сохранена. Тестов: {len(tests)}. '
-                'Новые тесты применяются к следующим отправкам — старые оценки не меняются.'
-            )
+            if is_new:
+                messages.success(request, f'Задача «{task.title}» создана. Тестов: {len(tests)}. '
+                                          'Она уже есть в каталоге «Все задачи».')
+            else:
+                messages.success(request, f'Задача «{task.title}» сохранена. Тестов: {len(tests)}. '
+                                          'Новые тесты применяются к следующим отправкам — старые оценки не меняются.')
             return redirect('task_edit', task_id=task.id)
 
         for e in errors:
             messages.error(request, e)
-        form_values, selected_tag_ids = values, {int(t) for t in request.POST.getlist('tags') if t.isdigit()}
+        form_values = dict(values, level=level)
+        selected_tag_ids = {int(t) for t in request.POST.getlist('tags') if t.isdigit()}
     else:
-        form_values = {f: getattr(task, f) for f in text_fields}
+        form_values = {f: getattr(task, f) for f in TASK_TEXT_FIELDS}
+        form_values['level'] = task.level
         tests = list(task.test_cases or [])
-        selected_tag_ids = set(task.tags.values_list('id', flat=True))
+        selected_tag_ids = set(task.tags.values_list('id', flat=True)) if not is_new else set()
 
     # Всегда показываем хотя бы 5 строк для тестов (пустые можно просто не заполнять).
     test_rows = tests + [{'input': '', 'output': ''}] * max(0, 5 - len(tests))
 
     return render(request, 'task_edit.html', {
         'task': task,
+        'is_new': is_new,
         'v': form_values,
         'test_rows': test_rows,
         'all_tags': Tag.objects.all(),
         'selected_tag_ids': selected_tag_ids,
         'max_tests': MAX_TEST_CASES,
+    })
+
+
+@staff_member_required
+def task_edit(request, task_id):
+    """Редактирование задачи учителем (любой учитель, любая задача)."""
+    return _task_form(request, get_object_or_404(Task, id=task_id))
+
+
+@staff_member_required
+def task_create(request):
+    """Новая задача через форму — доступно любому учителю."""
+    return _task_form(request, Task(level=''))
+
+
+TASK_IMPORT_MAX_BYTES = 1024 * 1024  # 1 МБ JSON
+TASK_IMPORT_MAX_TASKS = 200
+
+
+def _parse_tasks_json(data):
+    """Проверка JSON для импорта задач. Принимает список задач (или одну задачу-объект).
+    Возвращает (задачи, ошибки); если есть хоть одна ошибка — ничего не импортируем."""
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list) or not data:
+        return [], ['Ожидается список задач: [ {...}, {...} ].']
+    if len(data) > TASK_IMPORT_MAX_TASKS:
+        return [], [f'За раз можно загрузить не больше {TASK_IMPORT_MAX_TASKS} задач.']
+
+    existing = set(Task.objects.values_list('title', flat=True))
+    seen, items, errors = set(), [], []
+    for i, raw in enumerate(data, 1):
+        where = f'Задача №{i}'
+        if not isinstance(raw, dict):
+            errors.append(f'{where}: должна быть объектом {{...}}.'); continue
+        item = {f: _clean_text(str(raw.get(f) or '')) for f in TASK_TEXT_FIELDS}
+        item['title'] = item['title'].strip()
+        if item['title']:
+            where = f'Задача №{i} «{item["title"]}»'
+        for f, label in TASK_REQUIRED_FIELDS.items():
+            if not item[f].strip():
+                errors.append(f'{where}: не заполнено поле «{f}» ({label}).')
+        level = str(raw.get('level') or '').strip().upper()
+        if level not in TASK_LEVELS:
+            errors.append(f'{where}: поле «level» должно быть A, B или C.')
+        item['level'] = level
+        if item['title'] in existing:
+            errors.append(f'{where}: задача с таким названием уже есть на сайте.')
+        elif item['title'] in seen:
+            errors.append(f'{where}: название повторяется в файле.')
+        seen.add(item['title'])
+
+        tags = raw.get('tags') or []
+        if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+            errors.append(f'{where}: «tags» — список названий тегов, например ["if/else"].'); tags = []
+        item['tags'] = [t.strip() for t in tags if t.strip()]
+
+        tests = raw.get('test_cases') or []
+        clean_tests = []
+        if not isinstance(tests, list):
+            errors.append(f'{where}: «test_cases» — список вида [{{"input": "...", "output": "..."}}].')
+        else:
+            for j, t in enumerate(tests, 1):
+                if not isinstance(t, dict) or 'input' not in t or 'output' not in t:
+                    errors.append(f'{where}: тест №{j} должен содержать "input" и "output".'); continue
+                clean_tests.append({'input': _clean_text(str(t['input'])), 'output': _clean_text(str(t['output'])).strip()})
+            if len(clean_tests) > MAX_TEST_CASES:
+                errors.append(f'{where}: не больше {MAX_TEST_CASES} тестов.')
+        item['test_cases'] = clean_tests
+        items.append(item)
+    return items, errors
+
+
+@staff_member_required
+def task_import(request):
+    """Импорт задач из JSON (файлом или вставкой текста) — доступно любому учителю.
+    Всё или ничего: при любой ошибке ни одна задача не создаётся."""
+    pasted = ''
+    if request.method == 'POST':
+        upload = request.FILES.get('json_file')
+        pasted = request.POST.get('json_text', '')
+        raw = None
+        if upload:
+            if upload.size > TASK_IMPORT_MAX_BYTES:
+                messages.error(request, 'Файл слишком большой (максимум 1 МБ).')
+            else:
+                raw = upload.read()
+        elif pasted.strip():
+            raw = pasted.encode('utf-8')
+        else:
+            messages.error(request, 'Выберите JSON-файл или вставьте JSON в поле.')
+
+        if raw is not None:
+            try:
+                data = json.loads(raw.decode('utf-8-sig'))
+            except (UnicodeDecodeError, ValueError) as exc:
+                messages.error(request, f'Это не похоже на правильный JSON: {exc}')
+            else:
+                items, errors = _parse_tasks_json(data)
+                if errors:
+                    for e in errors[:30]:
+                        messages.error(request, e)
+                    if len(errors) > 30:
+                        messages.error(request, f'…и ещё ошибок: {len(errors) - 30}.')
+                    messages.warning(request, 'Ничего не импортировано — исправьте ошибки и загрузите снова.')
+                else:
+                    with transaction.atomic():
+                        for item in items:
+                            task = Task.objects.create(**{k: v for k, v in item.items() if k != 'tags'})
+                            for name in item['tags']:
+                                tag, _ = Tag.objects.get_or_create(name=name)
+                                task.tags.add(tag)
+                    with_tests = sum(1 for it in items if it['test_cases'])
+                    messages.success(request, f'Импортировано задач: {len(items)} (с тестами: {with_tests}).')
+                    return redirect('task_tags_list')
+
+    return render(request, 'task_import.html', {
+        'pasted': pasted, 'max_tasks': TASK_IMPORT_MAX_TASKS, 'max_tests': MAX_TEST_CASES,
     })
 
 

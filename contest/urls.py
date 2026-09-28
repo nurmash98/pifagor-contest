@@ -46,6 +46,8 @@ urlpatterns = [
 
     # Задачи: любой учитель может редактировать любую задачу (условие, пример, тесты, теги)
     path('teacher/tasks/', views.task_tags_list, name='task_tags_list'),
+    path('teacher/tasks/new/', views.task_create, name='task_create'),
+    path('teacher/tasks/import/', views.task_import, name='task_import'),
     path('teacher/tasks/<int:task_id>/edit/', views.task_edit, name='task_edit'),
     path('teacher/tasks/<int:task_id>/tags/', views.task_tags_edit, name='task_tags_edit'),  # старый адрес
 
