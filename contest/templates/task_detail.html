@@ -163,9 +163,9 @@
                 <p class="small text-muted mb-3">🧪 {% t "Решение проверяется автоматически на тестах, балл выставляется сразу: за каждый пройденный тест — 2 балла (5 из 5 = 10)." %}</p>
             {% endif %}
 
-            {% if cooldown_hours %}
+            {% if cooldown_minutes %}
                 <div class="alert alert-info rounded-3">
-                    {% t "Эту задачу можно отправлять не чаще одного раза в 24 часа. Повторная отправка будет доступна примерно через" %} {{ cooldown_hours }} {% t "ч." %}
+                    {% t "Эту задачу можно отправлять не чаще одного раза в 20 минут. Повторная отправка будет доступна через" %} {{ cooldown_minutes }} {% t "мин." %}
                 </div>
             {% endif %}
 
@@ -175,14 +175,14 @@
                     <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="{% t '# Напишите ваш код здесь...' %}" required {% if cooldown_hours %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}" required {% if cooldown_minutes %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="small text-muted">
                         {% t "Текущий статус:" %} <strong>{% t submission.get_status_display %}</strong>
                     </span>
-                    <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_hours %}disabled{% endif %}>
+                    <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_minutes %}disabled{% endif %}>
                         {% t "Отправить решение →" %}
                     </button>
                 </div>

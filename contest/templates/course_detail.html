@@ -62,8 +62,9 @@
                 <div class="d-flex align-items-center gap-2">
                     {% if not request.user.is_staff %}
                         {% if task.user_sub.status == 'DONE' %}
-                            <span class="rounded-circle d-inline-flex align-items-center justify-content-center bg-success text-white flex-shrink-0"
-                                  style="width: 28px; height: 28px; font-size: 0.7rem; font-weight: 700;"
+                            {# 8–10 — зелёный, 6–7 — оранжевый, 0–5 — красный #}
+                            <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                  style="width: 22px; height: 22px; font-size: 0.65rem; font-weight: 700; background-color: {% if task.user_sub.score >= 8 %}#198754{% elif task.user_sub.score >= 6 %}#fd7e14{% else %}#dc3545{% endif %};"
                                   title="{% t 'Оценено:' %} {{ task.user_sub.score }}/10">{{ task.user_sub.score }}</span>
                         {% elif task.user_sub.status == 'TESTING' %}
                             <span class="rounded-circle bg-primary flex-shrink-0" style="width: 16px; height: 16px;" title="{% t 'На проверке' %}"></span>

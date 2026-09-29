@@ -25,7 +25,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 logger = logging.getLogger(__name__)
 
-SUBMISSION_COOLDOWN = timedelta(hours=24)
+SUBMISSION_COOLDOWN = timedelta(minutes=20)  # пауза между отправками одной задачи
 
 # Сколько задач ученик может держать "В работе" одновременно (Kanban).
 MAX_ACTIVE_TASKS = 5
@@ -96,6 +96,11 @@ def _class_leaderboard_rows(school_classes):
         })
     rows.sort(key=lambda row: row['total'], reverse=True)
     return rows
+
+
+def _minutes_left(delta):
+    """Сколько минут ждать (с округлением вверх, минимум 1)."""
+    return max(1, -(-int(delta.total_seconds()) // 60))
 
 
 def _cooldown_remaining(submission):
@@ -291,7 +296,7 @@ def task_detail(request, task_id):
         context = {
             'task': task,
             'submission': None,
-            'cooldown_hours': None,
+            'cooldown_minutes': None,
             'back_url': back_url or reverse('all_tasks'),
             'readonly': True,
         }
@@ -312,11 +317,10 @@ def task_detail(request, task_id):
 
     cooldown = _cooldown_remaining(submission)
 
-    # ОБРАБОТКА ОТПРАВКИ КОДА (Ручная проверка) — не чаще одного раза в 24 часа
+    # ОБРАБОТКА ОТПРАВКИ КОДА — не чаще одного раза в 20 минут (SUBMISSION_COOLDOWN)
     if request.method == 'POST':
         if cooldown:
-            hours_left = int(cooldown.total_seconds() // 3600) + 1
-            messages.warning(request, f'Эту задачу можно отправлять раз в 24 часа. Попробуйте снова через {hours_left} ч.')
+            messages.warning(request, f'Эту задачу можно отправлять раз в 20 минут. Попробуйте снова через {_minutes_left(cooldown)} мин.')
             return redirect(task_url_with_back)
 
         code = request.POST.get('code', '')
@@ -331,7 +335,7 @@ def task_detail(request, task_id):
         'task': task,
         'submission': submission,
         'attempts': submission.attempts.all(),
-        'cooldown_hours': int(cooldown.total_seconds() // 3600) + 1 if cooldown else None,
+        'cooldown_minutes': _minutes_left(cooldown) if cooldown else None,
         'back_url': back_url or reverse('all_tasks'),
         'readonly': False,
     }
@@ -401,8 +405,7 @@ def submit_code(request, submission_id):
 
         cooldown = _cooldown_remaining(submission)
         if cooldown:
-            hours_left = int(cooldown.total_seconds() // 3600) + 1
-            messages.warning(request, f'Эту задачу можно отправлять раз в 24 часа. Попробуйте снова через {hours_left} ч.')
+            messages.warning(request, f'Эту задачу можно отправлять раз в 20 минут. Попробуйте снова через {_minutes_left(cooldown)} мин.')
             return redirect('kanban')
 
         code = request.POST.get('code', '')
