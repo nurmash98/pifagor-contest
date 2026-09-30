@@ -72,6 +72,7 @@
                                    {% if task.id in selected_task_ids %}checked{% endif %}>
                             <label class="form-check-label" for="task-{{ task.id }}">
                                 [{{ task.level }}] {{ task.title }}
+                                <span class="text-muted" style="font-size: 0.75rem;">решили: {{ task.solved_count }}</span>
                                 {% for tag in task.tags.all %}
                                     <span class="badge bg-light text-dark border ms-1">#{{ tag.name }}</span>
                                 {% endfor %}

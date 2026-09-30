@@ -43,6 +43,7 @@
                     <span class="badge badge-level-C me-2">C</span>
                 {% endif %}
                 <a href="{% url 'task_edit' task.id %}" class="fw-bold text-decoration-none" style="color: #1a1a4b;">{{ task.title }}</a>
+                <span class="text-muted ms-1" style="font-size: 0.75rem;">решили: {{ task.solved_count }}</span>
                 {% if task.test_cases %}
                     <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">🧪 {{ task.test_cases|length }} тестов</span>
                 {% else %}

@@ -11,7 +11,7 @@
     <div class="col-md-8">
         <h3 class="fw-bold" style="color: #1a1a4b;">📊 Анализ курса: {{ course.name }}</h3>
         <p class="text-muted small mb-0">
-            Средний балл каждого ученика по темам курса. Если задача ещё не решена — она считается за 0 баллов.
+            Сколько задач каждой темы ученик решил полностью — на 10 баллов (из всех задач темы).
         </p>
     </div>
     <div class="col-md-4">
@@ -36,9 +36,9 @@
                 <tr>
                     <th class="ps-3">Ученик</th>
                     {% for topic in topics %}
-                        <th class="text-center">{{ topic.name }}</th>
+                        <th class="text-center">{{ topic.name }}<div class="text-muted small fw-normal">задач: {{ topic.tasks.count }}</div></th>
                     {% endfor %}
-                    <th class="text-center">Средний балл</th>
+                    <th class="text-center">Всего на 10</th>
                 </tr>
             </thead>
             <tbody>
@@ -49,11 +49,11 @@
                         <div class="text-muted small">{{ row.student.user.username }}</div>
                     </td>
                     {% for cell in row.cells %}
-                        <td class="text-center {% if cell.average >= 7 %}text-success{% elif cell.average >= 4 %}text-warning{% else %}text-danger{% endif %} fw-bold">
-                            {{ cell.average }}
+                        <td class="text-center fw-bold {% if cell.total and cell.done == cell.total %}text-success{% elif cell.done %}text-warning{% else %}text-muted{% endif %}">
+                            {{ cell.done }}/{{ cell.total }}
                         </td>
                     {% endfor %}
-                    <td class="text-center fw-bold" style="color: #1a1a4b;">{{ row.overall_average }}</td>
+                    <td class="text-center fw-bold" style="color: #1a1a4b;">{{ row.overall_done }}/{{ row.overall_total }}</td>
                 </tr>
                 {% empty %}
                 <tr>

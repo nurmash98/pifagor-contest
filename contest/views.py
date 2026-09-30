@@ -8,7 +8,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField, F
+from django.db.models import Sum, Count, Q, Case, When, Value, IntegerField, F, Prefetch
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -96,6 +96,17 @@ def _class_leaderboard_rows(school_classes):
         })
     rows.sort(key=lambda row: row['total'], reverse=True)
     return rows
+
+
+def _tasks_by_level_and_solved(qs=None):
+    """Задачи с числом учеников, решивших их на 10/10 (task.solved_count), в порядке:
+    уровень A→B→C, внутри уровня — сначала самые решаемые, затем по названию.
+    Подсчёт и сортировка — одним SQL-запросом в базе (COUNT + ORDER BY), без
+    перебора в Python."""
+    qs = Task.objects.all() if qs is None else qs
+    return qs.annotate(
+        solved_count=Count('submission', filter=Q(submission__is_graded=True, submission__score=10)),
+    ).order_by('level', '-solved_count', 'title')
 
 
 def _minutes_left(delta):
@@ -255,7 +266,7 @@ def all_tasks_view(request):
     if selected_tag_id:
         tasks = tasks.filter(tags__id=selected_tag_id)
 
-    tasks = list(tasks)
+    tasks = list(_tasks_by_level_and_solved(tasks))
     _apply_task_language(tasks, lang)
 
     if student is not None:
@@ -698,7 +709,9 @@ def course_detail(request, course_id):
         return redirect('courses')
 
     # theory_html (до 2 МБ на тему) на странице курса не нужен — только признак, что он есть.
-    topics = course.topics.prefetch_related('tasks__tags').defer('theory_html')
+    topics = course.topics.prefetch_related(
+        Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))
+    ).defer('theory_html')
     lang = _get_content_lang(request)
     for topic in topics:
         _apply_task_language(topic.tasks.all(), lang)
@@ -766,7 +779,8 @@ def course_manage(request, course_id):
 
 @staff_member_required
 def course_analytics(request, course_id):
-    """Список классов -> при выборе класса таблица: ученики x темы, средний балл (не решил — 0 баллов)."""
+    """Список классов -> при выборе класса таблица: ученики x темы — сколько задач темы
+    ученик решил на 10/10 (из скольких)."""
     course = _get_owned_course_or_none(request, course_id)
     if course is None:
         messages.error(request, 'Это не ваш курс.')
@@ -792,29 +806,25 @@ def course_analytics(request, course_id):
     if selected_class:
         class_students = Student.objects.filter(school_class=selected_class).order_by('full_name')
 
-        # Все баллы DONE-решений учеников этого класса: {(student_id, task_id): score}
-        scores = {
-            (s['student_id'], s['task_id']): s['score']
-            for s in Submission.objects.filter(
-                is_graded=True, student__school_class=selected_class
-            ).values('student_id', 'task_id', 'score')
-        }
+        # Задачи этого класса, решённые на 10/10 (итоговая оценка): {(student_id, task_id)}
+        perfect = set(
+            Submission.objects.filter(is_graded=True, score=10, student__school_class=selected_class)
+            .values_list('student_id', 'task_id')
+        )
 
         for student in class_students:
             cells = []
-            overall_total = 0
-            overall_possible = 0
+            overall_done = overall_total = 0
             for topic, task_ids in topic_task_ids:
-                total = sum(scores.get((student.id, tid), 0) for tid in task_ids)
-                average = round(total / len(task_ids), 1) if task_ids else 0
-                cells.append({'topic': topic, 'average': average})
-                overall_total += total
-                overall_possible += len(task_ids)
-            overall_average = round(overall_total / overall_possible, 1) if overall_possible else 0
+                done = sum(1 for tid in task_ids if (student.id, tid) in perfect)
+                cells.append({'topic': topic, 'done': done, 'total': len(task_ids)})
+                overall_done += done
+                overall_total += len(task_ids)
             students.append({
                 'student': student,
                 'cells': cells,
-                'overall_average': overall_average,
+                'overall_done': overall_done,
+                'overall_total': overall_total,
             })
 
     context = {
@@ -855,7 +865,7 @@ def topic_create(request, course_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    all_tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+    all_tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -936,7 +946,7 @@ def topic_edit(request, topic_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    all_tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+    all_tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -964,7 +974,7 @@ def topic_edit(request, topic_id):
 def task_tags_list(request):
     """Полный список всех задач для управления тегами — доступен любому учителю,
     вне привязки к его классам или курсам."""
-    tasks = Task.objects.prefetch_related('tags').order_by('level', 'title')
+    tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
 
     level_filter = request.GET.get('level', '')
     if level_filter in ['A', 'B', 'C']:
