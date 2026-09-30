@@ -6,3 +6,6 @@ sqlparse==0.6.0
 gunicorn==23.0.0
 psycopg2-binary==2.9.10
 whitenoise==6.8.2
+
+# Актуальная база часовых поясов (Asia/Almaty = UTC+5) — для времени СОР/СОЧ
+tzdata==2025.2

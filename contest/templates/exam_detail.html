@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{{ exam.title }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a></div>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+    <div>
+        <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+        <h3 class="fw-bold d-inline" style="color: #1a1a4b;">{{ exam.title }}</h3>
+        <div class="text-muted small mt-1">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "каждая задача — до 10 баллов" %}</div>
+    </div>
+    {% if in_progress %}
+    <div class="text-end">
+        <div class="small text-muted">{% t "Осталось" %}</div>
+        <div id="exam-timer" class="fs-3 fw-bold text-danger font-monospace" data-end="{{ exam.end_at|date:'c' }}">--:--</div>
+    </div>
+    {% endif %}
+</div>
+
+{% if state == 'upcoming' %}
+    <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
+        <p class="mb-2">{% t "Начнётся" %} <strong>{{ exam.start_at|date:"d.m.Y H:i" }}</strong></p>
+        <button class="btn btn-secondary px-4" disabled>{% t "Начать" %}</button>
+    </div>
+
+{% elif not attempt and state == 'active' %}
+    <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
+        <p class="mb-1">{% t "Задач" %}: <strong>{{ tasks|length }}</strong> · {% t "до" %} {{ exam.end_at|date:"H:i" }}</p>
+        <p class="text-muted small mb-4">{% t "После старта Курсы, Все задачи и Kanban будут закрыты до конца СОР/СОЧ." %}</p>
+        <form method="post" action="{% url 'exam_start' exam.id %}">{% csrf_token %}
+            <button class="btn btn-danger btn-lg px-5 rounded-pill">▶ {% t "Начать" %}</button>
+        </form>
+    </div>
+
+{% else %}
+    {% if finished %}
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-3 text-center">
+        <div class="text-muted small">{% t "Оценка (средний балл по всем задачам)" %}</div>
+        <div class="display-6 fw-bold {% if grade >= 8 %}text-success{% elif grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ grade }}/10</div>
+        {% if not attempt %}<div class="text-muted small">{% t "Вы не участвовали в этом СОР/СОЧ." %}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
+        <ul class="list-group list-group-flush">
+            {% for task in tasks %}
+            <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <span class="text-muted me-2">{{ forloop.counter }}.</span>
+                    {% if attempt %}
+                    <a href="{% url 'exam_task' exam.id task.id %}" class="fw-semibold text-decoration-none" style="color: #1a1a4b;">{{ task.display_title }}</a>
+                    {% else %}<span class="fw-semibold">{{ task.display_title }}</span>{% endif %}
+                </div>
+                {% if task.answer %}
+                    <span class="badge {% if task.answer.best_score >= 8 %}bg-success{% elif task.answer.best_score >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ task.answer.best_score }}/10</span>
+                {% else %}
+                    <span class="badge bg-light text-muted border">{% if finished %}0/10{% else %}{% t "не сдано" %}{% endif %}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if in_progress %}
+    <form method="post" action="{% url 'exam_finish' exam.id %}" class="text-end"
+          onsubmit="return confirm('{% t "Завершить СОР/СОЧ? Изменить ответы потом будет нельзя." %}');">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger rounded-pill px-4">{% t "Завершить" %}</button>
+    </form>
+    {% endif %}
+{% endif %}
+
+{% if in_progress %}{% include 'exam_timer.html' %}{% endif %}
+{% endblock %}

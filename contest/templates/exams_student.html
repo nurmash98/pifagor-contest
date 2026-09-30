@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{% t "СОР/СОЧ" %} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-4" style="color: #1a1a4b;">📝 {% t "СОР/СОЧ" %}</h3>
+
+{% if active %}
+<h6 class="fw-bold text-danger mb-2">{% t "Идёт сейчас" %}</h6>
+{% for exam in active %}
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-3 border-start border-4 border-danger">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <span class="badge bg-danger me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+            <strong style="color: #1a1a4b;">{{ exam.title }}</strong>
+            <div class="text-muted small">{% t "до" %} {{ exam.end_at|date:"H:i" }} · {% t "задач" %}: {{ exam.tasks.all|length }}</div>
+        </div>
+        <a href="{% url 'exam_detail' exam.id %}" class="btn btn-danger btn-sm rounded-pill px-3">
+            {% if exam.my_attempt %}{% t "Продолжить" %} →{% else %}{% t "Начать" %} →{% endif %}
+        </a>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h6 class="fw-bold text-muted mb-2 mt-4">{% t "Предстоящие" %}</h6>
+{% for exam in upcoming %}
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-2">
+    <span><span class="badge bg-secondary me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+    <strong style="color: #1a1a4b;">{{ exam.title }}</strong></span>
+    <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "задач" %}: {{ exam.tasks.all|length }}</div>
+</div>
+{% empty %}
+<p class="text-muted small">{% t "Пока ничего не запланировано." %}</p>
+{% endfor %}
+
+<h6 class="fw-bold text-muted mb-2 mt-4">{% t "Сданные" %}</h6>
+{% for exam in finished %}
+<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none">
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-2 d-flex flex-row justify-content-between align-items-center">
+    <div>
+        <span class="badge bg-light text-dark border me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+        <strong style="color: #1a1a4b;">{{ exam.title }}</strong>
+        <div class="text-muted small">{{ exam.start_at|date:"d.m.Y" }}{% if not exam.my_attempt %} · {% t "не участвовал" %}{% endif %}</div>
+    </div>
+    <span class="badge fs-6 {% if exam.my_grade >= 8 %}bg-success{% elif exam.my_grade >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ exam.my_grade }}/10</span>
+</div>
+</a>
+{% empty %}
+<p class="text-muted small">{% t "Сданных пока нет." %}</p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{{ task.display_title }} - {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
+    {% if active %}<span class="small text-muted">{% t "Осталось" %}: <span id="exam-timer" class="fw-bold text-danger font-monospace" data-end="{{ exam.end_at|date:'c' }}">--:--</span></span>{% endif %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-3" style="color: #1a1a4b;">{{ task.display_title }}</h4>
+            <p class="lh-lg">{{ task.display_description|linebreaksbr }}</p>
+            <div class="row g-2">
+                <div class="col-md-6"><div class="bg-light p-3 rounded-3 border"><span class="fw-bold text-muted small d-block mb-1">{% t "Пример ввода (Input):" %}</span><code class="text-dark" style="white-space: pre-wrap;">{{ task.display_input_example }}</code></div></div>
+                <div class="col-md-6"><div class="bg-light p-3 rounded-3 border"><span class="fw-bold text-muted small d-block mb-1">{% t "Пример вывода (Output):" %}</span><code class="text-dark" style="white-space: pre-wrap;">{{ task.display_output_example }}</code></div></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            {% if answer %}
+            <div class="alert {% if answer.best_score == 10 %}alert-success{% else %}alert-warning{% endif %} rounded-3">
+                <div class="d-flex justify-content-between"><strong>{% t "Лучший результат" %}</strong><span class="badge bg-dark">{{ answer.best_score }}/10</span></div>
+                <div class="small mt-1">{% t "Последняя отправка" %}: {% t "пройдено тестов" %} {{ answer.tests_passed }}/{{ answer.tests_total }}</div>
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    {% for r in answer.results %}
+                        {% if r.ok %}<span class="badge bg-success">{{ forloop.counter }} ✓</span>
+                        {% elif r.error == 'timeout' %}<span class="badge bg-dark">{{ forloop.counter }} ⏱</span>
+                        {% elif r.error == 'memory' %}<span class="badge bg-dark">{{ forloop.counter }} 💾</span>
+                        {% else %}<span class="badge bg-danger">{{ forloop.counter }} ✗</span>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% if active %}
+            <form method="post" id="exam-form">
+                {% csrf_token %}
+                <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
+                <textarea name="code" class="form-control rounded-3 font-monospace p-3 mb-3" style="min-height: 300px; background-color: #272822; color: #f8f8f2;" required>{{ answer.code|default:'' }}</textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small text-muted">{% t "Можно отправлять несколько раз — засчитывается лучший результат." %}</span>
+                    <button type="submit" id="exam-submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">{% t "Отправить" %} →</button>
+                </div>
+            </form>
+            <script>
+            document.getElementById('exam-form').addEventListener('submit', function () {
+                var b = document.getElementById('exam-submit'); b.disabled = true; b.textContent = '{% t "Проверяем..." %}';
+            });
+            </script>
+            {% else %}
+                <p class="text-muted mb-2">{% t "Время СОР/СОЧ вышло — ответы больше не принимаются." %}</p>
+                {% if answer %}<pre class="bg-dark text-light p-3 rounded-3 small mb-0" style="white-space: pre-wrap;"><code>{{ answer.best_code }}</code></pre>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% if active %}{% include 'exam_timer.html' %}{% endif %}
+{% endblock %}

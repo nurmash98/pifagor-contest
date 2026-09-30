@@ -123,12 +123,23 @@
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">{% t "Курсы" %}</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'exam_list' %}">{% t "СОР/СОЧ" %}</a>
+                            </li>
                             <li class="nav-item me-3">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>
                             </li>
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->
                         {% else %}
+                            {% if active_exam_attempt %}
+                            <!-- Идёт СОР/СОЧ: Курсы, Все задачи и Kanban закрыты до его окончания -->
+                            <li class="nav-item me-2">
+                                <a class="btn btn-danger btn-sm fw-bold rounded-pill px-3" href="{% url 'exam_detail' active_exam_attempt.exam_id %}">
+                                    ⏱ {% t "Идёт СОР/СОЧ" %}
+                                </a>
+                            </li>
+                            {% else %}
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'all_tasks' %}">{% t "Все задачи" %}</a>
                             </li>
@@ -137,6 +148,10 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'kanban' %}">{% t "Kanban Доска" %}</a>
+                            </li>
+                            {% endif %}
+                            <li class="nav-item">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'exam_list' %}">{% t "СОР/СОЧ" %}</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>

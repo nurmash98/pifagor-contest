@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import exam_views
 
 urlpatterns = [
     # Главная страница - каталог задач
@@ -32,7 +33,18 @@ urlpatterns = [
     # Переключатель языка условий задач (RU/KZ)
     path('lang/<str:lang>/', views.set_content_lang, name='set_content_lang'),
 
-# Кабинет преподавателя
+    # СОР / СОЧ (БЖБ / ТЖБ)
+    path('exams/', exam_views.exam_list, name='exam_list'),
+    path('exams/new/', exam_views.exam_create, name='exam_create'),
+    path('exams/<int:exam_id>/', exam_views.exam_detail, name='exam_detail'),
+    path('exams/<int:exam_id>/start/', exam_views.exam_start, name='exam_start'),
+    path('exams/<int:exam_id>/finish/', exam_views.exam_finish, name='exam_finish'),
+    path('exams/<int:exam_id>/task/<int:task_id>/', exam_views.exam_task, name='exam_task'),
+    path('exams/<int:exam_id>/edit/', exam_views.exam_edit, name='exam_edit'),
+    path('exams/<int:exam_id>/delete/', exam_views.exam_delete, name='exam_delete'),
+    path('exams/<int:exam_id>/results/', exam_views.exam_results, name='exam_results'),
+
+    # Кабинет преподавателя
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path('teacher/grade/<int:submission_id>/', views.grade_submission, name='grade_submission'),
 

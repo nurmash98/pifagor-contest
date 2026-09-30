@@ -295,3 +295,93 @@ class Attempt(models.Model):
 
     def __str__(self):
         return f"Попытка #{self.number} — {self.submission}"
+
+class Exam(models.Model):
+    """СОР / СОЧ (БЖБ / ТЖБ): учитель выбирает класс, время начала, длительность и задачи.
+    Каждая задача — до 10 баллов (по автотестам), оценка за экзамен — средний балл по всем
+    задачам экзамена. Сложность задач здесь не влияет на баллы."""
+    KIND_CHOICES = [('SOR', 'СОР'), ('SOCH', 'СОЧ')]
+
+    kind = models.CharField(max_length=4, choices=KIND_CHOICES, default='SOR', verbose_name="Тип")
+    title = models.CharField(max_length=200, verbose_name="Название")
+    school_class = models.CharField(max_length=10, verbose_name="Класс")
+    start_at = models.DateTimeField(verbose_name="Начало")
+    duration_minutes = models.PositiveIntegerField(verbose_name="Длительность (минут)")
+    tasks = models.ManyToManyField(Task, related_name='exams', verbose_name="Задачи")
+    created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='exams', verbose_name="Кто создал")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "СОР/СОЧ"
+        verbose_name_plural = "СОР/СОЧ"
+        ordering = ['-start_at']
+
+    def save(self, *args, **kwargs):
+        self.school_class = normalize_school_class(self.school_class)
+        super().save(*args, **kwargs)
+
+    @property
+    def end_at(self):
+        from datetime import timedelta
+        return self.start_at + timedelta(minutes=self.duration_minutes)
+
+    def status(self, now=None):
+        """'upcoming' — ещё не началось, 'active' — идёт, 'finished' — время вышло."""
+        from django.utils import timezone
+        now = now or timezone.now()
+        if now < self.start_at:
+            return 'upcoming'
+        return 'active' if now < self.end_at else 'finished'
+
+    def __str__(self):
+        return f"{self.get_kind_display()} «{self.title}» ({self.school_class})"
+
+
+class ExamAttempt(models.Model):
+    """Ученик нажал «Начать» на экзамене. Пока попытка идёт (не завершена и время экзамена
+    не вышло), Курсы, Все задачи и Kanban для него закрыты."""
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='attempts')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='exam_attempts')
+    started_at = models.DateTimeField(verbose_name="Начал")
+    finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Завершил досрочно")
+
+    class Meta:
+        verbose_name = "Попытка СОР/СОЧ"
+        verbose_name_plural = "Попытки СОР/СОЧ"
+        unique_together = [('exam', 'student')]
+
+    def is_active(self, now=None):
+        from django.utils import timezone
+        now = now or timezone.now()
+        return self.finished_at is None and now < self.exam.end_at
+
+    def grade(self):
+        """Оценка из 10 — средний балл по ВСЕМ задачам экзамена (не сданная задача = 0)."""
+        task_count = self.exam.tasks.count()
+        if not task_count:
+            return 0
+        total = sum(a.best_score for a in self.answers.all())
+        return round(total / task_count, 1)
+
+    def __str__(self):
+        return f"{self.student} — {self.exam}"
+
+
+class ExamAnswer(models.Model):
+    """Решение одной задачи экзамена: последний отправленный код и лучший результат."""
+    attempt = models.ForeignKey(ExamAttempt, on_delete=models.CASCADE, related_name='answers')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    code = models.TextField(blank=True, verbose_name="Последний код")
+    best_code = models.TextField(blank=True, verbose_name="Код с лучшим результатом")
+    best_score = models.IntegerField(default=0, verbose_name="Лучший балл (0-10)")
+    tests_passed = models.IntegerField(default=0)
+    tests_total = models.IntegerField(default=0)
+    results = models.JSONField(default=list, blank=True)
+    submissions_count = models.PositiveIntegerField(default=0)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Ответ на СОР/СОЧ"
+        verbose_name_plural = "Ответы на СОР/СОЧ"
+        unique_together = [('attempt', 'task')]

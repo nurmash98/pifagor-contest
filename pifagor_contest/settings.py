@@ -61,6 +61,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Пока ученик пишет СОР/СОЧ — Курсы, Все задачи и Kanban для него закрыты.
+    'contest.middleware.ExamLockMiddleware',
 ]
 
 ROOT_URLCONF = 'pifagor_contest.urls'
@@ -76,6 +78,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'contest.context_processors.content_lang',
+                'contest.context_processors.active_exam',
             ],
         },
     },
@@ -137,7 +140,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# Казахстан (единый часовой пояс UTC+5 с 2024 года) — время СОР/СОЧ учитель вводит по местному времени.
+TIME_ZONE = 'Asia/Almaty'
 
 USE_I18N = True
 

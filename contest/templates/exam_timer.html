@@ -1,0 +1,15 @@
+<script>
+// Обратный отсчёт до конца СОР/СОЧ; когда время вышло — перезагружаем страницу (сервер покажет итог).
+(function () {
+    var el = document.getElementById('exam-timer');
+    if (!el) return;
+    var end = new Date(el.getAttribute('data-end')).getTime();
+    function tick() {
+        var left = Math.max(0, Math.floor((end - Date.now()) / 1000));
+        var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+        el.textContent = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+        if (left <= 0) { clearInterval(timer); setTimeout(function () { location.reload(); }, 1500); }
+    }
+    var timer = setInterval(tick, 1000); tick();
+})();
+</script>

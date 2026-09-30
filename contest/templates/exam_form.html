@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_new %}Новый СОР/СОЧ{% else %}Изменить СОР/СОЧ{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a></div>
+<form method="post">
+{% csrf_token %}
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">{% if is_new %}Новый СОР/СОЧ{% else %}Изменить СОР/СОЧ{% endif %}</h4>
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Тип</label>
+                <div class="d-flex gap-3">
+                    <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="SOR" id="k1" {% if v.kind != 'SOCH' %}checked{% endif %}><label class="form-check-label" for="k1">СОР (БЖБ)</label></div>
+                    <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="SOCH" id="k2" {% if v.kind == 'SOCH' %}checked{% endif %}><label class="form-check-label" for="k2">СОЧ (ТЖБ)</label></div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Название</label>
+                <input type="text" name="title" class="form-control" value="{{ v.title }}" placeholder="например, СОР №1: Условия" maxlength="200" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Класс</label>
+                {% if class_choices is not None %}
+                <select name="school_class" class="form-select" required>
+                    {% for cls in class_choices %}<option value="{{ cls }}" {% if v.school_class == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
+                </select>
+                {% else %}
+                <input type="text" name="school_class" class="form-control" value="{{ v.school_class }}" placeholder="например, 7F" required>
+                {% endif %}
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col-7">
+                    <label class="form-label fw-semibold small">Начало</label>
+                    <input type="datetime-local" name="start_at" class="form-control" value="{{ v.start_at }}" required>
+                </div>
+                <div class="col-5">
+                    <label class="form-label fw-semibold small">Минут</label>
+                    <input type="number" name="duration_minutes" class="form-control" value="{{ v.duration_minutes }}" min="1" max="{{ max_duration }}" required>
+                </div>
+            </div>
+            <p class="text-muted small">Время — по Казахстану. Каждая задача — до 10 баллов по автотестам (сложность не влияет),
+                оценка — средний балл по всем задачам. Во время СОР/СОЧ ученику закрыты Курсы, Все задачи и Kanban.
+                Изменить можно только до начала.</p>
+            <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">{% if is_new %}Создать{% else %}Сохранить{% endif %}</button>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold mb-0" style="color: #1a1a4b;">Задачи <span class="text-muted small fw-normal">выбрано: <span id="picked">{{ selected|length }}</span></span></h5>
+            </div>
+            <div class="d-flex gap-2 mb-2">
+                <input type="text" id="task-search" class="form-control form-control-sm" placeholder="Поиск по названию">
+                <select id="tag-filter" class="form-select form-select-sm" style="max-width: 200px;">
+                    <option value="">Все теги</option>
+                    {% for tag in all_tags %}<option value="{{ tag.name }}">#{{ tag.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="border rounded-3 p-2" style="max-height: 520px; overflow-y: auto;">
+                {% for task in tasks %}
+                <div class="form-check py-1 task-row" data-title="{{ task.title|lower }}" data-tags="|{% for tag in task.tags.all %}{{ tag.name }}|{% endfor %}">
+                    <input class="form-check-input" type="checkbox" name="tasks" value="{{ task.id }}" id="t{{ task.id }}" {% if task.id in selected %}checked{% endif %}>
+                    <label class="form-check-label" for="t{{ task.id }}">[{{ task.level }}] {{ task.title }}
+                        {% for tag in task.tags.all %}<span class="badge bg-light text-dark border ms-1">#{{ tag.name }}</span>{% endfor %}</label>
+                </div>
+                {% empty %}<div class="text-muted small p-2">Нет задач с тестами.</div>{% endfor %}
+            </div>
+            <div class="form-text">В списке только задачи с тестами — их баллы считаются автоматически.</div>
+        </div>
+    </div>
+</div>
+</form>
+<script>
+(function () {
+    var search = document.getElementById('task-search'), tag = document.getElementById('tag-filter');
+    function apply() {
+        var q = search.value.trim().toLowerCase(), t = tag.value;
+        document.querySelectorAll('.task-row').forEach(function (row) {
+            var ok = (!q || row.dataset.title.indexOf(q) !== -1) && (!t || row.dataset.tags.indexOf('|' + t + '|') !== -1);
+            row.style.display = ok ? '' : 'none';
+        });
+    }
+    search.addEventListener('input', apply); tag.addEventListener('change', apply);
+    document.addEventListener('change', function (e) {
+        if (e.target.name === 'tasks') document.getElementById('picked').textContent = document.querySelectorAll('input[name=tasks]:checked').length;
+    });
+})();
+</script>
+{% endblock %}

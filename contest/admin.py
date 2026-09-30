@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Task, Submission, Attempt, Tag, Course, Topic, Teacher, ClassBonus
+from .models import Student, Task, Submission, Attempt, Tag, Course, Topic, Teacher, ClassBonus, Exam, ExamAttempt, ExamAnswer
 
 
 def _teacher_of(request):
@@ -146,3 +146,23 @@ class ClassBonusAdmin(admin.ModelAdmin):
     list_filter = ('school_class',)
     search_fields = ('school_class', 'comment')
     readonly_fields = ('created_at',)
+
+@admin.register(Exam)
+class ExamAdmin(admin.ModelAdmin):
+    list_display = ('title', 'kind', 'school_class', 'start_at', 'duration_minutes', 'created_by')
+    list_filter = ('kind', 'school_class')
+    filter_horizontal = ('tasks',)
+
+
+class ExamAnswerInline(admin.TabularInline):
+    model = ExamAnswer
+    extra = 0
+    fields = ('task', 'best_score', 'tests_passed', 'tests_total', 'submissions_count', 'submitted_at')
+    readonly_fields = fields
+
+
+@admin.register(ExamAttempt)
+class ExamAttemptAdmin(admin.ModelAdmin):
+    list_display = ('student', 'exam', 'started_at', 'finished_at')
+    list_filter = ('exam',)
+    inlines = [ExamAnswerInline]

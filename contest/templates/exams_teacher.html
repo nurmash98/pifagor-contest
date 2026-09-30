@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}СОР/СОЧ - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">📝 СОР/СОЧ</h3>
+    <a href="{% url 'exam_create' %}" class="btn btn-pifagor-green rounded-pill px-3">+ Создать СОР/СОЧ</a>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <ul class="list-group list-group-flush">
+        {% for exam in exams %}
+        <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge {% if exam.kind == 'SOR' %}bg-primary{% else %}bg-dark{% endif %} me-2">{{ exam.get_kind_display }}</span>
+                <strong style="color: #1a1a4b;">{{ exam.title }}</strong>
+                <span class="badge bg-secondary ms-1">{{ exam.school_class }}</span>
+                {% if exam.state == 'active' %}<span class="badge bg-danger ms-1">идёт</span>
+                {% elif exam.state == 'upcoming' %}<span class="badge bg-info text-dark ms-1">запланирован</span>
+                {% else %}<span class="badge bg-light text-muted border ms-1">завершён</span>{% endif %}
+                <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} мин · задач: {{ exam.tasks.all|length }}</div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
+                {% if exam.state == 'upcoming' %}
+                <a href="{% url 'exam_edit' exam.id %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">Изменить</a>
+                {% endif %}
+                <form method="post" action="{% url 'exam_delete' exam.id %}" onsubmit="return confirm('Удалить «{{ exam.title }}» вместе со всеми ответами учеников?');">
+                    {% csrf_token %}<button class="btn btn-outline-danger btn-sm rounded-pill px-3">Удалить</button>
+                </form>
+            </div>
+        </li>
+        {% empty %}
+        <li class="list-group-item p-4 text-center text-muted">СОР/СОЧ пока нет — создайте первый.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

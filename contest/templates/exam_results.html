@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Результаты: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a></div>
+<h3 class="fw-bold mb-1" style="color: #1a1a4b;">{{ exam.get_kind_display }} «{{ exam.title }}» · {{ exam.school_class }}</h3>
+<p class="text-muted small mb-4">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} ·
+    {% if state == 'active' %}<span class="text-danger fw-semibold">идёт сейчас</span>{% elif state == 'upcoming' %}ещё не начался{% else %}завершён{% endif %}
+    · оценка = средний балл по {{ tasks|length }} задачам (не сдано = 0)</p>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-3">Ученик</th>
+                    {% for task in tasks %}<th class="text-center small" title="{{ task.title }}">{{ forloop.counter }}. {{ task.title|truncatechars:18 }}</th>{% endfor %}
+                    <th class="text-center">Оценка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td class="ps-3">
+                        <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>
+                        <div class="small">{% if row.status == 'not_started' %}<span class="text-muted">не начинал</span>
+                            {% elif row.status == 'in_progress' %}<span class="text-danger">пишет сейчас</span>
+                            {% else %}<span class="text-success">сдал</span>{% endif %}</div>
+                    </td>
+                    {% for a in row.cells %}
+                    <td class="text-center">
+                        {% if a %}
+                        <details>
+                            <summary class="fw-bold {% if a.best_score >= 8 %}text-success{% elif a.best_score >= 6 %}text-warning{% else %}text-danger{% endif %}" style="cursor: pointer; list-style: none;">{{ a.best_score }}</summary>
+                            <pre class="bg-dark text-light p-2 rounded-3 small text-start mt-1 mb-0" style="max-width: 320px; white-space: pre-wrap;"><code>{{ a.best_code }}</code></pre>
+                            <div class="small text-muted">отправок: {{ a.submissions_count }}</div>
+                        </details>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-center fw-bold fs-5 {% if row.grade >= 8 %}text-success{% elif row.grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.grade }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{{ tasks|length|add:2 }}" class="p-4 text-center text-muted">В классе {{ exam.school_class }} пока нет учеников.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<p class="text-muted small mt-2">Нажмите на балл, чтобы посмотреть код с лучшим результатом.</p>
+{% endblock %}
