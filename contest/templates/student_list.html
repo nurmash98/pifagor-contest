@@ -10,13 +10,16 @@
 <div class="row mb-4 align-items-center">
     <div class="col-md-5">
         <h3 class="fw-bold" style="color: #1a1a4b;">Ученики</h3>
-        <p class="text-muted small mb-0">Все ученики — можно добавить, изменить логин/пароль/класс или удалить.</p>
+        <p class="text-muted small mb-0">
+            {% if my_classes is None %}Все ученики{% elif my_classes %}Ученики ваших классов: <strong>{{ my_classes|join:", " }}</strong>{% else %}Вам пока не назначены классы — обратитесь к администратору{% endif %}
+            — можно добавить, изменить логин/пароль/класс или удалить.
+        </p>
     </div>
     <div class="col-md-7">
         <form method="get" class="d-flex gap-2">
             <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск по имени или логину" value="{{ q }}">
             <select name="class" class="form-select form-select-sm" style="max-width: 160px;">
-                <option value="">Все классы</option>
+                <option value="">{% if my_classes is None %}Все классы{% else %}Все мои классы{% endif %}</option>
                 {% for cls in all_classes %}
                     <option value="{{ cls }}" {% if cls == class_filter %}selected{% endif %}>{{ cls }}</option>
                 {% endfor %}

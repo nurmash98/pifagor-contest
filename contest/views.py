@@ -1201,10 +1201,39 @@ def task_import(request):
     })
 
 
+def _managed_classes(user):
+    """Классы, учеников которых этот пользователь может видеть и редактировать:
+    для учителя — только его классы (Teacher.classes), для админа — None (все)."""
+    if user.is_superuser:
+        return None
+    teacher = Teacher.objects.filter(user=user).first()
+    return None if teacher is None else teacher.class_list()
+
+
+def _managed_student_or_none(request, student_id):
+    student = get_object_or_404(Student, id=student_id)
+    classes = _managed_classes(request.user)
+    if classes is not None and student.school_class not in classes:
+        return None
+    return student
+
+
+def _student_form_classes(request):
+    """Классы для выбора в форме ученика: у учителя — список его классов (select),
+    у админа — None (свободный ввод)."""
+    classes = _managed_classes(request.user)
+    if classes is None:
+        return None
+    return sorted(set(classes))
+
+
 @staff_member_required
 def student_list(request):
-    """Полный список всех учеников — доступен любому учителю, вне привязки к его классам."""
+    """Ученики для редактирования: учитель видит только свои классы, админ — всех."""
+    classes = _managed_classes(request.user)
     students = Student.objects.select_related('user').order_by('school_class', 'full_name')
+    if classes is not None:
+        students = students.filter(school_class__in=classes)
 
     class_filter = request.GET.get('class', '').strip()
     if class_filter:
@@ -1214,18 +1243,25 @@ def student_list(request):
     if q:
         students = students.filter(Q(full_name__icontains=q) | Q(user__username__icontains=q))
 
-    all_classes = (
-        Student.objects.order_by('school_class').values_list('school_class', flat=True).distinct()
-    )
+    if classes is not None:
+        all_classes = sorted(set(classes))
+    else:
+        all_classes = Student.objects.order_by('school_class').values_list('school_class', flat=True).distinct()
 
     return render(request, 'student_list.html', {
         'students': students, 'all_classes': all_classes, 'class_filter': class_filter, 'q': q,
+        'my_classes': classes,
     })
 
 
 @staff_member_required
 def student_create(request):
-    """Добавление нового ученика (логин, пароль, имя, класс) — доступно любому учителю."""
+    """Добавление нового ученика (логин, пароль, имя, класс). Учитель — только в свои классы."""
+    form_classes = _student_form_classes(request)
+    if form_classes == []:
+        messages.error(request, 'Вам пока не назначены классы — обратитесь к администратору.')
+        return redirect('student_list')
+
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '').strip()
@@ -1234,6 +1270,8 @@ def student_create(request):
 
         if not username or not password or not full_name or not school_class:
             messages.error(request, 'Заполните логин, пароль, имя и класс.')
+        elif form_classes is not None and school_class not in form_classes:
+            messages.error(request, 'Можно добавлять учеников только в свои классы.')
         elif User.objects.filter(username=username).exists():
             messages.error(request, 'Этот логин уже занят.')
         else:
@@ -1242,13 +1280,17 @@ def student_create(request):
             messages.success(request, f'Ученик «{full_name}» добавлен.')
             return redirect('student_list')
 
-    return render(request, 'student_form.html', {'mode': 'create'})
+    return render(request, 'student_form.html', {'mode': 'create', 'form_classes': form_classes})
 
 
 @staff_member_required
 def student_edit(request, student_id):
-    """Изменение логина, пароля, имени и класса ученика — доступно любому учителю."""
-    student = get_object_or_404(Student, id=student_id)
+    """Изменение логина, пароля, имени и класса ученика — только ученики своих классов."""
+    student = _managed_student_or_none(request, student_id)
+    if student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+        return redirect('student_list')
+    form_classes = _student_form_classes(request)
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
@@ -1258,6 +1300,8 @@ def student_edit(request, student_id):
 
         if not username or not full_name or not school_class:
             messages.error(request, 'Заполните логин, имя и класс.')
+        elif form_classes is not None and school_class not in form_classes:
+            messages.error(request, 'Можно переводить ученика только в свои классы.')
         elif User.objects.filter(username=username).exclude(id=student.user_id).exists():
             messages.error(request, 'Этот логин уже занят другим пользователем.')
         else:
@@ -1271,13 +1315,16 @@ def student_edit(request, student_id):
             messages.success(request, 'Данные ученика обновлены.')
             return redirect('student_list')
 
-    return render(request, 'student_form.html', {'mode': 'edit', 'student': student})
+    return render(request, 'student_form.html', {'mode': 'edit', 'student': student, 'form_classes': form_classes})
 
 
 @staff_member_required
 def student_delete(request, student_id):
-    """Удаление ученика вместе с его аккаунтом и решениями — доступно любому учителю."""
-    student = get_object_or_404(Student, id=student_id)
+    """Удаление ученика вместе с его аккаунтом и решениями — только ученики своих классов."""
+    student = _managed_student_or_none(request, student_id)
+    if student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+        return redirect('student_list')
     if request.method == 'POST':
         name = student.full_name
         student.user.delete()  # каскадом удаляет Student и его Submission

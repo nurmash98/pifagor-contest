@@ -32,8 +32,17 @@
                 </div>
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Класс</label>
+                    {% if form_classes is not None %}
+                    <select name="school_class" class="form-select" required>
+                        {% for cls in form_classes %}
+                            <option value="{{ cls }}" {% if student and student.school_class == cls %}selected{% endif %}>{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Можно выбрать только ваши классы.</div>
+                    {% else %}
                     <input type="text" name="school_class" class="form-control" placeholder="например, 10А"
                            value="{% if student %}{{ student.school_class }}{% endif %}" required>
+                    {% endif %}
                 </div>
                 <button type="submit" class="btn btn-pifagor-green px-4">
                     {% if mode == 'create' %}Добавить ученика{% else %}Сохранить{% endif %}
