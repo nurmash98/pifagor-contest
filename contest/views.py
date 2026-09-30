@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus
+from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus, normalize_school_class
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests, MAX_TEST_CASES
 from django.contrib.admin.views.decorators import staff_member_required
@@ -477,7 +477,7 @@ def leaderboard(request):
         teacher = Teacher.objects.filter(user=request.user).first()
         if teacher is not None:
             teacher_classes = teacher.class_list()
-            requested_class = request.GET.get('class', '').strip()
+            requested_class = normalize_school_class(request.GET.get('class', ''))
             selected_class = requested_class if requested_class in teacher_classes else ''
             scope_label = selected_class or ', '.join(teacher_classes)
             limit = None  # Учитель видит полный список своих классов, без топ-10
@@ -567,7 +567,7 @@ def add_class_bonus(request):
     if request.method != 'POST':
         return redirect('leaderboard')
 
-    school_class = request.POST.get('school_class', '').strip()
+    school_class = normalize_school_class(request.POST.get('school_class', ''))
     comment = request.POST.get('comment', '').strip()
     try:
         points = int(request.POST.get('points', ''))
@@ -795,7 +795,7 @@ def course_analytics(request, course_id):
             .values_list('school_class', flat=True).distinct()
         )
 
-    selected_class = request.GET.get('class', '').strip()
+    selected_class = normalize_school_class(request.GET.get('class', ''))
     if selected_class not in classes:
         selected_class = classes[0] if classes else ''
 
@@ -1235,7 +1235,7 @@ def student_list(request):
     if classes is not None:
         students = students.filter(school_class__in=classes)
 
-    class_filter = request.GET.get('class', '').strip()
+    class_filter = normalize_school_class(request.GET.get('class', ''))
     if class_filter:
         students = students.filter(school_class=class_filter)
 
@@ -1266,7 +1266,7 @@ def student_create(request):
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '').strip()
         full_name = request.POST.get('full_name', '').strip()
-        school_class = request.POST.get('school_class', '').strip()
+        school_class = normalize_school_class(request.POST.get('school_class', ''))
 
         if not username or not password or not full_name or not school_class:
             messages.error(request, 'Заполните логин, пароль, имя и класс.')
@@ -1296,7 +1296,7 @@ def student_edit(request, student_id):
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '').strip()
         full_name = request.POST.get('full_name', '').strip()
-        school_class = request.POST.get('school_class', '').strip()
+        school_class = normalize_school_class(request.POST.get('school_class', ''))
 
         if not username or not full_name or not school_class:
             messages.error(request, 'Заполните логин, имя и класс.')

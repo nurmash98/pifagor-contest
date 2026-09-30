@@ -55,14 +55,31 @@
                         {% endif %}
 
                         {% for field in form %}
+                            {% if field.name != 'grade' and field.name != 'letter' %}
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small">{% t field.label %}</label>
                                 {{ field }}
+                                {% if field.name == 'username' %}<div class="form-text">{% t "Под этим никнеймом вы будете входить на сайт." %}</div>{% endif %}
                                 {% for error in field.errors %}
                                     <div class="text-danger small mt-1">{% t error %}</div>
                                 {% endfor %}
                             </div>
+                            {% endif %}
                         {% endfor %}
+
+                        <!-- Класс: цифра + английский литер из списков, например 7F -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold small">{% t "Класс" %}</label>
+                                {{ form.grade }}
+                                {% for error in form.grade.errors %}<div class="text-danger small mt-1">{% t error %}</div>{% endfor %}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold small">{% t "Литер" %}</label>
+                                {{ form.letter }}
+                                {% for error in form.letter.errors %}<div class="text-danger small mt-1">{% t error %}</div>{% endfor %}
+                            </div>
+                        </div>
 
                         <button type="submit" id="register-btn" class="btn btn-pifagor-green w-100 py-2 rounded-3 my-3">{% t "Зарегистрироваться" %}</button>
                     </form>

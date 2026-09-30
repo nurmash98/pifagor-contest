@@ -4,10 +4,33 @@ from django.db import models
 from django.contrib.auth.models import User, Group
 
 
+# Литер класса — всегда заглавная английская буква, слитно с цифрой: «7F».
+# Русские/казахские буквы, похожие на английские, переводим ПО ВИДУ (В→B, С→C, Н→H, Р→P,
+# Х→X, М→M, Т→T, К→K…), остальные — по звучанию (Ф→F, Д→D, Г→G, Л→L…).
+CYRILLIC_CLASS_LETTERS = {
+    'А': 'A', 'В': 'B', 'Е': 'E', 'Ё': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O',
+    'Р': 'P', 'С': 'C', 'Т': 'T', 'Х': 'X', 'У': 'U',
+    'Б': 'B', 'Г': 'G', 'Д': 'D', 'З': 'Z', 'И': 'I', 'Й': 'I', 'Л': 'L', 'П': 'P',
+    'Ф': 'F', 'Ц': 'C', 'Э': 'E', 'Ы': 'Y',
+    'Ә': 'A', 'Ғ': 'G', 'Қ': 'K', 'Ң': 'N', 'Ө': 'O', 'Ұ': 'U', 'Ү': 'U', 'Һ': 'H', 'І': 'I',
+}
+
+
+def normalize_school_class(value):
+    """'7f', '7 f', '7 F', '7ф', ' 7 Ф ' → '7F'. Пробелы убираются, буквы — заглавные
+    английские. Буквы без понятной английской пары остаются как есть (заглавными)."""
+    text = ''.join((value or '').split()).upper()
+    return ''.join(CYRILLIC_CLASS_LETTERS.get(ch, ch) for ch in text)
+
+
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     full_name = models.CharField(max_length=150, verbose_name="Имя и Фамилия")
-    school_class = models.CharField(max_length=10, verbose_name="Класс (например, 10А)")
+    school_class = models.CharField(max_length=10, verbose_name="Класс (например, 7F)")
+
+    def save(self, *args, **kwargs):
+        self.school_class = normalize_school_class(self.school_class)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.full_name} ({self.school_class})"
@@ -132,7 +155,7 @@ class Teacher(models.Model):
     classes = models.CharField(
         max_length=255, blank=True,
         verbose_name="Классы",
-        help_text="Классы этого учителя через запятую, например: 10А, 11Б"
+        help_text="Классы этого учителя через запятую, например: 7F, 10A (пробелы, регистр и русские буквы исправятся сами)"
     )
     courses = models.ManyToManyField(Course, blank=True, related_name='teachers', verbose_name="Курсы")
 
@@ -144,10 +167,11 @@ class Teacher(models.Model):
         return self.full_name
 
     def class_list(self):
-        """Список классов учителя без пробелов, например ['10А', '11Б']."""
-        return [c.strip() for c in self.classes.split(',') if c.strip()]
+        """Список классов учителя в стандартном виде, например ['7F', '10A']."""
+        return [normalize_school_class(c) for c in self.classes.split(',') if c.strip()]
 
     def save(self, *args, **kwargs):
+        self.classes = ', '.join(dict.fromkeys(self.class_list()))
         super().save(*args, **kwargs)
         # Учитель автоматически получает доступ в админку и нужные права,
         # чтобы админу не пришлось настраивать это вручную каждый раз.
@@ -178,6 +202,10 @@ class ClassBonus(models.Model):
         verbose_name = "Баллы классу"
         verbose_name_plural = "Баллы классам"
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        self.school_class = normalize_school_class(self.school_class)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         sign = '+' if self.points > 0 else ''
