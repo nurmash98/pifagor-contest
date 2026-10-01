@@ -19,7 +19,7 @@
                 {% if exam.state == 'active' %}<span class="badge bg-danger ms-1">идёт</span>
                 {% elif exam.state == 'upcoming' %}<span class="badge bg-info text-dark ms-1">запланирован</span>
                 {% else %}<span class="badge bg-light text-muted border ms-1">завершён</span>{% endif %}
-                <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} мин · {% if exam.is_random %}🎲 каждому {{ exam.random_count }} случайных из {{ exam.tasks.all|length }}{% else %}задач: {{ exam.tasks.all|length }}{% endif %}</div>
+                <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} мин · {% if exam.is_random %}🎲 случайных задач: {{ exam.random_count }}{% else %}задач: {{ exam.tasks.all|length }}{% endif %}</div>
             </div>
             <div class="d-flex gap-2">
                 <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>

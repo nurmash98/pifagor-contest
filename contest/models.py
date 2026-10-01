@@ -311,6 +311,9 @@ class Exam(models.Model):
     # 0 — все ученики решают все выбранные задачи; N > 0 — каждому ученику при старте
     # компьютер случайно выбирает N задач из выбранных учителем (у соседей — разные варианты).
     random_count = models.PositiveIntegerField(default=0, verbose_name="Случайных задач каждому (0 — все)")
+    # Случайный режим: условия для каждой задачи — [{"tag": id тега или null, "level": "A"/"B"/"C"/""}].
+    # При старте каждому ученику для каждого условия выпадает своя случайная задача с тестами.
+    random_slots = models.JSONField(default=list, blank=True, verbose_name="Условия случайных задач")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name='exams', verbose_name="Кто создал")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -332,6 +335,21 @@ class Exam(models.Model):
     @property
     def is_random(self):
         return self.random_count > 0
+
+    def slot_list(self):
+        """Условия случайных задач с подписями: [{'tag': id, 'level': 'B', 'label': '#циклы · B'}]."""
+        tag_names = dict(Tag.objects.filter(id__in=[sl.get('tag') for sl in self.random_slots if sl.get('tag')])
+                         .values_list('id', 'name'))
+        out = []
+        for sl in self.random_slots:
+            parts = []
+            if sl.get('tag'):
+                parts.append('#' + tag_names.get(sl['tag'], '?'))
+            if sl.get('level'):
+                parts.append(sl['level'])
+            out.append({'tag': sl.get('tag'), 'level': sl.get('level') or '',
+                        'label': ' · '.join(parts) or 'любая'})
+        return out
 
     def tasks_per_student(self):
         return self.random_count if self.is_random else len(self.tasks.all())

@@ -8,8 +8,9 @@
 Оценка за экзамен — средний балл по всем задачам экзамена (не сданная задача = 0).
 
 Задачи — либо «определённые» (все ученики решают все выбранные задачи), либо «случайные»:
-учитель выбирает набор задач и число N, а при нажатии «Начать» компьютер каждому ученику
-случайно выбирает N задач из набора. Оценка — средний балл по выпавшим задачам.
+учитель задаёт количество задач и для каждой — тег и сложность, а при нажатии «Начать»
+компьютер каждому ученику по каждому условию выбирает случайную задачу (без повторов).
+Оценка — средний балл по выпавшим задачам.
 """
 import random
 from datetime import datetime, timedelta
@@ -26,6 +27,41 @@ from .models import Exam, ExamAnswer, ExamAttempt, Student, Tag, Task, Teacher, 
 
 EXAM_MAX_DURATION = 600          # минут
 EXAM_SUBMIT_THROTTLE_SECONDS = 10  # повторная отправка одной задачи — не чаще (защита CPU)
+EXAM_MAX_RANDOM_SLOTS = 20
+
+
+def _slot_candidates(slot):
+    """id задач с тестами, подходящих под условие {'tag': id|None, 'level': 'A'|'B'|'C'|''}."""
+    qs = Task.objects.exclude(test_cases=[])
+    if slot.get('tag'):
+        qs = qs.filter(tags__id=slot['tag'])
+    if slot.get('level'):
+        qs = qs.filter(level=slot['level'])
+    return list(qs.values_list('id', flat=True).distinct())
+
+
+def _random_match(candidates):
+    """Каждому условию — своя случайная задача, без повторов (паросочетание Куна по
+    перемешанным спискам). Возвращает список id (None — если задачи для условия не хватило)."""
+    cands = [random.sample(c, len(c)) for c in candidates]
+    owner = {}
+
+    def place(i, seen):
+        for t in cands[i]:
+            if t in seen:
+                continue
+            seen.add(t)
+            if t not in owner or place(owner[t], seen):
+                owner[t] = i
+                return True
+        return False
+
+    for i in range(len(cands)):
+        place(i, set())
+    result = [None] * len(cands)
+    for t, i in owner.items():
+        result[i] = t
+    return result
 
 
 def active_attempt_for(user, now=None):
@@ -127,7 +163,10 @@ def exam_start(request, exam_id):
         messages.warning(request, 'Сейчас этот СОР/СОЧ не идёт.')
     elif attempt is None:
         task_ids = []
-        if exam.is_random:
+        if exam.random_slots:
+            picked = _random_match([_slot_candidates(sl) for sl in exam.random_slots])
+            task_ids = [t for t in picked if t is not None]
+        elif exam.is_random:   # старый вариант: N случайных из отмеченного набора
             pool = list(exam.tasks.values_list('id', flat=True))
             task_ids = random.sample(pool, min(exam.random_count, len(pool)))
         ExamAttempt.objects.get_or_create(exam=exam, student=student,
@@ -154,7 +193,7 @@ def exam_task(request, exam_id, task_id):
     student, exam, attempt = _student_exam_or_redirect(request, exam_id)
     if exam is None:
         return redirect('exam_list')
-    task = get_object_or_404(exam.tasks, id=task_id)
+    task = get_object_or_404(Task, id=task_id)
     if attempt is None:
         return redirect('exam_detail', exam_id=exam.id)
     if task.id not in {t.id for t in attempt.task_list()}:
@@ -239,8 +278,9 @@ def _exam_form(request, exam):
         start_raw = request.POST.get('start_at', '')
         duration_raw = request.POST.get('duration_minutes', '')
         task_ids = [int(t) for t in request.POST.getlist('tasks') if t.isdigit()]
-        mode = request.POST.get('mode', 'fixed')
-        random_raw = request.POST.get('random_count', '')
+        mode = 'random' if request.POST.get('mode') == 'random' else 'fixed'
+        slot_tags = request.POST.getlist('slot_tag')
+        slot_levels = request.POST.getlist('slot_level')
 
         if kind not in ('SOR', 'SOCH'):
             errors.append('Выберите тип: СОР или СОЧ.')
@@ -262,31 +302,39 @@ def _exam_form(request, exam):
         except (ValueError, TypeError):
             duration = None
             errors.append(f'Длительность — от 1 до {EXAM_MAX_DURATION} минут.')
-        chosen = list(tasks.filter(id__in=task_ids))
-        if not chosen:
-            errors.append('Добавьте хотя бы одну задачу.')
-        random_count = 0
-        if mode == 'random':
-            try:
-                random_count = int(random_raw)
-                if random_count < 1:
-                    raise ValueError
-            except (ValueError, TypeError):
-                errors.append('Укажите, сколько случайных задач получит каждый ученик.')
+        chosen, slots = [], []
+        if mode == 'fixed':
+            chosen = list(tasks.filter(id__in=task_ids))
+            if not chosen:
+                errors.append('Добавьте хотя бы одну задачу.')
+        else:
+            tag_ids = set(Tag.objects.values_list('id', flat=True))
+            for tag_raw, level in zip(slot_tags, slot_levels):
+                tag = int(tag_raw) if tag_raw.isdigit() and int(tag_raw) in tag_ids else None
+                slots.append({'tag': tag, 'level': level if level in ('A', 'B', 'C') else ''})
+            if not 1 <= len(slots) <= EXAM_MAX_RANDOM_SLOTS:
+                errors.append(f'Количество случайных задач — от 1 до {EXAM_MAX_RANDOM_SLOTS}.')
             else:
-                if chosen and random_count >= len(chosen):
-                    errors.append(f'Для случайного выбора отметьте больше задач, чем получит ученик: '
-                                  f'выбрано {len(chosen)}, а каждому — {random_count}.')
+                candidates = [_slot_candidates(sl) for sl in slots]
+                empty = [i for i, c in enumerate(candidates, 1) if not c]
+                if empty:
+                    errors.append('Нет задач с тестами под условие задачи №' + ', №'.join(map(str, empty))
+                                  + ' — выберите другой тег или сложность.')
+                elif None in _random_match(candidates):
+                    errors.append('Под одинаковые условия не хватает разных задач — одному ученику '
+                                  'задачи не повторяются. Измените тег или сложность.')
+        random_count = len(slots)
 
         if not errors:
             exam.kind, exam.title, exam.school_class = kind, title, school_class
             exam.start_at, exam.duration_minutes = start_at, duration
             exam.random_count = random_count
+            exam.random_slots = slots
             if is_new:
                 exam.created_by = _teacher(request.user)
             exam.save()
             exam.tasks.set(chosen)
-            what = (f'каждому {random_count} случайных из {len(chosen)} задач' if random_count
+            what = (f'каждому {random_count} случайных задач по тегу и сложности' if random_count
                     else f'{len(chosen)} задач')
             messages.success(request, f'{exam.get_kind_display()} «{exam.title}» сохранён: {what}, '
                                       f'{timezone.localtime(exam.start_at):%d.%m.%Y %H:%M}, {duration} мин.')
@@ -294,8 +342,8 @@ def _exam_form(request, exam):
         for e in errors:
             messages.error(request, e)
         values = {'kind': kind, 'title': title, 'school_class': school_class, 'start_at': start_raw,
-                  'duration_minutes': duration_raw, 'mode': 'random' if mode == 'random' else 'fixed',
-                  'random_count': random_raw}
+                  'duration_minutes': duration_raw, 'mode': mode}
+        slot_values = [{'tag': sl['tag'], 'level': sl['level']} for sl in slots] if mode == 'random' else None
         selected = set(task_ids)
     else:
         values = {
@@ -303,15 +351,16 @@ def _exam_form(request, exam):
             'start_at': timezone.localtime(exam.start_at).strftime('%Y-%m-%dT%H:%M') if exam.start_at else '',
             'duration_minutes': exam.duration_minutes or 40,
             'mode': 'random' if exam.random_count else 'fixed',
-            'random_count': exam.random_count or 3,
         }
+        slot_values = [{'tag': sl.get('tag'), 'level': sl.get('level') or ''} for sl in exam.random_slots] or None
         selected = set(exam.tasks.values_list('id', flat=True)) if not is_new else set()
 
     return render(request, 'exam_form.html', {
         'exam': exam, 'is_new': is_new, 'v': values, 'tasks': tasks, 'selected': selected,
         'class_choices': sorted(set(classes)) if classes is not None else None,
         'all_tags': Tag.objects.all(), 'max_duration': EXAM_MAX_DURATION,
-        'levels': Task.LEVEL_CHOICES,
+        'levels': Task.LEVEL_CHOICES, 'max_slots': EXAM_MAX_RANDOM_SLOTS,
+        'slots': slot_values or [{'tag': None, 'level': ''} for _ in range(3)],
     })
 
 
@@ -377,8 +426,11 @@ def exam_results(request, exam_id):
             'cells': cells,
             'grade': attempt.grade() if attempt else 0,
         })
-    columns = ([f'№{i}' for i in range(1, exam.random_count + 1)] if exam.is_random
+    labels = [sl['label'] for sl in exam.slot_list()]
+    columns = ([f'№{i}' + (f' {labels[i - 1]}' if i <= len(labels) else '') for i in range(1, exam.random_count + 1)]
+               if exam.is_random
                else [f'{i}. {t.title}' for i, t in enumerate(tasks, 1)])
     return render(request, 'exam_results.html', {
         'exam': exam, 'tasks': tasks, 'rows': rows, 'state': exam.status(now), 'columns': columns,
+        'slot_labels': labels,
     })

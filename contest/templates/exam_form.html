@@ -46,15 +46,7 @@
                 <div class="form-check"><input class="form-check-input" type="radio" name="mode" value="fixed" id="m1" {% if v.mode != 'random' %}checked{% endif %}>
                     <label class="form-check-label" for="m1">Определённые — все ученики решают все отмеченные задачи</label></div>
                 <div class="form-check"><input class="form-check-input" type="radio" name="mode" value="random" id="m2" {% if v.mode == 'random' %}checked{% endif %}>
-                    <label class="form-check-label" for="m2">🎲 Случайные — компьютер каждому ученику выбирает из отмеченных</label></div>
-                <div id="random-box" class="mt-2 ps-4" {% if v.mode != 'random' %}style="display: none;"{% endif %}>
-                    <div class="input-group input-group-sm" style="max-width: 300px;">
-                        <span class="input-group-text">Каждому ученику</span>
-                        <input type="number" name="random_count" class="form-control" value="{{ v.random_count }}" min="1">
-                        <span class="input-group-text">задач</span>
-                    </div>
-                    <div class="form-text">Отметьте справа больше задач, чем получит ученик (например, 10 из них — по 3 каждому). Задачи выпадают в момент нажатия «Начать».</div>
-                </div>
+                    <label class="form-check-label" for="m2">🎲 Случайные — для каждой задачи выбираете тег и сложность, компьютер подбирает задачу каждому ученику</label></div>
             </div>
             <p class="text-muted small">Время — по Казахстану. Каждая задача — до 10 баллов по автотестам (сложность не влияет),
                 оценка — средний балл по всем задачам. Во время СОР/СОЧ ученику закрыты Курсы, Все задачи и Kanban.
@@ -63,7 +55,32 @@
         </div>
     </div>
     <div class="col-lg-7">
-        <div class="card border-0 shadow-sm rounded-4 p-4">
+        <div id="random-box" class="card border-0 shadow-sm rounded-4 p-4" {% if v.mode != 'random' %}style="display: none;"{% endif %}>
+            <h5 class="fw-bold mb-3" style="color: #1a1a4b;">🎲 Случайные задачи</h5>
+            <div class="input-group input-group-sm mb-3" style="max-width: 260px;">
+                <span class="input-group-text">Количество задач</span>
+                <input type="number" id="slot-count" class="form-control" value="{{ slots|length }}" min="1" max="{{ max_slots }}">
+            </div>
+            <div id="slots">
+                {% for sl in slots %}
+                <div class="slot-row d-flex gap-2 align-items-center mb-2 flex-wrap">
+                    <span class="fw-semibold slot-num" style="min-width: 76px;">Задача {{ forloop.counter }}</span>
+                    <select name="slot_tag" class="form-select form-select-sm" style="max-width: 200px;">
+                        <option value="">Любой тег</option>
+                        {% for tag in all_tags %}<option value="{{ tag.id }}" {% if sl.tag == tag.id %}selected{% endif %}>#{{ tag.name }}</option>{% endfor %}
+                    </select>
+                    <select name="slot_level" class="form-select form-select-sm" style="max-width: 180px;">
+                        <option value="">Любая сложность</option>
+                        {% for code, label in levels %}<option value="{{ code }}" {% if sl.level == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                    <span class="small slot-fit text-muted"></span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="form-text">При нажатии «Начать» компьютер каждому ученику по каждому условию выбирает случайную задачу с тестами.
+                Задачи у одного ученика не повторяются, у соседей обычно разные.</div>
+        </div>
+        <div id="fixed-box" class="card border-0 shadow-sm rounded-4 p-4" {% if v.mode == 'random' %}style="display: none;"{% endif %}>
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h5 class="fw-bold mb-0" style="color: #1a1a4b;">Задачи <span class="text-muted small fw-normal">выбрано: <span id="picked">{{ selected|length }}</span></span></h5>
             </div>
@@ -85,7 +102,7 @@
             </div>
             <div class="border rounded-3 p-2" style="max-height: 520px; overflow-y: auto;">
                 {% for task in tasks %}
-                <div class="form-check py-1 task-row" data-title="{{ task.title|lower }}" data-level="{{ task.level }}" data-tags="|{% for tag in task.tags.all %}{{ tag.name }}|{% endfor %}">
+                <div class="form-check py-1 task-row" data-title="{{ task.title|lower }}" data-level="{{ task.level }}" data-tagids="|{% for tag in task.tags.all %}{{ tag.id }}|{% endfor %}" data-tags="|{% for tag in task.tags.all %}{{ tag.name }}|{% endfor %}">
                     <input class="form-check-input" type="checkbox" name="tasks" value="{{ task.id }}" id="t{{ task.id }}" {% if task.id in selected %}checked{% endif %}>
                     <label class="form-check-label" for="t{{ task.id }}">[{{ task.level }}] {{ task.title }}
                         {% for tag in task.tags.all %}<span class="badge bg-light text-dark border ms-1">#{{ tag.name }}</span>{% endfor %}</label>
@@ -125,9 +142,43 @@
         document.querySelectorAll('input[name=tasks]').forEach(function (cb) { cb.checked = false; });
         countPicked();
     });
+    // --- случайный режим: условия «тег + сложность» для каждой задачи
+    var slotsBox = document.getElementById('slots'), slotCount = document.getElementById('slot-count');
+    function refreshSlots() {
+        var used = {};
+        slotsBox.querySelectorAll('.slot-row').forEach(function (row, i) {
+            row.querySelector('.slot-num').textContent = 'Задача ' + (i + 1);
+            var tg = row.querySelector('[name=slot_tag]').value, lv = row.querySelector('[name=slot_level]').value, n = 0;
+            rows().forEach(function (r) {
+                if ((!tg || r.dataset.tagids.indexOf('|' + tg + '|') !== -1) && (!lv || r.dataset.level === lv)) n++;
+            });
+            var key = tg + '/' + lv; used[key] = (used[key] || 0) + 1;
+            var fit = row.querySelector('.slot-fit');
+            fit.textContent = 'подходит задач: ' + n;
+            fit.className = 'small slot-fit ' + (n === 0 || used[key] > n ? 'text-danger fw-semibold' : 'text-muted');
+        });
+    }
+    slotCount.addEventListener('input', function () {
+        var want = Math.max(1, Math.min({{ max_slots }}, parseInt(slotCount.value, 10) || 1));
+        var list = slotsBox.querySelectorAll('.slot-row');
+        for (var i = list.length; i < want; i++) {
+            var copy = list[list.length - 1].cloneNode(true);
+            copy.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
+            slotsBox.appendChild(copy);
+        }
+        list = slotsBox.querySelectorAll('.slot-row');
+        for (var j = list.length - 1; j >= want; j--) list[j].remove();
+        refreshSlots();
+    });
+    refreshSlots();
     document.addEventListener('change', function (e) {
         if (e.target.name === 'tasks') countPicked();
-        if (e.target.name === 'mode') document.getElementById('random-box').style.display = e.target.value === 'random' ? '' : 'none';
+        if (e.target.name === 'slot_tag' || e.target.name === 'slot_level') refreshSlots();
+        if (e.target.name === 'mode') {
+            var rnd = e.target.value === 'random';
+            document.getElementById('random-box').style.display = rnd ? '' : 'none';
+            document.getElementById('fixed-box').style.display = rnd ? 'none' : '';
+        }
     });
 })();
 </script>
