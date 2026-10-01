@@ -28,7 +28,8 @@
 
 {% elif not attempt and state == 'active' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
-        <p class="mb-1">{% t "Задач" %}: <strong>{{ tasks|length }}</strong> · {% t "до" %} {{ exam.end_at|date:"H:i" }}</p>
+        <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ exam.end_at|date:"H:i" }}</p>
+        {% if exam.is_random %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         <p class="text-muted small mb-4">{% t "После старта Курсы, Все задачи и Kanban будут закрыты до конца СОР/СОЧ." %}</p>
         <form method="post" action="{% url 'exam_start' exam.id %}">{% csrf_token %}
             <button class="btn btn-danger btn-lg px-5 rounded-pill">▶ {% t "Начать" %}</button>

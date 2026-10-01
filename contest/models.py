@@ -308,6 +308,9 @@ class Exam(models.Model):
     start_at = models.DateTimeField(verbose_name="Начало")
     duration_minutes = models.PositiveIntegerField(verbose_name="Длительность (минут)")
     tasks = models.ManyToManyField(Task, related_name='exams', verbose_name="Задачи")
+    # 0 — все ученики решают все выбранные задачи; N > 0 — каждому ученику при старте
+    # компьютер случайно выбирает N задач из выбранных учителем (у соседей — разные варианты).
+    random_count = models.PositiveIntegerField(default=0, verbose_name="Случайных задач каждому (0 — все)")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name='exams', verbose_name="Кто создал")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -325,6 +328,13 @@ class Exam(models.Model):
     def end_at(self):
         from datetime import timedelta
         return self.start_at + timedelta(minutes=self.duration_minutes)
+
+    @property
+    def is_random(self):
+        return self.random_count > 0
+
+    def tasks_per_student(self):
+        return self.random_count if self.is_random else len(self.tasks.all())
 
     def status(self, now=None):
         """'upcoming' — ещё не началось, 'active' — идёт, 'finished' — время вышло."""
@@ -345,6 +355,8 @@ class ExamAttempt(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='exam_attempts')
     started_at = models.DateTimeField(verbose_name="Начал")
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Завершил досрочно")
+    # Для СОР/СОЧ со случайными задачами — id задач, выпавших этому ученику (в порядке показа).
+    task_ids = models.JSONField(default=list, blank=True, verbose_name="Выпавшие задачи")
 
     class Meta:
         verbose_name = "Попытка СОР/СОЧ"
@@ -356,12 +368,20 @@ class ExamAttempt(models.Model):
         now = now or timezone.now()
         return self.finished_at is None and now < self.exam.end_at
 
+    def task_list(self):
+        """Задачи этого ученика: выпавшие случайно, либо все задачи экзамена."""
+        if self.exam.is_random and self.task_ids:
+            by_id = {t.id: t for t in Task.objects.filter(id__in=self.task_ids)}
+            return [by_id[i] for i in self.task_ids if i in by_id]
+        return list(self.exam.tasks.all())
+
     def grade(self):
-        """Оценка из 10 — средний балл по ВСЕМ задачам экзамена (не сданная задача = 0)."""
-        task_count = self.exam.tasks.count()
+        """Оценка из 10 — средний балл по ВСЕМ задачам ученика (не сданная задача = 0)."""
+        ids = {t.id for t in self.task_list()}
+        task_count = len(ids)
         if not task_count:
             return 0
-        total = sum(a.best_score for a in self.answers.all())
+        total = sum(a.best_score for a in self.answers.all() if a.task_id in ids)
         return round(total / task_count, 1)
 
     def __str__(self):

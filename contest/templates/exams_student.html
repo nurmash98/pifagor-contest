@@ -14,7 +14,7 @@
         <div>
             <span class="badge bg-danger me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
             <strong style="color: #1a1a4b;">{{ exam.title }}</strong>
-            <div class="text-muted small">{% t "до" %} {{ exam.end_at|date:"H:i" }} · {% t "задач" %}: {{ exam.tasks.all|length }}</div>
+            <div class="text-muted small">{% t "до" %} {{ exam.end_at|date:"H:i" }} · {% t "задач" %}: {{ exam.tasks_per_student }}</div>
         </div>
         <a href="{% url 'exam_detail' exam.id %}" class="btn btn-danger btn-sm rounded-pill px-3">
             {% if exam.my_attempt %}{% t "Продолжить" %} →{% else %}{% t "Начать" %} →{% endif %}
@@ -29,7 +29,7 @@
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-2">
     <span><span class="badge bg-secondary me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
     <strong style="color: #1a1a4b;">{{ exam.title }}</strong></span>
-    <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "задач" %}: {{ exam.tasks.all|length }}</div>
+    <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "задач" %}: {{ exam.tasks_per_student }}</div>
 </div>
 {% empty %}
 <p class="text-muted small">{% t "Пока ничего не запланировано." %}</p>

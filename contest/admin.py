@@ -149,7 +149,7 @@ class ClassBonusAdmin(admin.ModelAdmin):
 
 @admin.register(Exam)
 class ExamAdmin(admin.ModelAdmin):
-    list_display = ('title', 'kind', 'school_class', 'start_at', 'duration_minutes', 'created_by')
+    list_display = ('title', 'kind', 'school_class', 'start_at', 'duration_minutes', 'random_count', 'created_by')
     list_filter = ('kind', 'school_class')
     filter_horizontal = ('tasks',)
 
@@ -163,6 +163,6 @@ class ExamAnswerInline(admin.TabularInline):
 
 @admin.register(ExamAttempt)
 class ExamAttemptAdmin(admin.ModelAdmin):
-    list_display = ('student', 'exam', 'started_at', 'finished_at')
+    list_display = ('student', 'exam', 'started_at', 'finished_at', 'task_ids')
     list_filter = ('exam',)
     inlines = [ExamAnswerInline]
