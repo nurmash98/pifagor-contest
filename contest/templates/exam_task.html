@@ -19,6 +19,7 @@
                 <div class="col-md-6"><div class="bg-light p-3 rounded-3 border"><span class="fw-bold text-muted small d-block mb-1">{% t "Пример вывода (Output):" %}</span><code class="text-dark" style="white-space: pre-wrap;">{{ task.display_output_example }}</code></div></div>
             </div>
         </div>
+        {% include 'ide_links.html' with ide_class='mt-4' %}
     </div>
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm rounded-4 p-4">
