@@ -383,6 +383,7 @@ def kanban_board(request):
         'in_progress': in_progress,
         'testing': testing,
         'done': done,
+        'max_active_tasks': MAX_ACTIVE_TASKS,
     }
     return render(request, 'kanban.html', context)
 

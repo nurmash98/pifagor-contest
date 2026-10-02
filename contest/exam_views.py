@@ -28,6 +28,7 @@ from .models import Exam, ExamAnswer, ExamAttempt, Student, Tag, Task, Teacher, 
 EXAM_MAX_DURATION = 600          # минут
 EXAM_SUBMIT_THROTTLE_SECONDS = 10  # повторная отправка одной задачи — не чаще (защита CPU)
 EXAM_MAX_RANDOM_SLOTS = 20
+EXAM_MAX_SUBMISSIONS = 3           # сколько раз можно отправить решение одной задачи на СОР/СОЧ
 
 
 def _slot_candidates(slot):
@@ -206,6 +207,9 @@ def exam_task(request, exam_id, task_id):
         if not active:
             messages.warning(request, 'Время СОР/СОЧ вышло — ответы больше не принимаются.')
             return redirect('exam_detail', exam_id=exam.id)
+        if answer is not None and answer.submissions_count >= EXAM_MAX_SUBMISSIONS:
+            messages.warning(request, f'По этой задаче уже использованы все {EXAM_MAX_SUBMISSIONS} отправки.')
+            return redirect('exam_task', exam_id=exam.id, task_id=task.id)
         throttle_key = f'exam_submit:{attempt.id}:{task.id}'
         if not cache.add(throttle_key, 1, EXAM_SUBMIT_THROTTLE_SECONDS):
             messages.warning(request, f'Подождите {EXAM_SUBMIT_THROTTLE_SECONDS} секунд перед повторной отправкой.')
@@ -223,14 +227,18 @@ def exam_task(request, exam_id, task_id):
         if score >= answer.best_score:
             answer.best_score, answer.best_code = score, code
         answer.save()
+        left = EXAM_MAX_SUBMISSIONS - answer.submissions_count
         messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов. '
-                                  f'Лучший результат по задаче: {answer.best_score}/10.')
+                                  f'Лучший результат по задаче: {answer.best_score}/10. '
+                                  f'Осталось отправок: {left} из {EXAM_MAX_SUBMISSIONS}.')
         return redirect('exam_task', exam_id=exam.id, task_id=task.id)
 
     from .views import _apply_task_language, _get_content_lang
     _apply_task_language([task], _get_content_lang(request))
     return render(request, 'exam_task.html', {
         'exam': exam, 'task': task, 'answer': answer, 'active': active, 'attempt': attempt,
+        'max_submissions': EXAM_MAX_SUBMISSIONS,
+        'submissions_left': EXAM_MAX_SUBMISSIONS - (answer.submissions_count if answer else 0),
     })
 
 

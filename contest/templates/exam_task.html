@@ -37,13 +37,18 @@
                 </div>
             </div>
             {% endif %}
-            {% if active %}
+            {% if active and submissions_left <= 0 %}
+                <div class="alert alert-secondary rounded-3 mb-2">{% t "Вы использовали все отправки по этой задаче" %} ({{ max_submissions }}/{{ max_submissions }}).</div>
+                {% if answer %}<pre class="bg-dark text-light p-3 rounded-3 small mb-0" style="white-space: pre-wrap;"><code>{{ answer.best_code }}</code></pre>{% endif %}
+            {% elif active %}
+            <div class="alert alert-info rounded-3 py-2 small mb-3">⚠️ {% t "Решение по задаче можно отправить максимум" %} <strong>{{ max_submissions }} {% t "раза" %}</strong>.
+                {% t "Осталось отправок" %}: <strong>{{ submissions_left }} / {{ max_submissions }}</strong></div>
             <form method="post" id="exam-form">
                 {% csrf_token %}
                 <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
                 <textarea name="code" class="form-control rounded-3 font-monospace p-3 mb-3" style="min-height: 300px; background-color: #272822; color: #f8f8f2;" required>{{ answer.code|default:'' }}</textarea>
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="small text-muted">{% t "Можно отправлять несколько раз — засчитывается лучший результат." %}</span>
+                    <span class="small text-muted">{% t "Засчитывается лучший результат." %}</span>
                     <button type="submit" id="exam-submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">{% t "Отправить" %} →</button>
                 </div>
             </form>
