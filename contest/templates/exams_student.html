@@ -6,8 +6,22 @@
 {% block content %}
 <h3 class="fw-bold mb-4" style="color: #1a1a4b;">📝 {% t "СОР/СОЧ" %}</h3>
 
-{% if active %}
+{% if active or active_retakes %}
 <h6 class="fw-bold text-danger mb-2">{% t "Идёт сейчас" %}</h6>
+{% for retake in active_retakes %}
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-3 border-start border-4 border-warning">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>
+            <strong style="color: #1a1a4b;">{{ retake.exam.title }}</strong>
+            <div class="text-muted small">{% t "до" %} {{ retake.end_at|date:"H:i" }} · {% t "задач" %}: {{ retake.exam.tasks_per_student }}</div>
+        </div>
+        <a href="{% url 'retake_detail' retake.exam.id retake.id %}" class="btn btn-warning btn-sm rounded-pill px-3">
+            {% if retake.my_attempt %}{% t "Продолжить" %} →{% else %}{% t "Начать" %} →{% endif %}
+        </a>
+    </div>
+</div>
+{% endfor %}
 {% for exam in active %}
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-3 border-start border-4 border-danger">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -25,6 +39,13 @@
 {% endif %}
 
 <h6 class="fw-bold text-muted mb-2 mt-4">{% t "Предстоящие" %}</h6>
+{% for retake in upcoming_retakes %}
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-2 border-start border-4 border-warning">
+    <span><span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>
+    <strong style="color: #1a1a4b;">{{ retake.exam.title }}</strong></span>
+    <div class="text-muted small">{{ retake.start_at|date:"d.m.Y H:i" }} · {{ retake.duration_minutes }} {% t "мин" %} · {% t "задач" %}: {{ retake.exam.tasks_per_student }}</div>
+</div>
+{% endfor %}
 {% for exam in upcoming %}
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-2">
     <span><span class="badge bg-secondary me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
@@ -32,7 +53,7 @@
     <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "задач" %}: {{ exam.tasks_per_student }}</div>
 </div>
 {% empty %}
-<p class="text-muted small">{% t "Пока ничего не запланировано." %}</p>
+{% if not upcoming_retakes %}<p class="text-muted small">{% t "Пока ничего не запланировано." %}</p>{% endif %}
 {% endfor %}
 
 <h6 class="fw-bold text-muted mb-2 mt-4">{% t "Сданные" %}</h6>
@@ -44,7 +65,15 @@
         <strong style="color: #1a1a4b;">{{ exam.title }}</strong>
         <div class="text-muted small">{{ exam.start_at|date:"d.m.Y" }}{% if not exam.my_attempt %} · {% t "не участвовал" %}{% endif %}</div>
     </div>
-    <span class="badge fs-6 {% if exam.my_grade >= 8 %}bg-success{% elif exam.my_grade >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ exam.my_grade }}/10</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge fs-6 {% if exam.my_grade >= 8 %}bg-success{% elif exam.my_grade >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}" title="{% t "Оценка за экзамен" %}">{{ exam.my_grade }}/10</span>
+        {% if exam.my_retake %}
+        <span class="text-muted">→</span>
+        {% if exam.my_retake.state == 'finished' %}
+        <span class="badge fs-6 {% if exam.my_retake.my_grade >= 8 %}bg-success{% elif exam.my_retake.my_grade >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}" title="{% t "Оценка за пересдачу" %}">🔁 {{ exam.my_retake.my_grade }}/10</span>
+        {% else %}<span class="badge fs-6 bg-light text-muted border" title="{% t "Пересдача" %}">🔁 —</span>{% endif %}
+        {% endif %}
+    </div>
 </div>
 </a>
 {% empty %}

@@ -43,6 +43,14 @@ urlpatterns = [
     path('exams/<int:exam_id>/edit/', exam_views.exam_edit, name='exam_edit'),
     path('exams/<int:exam_id>/delete/', exam_views.exam_delete, name='exam_delete'),
     path('exams/<int:exam_id>/results/', exam_views.exam_results, name='exam_results'),
+    # Пересдача СОР/СОЧ
+    path('exams/<int:exam_id>/retake/new/', exam_views.retake_create, name='retake_create'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/', exam_views.exam_detail, name='retake_detail'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/start/', exam_views.exam_start, name='retake_start'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/finish/', exam_views.exam_finish, name='retake_finish'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/task/<int:task_id>/', exam_views.exam_task, name='retake_task'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/results/', exam_views.exam_results, name='retake_results'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/delete/', exam_views.retake_delete, name='retake_delete'),
 
     # Кабинет преподавателя
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),

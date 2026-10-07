@@ -5,8 +5,8 @@
 
 {% block content %}
 <div class="mb-3 d-flex justify-content-between align-items-center">
-    <a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
-    {% if active %}<span class="small text-muted">{% t "Осталось" %}: <span id="exam-timer" class="fw-bold text-danger font-monospace" data-end="{{ exam.end_at|date:'c' }}">--:--</span></span>{% endif %}
+    <a href="{% if retake %}{% url 'retake_detail' exam.id retake.id %}{% else %}{% url 'exam_detail' exam.id %}{% endif %}" class="text-decoration-none text-muted small">← {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</a>
+    {% if active %}<span class="small text-muted">{% t "Осталось" %}: <span id="exam-timer" class="fw-bold text-danger font-monospace" data-end="{{ window.end_at|date:'c' }}">--:--</span></span>{% endif %}
 </div>
 
 <div class="row g-4">

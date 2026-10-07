@@ -135,7 +135,7 @@
                             {% if active_exam_attempt %}
                             <!-- Идёт СОР/СОЧ: Курсы, Все задачи и Kanban закрыты до его окончания -->
                             <li class="nav-item me-2">
-                                <a class="btn btn-danger btn-sm fw-bold rounded-pill px-3" href="{% url 'exam_detail' active_exam_attempt.exam_id %}">
+                                <a class="btn btn-danger btn-sm fw-bold rounded-pill px-3" href="{{ active_exam_attempt.get_absolute_url }}">
                                     ⏱ {% t "Идёт СОР/СОЧ" %}
                                 </a>
                             </li>

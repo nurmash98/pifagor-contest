@@ -366,6 +366,40 @@ class Exam(models.Model):
         return f"{self.get_kind_display()} «{self.title}» ({self.school_class})"
 
 
+class ExamRetake(models.Model):
+    """Пересдача СОР/СОЧ: учитель после экзамена выбирает конкретных учеников и назначает им
+    своё время. Каждому из них при старте выпадают ДРУГИЕ случайные задачи (не те, что были на
+    экзамене). Оценка за пересдачу хранится отдельно — у ученика видны обе: за экзамен и за пересдачу."""
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='retakes', verbose_name="Экзамен")
+    students = models.ManyToManyField('Student', related_name='exam_retakes', verbose_name="Ученики")
+    start_at = models.DateTimeField(verbose_name="Начало пересдачи")
+    duration_minutes = models.PositiveIntegerField(verbose_name="Длительность (минут)")
+    created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='exam_retakes', verbose_name="Кто назначил")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Пересдача СОР/СОЧ"
+        verbose_name_plural = "Пересдачи СОР/СОЧ"
+        ordering = ['start_at']
+
+    @property
+    def end_at(self):
+        from datetime import timedelta
+        return self.start_at + timedelta(minutes=self.duration_minutes)
+
+    def status(self, now=None):
+        """'upcoming' — ещё не началась, 'active' — идёт, 'finished' — время вышло."""
+        from django.utils import timezone
+        now = now or timezone.now()
+        if now < self.start_at:
+            return 'upcoming'
+        return 'active' if now < self.end_at else 'finished'
+
+    def __str__(self):
+        return f"Пересдача {self.exam} — {self.start_at:%d.%m.%Y %H:%M}"
+
+
 class ExamAttempt(models.Model):
     """Ученик нажал «Начать» на экзамене. Пока попытка идёт (не завершена и время экзамена
     не вышло), Курсы, Все задачи и Kanban для него закрыты."""
@@ -375,19 +409,41 @@ class ExamAttempt(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Завершил досрочно")
     # Для СОР/СОЧ со случайными задачами — id задач, выпавших этому ученику (в порядке показа).
     task_ids = models.JSONField(default=list, blank=True, verbose_name="Выпавшие задачи")
+    # Пусто — это попытка самого экзамена; иначе — попытка пересдачи (задачи всегда случайные).
+    retake = models.ForeignKey(ExamRetake, null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='attempts', verbose_name="Пересдача")
 
     class Meta:
         verbose_name = "Попытка СОР/СОЧ"
         verbose_name_plural = "Попытки СОР/СОЧ"
-        unique_together = [('exam', 'student')]
+        constraints = [
+            models.UniqueConstraint(fields=['exam', 'student'], condition=models.Q(retake__isnull=True),
+                                    name='unique_exam_attempt'),
+            models.UniqueConstraint(fields=['retake', 'student'], condition=models.Q(retake__isnull=False),
+                                    name='unique_retake_attempt'),
+        ]
+
+    @property
+    def window(self):
+        """Что задаёт время попытки: пересдача (если это она) или сам экзамен."""
+        return self.retake if self.retake_id else self.exam
 
     def is_active(self, now=None):
         from django.utils import timezone
         now = now or timezone.now()
-        return self.finished_at is None and now < self.exam.end_at
+        return self.finished_at is None and now < self.window.end_at
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+        if self.retake_id:
+            return reverse('retake_detail', args=[self.exam_id, self.retake_id])
+        return reverse('exam_detail', args=[self.exam_id])
 
     def task_list(self):
         """Задачи этого ученика: выпавшие случайно, либо все задачи экзамена."""
+        if self.retake_id:
+            by_id = {t.id: t for t in Task.objects.filter(id__in=self.task_ids)}
+            return [by_id[i] for i in self.task_ids if i in by_id]
         if self.exam.is_random and self.task_ids:
             by_id = {t.id: t for t in Task.objects.filter(id__in=self.task_ids)}
             return [by_id[i] for i in self.task_ids if i in by_id]

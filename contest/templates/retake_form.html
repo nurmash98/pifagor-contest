@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Пересдача: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_results' exam.id %}" class="text-decoration-none text-muted small">← Результаты</a></div>
+<h3 class="fw-bold mb-1" style="color: #1a1a4b;">🔁 Пересдача: {{ exam.get_kind_display }} «{{ exam.title }}» · {{ exam.school_class }}</h3>
+<p class="text-muted small mb-4">Выберите учеников и время. Каждому при старте выпадут <strong>другие</strong> случайные задачи
+    ({{ task_count }} шт., по тем же условиям — тег и сложность, — но не те, что были у него на экзамене).
+    Оценка за экзамен останется, а после пересдачи у выбранных учеников появится вторая оценка.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong>Кто пересдаёт</strong>
+                    <span class="small">
+                        <a href="#" id="sel-low" class="text-decoration-none">Оценка ниже 6</a> ·
+                        <a href="#" id="sel-all" class="text-decoration-none">Все</a> ·
+                        <a href="#" id="sel-none" class="text-decoration-none">Снять</a>
+                    </span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for st in students %}
+                    <li class="list-group-item">
+                        <label class="d-flex justify-content-between align-items-center w-100 mb-0" style="cursor: {% if st.existing_retake %}not-allowed{% else %}pointer{% endif %};">
+                            <span>
+                                <input type="checkbox" class="form-check-input me-2 retake-cb" name="students" value="{{ st.id }}"
+                                       data-grade="{{ st.exam_grade|stringformat:'s' }}"
+                                       {% if st.id in selected %}checked{% endif %}{% if st.existing_retake %} disabled{% endif %}>
+                                <strong style="color: #1a1a4b;">{{ st.full_name }}</strong>
+                                {% if st.existing_retake %}<span class="badge bg-warning text-dark ms-1">пересдача уже назначена · {{ st.existing_retake.start_at|date:"d.m H:i" }}</span>{% endif %}
+                            </span>
+                            <span class="small">
+                                {% if not st.took_part %}<span class="text-muted">не участвовал · </span>{% endif %}
+                                <span class="fw-bold {% if st.exam_grade >= 8 %}text-success{% elif st.exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ st.exam_grade }}</span>
+                            </span>
+                        </label>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item p-4 text-center text-muted">В классе {{ exam.school_class }} нет учеников.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small text-muted">Начало пересдачи</label>
+                    <input type="datetime-local" name="start_at" class="form-control" value="{{ v.start_at }}" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small text-muted">Длительность (минут, до {{ max_duration }})</label>
+                    <input type="number" name="duration_minutes" class="form-control" min="1" max="{{ max_duration }}" value="{{ v.duration_minutes }}" required>
+                </div>
+                <button class="btn btn-warning rounded-pill px-4 fw-semibold">Назначить пересдачу</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+(function () {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.retake-cb'));
+    function set(fn) { boxes.forEach(function (b) { if (!b.disabled) b.checked = fn(b); }); }
+    document.getElementById('sel-all').onclick = function (e) { e.preventDefault(); set(function () { return true; }); };
+    document.getElementById('sel-none').onclick = function (e) { e.preventDefault(); set(function () { return false; }); };
+    document.getElementById('sel-low').onclick = function (e) {
+        e.preventDefault();
+        set(function (b) { return parseFloat(b.getAttribute('data-grade').replace(',', '.')) < 6; });
+    };
+})();
+</script>
+{% endblock %}

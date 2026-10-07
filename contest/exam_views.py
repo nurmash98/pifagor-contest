@@ -11,6 +11,11 @@
 учитель задаёт количество задач и для каждой — тег и сложность, а при нажатии «Начать»
 компьютер каждому ученику по каждому условию выбирает случайную задачу (без повторов).
 Оценка — средний балл по выпавшим задачам.
+
+Пересдача: после окончания экзамена учитель нажимает «Пересдача», выбирает конкретных
+учеников и назначает время. Каждому из них при старте выпадают ДРУГИЕ случайные задачи
+(не те, что были на экзамене). Оценка за экзамен остаётся как есть, а оценка за пересдачу
+хранится отдельно — после пересдачи у ученика видны обе.
 """
 import random
 from datetime import datetime, timedelta
@@ -19,11 +24,13 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .autotest import run_autotests
-from .models import Exam, ExamAnswer, ExamAttempt, Student, Tag, Task, Teacher, normalize_school_class
+from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
+                     normalize_school_class)
 
 EXAM_MAX_DURATION = 600          # минут
 EXAM_SUBMIT_THROTTLE_SECONDS = 10  # повторная отправка одной задачи — не чаще (защита CPU)
@@ -31,9 +38,12 @@ EXAM_MAX_RANDOM_SLOTS = 20
 EXAM_MAX_SUBMISSIONS = 3           # сколько раз можно отправить решение одной задачи на СОР/СОЧ
 
 
-def _slot_candidates(slot):
-    """id задач с тестами, подходящих под условие {'tag': id|None, 'level': 'A'|'B'|'C'|''}."""
+def _slot_candidates(slot, exclude=()):
+    """id задач с тестами, подходящих под условие {'tag': id|None, 'level': 'A'|'B'|'C'|''}.
+    exclude — id задач, которые выбирать нельзя."""
     qs = Task.objects.exclude(test_cases=[])
+    if exclude:
+        qs = qs.exclude(id__in=list(exclude))
     if slot.get('tag'):
         qs = qs.filter(tags__id=slot['tag'])
     if slot.get('level'):
@@ -65,12 +75,68 @@ def _random_match(candidates):
     return result
 
 
+def _retake_slots(exam, prev_attempt):
+    """Условия задач для пересдачи: те же, что у экзамена (тег + сложность). Если экзамен
+    был с «определёнными» задачами — условие берётся от каждой его задачи (её сложность и тег)."""
+    if exam.random_slots:
+        return [dict(sl) for sl in exam.random_slots]
+    if prev_attempt is not None and prev_attempt.task_ids:
+        base = prev_attempt.task_list()
+    else:
+        base = list(exam.tasks.all())[:max(exam.tasks_per_student(), 1)]
+    slots = []
+    for task in base:
+        tag_id = task.tags.order_by('id').values_list('id', flat=True).first()
+        slots.append({'tag': tag_id, 'level': task.level})
+    return slots
+
+
+def _retake_task_ids(exam, student):
+    """Случайные задачи ученику на пересдачу — НЕ те, что были у него на экзамене.
+    Если под условие (тег + сложность) не хватает других задач, условие ослабляется:
+    сначала без тега, потом без сложности. В самом крайнем случае (в базе почти нет задач
+    с тестами) допускаются повторы с экзамена, но внутри пересдачи задачи не повторяются."""
+    prev = ExamAttempt.objects.filter(exam=exam, student=student, retake__isnull=True).first()
+    if prev is not None:
+        seen = {t.id for t in prev.task_list()}
+    elif not exam.is_random:
+        seen = set(exam.tasks.values_list('id', flat=True))
+    else:
+        seen = set()
+    slots = _retake_slots(exam, prev)
+
+    def relaxed(slot, level):
+        return {'tag': slot.get('tag') if level < 1 else None,
+                'level': slot.get('level') if level < 2 else ''}
+
+    result = [None] * len(slots)
+    taken = set(seen)
+    for level in (0, 1, 2):
+        todo = [i for i, t in enumerate(result) if t is None]
+        if not todo:
+            break
+        picked = _random_match([_slot_candidates(relaxed(slots[i], level), taken) for i in todo])
+        for i, task_id in zip(todo, picked):
+            if task_id is not None:
+                result[i] = task_id
+                taken.add(task_id)
+    todo = [i for i, t in enumerate(result) if t is None]
+    if todo:   # крайний случай: разрешаем повторы с экзамена
+        used = {t for t in result if t is not None}
+        picked = _random_match([_slot_candidates(relaxed(slots[i], 2), used) for i in todo])
+        for i, task_id in zip(todo, picked):
+            result[i] = task_id
+    return [t for t in result if t is not None]
+
+
 def active_attempt_for(user, now=None):
-    """Идущая сейчас попытка экзамена ученика (или None)."""
+    """Идущая сейчас попытка экзамена или пересдачи ученика (или None)."""
     now = now or timezone.now()
     qs = ExamAttempt.objects.filter(
-        student__user=user, finished_at__isnull=True, exam__start_at__lte=now,
-    ).select_related('exam')
+        student__user=user, finished_at__isnull=True,
+    ).filter(
+        Q(retake__isnull=True, exam__start_at__lte=now) | Q(retake__start_at__lte=now),
+    ).select_related('exam', 'retake')
     for attempt in qs:
         if attempt.is_active(now):
             return attempt
@@ -83,6 +149,20 @@ def _score(passed, total):
 
 # ---------------------------------------------------------------- общий список
 
+def _to_detail(exam, retake=None):
+    if retake is not None:
+        return redirect('retake_detail', exam_id=exam.id, retake_id=retake.id)
+    return redirect('exam_detail', exam_id=exam.id)
+
+
+def _attempt_state(window, attempt, now):
+    """'upcoming' / 'active' / 'finished' для экзамена или пересдачи с учётом досрочного завершения."""
+    state = window.status(now)
+    if attempt is not None and not attempt.is_active(now):
+        state = 'finished'
+    return state
+
+
 @login_required
 def exam_list(request):
     if request.user.is_staff:
@@ -90,14 +170,31 @@ def exam_list(request):
     student = get_object_or_404(Student, user=request.user)
     now = timezone.now()
     exams = list(Exam.objects.filter(school_class=student.school_class).prefetch_related('tasks'))
-    attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=exams)
+    attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=exams, retake__isnull=True)
                 .prefetch_related('answers')}
+    retakes = list(ExamRetake.objects.filter(students=student, exam__in=exams).select_related('exam'))
+    retake_attempts = {a.retake_id: a for a in ExamAttempt.objects.filter(student=student, retake__in=retakes)
+                       .prefetch_related('answers')}
+    retake_by_exam = {}
+    active_retakes, upcoming_retakes = [], []
+    for retake in retakes:               # у ученика на экзамен — одна пересдача (берём последнюю)
+        retake.my_attempt = retake_attempts.get(retake.id)
+        retake.state = _attempt_state(retake, retake.my_attempt, now)
+        if retake.state == 'finished':
+            retake.my_grade = retake.my_attempt.grade() if retake.my_attempt else 0
+        if retake.exam_id not in retake_by_exam or retake.start_at > retake_by_exam[retake.exam_id].start_at:
+            retake_by_exam[retake.exam_id] = retake
+        if retake.state == 'active':
+            active_retakes.append(retake)
+        elif retake.state == 'upcoming':
+            upcoming_retakes.append(retake)
+    upcoming_retakes.sort(key=lambda r: r.start_at)
+
     active, upcoming, finished = [], [], []
     for exam in exams:
         exam.my_attempt = attempts.get(exam.id)
-        exam.state = exam.status(now)
-        if exam.my_attempt and not exam.my_attempt.is_active(now):
-            exam.state = 'finished'
+        exam.state = _attempt_state(exam, exam.my_attempt, now)
+        exam.my_retake = retake_by_exam.get(exam.id)
         if exam.state == 'finished':
             exam.my_grade = exam.my_attempt.grade() if exam.my_attempt else 0
             finished.append(exam)
@@ -108,30 +205,47 @@ def exam_list(request):
     upcoming.sort(key=lambda e: e.start_at)
     return render(request, 'exams_student.html', {
         'active': active, 'upcoming': upcoming, 'finished': finished,
+        'active_retakes': active_retakes, 'upcoming_retakes': upcoming_retakes,
     })
 
 
 # ---------------------------------------------------------------- ученик
 
-def _student_exam_or_redirect(request, exam_id):
+def _student_exam_or_redirect(request, exam_id, retake_id=None):
+    """(ученик, экзамен, пересдача, попытка). Для пересдачи ученик должен быть в её списке."""
     student = Student.objects.filter(user=request.user).first()
     exam = get_object_or_404(Exam, id=exam_id)
     if student is None or exam.school_class != student.school_class:
         messages.error(request, 'Этот СОР/СОЧ не для вашего класса.')
-        return None, None, None
-    attempt = ExamAttempt.objects.filter(exam=exam, student=student).first()
-    return student, exam, attempt
+        return None, None, None, None
+    retake = None
+    if retake_id is not None:
+        retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam)
+        if not retake.students.filter(id=student.id).exists():
+            messages.error(request, 'Эта пересдача назначена не вам.')
+            return None, None, None, None
+    attempt = ExamAttempt.objects.filter(exam=exam, student=student, retake=retake).first()
+    return student, exam, retake, attempt
+
+
+def _grade_info(window, attempt, now):
+    """(завершено, оценка) для экзамена или пересдачи; оценка None, пока не завершено."""
+    done = window.status(now) == 'finished' or (attempt is not None and not attempt.is_active(now))
+    if not done:
+        return False, None
+    return True, (attempt.grade() if attempt else 0)
 
 
 @login_required
-def exam_detail(request, exam_id):
+def exam_detail(request, exam_id, retake_id=None):
     if request.user.is_staff:
         return redirect('exam_results', exam_id=exam_id)
-    student, exam, attempt = _student_exam_or_redirect(request, exam_id)
+    student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
     now = timezone.now()
-    state = exam.status(now)
+    window = retake or exam
+    state = window.status(now)
     in_progress = attempt is not None and attempt.is_active(now)
     finished = state == 'finished' or (attempt is not None and not in_progress)
 
@@ -139,81 +253,105 @@ def exam_detail(request, exam_id):
         tasks = attempt.task_list()
     else:
         # Набор для случайного выбора ученику не показываем — только его выпавшие задачи.
-        tasks = [] if exam.is_random else list(exam.tasks.all())
+        tasks = [] if (exam.is_random or retake) else list(exam.tasks.all())
     from .views import _apply_task_language, _get_content_lang
     _apply_task_language(tasks, _get_content_lang(request))
     answers = {a.task_id: a for a in attempt.answers.all()} if attempt else {}
     for task in tasks:
         task.answer = answers.get(task.id)
 
+    # Обе оценки: за экзамен и за пересдачу (пересдача — только у тех, кому её назначили).
+    main_attempt = attempt if retake is None else \
+        ExamAttempt.objects.filter(exam=exam, student=student, retake__isnull=True).first()
+    my_retake = retake or ExamRetake.objects.filter(exam=exam, students=student).order_by('-start_at').first()
+    retake_attempt = None
+    if my_retake is not None:
+        retake_attempt = attempt if retake else \
+            ExamAttempt.objects.filter(exam=exam, student=student, retake=my_retake).first()
+    exam_done, exam_grade = _grade_info(exam, main_attempt, now)
+    retake_done, retake_grade = _grade_info(my_retake, retake_attempt, now) if my_retake else (False, None)
+    my_retake_state = _attempt_state(my_retake, retake_attempt, now) if my_retake else None
+
     return render(request, 'exam_detail.html', {
-        'exam': exam, 'attempt': attempt, 'state': state, 'tasks': tasks,
+        'exam': exam, 'retake': retake, 'window': window, 'attempt': attempt, 'state': state, 'tasks': tasks,
         'in_progress': in_progress, 'finished': finished, 'task_count': exam.tasks_per_student(),
-        'grade': attempt.grade() if (attempt and finished) else (0 if finished else None),
+        'grade': (attempt.grade() if attempt else 0) if finished else None,
+        'my_retake': my_retake, 'my_retake_state': my_retake_state,
+        'exam_done': exam_done, 'exam_grade': exam_grade,
+        'retake_done': retake_done, 'retake_grade': retake_grade,
     })
 
 
 @login_required
-def exam_start(request, exam_id):
+def exam_start(request, exam_id, retake_id=None):
     if request.method != 'POST' or request.user.is_staff:
         return redirect('exam_list')
-    student, exam, attempt = _student_exam_or_redirect(request, exam_id)
+    student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
-    if exam.status() != 'active':
-        messages.warning(request, 'Сейчас этот СОР/СОЧ не идёт.')
+    if (retake or exam).status() != 'active':
+        messages.warning(request, 'Сейчас эта пересдача не идёт.' if retake else 'Сейчас этот СОР/СОЧ не идёт.')
     elif attempt is None:
         task_ids = []
-        if exam.random_slots:
+        if retake is not None:
+            task_ids = _retake_task_ids(exam, student)
+        elif exam.random_slots:
             picked = _random_match([_slot_candidates(sl) for sl in exam.random_slots])
             task_ids = [t for t in picked if t is not None]
         elif exam.is_random:   # старый вариант: N случайных из отмеченного набора
             pool = list(exam.tasks.values_list('id', flat=True))
             task_ids = random.sample(pool, min(exam.random_count, len(pool)))
-        ExamAttempt.objects.get_or_create(exam=exam, student=student,
+        ExamAttempt.objects.get_or_create(exam=exam, student=student, retake=retake,
                                           defaults={'started_at': timezone.now(), 'task_ids': task_ids})
-    return redirect('exam_detail', exam_id=exam.id)
+    return _to_detail(exam, retake)
 
 
 @login_required
-def exam_finish(request, exam_id):
+def exam_finish(request, exam_id, retake_id=None):
     if request.method != 'POST' or request.user.is_staff:
         return redirect('exam_list')
-    student, exam, attempt = _student_exam_or_redirect(request, exam_id)
+    student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
+    if exam is None:
+        return redirect('exam_list')
     if attempt is not None and attempt.is_active():
         attempt.finished_at = timezone.now()
         attempt.save(update_fields=['finished_at'])
-        messages.success(request, 'Вы завершили СОР/СОЧ.')
-    return redirect('exam_detail', exam_id=exam_id)
+        messages.success(request, 'Вы завершили пересдачу.' if retake else 'Вы завершили СОР/СОЧ.')
+    return _to_detail(exam, retake)
 
 
 @login_required
-def exam_task(request, exam_id, task_id):
+def exam_task(request, exam_id, task_id, retake_id=None):
     if request.user.is_staff:
         return redirect('exam_results', exam_id=exam_id)
-    student, exam, attempt = _student_exam_or_redirect(request, exam_id)
+    student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
     task = get_object_or_404(Task, id=task_id)
     if attempt is None:
-        return redirect('exam_detail', exam_id=exam.id)
+        return _to_detail(exam, retake)
     if task.id not in {t.id for t in attempt.task_list()}:
         messages.warning(request, 'Эта задача вам не выпала.')
-        return redirect('exam_detail', exam_id=exam.id)
+        return _to_detail(exam, retake)
     answer = ExamAnswer.objects.filter(attempt=attempt, task=task).first()
     active = attempt.is_active()
+
+    def back_to_task():
+        if retake is not None:
+            return redirect('retake_task', exam_id=exam.id, retake_id=retake.id, task_id=task.id)
+        return redirect('exam_task', exam_id=exam.id, task_id=task.id)
 
     if request.method == 'POST':
         if not active:
             messages.warning(request, 'Время СОР/СОЧ вышло — ответы больше не принимаются.')
-            return redirect('exam_detail', exam_id=exam.id)
+            return _to_detail(exam, retake)
         if answer is not None and answer.submissions_count >= EXAM_MAX_SUBMISSIONS:
             messages.warning(request, f'По этой задаче уже использованы все {EXAM_MAX_SUBMISSIONS} отправки.')
-            return redirect('exam_task', exam_id=exam.id, task_id=task.id)
+            return back_to_task()
         throttle_key = f'exam_submit:{attempt.id}:{task.id}'
         if not cache.add(throttle_key, 1, EXAM_SUBMIT_THROTTLE_SECONDS):
             messages.warning(request, f'Подождите {EXAM_SUBMIT_THROTTLE_SECONDS} секунд перед повторной отправкой.')
-            return redirect('exam_task', exam_id=exam.id, task_id=task.id)
+            return back_to_task()
         code = (request.POST.get('code') or '').replace('\r\n', '\n')
         result = run_autotests(task, code)
         passed, total = (result['passed'], result['total']) if result.get('available') else (0, len(task.test_cases or []))
@@ -231,12 +369,13 @@ def exam_task(request, exam_id, task_id):
         messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов. '
                                   f'Лучший результат по задаче: {answer.best_score}/10. '
                                   f'Осталось отправок: {left} из {EXAM_MAX_SUBMISSIONS}.')
-        return redirect('exam_task', exam_id=exam.id, task_id=task.id)
+        return back_to_task()
 
     from .views import _apply_task_language, _get_content_lang
     _apply_task_language([task], _get_content_lang(request))
     return render(request, 'exam_task.html', {
-        'exam': exam, 'task': task, 'answer': answer, 'active': active, 'attempt': attempt,
+        'exam': exam, 'retake': retake, 'window': retake or exam, 'task': task, 'answer': answer,
+        'active': active, 'attempt': attempt,
         'max_submissions': EXAM_MAX_SUBMISSIONS,
         'submissions_left': EXAM_MAX_SUBMISSIONS - (answer.submissions_count if answer else 0),
     })
@@ -270,6 +409,7 @@ def _teacher_exam_list(request):
     now = timezone.now()
     for exam in exams:
         exam.state = exam.status(now)
+        exam.retake_count = exam.retakes.count()
     return render(request, 'exams_teacher.html', {'exams': exams})
 
 
@@ -402,16 +542,11 @@ def exam_delete(request, exam_id):
     return redirect('exam_list')
 
 
-@staff_member_required
-def exam_results(request, exam_id):
-    exam = get_object_or_404(Exam, id=exam_id)
-    if not _can_manage(request.user, exam):
-        messages.error(request, 'Это СОР/СОЧ не вашего класса.')
-        return redirect('exam_list')
-    now = timezone.now()
+def _result_rows(exam, students, attempts, now, per_student):
+    """Строки таблицы результатов. per_student — у каждого ученика свои задачи (случайный
+    экзамен или пересдача): колонки «№1..№N», в каждой выпавшая задача и балл."""
     tasks = list(exam.tasks.all())
-    students = Student.objects.filter(school_class=exam.school_class).select_related('user').order_by('full_name')
-    attempts = {a.student_id: a for a in exam.attempts.prefetch_related('answers')}
+    count = exam.tasks_per_student()
     rows = []
     for st in students:
         attempt = attempts.get(st.id)
@@ -422,23 +557,159 @@ def exam_results(request, exam_id):
             status = 'in_progress'
         else:
             status = 'finished'
-        if exam.is_random:
-            # Колонки «№1..№N»: в каждой — выпавшая задача и балл за неё.
+        if per_student:
             mine = attempt.task_list() if attempt else []
             cells = [{'task': t, 'answer': answers.get(t.id)} for t in mine]
-            cells += [{'task': None, 'answer': None}] * (exam.random_count - len(cells))
+            cells += [{'task': None, 'answer': None}] * (count - len(cells))
         else:
             cells = [{'task': t, 'answer': answers.get(t.id)} for t in tasks]
-        rows.append({
-            'student': st, 'attempt': attempt, 'status': status,
-            'cells': cells,
-            'grade': attempt.grade() if attempt else 0,
-        })
+        rows.append({'student': st, 'attempt': attempt, 'status': status, 'cells': cells,
+                     'grade': attempt.grade() if attempt else 0})
+    return rows
+
+
+def _result_columns(exam, per_student):
     labels = [sl['label'] for sl in exam.slot_list()]
-    columns = ([f'№{i}' + (f' {labels[i - 1]}' if i <= len(labels) else '') for i in range(1, exam.random_count + 1)]
-               if exam.is_random
-               else [f'{i}. {t.title}' for i, t in enumerate(tasks, 1)])
+    if per_student:
+        return [f'№{i}' + (f' {labels[i - 1]}' if i <= len(labels) else '')
+                for i in range(1, exam.tasks_per_student() + 1)], labels
+    return [f'{i}. {t.title}' for i, t in enumerate(exam.tasks.all(), 1)], labels
+
+
+@staff_member_required
+def exam_results(request, exam_id, retake_id=None):
+    exam = get_object_or_404(Exam, id=exam_id)
+    if not _can_manage(request.user, exam):
+        messages.error(request, 'Это СОР/СОЧ не вашего класса.')
+        return redirect('exam_list')
+    now = timezone.now()
+    tasks = list(exam.tasks.all())
+    class_students = Student.objects.filter(school_class=exam.school_class).select_related('user').order_by('full_name')
+    retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam) if retake_id is not None else None
+
+    exam_attempts = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
+    if retake is not None:
+        students = retake.students.select_related('user').order_by('full_name')
+        attempts = {a.student_id: a for a in retake.attempts.prefetch_related('answers')}
+        rows = _result_rows(exam, students, attempts, now, per_student=True)
+        for row in rows:    # рядом — оценка того же ученика за сам экзамен
+            ea = exam_attempts.get(row['student'].id)
+            row['exam_grade'] = ea.grade() if ea else 0
+        state = retake.status(now)
+        per_student = True
+    else:
+        rows = _result_rows(exam, class_students, exam_attempts, now, per_student=exam.is_random)
+        state = exam.status(now)
+        per_student = exam.is_random
+
+    retakes = list(exam.retakes.prefetch_related('students').all())
+    if retake is None and retakes:
+        # Ученикам, назначенным на пересдачу, — вторая оценка (после окончания пересдачи).
+        retake_attempts = {(a.retake_id, a.student_id): a
+                           for a in ExamAttempt.objects.filter(exam=exam, retake__in=retakes)}
+        assigned = {}
+        for rt in retakes:
+            for st in rt.students.all():
+                assigned[st.id] = rt
+        for row in rows:
+            rt = assigned.get(row['student'].id)
+            row['retake'] = rt
+            if rt is None:
+                continue
+            ra = retake_attempts.get((rt.id, row['student'].id))
+            rstate = _attempt_state(rt, ra, now)
+            row['retake_state'] = rstate
+            row['retake_grade'] = (ra.grade() if ra else 0) if rstate == 'finished' else None
+    for rt in retakes:
+        rt.state = rt.status(now)
+        rt.student_names = ', '.join(s.full_name for s in rt.students.all())
+        rt.attempt_count = rt.attempts.count()
+
+    columns, labels = _result_columns(exam, per_student)
     return render(request, 'exam_results.html', {
-        'exam': exam, 'tasks': tasks, 'rows': rows, 'state': exam.status(now), 'columns': columns,
-        'slot_labels': labels,
+        'exam': exam, 'tasks': tasks, 'rows': rows, 'state': state, 'columns': columns,
+        'slot_labels': labels, 'retake': retake, 'retakes': retakes,
+        'has_retakes': bool(retakes), 'per_student': per_student,
+        'exam_finished': exam.status(now) == 'finished',
     })
+
+
+@staff_member_required
+def retake_create(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    if not _can_manage(request.user, exam):
+        messages.error(request, 'Это СОР/СОЧ не вашего класса.')
+        return redirect('exam_list')
+    now = timezone.now()
+    if exam.status(now) != 'finished':
+        messages.warning(request, 'Пересдачу можно назначить только после окончания СОР/СОЧ.')
+        return redirect('exam_results', exam_id=exam.id)
+
+    exam_attempts = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
+    in_retake = {}
+    for rt in exam.retakes.prefetch_related('students'):
+        for st in rt.students.all():
+            in_retake[st.id] = rt
+    students = list(Student.objects.filter(school_class=exam.school_class).order_by('full_name'))
+    for st in students:
+        attempt = exam_attempts.get(st.id)
+        st.exam_grade = attempt.grade() if attempt else 0
+        st.took_part = attempt is not None
+        st.existing_retake = in_retake.get(st.id)
+    allowed = {st.id for st in students if st.existing_retake is None}
+
+    if request.method == 'POST':
+        errors = []
+        chosen_ids = {int(x) for x in request.POST.getlist('students') if x.isdigit()} & allowed
+        start_raw = request.POST.get('start_at', '')
+        duration_raw = request.POST.get('duration_minutes', '')
+        if not chosen_ids:
+            errors.append('Выберите хотя бы одного ученика для пересдачи.')
+        start_at = None
+        try:
+            start_at = timezone.make_aware(datetime.strptime(start_raw, '%Y-%m-%dT%H:%M'))
+        except (ValueError, TypeError):
+            errors.append('Укажите дату и время начала пересдачи.')
+        try:
+            duration = int(duration_raw)
+            if not 1 <= duration <= EXAM_MAX_DURATION:
+                raise ValueError
+        except (ValueError, TypeError):
+            duration = None
+            errors.append(f'Длительность — от 1 до {EXAM_MAX_DURATION} минут.')
+        if start_at and duration and start_at + timedelta(minutes=duration) <= now:
+            errors.append('Время пересдачи уже прошло — укажите время в будущем.')
+        if not errors:
+            retake = ExamRetake.objects.create(exam=exam, start_at=start_at, duration_minutes=duration,
+                                               created_by=_teacher(request.user))
+            retake.students.set(Student.objects.filter(id__in=chosen_ids))
+            messages.success(request, f'Пересдача назначена: {len(chosen_ids)} уч., '
+                                      f'{timezone.localtime(start_at):%d.%m.%Y %H:%M}, {duration} мин. '
+                                      f'Каждому выпадут другие случайные задачи.')
+            return redirect('exam_results', exam_id=exam.id)
+        for e in errors:
+            messages.error(request, e)
+        values = {'start_at': start_raw, 'duration_minutes': duration_raw}
+        selected = chosen_ids
+    else:
+        soon = timezone.localtime(now + timedelta(minutes=30)).replace(second=0, microsecond=0)
+        soon = soon.replace(minute=soon.minute - soon.minute % 5)
+        values = {'start_at': soon.strftime('%Y-%m-%dT%H:%M'), 'duration_minutes': exam.duration_minutes}
+        selected = set()
+    return render(request, 'retake_form.html', {
+        'exam': exam, 'students': students, 'selected': selected, 'v': values,
+        'max_duration': EXAM_MAX_DURATION, 'task_count': exam.tasks_per_student(),
+    })
+
+
+@staff_member_required
+def retake_delete(request, exam_id, retake_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam)
+    if request.method == 'POST' and _can_manage(request.user, exam):
+        if retake.attempts.exists():
+            messages.warning(request, 'Ученики уже начали эту пересдачу — удалить её нельзя, чтобы не потерять оценки.')
+        else:
+            retake.delete()
+            messages.success(request, 'Пересдача удалена.')
+    return redirect('exam_results', exam_id=exam.id)

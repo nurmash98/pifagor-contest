@@ -3,17 +3,59 @@
 {% block title %}Результаты: {{ exam.title }}{% endblock %}
 
 {% block content %}
-<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a></div>
-<h3 class="fw-bold mb-1" style="color: #1a1a4b;">{{ exam.get_kind_display }} «{{ exam.title }}» · {{ exam.school_class }}</h3>
+<div class="mb-3">
+    {% if retake %}<a href="{% url 'exam_results' exam.id %}" class="text-decoration-none text-muted small">← Результаты экзамена</a>
+    {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a>{% endif %}
+</div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">{% if retake %}<span class="badge bg-warning text-dark me-2 fs-6">🔁 Пересдача</span>{% endif %}{{ exam.get_kind_display }} «{{ exam.title }}» · {{ exam.school_class }}</h3>
+    {% if not retake and exam_finished %}
+    <a href="{% url 'retake_create' exam.id %}" class="btn btn-warning rounded-pill px-3">🔁 Назначить пересдачу</a>
+    {% endif %}
+</div>
+{% if retake %}
+<p class="text-muted small mb-4">{{ retake.start_at|date:"d.m.Y H:i" }} – {{ retake.end_at|date:"H:i" }} ·
+    {% if state == 'active' %}<span class="text-danger fw-semibold">идёт сейчас</span>{% elif state == 'upcoming' %}ещё не началась{% else %}завершена{% endif %}
+    · каждому ученику {{ exam.tasks_per_student }} других случайных задач (не те, что были на экзамене)
+    · оценка = средний балл по выпавшим задачам (не сдано = 0)</p>
+{% else %}
 <p class="text-muted small mb-4">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} ·
     {% if state == 'active' %}<span class="text-danger fw-semibold">идёт сейчас</span>{% elif state == 'upcoming' %}ещё не начался{% else %}завершён{% endif %}
     {% if exam.is_random %}· каждому ученику {{ exam.random_count }} случайных задач
     · оценка = средний балл по выпавшим задачам (не сдано = 0){% else %}· оценка = средний балл по {{ tasks|length }} задачам (не сдано = 0){% endif %}</p>
-{% if exam.is_random and not slot_labels and tasks %}
+{% endif %}
+{% if exam.is_random and not retake and not slot_labels and tasks %}
 <details class="mb-3 small">
     <summary class="text-muted" style="cursor: pointer;">Набор задач для случайного выбора ({{ tasks|length }})</summary>
     <ol class="mt-2 mb-0">{% for task in tasks %}<li>[{{ task.level }}] {{ task.title }}</li>{% endfor %}</ol>
 </details>
+{% endif %}
+
+{% if retakes and not retake %}
+<div class="card border-0 shadow-sm rounded-4 mb-4 border-start border-4 border-warning">
+    <div class="card-body py-3">
+        <h6 class="fw-bold mb-2">🔁 Пересдачи</h6>
+        {% for rt in retakes %}
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 py-2 {% if not forloop.last %}border-bottom{% endif %}">
+            <div>
+                <strong>{{ rt.start_at|date:"d.m.Y H:i" }}</strong> – {{ rt.end_at|date:"H:i" }}
+                {% if rt.state == 'active' %}<span class="badge bg-danger ms-1">идёт</span>
+                {% elif rt.state == 'upcoming' %}<span class="badge bg-info text-dark ms-1">запланирована</span>
+                {% else %}<span class="badge bg-light text-muted border ms-1">завершена</span>{% endif %}
+                <div class="small text-muted">{{ rt.student_names }}</div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'retake_results' exam.id rt.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
+                {% if not rt.attempt_count %}
+                <form method="post" action="{% url 'retake_delete' exam.id rt.id %}" onsubmit="return confirm('Удалить эту пересдачу?');">
+                    {% csrf_token %}<button class="btn btn-outline-danger btn-sm rounded-pill px-3">Удалить</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 {% endif %}
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
@@ -23,7 +65,13 @@
                 <tr>
                     <th class="ps-3">Ученик</th>
                     {% for col in columns %}<th class="text-center small" title="{{ col }}">{{ col|truncatechars:21 }}</th>{% endfor %}
-                    <th class="text-center">Оценка</th>
+                    {% if retake %}
+                    <th class="text-center">Оценка пересдачи</th>
+                    <th class="text-center">Оценка за экзамен</th>
+                    {% else %}
+                    <th class="text-center">Оценка{% if has_retakes %} (экзамен){% endif %}</th>
+                    {% if has_retakes %}<th class="text-center">🔁 Пересдача</th>{% endif %}
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -37,7 +85,7 @@
                     </td>
                     {% for cell in row.cells %}
                     <td class="text-center">
-                        {% if exam.is_random and cell.task %}<div class="small text-muted" title="{{ cell.task.title }}">{{ cell.task.title|truncatechars:20 }}</div>{% endif %}
+                        {% if per_student and cell.task %}<div class="small text-muted" title="{{ cell.task.title }}">{{ cell.task.title|truncatechars:20 }}</div>{% endif %}
                         {% with a=cell.answer %}
                         {% if a %}
                         <details>
@@ -45,18 +93,28 @@
                             <pre class="bg-dark text-light p-2 rounded-3 small text-start mt-1 mb-0" style="max-width: 320px; white-space: pre-wrap;"><code>{{ a.best_code }}</code></pre>
                             <div class="small text-muted">отправок: {{ a.submissions_count }}</div>
                         </details>
-                        {% else %}<span class="text-muted">{% if exam.is_random and cell.task %}0{% else %}—{% endif %}</span>{% endif %}
+                        {% else %}<span class="text-muted">{% if per_student and cell.task %}0{% else %}—{% endif %}</span>{% endif %}
                         {% endwith %}
                     </td>
                     {% endfor %}
                     <td class="text-center fw-bold fs-5 {% if row.grade >= 8 %}text-success{% elif row.grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.grade }}</td>
+                    {% if retake %}
+                    <td class="text-center fw-bold fs-5 {% if row.exam_grade >= 8 %}text-success{% elif row.exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.exam_grade }}</td>
+                    {% elif has_retakes %}
+                    <td class="text-center">
+                        {% if not row.retake %}<span class="text-muted">—</span>
+                        {% elif row.retake_grade is not None %}<span class="fw-bold fs-5 {% if row.retake_grade >= 8 %}text-success{% elif row.retake_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.retake_grade }}</span>
+                        {% elif row.retake_state == 'active' %}<span class="small text-danger">идёт</span>
+                        {% else %}<span class="small text-muted" title="{{ row.retake.start_at|date:'d.m.Y H:i' }}">{{ row.retake.start_at|date:"d.m H:i" }}</span>{% endif %}
+                    </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
-                <tr><td colspan="{{ columns|length|add:2 }}" class="p-4 text-center text-muted">В классе {{ exam.school_class }} пока нет учеников.</td></tr>
+                <tr><td colspan="{{ columns|length|add:3 }}" class="p-4 text-center text-muted">{% if retake %}В этой пересдаче нет учеников.{% else %}В классе {{ exam.school_class }} пока нет учеников.{% endif %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-<p class="text-muted small mt-2">Нажмите на балл, чтобы посмотреть код с лучшим результатом.</p>
+<p class="text-muted small mt-2">Нажмите на балл, чтобы посмотреть код с лучшим результатом.{% if has_retakes and not retake %} У учеников, которые пересдавали, в колонке «Пересдача» стоит вторая оценка — оценка за экзамен остаётся прежней.{% endif %}</p>
 {% endblock %}

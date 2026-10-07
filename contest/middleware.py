@@ -29,6 +29,6 @@ class ExamLockMiddleware:
         attempt = getattr(request, 'active_exam_attempt', None)
         match = getattr(request, 'resolver_match', None)
         if attempt is not None and match is not None and match.url_name in EXAM_LOCKED_VIEWS:
-            messages.warning(request, 'Идёт СОР/СОЧ — Курсы, Все задачи и Kanban откроются после его окончания.')
-            return redirect('exam_detail', exam_id=attempt.exam_id)
+            messages.warning(request, 'Идёт СОР/СОЧ (или пересдача) — Курсы, Все задачи и Kanban откроются после его окончания.')
+            return redirect(attempt.get_absolute_url())
         return None

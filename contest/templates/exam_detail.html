@@ -4,46 +4,92 @@
 {% block title %}{{ exam.title }} - Pifagor Contest{% endblock %}
 
 {% block content %}
-<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a></div>
+<div class="mb-3">
+    {% if retake %}<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
+    {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a>{% endif %}
+</div>
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
         <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+        {% if retake %}<span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>{% endif %}
         <h3 class="fw-bold d-inline" style="color: #1a1a4b;">{{ exam.title }}</h3>
-        <div class="text-muted small mt-1">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} · {% t "каждая задача — до 10 баллов" %}</div>
+        <div class="text-muted small mt-1">{{ window.start_at|date:"d.m.Y H:i" }} – {{ window.end_at|date:"H:i" }} · {{ window.duration_minutes }} {% t "мин" %} · {% t "каждая задача — до 10 баллов" %}</div>
     </div>
     {% if in_progress %}
     <div class="text-end">
         <div class="small text-muted">{% t "Осталось" %}</div>
-        <div id="exam-timer" class="fs-3 fw-bold text-danger font-monospace" data-end="{{ exam.end_at|date:'c' }}">--:--</div>
+        <div id="exam-timer" class="fs-3 fw-bold text-danger font-monospace" data-end="{{ window.end_at|date:'c' }}">--:--</div>
     </div>
     {% endif %}
 </div>
 
 {% if state == 'upcoming' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
-        <p class="mb-2">{% t "Начнётся" %} <strong>{{ exam.start_at|date:"d.m.Y H:i" }}</strong></p>
+        <p class="mb-2">{% if retake %}{% t "Пересдача начнётся" %}{% else %}{% t "Начнётся" %}{% endif %} <strong>{{ window.start_at|date:"d.m.Y H:i" }}</strong></p>
         <button class="btn btn-secondary px-4" disabled>{% t "Начать" %}</button>
     </div>
 
 {% elif not attempt and state == 'active' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
-        <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ exam.end_at|date:"H:i" }}</p>
+        <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ window.end_at|date:"H:i" }}</p>
         <p class="text-muted small mb-1">{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}</p>
-        {% if exam.is_random %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
+        {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
+        {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
         <p class="text-muted small mb-4">{% t "После старта Курсы, Все задачи и Kanban будут закрыты до конца СОР/СОЧ." %}</p>
-        <form method="post" action="{% url 'exam_start' exam.id %}">{% csrf_token %}
+        <form method="post" action="{% if retake %}{% url 'retake_start' exam.id retake.id %}{% else %}{% url 'exam_start' exam.id %}{% endif %}">{% csrf_token %}
             <button class="btn btn-danger btn-lg px-5 rounded-pill">▶ {% t "Начать" %}</button>
         </form>
     </div>
 
 {% else %}
     {% if finished %}
-    <div class="card border-0 shadow-sm rounded-4 p-4 mb-3 text-center">
-        <div class="text-muted small">{% t "Оценка (средний балл по всем задачам)" %}</div>
-        <div class="display-6 fw-bold {% if grade >= 8 %}text-success{% elif grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ grade }}/10</div>
-        {% if not attempt %}<div class="text-muted small">{% t "Вы не участвовали в этом СОР/СОЧ." %}</div>{% endif %}
+    <div class="row g-3 mb-3">
+        <div class="{% if my_retake %}col-md-6{% else %}col-12{% endif %}">
+            <div class="card border-0 shadow-sm rounded-4 p-4 h-100 text-center">
+                {% if my_retake %}
+                <div class="text-muted small">{% t "Оценка за экзамен" %}</div>
+                {% if exam_done %}
+                <div class="display-6 fw-bold {% if exam_grade >= 8 %}text-success{% elif exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ exam_grade }}/10</div>
+                {% else %}<div class="display-6 fw-bold text-muted">—</div>{% endif %}
+                {% else %}
+                <div class="text-muted small">{% t "Оценка (средний балл по всем задачам)" %}</div>
+                <div class="display-6 fw-bold {% if grade >= 8 %}text-success{% elif grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ grade }}/10</div>
+                {% if not attempt %}<div class="text-muted small">{% t "Вы не участвовали в этом СОР/СОЧ." %}</div>{% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% if my_retake %}
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-4 h-100 text-center border-top border-warning border-3">
+                <div class="text-muted small">🔁 {% t "Оценка за пересдачу" %}</div>
+                {% if retake_done %}
+                <div class="display-6 fw-bold {% if retake_grade >= 8 %}text-success{% elif retake_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ retake_grade }}/10</div>
+                {% else %}
+                <div class="display-6 fw-bold text-muted">—</div>
+                <div class="text-muted small">{% t "Пересдача" %}: {{ my_retake.start_at|date:"d.m.Y H:i" }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
+    {% endif %}
+
+    {% if not retake and my_retake and not retake_done %}
+    <div class="card border-0 shadow-sm rounded-4 p-3 mb-3 border-start border-4 border-warning d-flex flex-row justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <strong>🔁 {% t "Вам назначена пересдача" %}</strong>
+            <div class="text-muted small">{{ my_retake.start_at|date:"d.m.Y H:i" }} – {{ my_retake.end_at|date:"H:i" }} · {{ my_retake.duration_minutes }} {% t "мин" %}</div>
+        </div>
+        {% if my_retake_state == 'active' %}<a href="{% url 'retake_detail' exam.id my_retake.id %}" class="btn btn-warning btn-sm rounded-pill px-3">{% t "Перейти к пересдаче" %} →</a>
+        {% else %}<a href="{% url 'retake_detail' exam.id my_retake.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">{% t "Открыть" %}</a>{% endif %}
+    </div>
+    {% elif not retake and my_retake and retake_done %}
+    <div class="text-end mb-3"><a href="{% url 'retake_detail' exam.id my_retake.id %}" class="small text-decoration-none">{% t "Задачи и ответы пересдачи" %} →</a></div>
+    {% endif %}
+
+    {% if retake and exam_done %}
+    <div class="small text-muted mb-2">{% t "Оценка за экзамен" %}: <strong>{{ exam_grade }}/10</strong> · <a href="{% url 'exam_detail' exam.id %}">{% t "открыть экзамен" %}</a></div>
     {% endif %}
 
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
@@ -53,7 +99,7 @@
                 <div>
                     <span class="text-muted me-2">{{ forloop.counter }}.</span>
                     {% if attempt %}
-                    <a href="{% url 'exam_task' exam.id task.id %}" class="fw-semibold text-decoration-none" style="color: #1a1a4b;">{{ task.display_title }}</a>
+                    <a href="{% if retake %}{% url 'retake_task' exam.id retake.id task.id %}{% else %}{% url 'exam_task' exam.id task.id %}{% endif %}" class="fw-semibold text-decoration-none" style="color: #1a1a4b;">{{ task.display_title }}</a>
                     {% else %}<span class="fw-semibold">{{ task.display_title }}</span>{% endif %}
                 </div>
                 {% if task.answer %}
@@ -67,7 +113,7 @@
     </div>
 
     {% if in_progress %}
-    <form method="post" action="{% url 'exam_finish' exam.id %}" class="text-end"
+    <form method="post" action="{% if retake %}{% url 'retake_finish' exam.id retake.id %}{% else %}{% url 'exam_finish' exam.id %}{% endif %}" class="text-end"
           onsubmit="return confirm('{% t "Завершить СОР/СОЧ? Изменить ответы потом будет нельзя." %}');">
         {% csrf_token %}
         <button class="btn btn-outline-danger rounded-pill px-4">{% t "Завершить" %}</button>
