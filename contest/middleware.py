@@ -4,14 +4,14 @@ from django.shortcuts import redirect
 
 # Страницы, закрытые для ученика, пока он пишет СОР/СОЧ.
 EXAM_LOCKED_VIEWS = {
-    'all_tasks', 'task_detail', 'take_task', 'kanban', 'submit_code',
+    'all_tasks', 'task_detail',
     'courses', 'course_detail', 'topic_video', 'topic_theory',
 }
 
 
 class ExamLockMiddleware:
     """Пока у ученика идёт СОР/СОЧ (нажал «Начать», не завершил, время не вышло),
-    Курсы, Все задачи и Kanban недоступны — перекидываем обратно на экзамен.
+    Курсы и Все задачи недоступны — перекидываем обратно на экзамен.
     Идущая попытка кладётся в request.active_exam_attempt (для меню)."""
 
     def __init__(self, get_response):
@@ -29,6 +29,6 @@ class ExamLockMiddleware:
         attempt = getattr(request, 'active_exam_attempt', None)
         match = getattr(request, 'resolver_match', None)
         if attempt is not None and match is not None and match.url_name in EXAM_LOCKED_VIEWS:
-            messages.warning(request, 'Идёт СОР/СОЧ (или пересдача) — Курсы, Все задачи и Kanban откроются после его окончания.')
+            messages.warning(request, 'Идёт СОР/СОЧ (или пересдача) — Курсы и Все задачи откроются после его окончания.')
             return redirect(attempt.get_absolute_url())
         return None

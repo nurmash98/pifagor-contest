@@ -36,7 +36,7 @@
         <p class="text-muted small mb-1">{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}</p>
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
-        <p class="text-muted small mb-4">{% t "После старта Курсы, Все задачи и Kanban будут закрыты до конца СОР/СОЧ." %}</p>
+        <p class="text-muted small mb-4">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
         <form method="post" action="{% if retake %}{% url 'retake_start' exam.id retake.id %}{% else %}{% url 'exam_start' exam.id %}{% endif %}">{% csrf_token %}
             <button class="btn btn-danger btn-lg px-5 rounded-pill">▶ {% t "Начать" %}</button>
         </form>

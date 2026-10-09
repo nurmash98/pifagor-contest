@@ -8,11 +8,7 @@ urlpatterns = [
 
     # Детальная страница задачи и отправка кода
     path('task/<int:task_id>/', views.task_detail, name='task_detail'),
-    path('task/<int:task_id>/take/', views.take_task, name='take_task'),
 
-    # Доска задач и быстрая отправка кода (если используется)
-    path('kanban/', views.kanban_board, name='kanban'),
-    path('submission/<int:submission_id>/submit/', views.submit_code, name='submit_code'),
 
     # Рейтинг и профиль
     path('leaderboard/', views.leaderboard, name='leaderboard'),

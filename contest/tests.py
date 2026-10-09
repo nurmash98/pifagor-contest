@@ -306,3 +306,38 @@ class TwoGradesTests(RetakeTestBase):
         session.save()
         self.assertEqual(self.client.get(reverse('exam_list')).status_code, 200)
         self.assertEqual(self.client.get(reverse('retake_detail', args=[self.exam.id, self.rt.id])).status_code, 200)
+
+
+class KanbanRemovedTests(TestCase):
+    """Kanban-доски и лимита «не больше 5 задач в работе» больше нет."""
+
+    def setUp(self):
+        cache.clear()
+        self.tag = Tag.objects.create(name='циклы')
+        self.tasks = [make_task(f'Задача {i}', 'A', self.tag) for i in range(8)]
+        user = User.objects.create_user('pupil', password='x')
+        self.student = Student.objects.create(user=user, full_name='Ученик', school_class='7F')
+        self.client.force_login(user)
+
+    def test_student_can_open_more_than_five_tasks(self):
+        for task in self.tasks:
+            resp = self.client.get(reverse('task_detail', args=[task.id]))
+            self.assertEqual(resp.status_code, 200)
+        from .models import Submission
+        self.assertEqual(Submission.objects.filter(student=self.student, status='IN_PROGRESS').count(), 8)
+
+    def test_kanban_page_is_gone(self):
+        self.assertEqual(self.client.get('/kanban/').status_code, 404)
+
+    def test_no_kanban_link_in_menu(self):
+        page = self.client.get(reverse('all_tasks')).content.decode()
+        self.assertNotIn('Kanban', page)
+        self.assertNotIn('kanban', page)
+
+    def test_exam_text_no_longer_mentions_kanban(self):
+        exam = Exam.objects.create(kind='SOR', title='СОР', school_class='7F',
+                                   start_at=timezone.now() + timedelta(minutes=-1), duration_minutes=40)
+        exam.tasks.set(self.tasks[:2])
+        page = self.client.get(reverse('exam_detail', args=[exam.id])).content.decode()
+        self.assertIn('Курсы и Все задачи', page)
+        self.assertNotIn('Kanban', page)

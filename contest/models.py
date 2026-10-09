@@ -402,7 +402,7 @@ class ExamRetake(models.Model):
 
 class ExamAttempt(models.Model):
     """Ученик нажал «Начать» на экзамене. Пока попытка идёт (не завершена и время экзамена
-    не вышло), Курсы, Все задачи и Kanban для него закрыты."""
+    не вышло), Курсы и Все задачи для него закрыты."""
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='attempts')
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='exam_attempts')
     started_at = models.DateTimeField(verbose_name="Начал")

@@ -54,25 +54,6 @@
         .badge-level-B { background-color: #ffc107; color: #000; }  /* Желтый */
         .badge-level-C { background-color: #dc3545; color: white; } /* Красный */
 
-        /* Карточки и обертки */
-        .kanban-col {
-            background-color: #f4f5f7;
-            border-radius: 12px;
-            padding: 15px;
-            min-height: 70vh;
-        }
-        .task-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 15px;
-            transition: transform 0.2s;
-        }
-        .task-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
         /* Кастомный скроллбар для блоков с кодом */
         pre {
             scrollbar-width: thin;
@@ -138,7 +119,7 @@
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->
                         {% else %}
                             {% if active_exam_attempt %}
-                            <!-- Идёт СОР/СОЧ: Курсы, Все задачи и Kanban закрыты до его окончания -->
+                            <!-- Идёт СОР/СОЧ: Курсы и Все задачи закрыты до его окончания -->
                             <li class="nav-item me-2">
                                 <a class="btn btn-danger btn-sm fw-bold rounded-pill px-3" href="{{ active_exam_attempt.get_absolute_url }}">
                                     ⏱ {% t "Идёт СОР/СОЧ" %}
@@ -150,9 +131,6 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'courses' %}">{% t "Курсы" %}</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'kanban' %}">{% t "Kanban Доска" %}</a>
                             </li>
                             {% endif %}
                             <li class="nav-item">

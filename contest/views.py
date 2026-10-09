@@ -27,8 +27,6 @@ logger = logging.getLogger(__name__)
 
 SUBMISSION_COOLDOWN = timedelta(minutes=20)  # пауза между отправками одной задачи
 
-# Сколько задач ученик может держать "В работе" одновременно (Kanban).
-MAX_ACTIVE_TASKS = 5
 
 # Вход: после стольких неверных попыток подряд логин блокируется на LOGIN_LOCKOUT_SECONDS
 # (без проверки пароля — чтобы многократные нажатия "Войти" не грузили CPU).
@@ -206,7 +204,7 @@ def _submit_attempt(submission):
 
 def _safe_back_url(request):
     """Достаём ?back=... из запроса и проверяем, что это безопасная локальная ссылка,
-    чтобы кнопка 'Назад' вела туда, откуда пользователь пришёл (каталог, курс, Kanban)."""
+    чтобы кнопка 'Назад' вела туда, откуда пользователь пришёл (каталог, курс)."""
     raw_back = request.GET.get('back') or request.POST.get('back')
     if raw_back and url_has_allowed_host_and_scheme(
         raw_back, allowed_hosts={request.get_host()}, require_https=request.is_secure()
@@ -320,10 +318,6 @@ def task_detail(request, task_id):
 
     # Если задача еще не взята в работу
     if not submission:
-        active_count = Submission.objects.filter(student=student, status='IN_PROGRESS').count()
-        if active_count >= MAX_ACTIVE_TASKS:
-            messages.warning(request, f'Вы не можете взять более {MAX_ACTIVE_TASKS} задач одновременно. Завершите текущие задачи!')
-            return redirect(back_url or 'all_tasks')
         submission = Submission.objects.create(student=student, task=task, status='IN_PROGRESS')
 
     cooldown = _cooldown_remaining(submission)
@@ -351,83 +345,6 @@ def task_detail(request, task_id):
         'readonly': False,
     }
     return render(request, 'task_detail.html', context)
-
-
-@login_required
-def kanban_board(request):
-    """Главная страница ученика: Kanban доска."""
-    if request.user.is_staff:
-        return redirect('teacher_dashboard')
-    student = get_object_or_404(Student, user=request.user)
-    lang = _get_content_lang(request)
-
-    all_tasks = Task.objects.all()
-    submissions = Submission.objects.select_related('task').filter(student=student)
-
-    # Оставляем это QuerySet-ами (не списками), т.к. шаблон вызывает .count на них —
-    # но принудительно вычисляем их один раз, чтобы проставить язык задачам и закешировать результат.
-    in_progress = submissions.filter(status='IN_PROGRESS')
-    testing = submissions.filter(status='TESTING')
-    done = submissions.filter(status='DONE')
-    _apply_task_language(
-        [sub.task for sub in list(in_progress) + list(testing) + list(done)], lang
-    )
-
-    active_task_ids = submissions.values_list('task_id', flat=True)
-    backlog_tasks = all_tasks.exclude(id__in=active_task_ids)
-    _apply_task_language(list(backlog_tasks), lang)
-
-    context = {
-        'student': student,
-        'backlog_tasks': backlog_tasks,
-        'in_progress': in_progress,
-        'testing': testing,
-        'done': done,
-        'max_active_tasks': MAX_ACTIVE_TASKS,
-    }
-    return render(request, 'kanban.html', context)
-
-
-@login_required
-def take_task(request, task_id):
-    """Перенос задачи в статус 'В работе' прямо с Kanban-доски или каталога"""
-    if request.method == 'POST':
-        student = get_object_or_404(Student, user=request.user)
-        task = get_object_or_404(Task, id=task_id)
-
-        active_count = Submission.objects.filter(student=student, status='IN_PROGRESS').count()
-        if active_count >= MAX_ACTIVE_TASKS:
-            messages.warning(request,
-                             f'Вы не можете взять более {MAX_ACTIVE_TASKS} задач одновременно. Завершите текущие задачи на Kanban-доске!')
-            return redirect('all_tasks')
-
-        Submission.objects.get_or_create(
-            student=student,
-            task=task,
-            defaults={'status': 'IN_PROGRESS'}
-        )
-    return redirect('kanban')
-
-
-@login_required
-def submit_code(request, submission_id):
-    """Сохранение кода (для быстрой формы в Kanban, если она используется)"""
-    if request.method == 'POST':
-        submission = get_object_or_404(Submission, id=submission_id, student__user=request.user)
-
-        cooldown = _cooldown_remaining(submission)
-        if cooldown:
-            messages.warning(request, f'Эту задачу можно отправлять раз в 20 минут. Попробуйте снова через {_minutes_left(cooldown)} мин.')
-            return redirect('kanban')
-
-        code = request.POST.get('code', '')
-        submission.code = code
-        submission.status = 'TESTING'
-        submission.last_submitted_at = timezone.now()
-        submission.save()
-        messages.success(request, _submit_attempt(submission))
-
-    return redirect('kanban')
 
 
 @login_required

@@ -61,7 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Пока ученик пишет СОР/СОЧ — Курсы, Все задачи и Kanban для него закрыты.
+    # Пока ученик пишет СОР/СОЧ — Курсы и Все задачи для него закрыты.
     'contest.middleware.ExamLockMiddleware',
 ]
 
