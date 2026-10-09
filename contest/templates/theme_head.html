@@ -1,0 +1,103 @@
+{# Ночной / дневной режим: применяем сохранённую тему ДО отрисовки (без мигания) и стили тёмной темы. #}
+<script>
+(function () {
+    var theme = null;
+    try { theme = localStorage.getItem('pifagor-theme'); } catch (e) {}
+    if (theme !== 'dark' && theme !== 'light') {
+        theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-bs-theme', theme);
+})();
+</script>
+<style>
+    /* ---------- Кнопка переключения темы ---------- */
+    .theme-toggle {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; padding: 0; border-radius: 50%;
+        border: 1px solid var(--bs-border-color); background: transparent; color: var(--bs-body-color);
+        cursor: pointer; transition: background-color .15s, transform .15s;
+    }
+    .theme-toggle:hover { background-color: var(--bs-tertiary-bg); transform: rotate(12deg); }
+    .theme-toggle:focus-visible { outline: 2px solid #008b42; outline-offset: 2px; }
+    .theme-toggle svg { width: 18px; height: 18px; }
+    .theme-toggle .theme-icon-sun { display: none; }
+    [data-bs-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
+    [data-bs-theme="dark"] .theme-toggle .theme-icon-moon { display: none; }
+    .theme-toggle-floating { position: fixed; top: 16px; right: 16px; z-index: 1030; background: var(--bs-body-bg); }
+
+    /* ---------- Тёмная тема ---------- */
+    [data-bs-theme="dark"] {
+        --bs-body-bg: #0f1424;
+        --bs-body-bg-rgb: 15, 20, 36;
+        --bs-body-color: #e4e7f0;
+        --bs-body-color-rgb: 228, 231, 240;
+        --bs-secondary-bg: #1a2036;
+        --bs-tertiary-bg: #20274a;
+        --bs-border-color: #2d3558;
+        --bs-secondary-color: rgba(228, 231, 240, .68);
+    }
+    [data-bs-theme="dark"] body { background-color: var(--bs-body-bg); color: var(--bs-body-color); }
+
+    /* фирменные цвета: тёмно-синий на тёмном фоне не виден — берём светлый оттенок */
+    [data-bs-theme="dark"] .text-pifagor-blue,
+    [data-bs-theme="dark"] [style^="color: #1a1a4b"],
+    [data-bs-theme="dark"] [style*=" color: #1a1a4b"] { color: #c3c9ff !important; }
+    [data-bs-theme="dark"] .text-pifagor-green,
+    [data-bs-theme="dark"] [style*="color: #008b42"] { color: #34c27a !important; }
+    [data-bs-theme="dark"] [style*="color: #2c3e50"] { color: var(--bs-body-color) !important; }
+
+    /* белые поверхности */
+    [data-bs-theme="dark"] .bg-white { background-color: var(--bs-secondary-bg) !important; }
+    [data-bs-theme="dark"] .bg-light { background-color: var(--bs-tertiary-bg) !important; }
+    [data-bs-theme="dark"] .card { --bs-card-bg: var(--bs-secondary-bg); --bs-card-cap-bg: var(--bs-tertiary-bg); }
+    [data-bs-theme="dark"] .list-group { --bs-list-group-bg: transparent; }
+    [data-bs-theme="dark"] .navbar.bg-body { background-color: var(--bs-secondary-bg) !important; }
+    [data-bs-theme="dark"] .navbar-toggler-icon { filter: invert(1) grayscale(1) brightness(1.6); }
+    [data-bs-theme="dark"] .auth-card { box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+
+    /* тёмный текст на светлых плашках/бейджах: оставляем только там, где фон жёлтый/голубой */
+    [data-bs-theme="dark"] .text-dark:not(.bg-warning):not(.bg-info):not(.bg-success):not(.btn-warning):not(.btn-info) { color: var(--bs-body-color) !important; }
+    [data-bs-theme="dark"] .btn-outline-dark:not(:hover):not(.active):not(:active) { color: #e4e7f0; }
+    [data-bs-theme="dark"] .btn-outline-dark {
+        --bs-btn-color: #e4e7f0; --bs-btn-border-color: #6c7392;
+        --bs-btn-hover-color: #0f1424; --bs-btn-hover-bg: #e4e7f0; --bs-btn-hover-border-color: #e4e7f0;
+        --bs-btn-active-color: #0f1424; --bs-btn-active-bg: #e4e7f0; --bs-btn-active-border-color: #e4e7f0;
+    }
+
+    [data-bs-theme="dark"] .btn-outline-secondary:not(:hover):not(.active):not(:active) { color: #b4bad2; }
+    [data-bs-theme="dark"] .btn-outline-secondary {
+        --bs-btn-color: #b4bad2; --bs-btn-border-color: #4b5373;
+        --bs-btn-hover-color: #0f1424; --bs-btn-hover-bg: #e4e7f0; --bs-btn-hover-border-color: #e4e7f0;
+        --bs-btn-active-color: #0f1424; --bs-btn-active-bg: #e4e7f0; --bs-btn-active-border-color: #e4e7f0;
+    }
+    [data-bs-theme="dark"] .btn-pifagor-blue,
+    [data-bs-theme="dark"] .bg-pifagor-blue { background-color: #3b40a6; color: #fff; }
+    [data-bs-theme="dark"] .btn-pifagor-blue:hover { background-color: #4a50c4; color: #fff; }
+
+    /* таблицы */
+    [data-bs-theme="dark"] .table-light {
+        --bs-table-color: #e4e7f0; --bs-table-bg: #232a4d; --bs-table-border-color: #2d3558;
+        --bs-table-striped-bg: #232a4d; --bs-table-hover-bg: #2a3260; --bs-table-hover-color: #e4e7f0;
+        color: #e4e7f0;
+    }
+    [data-bs-theme="dark"] [style*="background-color: #f4f6f9"] { background-color: #232a4d !important; }
+    [data-bs-theme="dark"] .hover-bg-light:hover { background-color: #232a4d !important; }
+
+    /* Kanban */
+    [data-bs-theme="dark"] .kanban-col { background-color: #161c30 !important; }
+    [data-bs-theme="dark"] .kanban-col[style*="#e3f2fd"] { background-color: #14283f !important; }
+    [data-bs-theme="dark"] .kanban-col[style*="#fff3cd"] { background-color: #3a3216 !important; }
+    [data-bs-theme="dark"] .kanban-col[style*="#d4edda"] { background-color: #153324 !important; }
+    [data-bs-theme="dark"] .task-card { box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+    [data-bs-theme="dark"] .task-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, .55); }
+
+    /* формы */
+    [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select {
+        background-color: #151b30; border-color: var(--bs-border-color); color: var(--bs-body-color);
+    }
+    [data-bs-theme="dark"] .form-control:focus, [data-bs-theme="dark"] .form-select:focus {
+        background-color: #151b30; color: var(--bs-body-color); border-color: #34c27a; box-shadow: 0 0 0 .2rem rgba(52, 194, 122, .2);
+    }
+    [data-bs-theme="dark"] .form-control::placeholder { color: rgba(228, 231, 240, .4); }
+    [data-bs-theme="dark"] img[src$="logo.svg"] { background: #f8f9fa; border-radius: 12px; padding: 6px 10px; }
+</style>

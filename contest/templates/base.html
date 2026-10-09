@@ -79,17 +79,22 @@
             scrollbar-color: #6c757d #343a40;
         }
     </style>
+    {% include "theme_head.html" %}
 </head>
 <body class="d-flex flex-column min-vh-100">
 
     <!-- Навигационная панель -->
-    <nav class="navbar navbar-expand-lg bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg bg-body shadow-sm sticky-top">
         <div class="container">
             <!-- Логотип / Название -->
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
-                <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
-                <span style="color: #008b42; font-size: 1.5rem;" class="ms-1">CONTEST</span>
-            </a>
+            <div class="d-flex align-items-center gap-3">
+                <a class="navbar-brand fw-bold d-flex align-items-center me-0" href="/">
+                    <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
+                    <span style="color: #008b42; font-size: 1.5rem;" class="ms-1">CONTEST</span>
+                </a>
+                <!-- Ночной / дневной режим -->
+                {% include "theme_toggle.html" %}
+            </div>
 
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>

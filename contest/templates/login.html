@@ -33,8 +33,10 @@
             color: #fff;
         }
     </style>
+    {% include "theme_head.html" %}
 </head>
 <body class="d-flex align-items-center justify-content-center min-vh-100">
+    {% include "theme_toggle.html" with floating=1 %}
 
     <div class="container py-5">
         <div class="row justify-content-center">

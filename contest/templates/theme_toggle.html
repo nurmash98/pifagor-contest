@@ -1,0 +1,32 @@
+{% load ui_i18n %}
+{# Кнопка «ночной / дневной режим». С параметром floating=1 прижимается к правому верхнему углу (страницы входа). #}
+<button type="button" class="theme-toggle{% if floating %} theme-toggle-floating{% endif %}" data-theme-toggle
+        title="{% t 'Ночной режим' %} / {% t 'Дневной режим' %}" aria-label="{% t 'Ночной режим' %} / {% t 'Дневной режим' %}">
+    <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+    <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"/></svg>
+</button>
+<script>
+(function () {
+    var root = document.documentElement;
+    function current() { return root.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light'; }
+    function label(btn) {
+        var next = current() === 'dark' ? '{% t "Дневной режим" %}' : '{% t "Ночной режим" %}';
+        btn.setAttribute('title', next); btn.setAttribute('aria-label', next);
+    }
+    document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
+        label(btn);
+        btn.addEventListener('click', function () {
+            var next = current() === 'dark' ? 'light' : 'dark';
+            root.setAttribute('data-bs-theme', next);
+            try { localStorage.setItem('pifagor-theme', next); } catch (e) {}
+            document.querySelectorAll('[data-theme-toggle]').forEach(label);
+        });
+    });
+    window.addEventListener('storage', function (e) {   // другая вкладка сменила тему
+        if (e.key === 'pifagor-theme' && (e.newValue === 'dark' || e.newValue === 'light')) {
+            root.setAttribute('data-bs-theme', e.newValue);
+            document.querySelectorAll('[data-theme-toggle]').forEach(label);
+        }
+    });
+})();
+</script>
