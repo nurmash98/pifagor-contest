@@ -164,7 +164,8 @@
                             <a class="btn btn-outline-primary btn-sm rounded-pill px-3 me-2" href="{% url 'login' %}">{% t "Войти" %}</a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-pifagor-green btn-sm rounded-pill px-3" href="{% url 'register' %}">{% t "Регистрация" %}</a>
+                            {% if registration_open %}<a class="btn btn-pifagor-green btn-sm rounded-pill px-3" href="{% url 'register' %}">{% t "Регистрация" %}</a>
+                            {% else %}<button type="button" class="btn btn-pifagor-green btn-sm rounded-pill px-3" disabled title="{% t "Регистрация временно закрыта" %}">{% t "Регистрация" %}</button>{% endif %}
                         </li>
                     {% endif %}
                 </ul>

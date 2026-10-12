@@ -1,3 +1,4 @@
+from django.conf import settings
 import json
 import logging
 import re
@@ -514,6 +515,9 @@ def add_class_bonus(request):
 def register(request):
     if request.user.is_authenticated:
         return redirect('all_tasks')
+    if not settings.REGISTRATION_OPEN:
+        messages.info(request, 'Регистрация временно закрыта. Обратитесь к учителю.')
+        return redirect('login')
 
     if request.method == 'POST':
         form = StudentRegistrationForm(request.POST)

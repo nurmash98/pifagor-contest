@@ -341,3 +341,18 @@ class KanbanRemovedTests(TestCase):
         page = self.client.get(reverse('exam_detail', args=[exam.id])).content.decode()
         self.assertIn('Курсы и Все задачи', page)
         self.assertNotIn('Kanban', page)
+
+
+class RegistrationClosedTests(TestCase):
+    def test_closed_by_default(self):
+        self.assertEqual(self.client.get('/register/').status_code, 302)
+        r = self.client.post('/register/', {'username': 'new1', 'password': 'Passw0rd!x', 'full_name': 'A B', 'school_class': '7F'})
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(User.objects.filter(username='new1').exists())
+        page = self.client.get('/login/').content.decode()
+        self.assertNotIn('href="/register/"', page)
+
+    def test_open_when_enabled(self):
+        with self.settings(REGISTRATION_OPEN=True):
+            self.assertEqual(self.client.get('/register/').status_code, 200)
+            self.assertIn('href="/register/"', self.client.get('/login/').content.decode())

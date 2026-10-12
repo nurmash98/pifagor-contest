@@ -31,6 +31,9 @@ SECRET_KEY = os.environ.get(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# Регистрация новых учеников. Сейчас закрыта; чтобы открыть — DJANGO_REGISTRATION_OPEN=True.
+REGISTRATION_OPEN = os.environ.get('DJANGO_REGISTRATION_OPEN', 'False') == 'True'
+
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 # На сервере задайте DJANGO_ALLOWED_HOSTS, например: "1.2.3.4,pifagor.example.com"
@@ -79,6 +82,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'contest.context_processors.content_lang',
                 'contest.context_processors.active_exam',
+                'contest.context_processors.registration',
             ],
         },
     },
