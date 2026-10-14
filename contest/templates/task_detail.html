@@ -152,8 +152,10 @@
                 </div>
             {% endif %}
 
-            <form method="post" class="d-flex flex-column flex-grow-1">
+            <form method="post" class="d-flex flex-column flex-grow-1" id="task-form">
                 {% csrf_token %}
+                <input type="hidden" name="key_count" id="f-keys" value="0">
+                <input type="hidden" name="pointer_count" id="f-pointer" value="0">
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
                     <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3"
@@ -170,6 +172,20 @@
                     </button>
                 </div>
             </form>
+            <script>
+            // Считаем только КОЛИЧЕСТВО нажатий и движений (без самого текста) — подсказка учителю.
+            (function () {
+                var k = 0, m = 0;
+                document.addEventListener('keydown', function () { k++; });
+                ['mousemove', 'mousedown', 'touchstart', 'scroll'].forEach(function (e) {
+                    document.addEventListener(e, function () { m++; }, {passive: true});
+                });
+                document.getElementById('task-form').addEventListener('submit', function () {
+                    document.getElementById('f-keys').value = k;
+                    document.getElementById('f-pointer').value = m;
+                });
+            })();
+            </script>
         </div>
         {% endif %}
     </div>

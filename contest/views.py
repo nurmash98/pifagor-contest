@@ -17,7 +17,7 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus, normalize_school_class
+from .models import LoginEvent, Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus, normalize_school_class
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests, MAX_TEST_CASES
 from django.contrib.admin.views.decorators import staff_member_required
@@ -133,7 +133,7 @@ def _autotest_is_stale(submission):
     return False
 
 
-def _record_attempt(submission):
+def _record_attempt(submission, key_count=None, pointer_count=None):
     """Сохраняет только что отправленный код как новую попытку (история попыток по задаче)."""
     last = submission.attempts.order_by('-number').first()
     return Attempt.objects.create(
@@ -141,7 +141,15 @@ def _record_attempt(submission):
         number=(last.number + 1) if last else 1,
         code=submission.code or '',
         submitted_at=submission.last_submitted_at or timezone.now(),
+        key_count=key_count,
+        pointer_count=pointer_count,
     )
+
+
+def _count_param(request, name):
+    """Число из скрытого поля формы (нажатия/движения) или None, если поля нет/оно не число."""
+    raw = request.POST.get(name, '')
+    return min(int(raw), 10 ** 6) if raw.isdigit() else None
 
 
 def _refresh_autotests(submission):
@@ -174,12 +182,12 @@ def autotest_score(passed, total):
     return int(10 * passed / total + 0.5)
 
 
-def _submit_attempt(submission):
+def _submit_attempt(submission, key_count=None, pointer_count=None):
     """Всё, что происходит после сохранения нового кода: попытка в истории, автотесты и —
     если у задачи есть тесты — сразу оценка по ним. Итоговая оценка по задаче остаётся
     лучшей из всех попыток; учитель может потом исправить автоматическую оценку.
     Возвращает текст сообщения для ученика."""
-    attempt = _record_attempt(submission)
+    attempt = _record_attempt(submission, key_count, pointer_count)
     if not submission.task.test_cases:
         return 'Код отправлен! Преподаватель проверит ваше решение и выставит балл.'
 
@@ -334,7 +342,8 @@ def task_detail(request, task_id):
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
         submission.save()
-        messages.success(request, _submit_attempt(submission))
+        messages.success(request, _submit_attempt(
+            submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
         return redirect(task_url_with_back)
 
     context = {
@@ -568,6 +577,16 @@ def _login_fail_key(username):
     return 'login_fail:' + (username or '').strip().lower()
 
 
+def _log_login(request, user):
+    """Запоминаем устройство и адрес входа (для списка подозрительных у учителя)."""
+    try:
+        LoginEvent.objects.create(
+            user=user, ip=request.META.get('REMOTE_ADDR') or None,
+            user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:300])
+    except Exception:
+        logger.exception('Не удалось записать вход пользователя %s', user.pk)
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('teacher_dashboard' if request.user.is_staff else 'all_tasks')
@@ -593,6 +612,7 @@ def login_view(request):
         if user is not None:
             cache.delete(fail_key)
             auth_login(request, user)
+            _log_login(request, user)
             next_url = request.GET.get('next')
             if next_url and url_has_allowed_host_and_scheme(
                 next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()

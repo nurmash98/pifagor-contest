@@ -402,3 +402,53 @@ class FastSolveBlockTests(TestCase):
         other.user.refresh_from_db(); self.assertTrue(other.user.is_active)
         self.client.logout(); self.client.login(username='fs', password='pw12345')
         self.assertEqual(self.client.get('/teacher/suspicious/').status_code, 302)
+
+
+class ActivitySignalTests(TestCase):
+    def setUp(self):
+        self.teacher_u = User.objects.create_user('at', password='x', is_staff=True)
+        Teacher.objects.create(user=self.teacher_u, full_name='T', classes='7F')
+        self.su = User.objects.create_user('as', password='pw12345')
+        self.student = Student.objects.create(user=self.su, full_name='Тихий', school_class='7F')
+        self.task = Task.objects.create(title='T', description='d', level='A', test_cases=[])
+
+    def page(self):
+        self.client.login(username='at', password='x')
+        html = self.client.get('/teacher/suspicious/').content.decode()
+        self.client.logout()
+        return html
+
+    def test_idle_attempts_flagged_and_counts_saved(self):
+        self.client.login(username='as', password='pw12345')
+        url = f'/task/{self.task.id}/'
+        self.client.get(url)
+        r = self.client.post(url, {'code': 'print(1)', 'key_count': '0', 'pointer_count': '0'})
+        self.assertEqual(r.status_code, 302)
+        from .models import Attempt, Submission
+        a = Attempt.objects.get()
+        self.assertEqual((a.key_count, a.pointer_count), (0, 0))
+        self.client.logout()
+        self.assertNotIn('Тихий', self.page())   # одной отправки мало
+        sub = Submission.objects.get()
+        for n in (2, 3):
+            Attempt.objects.create(submission=sub, number=n, code='x', submitted_at=timezone.now(), key_count=0, pointer_count=0)
+        self.assertIn('Тихий', self.page())
+
+    def test_missing_counts_not_flagged(self):
+        from .models import Attempt, Submission
+        sub = Submission.objects.create(student=self.student, task=self.task)
+        for n in (1, 2, 3):
+            Attempt.objects.create(submission=sub, number=n, code='x', submitted_at=timezone.now())
+        self.assertNotIn('Тихий', self.page())
+
+    def test_login_logged_and_automation_flagged(self):
+        from .models import LoginEvent
+        self.client.post('/login/', {'username': 'as', 'password': 'pw12345'}, HTTP_USER_AGENT='Mozilla HeadlessChrome/120')
+        self.assertEqual(LoginEvent.objects.count(), 1)
+        self.assertIn('автоматизированного', self.page())
+
+    def test_many_devices(self):
+        from .models import LoginEvent
+        for ua in ('A', 'B', 'C'):
+            LoginEvent.objects.create(user=self.su, user_agent=ua)
+        self.assertIn('3 разных устройств', self.page())

@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Быстрые решения - Pifagor Contest{% endblock %}
+{% block title %}Подозрительные аккаунты - Pifagor Contest{% endblock %}
 
 {% block content %}
 <div class="mb-3"><a href="{% url 'student_list' %}" class="text-decoration-none text-muted small">← Ученики</a></div>
-<h3 class="fw-bold mb-1" style="color: #1a1a4b;">⚠ Подозрительно быстрые решения</h3>
-<p class="text-muted small mb-4">Здесь ученики, у которых не меньше <strong>{{ min_tasks }}</strong> задач решены на 10/10 с первой отправки
-    не позже чем через <strong>{{ seconds }} секунд</strong> после открытия задачи. Это только подсказка:
-    решать — вам. Заблокированный ученик не сможет войти, пока вы его не разблокируете.</p>
+<h3 class="fw-bold mb-1" style="color: #1a1a4b;">⚠ Подозрительные аккаунты</h3>
+<p class="text-muted small mb-4">Признаки, что за аккаунт, возможно, работает не сам ученик: слишком быстрые решения,
+    страница задачи, которую никто не трогал (нет нажатий клавиш и движений мыши), вход из автоматизированного
+    браузера, много разных устройств за неделю. Это <strong>только подсказки</strong>: ученик мог зайти с телефона и компьютера
+    или вставить код из тетради. Решаете вы. Заблокированный ученик не сможет войти, пока вы его не разблокируете.</p>
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
     <ul class="list-group list-group-flush">
@@ -17,11 +18,11 @@
                 <div>
                     <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>
                     <span class="badge bg-secondary ms-1">{{ row.student.school_class }}</span>
-                    <span class="badge bg-warning text-dark ms-1">быстрых решений: {{ row.count }}</span>
+                    <span class="badge bg-warning text-dark ms-1">признаков: {{ row.count }}</span>
                     {% if row.blocked %}<span class="badge bg-danger ms-1">Заблокирован</span>{% endif %}
-                    <div class="text-muted small mt-1">
-                        {% for task, sec in row.items %}{{ task.title }} — {{ sec }} с{% if not forloop.last %}; {% endif %}{% endfor %}
-                    </div>
+                    <ul class="text-muted small mt-1 mb-0 ps-3">
+                        {% for r in row.reasons %}<li>{{ r }}</li>{% endfor %}
+                    </ul>
                 </div>
                 <form method="post" action="{% url 'student_toggle_block' row.student.id %}">
                     {% csrf_token %}

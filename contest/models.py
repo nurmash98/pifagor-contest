@@ -283,6 +283,10 @@ class Attempt(models.Model):
     auto_graded = models.BooleanField(default=False, verbose_name="Оценено автоматически")
     tests_passed = models.IntegerField(null=True, blank=True, verbose_name="Тестов пройдено")
     tests_total = models.IntegerField(null=True, blank=True, verbose_name="Тестов всего")
+    # Что браузер насчитал на странице задачи (подсказка учителю, подделать можно):
+    # нажатия клавиш и касания/движения мыши. 0 и 0 — страницу, похоже, никто не трогал.
+    key_count = models.PositiveIntegerField(null=True, blank=True, verbose_name="Нажатий клавиш")
+    pointer_count = models.PositiveIntegerField(null=True, blank=True, verbose_name="Движений мыши/касаний")
 
     class Meta:
         verbose_name = "Попытка"
@@ -295,6 +299,18 @@ class Attempt(models.Model):
 
     def __str__(self):
         return f"Попытка #{self.number} — {self.submission}"
+
+class LoginEvent(models.Model):
+    """Успешный вход в аккаунт: с какого устройства (User-Agent) и адреса — для списка
+    подозрительных входов у учителя."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='login_events')
+    at = models.DateTimeField(auto_now_add=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ['-at']
+
 
 class Exam(models.Model):
     """СОР / СОЧ (БЖБ / ТЖБ): учитель выбирает класс, время начала, длительность и задачи.
