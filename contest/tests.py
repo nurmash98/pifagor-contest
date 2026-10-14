@@ -495,3 +495,28 @@ class EasyWhileTasksMigrationTests(TestCase):
     def test_sandbox_all_reference_outputs_match_task_text_examples(self):
         for t in Task.objects.filter(tags__name='while', level='A', title_kk__gt=''):
             self.assertTrue(t.input_example and t.output_example and len(t.test_cases) >= 4, t.title)
+
+
+class WhileInputPerLineTests(TestCase):
+    def test_per_line_conversion(self):
+        import importlib
+        mod = importlib.import_module('contest.migrations.0029_while_input_per_line')
+        self.assertEqual(mod.per_line('10 20 5 -1'), '10\n20\n5\n-1')
+        self.assertEqual(mod.per_line('abc, password, pass1234'), 'abc\npassword\npass1234')
+        self.assertEqual(mod.per_line('7\n3 5 9 7 2', keep_first_line=True), '7\n3\n5\n9\n7\n2')
+        self.assertEqual(mod.per_line('qwerty12345'), 'qwerty12345')
+
+    def test_migration_updates_task(self):
+        import importlib
+        from django.apps import apps
+        mod = importlib.import_module('contest.migrations.0029_while_input_per_line')
+        tag, _ = Tag.objects.get_or_create(name='while')
+        t = Task.objects.create(title='Сумма до отрицательного числа', level='C', description='Условие.',
+                                input_example='10 20 5 -1', output_example='35',
+                                test_cases=[{'input': '1 2 -3', 'output': '3'}])
+        t.tags.add(tag)
+        mod.forward(apps, None)
+        t.refresh_from_db()
+        self.assertEqual(t.input_example, '10\n20\n5\n-1')
+        self.assertEqual(t.test_cases[0]['input'], '1\n2\n-3')
+        self.assertIn('отдельной строке', t.description)
