@@ -520,3 +520,20 @@ class WhileInputPerLineTests(TestCase):
         self.assertEqual(t.input_example, '10\n20\n5\n-1')
         self.assertEqual(t.test_cases[0]['input'], '1\n2\n-3')
         self.assertIn('отдельной строке', t.description)
+
+
+class HardWhileTasksTests(TestCase):
+    def test_five_hard_tasks_with_reference_solutions(self):
+        from .autotest import run_autotests
+        hard = Task.objects.filter(tags__name='while', level='C', title_kk__gt='')
+        self.assertEqual(hard.count(), 5)
+        sols = {
+            'Следующее простое число': 'n=int(input())+1\nwhile True:\n    d=2\n    ok=n>1\n    while d*d<=n:\n        if n%d==0:\n            ok=False\n            break\n        d+=1\n    if ok:\n        break\n    n+=1\nprint(n)',
+            'Банкомат: наименьшее число купюр': 'n=int(input())\nc=0\nfor b in (10000,5000,2000,1000,500,200,100):\n    while n>=b:\n        n-=b\n        c+=1\nprint(c)',
+            'Максимум и его позиция': 'm=0\np=0\ni=0\nx=int(input())\nwhile x!=0:\n    i+=1\n    if x>m:\n        m=x\n        p=i\n    x=int(input())\nprint(m)\nprint(p)',
+            'Три попытки ввода пароля': 'pw=input()\nk=1\nwhile k<=3:\n    if input()==pw:\n        print("Вход выполнен с попытки", k)\n        break\n    k+=1\nelse:\n    print("Доступ заблокирован")',
+            'Первое число Фибоначчи больше N': 'n=int(input())\na=1\nb=1\nwhile b<=n:\n    a,b=b,a+b\nprint(b)',
+        }
+        for title, code in sols.items():
+            r = run_autotests(Task.objects.get(title=title), code)
+            self.assertEqual(r['passed'], r['total'], title)
