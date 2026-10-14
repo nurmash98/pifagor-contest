@@ -26,6 +26,7 @@
             </select>
             <button type="submit" class="btn btn-outline-dark btn-sm text-nowrap">Найти</button>
             <a href="{% url 'student_create' %}" class="btn btn-pifagor-green btn-sm text-nowrap px-3">+ Добавить</a>
+            <a href="{% url 'suspicious_students' %}" class="btn btn-outline-danger btn-sm text-nowrap">⚠ Быстрые решения</a>
         </form>
     </div>
 </div>
@@ -36,11 +37,15 @@
         <li class="list-group-item d-flex justify-content-between align-items-center p-3">
             <div>
                 <strong style="color: #1a1a4b;">{{ student.full_name }}</strong>
-                <span class="badge bg-secondary ms-2">{{ student.school_class }}</span>
+                <span class="badge bg-secondary ms-2">{{ student.school_class }}</span>{% if not student.user.is_active %}<span class="badge bg-danger ms-1">Заблокирован</span>{% endif %}
                 <div class="text-muted small">Логин: {{ student.user.username }}</div>
             </div>
             <div class="d-flex gap-2">
                 <a href="{% url 'student_edit' student.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить</a>
+                <form method="post" action="{% url 'student_toggle_block' student.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3">{% if student.user.is_active %}Заблокировать{% else %}Разблокировать{% endif %}</button>
+                </form>
                 <form method="post" action="{% url 'student_delete' student.id %}"
                       onsubmit="return confirm('Удалить ученика «{{ student.full_name }}» вместе со всеми его решениями?');">
                     {% csrf_token %}

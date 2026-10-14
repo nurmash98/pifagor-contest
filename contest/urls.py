@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import exam_views
+from . import moderation_views
 
 urlpatterns = [
     # Главная страница - каталог задач
@@ -69,6 +70,8 @@ urlpatterns = [
 
     # Управление учениками — доступно любому учителю для всех учеников
     path('teacher/students/', views.student_list, name='student_list'),
+    path('teacher/suspicious/', moderation_views.suspicious_students, name='suspicious_students'),
+    path('teacher/students/<int:student_id>/block/', moderation_views.student_toggle_block, name='student_toggle_block'),
     path('teacher/students/create/', views.student_create, name='student_create'),
     path('teacher/students/<int:student_id>/edit/', views.student_edit, name='student_edit'),
     path('teacher/students/<int:student_id>/delete/', views.student_delete, name='student_delete'),

@@ -601,6 +601,10 @@ def login_view(request):
             return redirect('teacher_dashboard' if user.is_staff else 'all_tasks')
 
         cache.set(fail_key, cache.get(fail_key, 0) + 1, LOGIN_LOCKOUT_SECONDS)
+        blocked = User.objects.filter(username=username, is_active=False).first() if username and password else None
+        if blocked is not None and blocked.check_password(password):
+            context['error'] = 'Аккаунт заблокирован. Обратитесь к учителю.'
+            return render(request, 'login.html', context)
         context['error'] = 'Неверный логин или пароль'
         return render(request, 'login.html', context)
 

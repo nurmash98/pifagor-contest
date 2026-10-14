@@ -356,3 +356,49 @@ class RegistrationClosedTests(TestCase):
         with self.settings(REGISTRATION_OPEN=True):
             self.assertEqual(self.client.get('/register/').status_code, 200)
             self.assertIn('href="/register/"', self.client.get('/login/').content.decode())
+
+
+class FastSolveBlockTests(TestCase):
+    def setUp(self):
+        self.teacher_u = User.objects.create_user('ft', password='x', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.teacher_u, full_name='T', classes='7F')
+        self.su = User.objects.create_user('fs', password='pw12345')
+        self.student = Student.objects.create(user=self.su, full_name='Быстрый', school_class='7F')
+        self.tasks = [Task.objects.create(title=f'T{i}', description='d', level='A', test_cases=[]) for i in range(3)]
+
+    def solve(self, task, seconds, score=10):
+        from .models import Attempt, Submission
+        sub = Submission.objects.create(student=self.student, task=task, status='DONE', score=score)
+        Attempt.objects.create(submission=sub, number=1, code='x', score=score,
+                               submitted_at=sub.created_at + timedelta(seconds=seconds))
+
+    def test_flagged_only_when_enough_fast(self):
+        self.solve(self.tasks[0], 10); self.solve(self.tasks[1], 12)
+        self.client.login(username='ft', password='x')
+        self.assertNotIn('Быстрый', self.client.get('/teacher/suspicious/').content.decode())
+        self.solve(self.tasks[2], 14)
+        self.assertIn('Быстрый', self.client.get('/teacher/suspicious/').content.decode())
+
+    def test_slow_or_wrong_not_counted(self):
+        self.solve(self.tasks[0], 60); self.solve(self.tasks[1], 10, score=4); self.solve(self.tasks[2], 5)
+        self.client.login(username='ft', password='x')
+        self.assertNotIn('Быстрый', self.client.get('/teacher/suspicious/').content.decode())
+
+    def test_block_and_unblock(self):
+        self.client.login(username='ft', password='x')
+        self.client.post(f'/teacher/students/{self.student.id}/block/')
+        self.su.refresh_from_db(); self.assertFalse(self.su.is_active)
+        self.client.logout()
+        r = self.client.post('/login/', {'username': 'fs', 'password': 'pw12345'})
+        self.assertIn('заблокирован', r.content.decode())
+        self.client.login(username='ft', password='x')
+        self.client.post(f'/teacher/students/{self.student.id}/block/')
+        self.su.refresh_from_db(); self.assertTrue(self.su.is_active)
+
+    def test_other_class_and_student_forbidden(self):
+        other = Student.objects.create(user=User.objects.create_user('o', password='x'), full_name='O', school_class='9A')
+        self.client.login(username='ft', password='x')
+        self.client.post(f'/teacher/students/{other.id}/block/')
+        other.user.refresh_from_db(); self.assertTrue(other.user.is_active)
+        self.client.logout(); self.client.login(username='fs', password='pw12345')
+        self.assertEqual(self.client.get('/teacher/suspicious/').status_code, 302)
