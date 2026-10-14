@@ -481,3 +481,17 @@ class TemporaryBlockTests(TestCase):
         self.assertIsNone(self.student.blocked_until)
         self.client.get('/teacher/students/')
         self.su.refresh_from_db(); self.assertFalse(self.su.is_active)
+
+
+class EasyWhileTasksMigrationTests(TestCase):
+    def test_easy_tasks_added(self):
+        from .autotest import run_autotests
+        easy = Task.objects.filter(tags__name='while', level='A', title_kk__gt='')
+        self.assertEqual(easy.count(), 15)
+        task = Task.objects.get(title='Сумма чисел от 1 до N')
+        ok = run_autotests(task, 'n=int(input())\ni=1\ns=0\nwhile i<=n:\n    s+=i\n    i+=1\nprint(s)')
+        self.assertEqual((ok['passed'], ok['total']), (5, 5))
+
+    def test_sandbox_all_reference_outputs_match_task_text_examples(self):
+        for t in Task.objects.filter(tags__name='while', level='A', title_kk__gt=''):
+            self.assertTrue(t.input_example and t.output_example and len(t.test_cases) >= 4, t.title)
