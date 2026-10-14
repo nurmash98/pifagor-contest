@@ -42,12 +42,12 @@
             </div>
             <div class="d-flex gap-2">
                 <a href="{% url 'student_edit' student.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить</a>
+                {% if not student.user.is_active %}
                 <form method="post" action="{% url 'student_toggle_block' student.id %}">
                     {% csrf_token %}
-                    {% if student.user.is_active %}<button type="submit" name="duration" value="temp" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Блок 72 ч</button>
-                    <button type="submit" name="duration" value="forever" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="return confirm('Заблокировать без срока?');">Навсегда</button>
-                    {% else %}<button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Разблокировать</button>{% endif %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Разблокировать</button>
                 </form>
+                {% endif %}
                 <form method="post" action="{% url 'student_delete' student.id %}"
                       onsubmit="return confirm('Удалить ученика «{{ student.full_name }}» вместе со всеми его решениями?');">
                     {% csrf_token %}
