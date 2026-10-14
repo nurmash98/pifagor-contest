@@ -27,6 +27,9 @@ class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     full_name = models.CharField(max_length=150, verbose_name="Имя и Фамилия")
     school_class = models.CharField(max_length=10, verbose_name="Класс (например, 7F)")
+    # Блокировка до этого времени (аккаунт user.is_active=False). Пусто при заблокированном
+    # аккаунте — блокировка бессрочная, пока учитель не разблокирует.
+    blocked_until = models.DateTimeField(null=True, blank=True, verbose_name="Заблокирован до")
 
     def save(self, *args, **kwargs):
         self.school_class = normalize_school_class(self.school_class)

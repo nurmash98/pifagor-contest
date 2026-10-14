@@ -8,7 +8,7 @@
 <p class="text-muted small mb-4">Признаки, что за аккаунт, возможно, работает не сам ученик: слишком быстрые решения,
     страница задачи, которую никто не трогал (нет нажатий клавиш и движений мыши), вход из автоматизированного
     браузера, много разных устройств за неделю. Это <strong>только подсказки</strong>: ученик мог зайти с телефона и компьютера
-    или вставить код из тетради. Решаете вы. Заблокированный ученик не сможет войти, пока вы его не разблокируете.</p>
+    или вставить код из тетради. Решаете вы. Блокировка «на 72 ч» снимается сама, «навсегда» — только вами.</p>
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
     <ul class="list-group list-group-flush">
@@ -19,7 +19,7 @@
                     <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>
                     <span class="badge bg-secondary ms-1">{{ row.student.school_class }}</span>
                     <span class="badge bg-warning text-dark ms-1">признаков: {{ row.count }}</span>
-                    {% if row.blocked %}<span class="badge bg-danger ms-1">Заблокирован</span>{% endif %}
+                    {% if row.blocked %}<span class="badge bg-danger ms-1">Заблокирован{% if row.until %} до {{ row.until|date:"d.m H:i" }}{% else %} без срока{% endif %}</span>{% endif %}
                     <ul class="text-muted small mt-1 mb-0 ps-3">
                         {% for r in row.reasons %}<li>{{ r }}</li>{% endfor %}
                     </ul>
@@ -27,7 +27,9 @@
                 <form method="post" action="{% url 'student_toggle_block' row.student.id %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="suspicious">
-                    <button type="submit" class="btn btn-sm rounded-pill px-3 {% if row.blocked %}btn-outline-secondary{% else %}btn-danger{% endif %}">{% if row.blocked %}Разблокировать{% else %}Заблокировать{% endif %}</button>
+                    {% if row.blocked %}<button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Разблокировать</button>
+                    {% else %}<button type="submit" name="duration" value="temp" class="btn btn-danger btn-sm rounded-pill px-3">Заблокировать на 72 ч</button>
+                    <button type="submit" name="duration" value="forever" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="return confirm('Заблокировать без срока?');">Навсегда</button>{% endif %}
                 </form>
             </div>
         </li>

@@ -452,3 +452,32 @@ class ActivitySignalTests(TestCase):
         for ua in ('A', 'B', 'C'):
             LoginEvent.objects.create(user=self.su, user_agent=ua)
         self.assertIn('3 разных устройств', self.page())
+
+
+class TemporaryBlockTests(TestCase):
+    setUp = FastSolveBlockTests.setUp
+    """Те же данные, что в FastSolveBlockTests (наследуем setUp)."""
+
+    def test_temp_block_72h_then_auto_release(self):
+        from django.utils import timezone as tz
+        self.client.login(username='ft', password='x')
+        self.client.post(f'/teacher/students/{self.student.id}/block/', {'duration': 'temp'})
+        self.student.refresh_from_db(); self.su.refresh_from_db()
+        self.assertFalse(self.su.is_active)
+        left = self.student.blocked_until - tz.now()
+        self.assertTrue(timedelta(hours=71, minutes=59) < left <= timedelta(hours=72))
+        self.client.logout()
+        r = self.client.post('/login/', {'username': 'fs', 'password': 'pw12345'})
+        self.assertIn('заблокирован до', r.content.decode())
+        Student.objects.filter(id=self.student.id).update(blocked_until=tz.now() - timedelta(minutes=1))
+        r = self.client.post('/login/', {'username': 'fs', 'password': 'pw12345'})
+        self.assertEqual(r.status_code, 302)
+        self.su.refresh_from_db(); self.assertTrue(self.su.is_active)
+
+    def test_forever_block_stays(self):
+        self.client.login(username='ft', password='x')
+        self.client.post(f'/teacher/students/{self.student.id}/block/', {'duration': 'forever'})
+        self.student.refresh_from_db()
+        self.assertIsNone(self.student.blocked_until)
+        self.client.get('/teacher/students/')
+        self.su.refresh_from_db(); self.assertFalse(self.su.is_active)

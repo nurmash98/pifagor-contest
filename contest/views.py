@@ -607,6 +607,8 @@ def login_view(request):
             context['error'] = 'Слишком много неудачных попыток. Подождите минуту и попробуйте снова.'
             return render(request, 'login.html', context, status=429)
 
+        from .moderation_views import release_expired_blocks
+        release_expired_blocks()   # срок временной блокировки вышел — аккаунт снова активен
         user = authenticate(request, username=username, password=password) if username and password else None
 
         if user is not None:
@@ -623,7 +625,9 @@ def login_view(request):
         cache.set(fail_key, cache.get(fail_key, 0) + 1, LOGIN_LOCKOUT_SECONDS)
         blocked = User.objects.filter(username=username, is_active=False).first() if username and password else None
         if blocked is not None and blocked.check_password(password):
-            context['error'] = 'Аккаунт заблокирован. Обратитесь к учителю.'
+            until = Student.objects.filter(user=blocked).values_list('blocked_until', flat=True).first()
+            context['error'] = ('Аккаунт заблокирован до ' + timezone.localtime(until).strftime('%d.%m %H:%M') + '. Обратитесь к учителю.'
+                                if until else 'Аккаунт заблокирован. Обратитесь к учителю.')
             return render(request, 'login.html', context)
         context['error'] = 'Неверный логин или пароль'
         return render(request, 'login.html', context)
@@ -1175,6 +1179,8 @@ def _student_form_classes(request):
 
 @staff_member_required
 def student_list(request):
+    from .moderation_views import release_expired_blocks
+    release_expired_blocks()
     """Ученики для редактирования: учитель видит только свои классы, админ — всех."""
     classes = _managed_classes(request.user)
     students = Student.objects.select_related('user').order_by('school_class', 'full_name')

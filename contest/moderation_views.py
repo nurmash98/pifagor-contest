@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from .models import Attempt, LoginEvent, Student
 from .views import _managed_classes, _managed_student_or_none
 
+BLOCK_HOURS = 72               # срок временной блокировки
 FAST_SOLVE_SECONDS = 15
 FAST_SOLVE_MIN_TASKS = 3
 
@@ -78,6 +79,7 @@ def _reasons(students_qs):
 
 @staff_member_required
 def suspicious_students(request):
+    release_expired_blocks()
     classes = _managed_classes(request.user)
     students = Student.objects.select_related('user')
     if classes is not None:
@@ -86,22 +88,51 @@ def suspicious_students(request):
     rows = []
     for st in students.filter(id__in=list(reasons)).order_by('school_class', 'full_name'):
         rows.append({'student': st, 'reasons': reasons[st.id], 'count': len(reasons[st.id]),
-                     'blocked': not st.user.is_active})
+                     'blocked': not st.user.is_active, 'until': st.blocked_until})
     rows.sort(key=lambda r: -r['count'])
     return render(request, 'suspicious_students.html', {'rows': rows})
+
+
+def release_expired_blocks():
+    """Снимает блокировки, срок которых вышел (аккаунт снова становится активным)."""
+    from django.contrib.auth.models import User
+    from django.utils import timezone
+    expired = Student.objects.filter(user__is_active=False, blocked_until__isnull=False,
+                                     blocked_until__lte=timezone.now())
+    user_ids = list(expired.values_list('user_id', flat=True))
+    if user_ids:
+        User.objects.filter(id__in=user_ids).update(is_active=True)
+        expired.update(blocked_until=None)
 
 
 @staff_member_required
 @require_POST
 def student_toggle_block(request, student_id):
+    """Блокировка: duration=temp — на BLOCK_HOURS часов, forever — бессрочно; если ученик
+    уже заблокирован — разблокировка."""
+    from datetime import timedelta
+    from django.utils import timezone
     student = _managed_student_or_none(request, student_id)
     if student is None:
         messages.error(request, 'Это ученик не вашего класса.')
         return redirect('student_list')
+    release_expired_blocks()
     user = student.user
-    user.is_active = not user.is_active
+    user.refresh_from_db()
+    if user.is_active:
+        user.is_active = False
+        if request.POST.get('duration') == 'forever':
+            student.blocked_until = None
+            note = 'заблокирован без срока — войти он не сможет, пока вы его не разблокируете.'
+        else:
+            student.blocked_until = timezone.now() + timedelta(hours=BLOCK_HOURS)
+            note = f'заблокирован на {BLOCK_HOURS} часов.'
+    else:
+        user.is_active = True
+        student.blocked_until = None
+        note = 'разблокирован.'
     user.save(update_fields=['is_active'])
-    messages.success(request, f'Ученик «{student.full_name}» ' +
-                     ('разблокирован.' if user.is_active else 'заблокирован — войти он больше не сможет.'))
+    student.save(update_fields=['blocked_until'])
+    messages.success(request, f'Ученик «{student.full_name}» {note}')
     nxt = request.POST.get('next')
     return redirect('suspicious_students' if nxt == 'suspicious' else 'student_list')
