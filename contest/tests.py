@@ -726,3 +726,27 @@ class TeacherSolveTests(TestCase):
         html = r.content.decode()
         self.assertIn('2/2', html)
         self.assertNotIn('Не прошёл тест', html)
+
+
+class InputHelpTests(TestCase):
+    def setUp(self):
+        u = User.objects.create_user('ih', password='pw12345')
+        Student.objects.create(user=u, full_name='И', school_class='7F')
+        self.client.login(username='ih', password='pw12345')
+
+    def page(self, example, lang=None):
+        t = Task.objects.create(title='X', description='d', level='A', input_example=example, test_cases=[])
+        if lang:
+            s = self.client.session; s['content_lang'] = lang; s.save()
+        return self.client.get(reverse('task_detail', args=[t.id])).content.decode()
+
+    def test_lines(self):
+        h = self.page('3\n7')
+        self.assertIn('Как читать входные данные', h)
+        self.assertIn('на РАЗНЫХ строках', h)
+
+    def test_one_line(self):
+        self.assertIn('в ОДНОЙ строке', self.page('3 7'))
+
+    def test_kk(self):
+        self.assertIn('Кіріс деректерін', self.page('3 7', 'kk'))

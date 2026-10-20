@@ -298,6 +298,23 @@ def all_tasks_view(request):
     return render(request, 'all_tasks.html', context)
 
 
+def _input_kind(task):
+    """'lines' — ввод на нескольких строках, 'one_line' — несколько значений в одной строке,
+    '' — не определить (одно значение или пример пуст)."""
+    raw = (task.input_example or '').replace('\\n', '\n').strip()
+    lines = [ln for ln in raw.splitlines() if ln.strip()]
+    if len(lines) > 1:
+        return 'lines'
+    if len(lines) == 1 and len(lines[0].split()) > 1:
+        return 'one_line'
+    return ''
+
+
+def _open_input_help(failed):
+    err = (failed or {}).get('error') or ''
+    return err.startswith(('ValueError', 'EOFError'))
+
+
 def _first_failed(results, task):
     """Первый упавший тест (dict с полем number) или None. Для старых отправок без
     сохранённого ввода берём ввод из тест-кейса задачи."""
@@ -348,6 +365,8 @@ def task_detail(request, task_id):
             'teacher_code': teacher_code,
             'teacher_result': teacher_result,
             'teacher_failed': teacher_failed,
+            'input_kind': _input_kind(task),
+            'open_help': _open_input_help(teacher_failed),
         }
         return render(request, 'task_detail.html', context)
 
@@ -383,6 +402,8 @@ def task_detail(request, task_id):
         'task': task,
         'submission': submission,
         'first_failed': first_failed,
+        'input_kind': _input_kind(task),
+        'open_help': _open_input_help(first_failed),
         'attempts': submission.attempts.all(),
         'cooldown_minutes': _minutes_left(cooldown) if cooldown else None,
         'back_url': back_url or reverse('all_tasks'),

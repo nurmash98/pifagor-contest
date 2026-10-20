@@ -114,6 +114,7 @@
                 <h5 class="fw-bold mb-2" style="color: #1a1a4b;">{% t "Решить как преподаватель" %}</h5>
                 <p class="text-muted small mb-3">{% t "Код проверяется на тестах задачи. Результат нигде не сохраняется: он не попадает в лидерборд, значки и список отправок." %}</p>
                 {% include 'autotest_block.html' with sub=teacher_result ff=teacher_failed %}
+                {% include 'input_help.html' %}
                 <form method="post" class="d-flex flex-column flex-grow-1">
                     {% csrf_token %}
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3"
@@ -127,6 +128,8 @@
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
             {% include 'autotest_block.html' with sub=submission ff=first_failed %}
+
+            {% include 'input_help.html' %}
 
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
             {% if task.test_cases %}
