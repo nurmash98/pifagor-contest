@@ -110,47 +110,23 @@
     <!-- Правая колонка: Форма отправки решения -->
     <div class="col-lg-6">
         {% if readonly %}
-            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100">
-                <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Просмотр преподавателя" %}</h5>
-                <p class="text-muted mb-0">
-                    {% t "Вы просматриваете задачу как преподаватель. Форма отправки решения доступна только ученикам." %}
-                </p>
+            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
+                <h5 class="fw-bold mb-2" style="color: #1a1a4b;">{% t "Решить как преподаватель" %}</h5>
+                <p class="text-muted small mb-3">{% t "Код проверяется на тестах задачи. Результат нигде не сохраняется: он не попадает в лидерборд, значки и список отправок." %}</p>
+                {% include 'autotest_block.html' with sub=teacher_result ff=teacher_failed %}
+                <form method="post" class="d-flex flex-column flex-grow-1">
+                    {% csrf_token %}
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3"
+                              style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
+                              placeholder="{% t '# Напишите ваш код здесь...' %}" required>{{ teacher_code|default:'' }}</textarea>
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">{% t "Проверить решение →" %}</button>
+                    </div>
+                </form>
             </div>
         {% else %}
         <div class="card border-0 shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
-            {% if submission.autotest_checked_at and submission.autotest_total %}
-            <div class="alert {% if submission.autotest_passed == submission.autotest_total %}alert-success{% else %}alert-warning{% endif %} rounded-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <strong>🧪 {% t "Автотесты" %}</strong>
-                    <span class="badge {% if submission.autotest_passed == submission.autotest_total %}bg-success{% else %}bg-secondary{% endif %}">{{ submission.autotest_passed }}/{{ submission.autotest_total }}</span>
-                </div>
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    {% for r in submission.autotest_results %}
-                        {% if r.ok %}
-                            <span class="badge bg-success">{{ forloop.counter }} ✓</span>
-                        {% elif r.error == 'timeout' %}
-                            <span class="badge bg-dark" title="{% t 'Превышено время выполнения' %}">{{ forloop.counter }} ⏱</span>
-                        {% elif r.error == 'memory' %}
-                            <span class="badge bg-dark" title="{% t 'Превышена память' %}">{{ forloop.counter }} 💾</span>
-                        {% else %}
-                            <span class="badge bg-danger">{{ forloop.counter }} ✗</span>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% if first_failed %}{% with r=first_failed %}
-                    <div class="small mb-2 p-2 rounded-3 border bg-white">
-                        <div class="fw-semibold mb-1">{% t "Не прошёл тест" %} №{{ r.number }}</div>
-                        {% if r.input %}<div class="text-muted">{% t "Входные данные" %}:</div><pre class="mb-1 small">{{ r.input }}</pre>{% endif %}
-                        {% if r.error == 'timeout' %}<div>⏱ {% t "Превышено время выполнения" %}</div>
-                        {% elif r.error == 'memory' %}<div>💾 {% t "Превышена память" %}</div>
-                        {% elif r.error %}{% error_hint r.error as hint %}{% if hint %}<div class="mt-2 p-2 rounded-3 fw-semibold" style="background:#198754;color:#fff;">💡 {{ hint }}</div>{% else %}<div class="text-danger">{% t "Ошибка выполнения" %}: <code>{{ r.error }}</code></div>{% endif %}
-                        {% else %}<div class="fw-semibold" style="color:#b02a37;">{% t "Ваш вывод" %}:</div><pre class="mb-2 small p-2 rounded-2" style="background:#f8d7da;color:#842029;border:1px solid #f1aeb5;">{% if r.actual %}{{ r.actual }}{% else %}{% t "(пусто)" %}{% endif %}</pre>
-                        <div class="fw-semibold" style="color:#146c43;">{% t "Ожидалось" %}:</div><pre class="mb-0 small p-2 rounded-2" style="background:#d1f2dc;color:#0a3622;border:1px solid #9fd8b5;">{% if r.expected %}{{ r.expected }}{% else %}{% t "(пусто)" %}{% endif %}</pre>{% endif %}
-                    </div>
-                {% endwith %}{% endif %}
-                <p class="text-muted small mb-0">{% t "За каждый пройденный тест — 2 балла (5 из 5 = 10). Преподаватель может изменить оценку." %}</p>
-            </div>
-            {% endif %}
+            {% include 'autotest_block.html' with sub=submission ff=first_failed %}
 
             <h5 class="fw-bold mb-3" style="color: #1a1a4b;">{% t "Отправка решения" %}</h5>
             {% if task.test_cases %}

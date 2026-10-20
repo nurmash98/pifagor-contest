@@ -298,6 +298,20 @@ def all_tasks_view(request):
     return render(request, 'all_tasks.html', context)
 
 
+def _first_failed(results, task):
+    """Первый упавший тест (dict с полем number) или None. Для старых отправок без
+    сохранённого ввода берём ввод из тест-кейса задачи."""
+    for i, r in enumerate(results or [], 1):
+        if not r.get('ok'):
+            failed = dict(r, number=i)
+            if 'input' not in failed:
+                cases = task.test_cases or []
+                if i <= len(cases):
+                    failed['input'] = str(cases[i - 1].get('input', ''))
+            return failed
+    return None
+
+
 @login_required
 def task_detail(request, task_id):
     """Детальная страница задачи и ручная отправка на проверку преподавателю.
@@ -311,12 +325,29 @@ def task_detail(request, task_id):
 
     if student is None:
         # Преподаватель/админ — только просмотр условия задачи
+        teacher_code, teacher_result, teacher_failed = '', None, None
+        if request.method == 'POST':
+            # Преподаватель решает задачу «для себя»: прогон тестов без сохранения
+            # (нет ни посылки, ни баллов, ни значков, ни места в лидерборде).
+            teacher_code = request.POST.get('code', '')
+            run = run_autotests(task, teacher_code)
+            if run.get('available'):
+                from types import SimpleNamespace
+                teacher_result = SimpleNamespace(
+                    autotest_checked_at=timezone.now(), autotest_total=run['total'],
+                    autotest_passed=run['passed'], autotest_results=run['results'])
+                teacher_failed = _first_failed(run['results'], task)
+            else:
+                messages.info(request, 'У этой задачи нет автотестов, проверить код нечем.')
         context = {
             'task': task,
             'submission': None,
             'cooldown_minutes': None,
             'back_url': back_url or reverse('all_tasks'),
             'readonly': True,
+            'teacher_code': teacher_code,
+            'teacher_result': teacher_result,
+            'teacher_failed': teacher_failed,
         }
         return render(request, 'task_detail.html', context)
 
@@ -346,15 +377,7 @@ def task_detail(request, task_id):
             submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
         return redirect(task_url_with_back)
 
-    first_failed = None
-    for i, r in enumerate(submission.autotest_results or [], 1):
-        if not r.get('ok'):
-            first_failed = dict(r, number=i)
-            if 'input' not in first_failed:  # старые отправки: берём ввод из тест-кейса задачи
-                cases = task.test_cases or []
-                if i <= len(cases):
-                    first_failed['input'] = str(cases[i - 1].get('input', ''))
-            break
+    first_failed = _first_failed(submission.autotest_results, task)
 
     context = {
         'task': task,

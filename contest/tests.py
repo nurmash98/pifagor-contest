@@ -695,3 +695,34 @@ class EmptyExpectedTests(TestCase):
         html = r.content.decode()
         self.assertIn('Ожидалось', html)
         self.assertIn('(пусто)', html)
+
+
+class TeacherSolveTests(TestCase):
+    def setUp(self):
+        from .models import Submission
+        self.Submission = Submission
+        u = User.objects.create_user('tt', password='pw12345')
+        Teacher.objects.create(user=u, full_name='Учитель', classes='7F')
+        self.task = Task.objects.create(
+            title='Сумма', description='d', level='A',
+            test_cases=[{'input': '2\n3', 'output': '5'}, {'input': '7\n8', 'output': '15'}])
+        self.client.login(username='tt', password='pw12345')
+        self.url = reverse('task_detail', args=[self.task.id])
+
+    def test_form_visible_for_teacher(self):
+        r = self.client.get(self.url)
+        self.assertIn('Решить как преподаватель', r.content.decode())
+
+    def test_teacher_run_shows_result_and_saves_nothing(self):
+        r = self.client.post(self.url, {'code': 'a=int(input());b=int(input());print(a*b)'})
+        html = r.content.decode()
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Не прошёл тест', html)
+        self.assertIn('Ожидалось', html)
+        self.assertEqual(self.Submission.objects.count(), 0)
+
+    def test_teacher_all_pass(self):
+        r = self.client.post(self.url, {'code': 'a=int(input());b=int(input());print(a+b)'})
+        html = r.content.decode()
+        self.assertIn('2/2', html)
+        self.assertNotIn('Не прошёл тест', html)
