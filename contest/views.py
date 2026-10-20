@@ -346,9 +346,16 @@ def task_detail(request, task_id):
             submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
         return redirect(task_url_with_back)
 
+    first_failed = None
+    for i, r in enumerate(submission.autotest_results or [], 1):
+        if not r.get('ok'):
+            first_failed = dict(r, number=i)
+            break
+
     context = {
         'task': task,
         'submission': submission,
+        'first_failed': first_failed,
         'attempts': submission.attempts.all(),
         'cooldown_minutes': _minutes_left(cooldown) if cooldown else None,
         'back_url': back_url or reverse('all_tasks'),

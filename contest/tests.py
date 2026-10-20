@@ -632,3 +632,32 @@ class BadgeTests(TestCase):
         sync_badges(self.student)
         b = StudentBadge.objects.get(student=self.student, key='t10')
         self.assertLess(abs((b.awarded_at - old).total_seconds()), 5)
+
+
+class FailedTestDetailsTests(TestCase):
+    def setUp(self):
+        u = User.objects.create_user('fd', password='pw12345')
+        self.student = Student.objects.create(user=u, full_name='Ученик', school_class='7F')
+        self.task = Task.objects.create(
+            title='Сумма', description='d', level='A',
+            test_cases=[{'input': '2\n3', 'output': '5'}, {'input': '7\n8', 'output': '15'}])
+        self.client.login(username='fd', password='pw12345')
+
+    def submit(self, code):
+        return self.client.post(reverse('task_detail', args=[self.task.id]), {'code': code}, follow=True)
+
+    def test_wrong_answer_shows_input_and_own_output_not_expected(self):
+        r = self.submit('a=int(input());b=int(input());print(a*b+1000)')
+        html = r.content.decode()
+        self.assertIn('Не прошёл тест', html)
+        self.assertIn('Ваш вывод', html)
+        self.assertIn('1006', html)         # вывод ученика на первом тесте
+        self.assertNotIn('>5<', html)       # ожидаемый ответ не раскрываем
+
+    def test_runtime_error_shown(self):
+        r = self.submit('print(1/0)')
+        self.assertIn('ZeroDivisionError', r.content.decode())
+
+    def test_all_passed_no_failure_block(self):
+        r = self.submit('a=int(input());b=int(input());print(a+b)')
+        self.assertNotIn('Не прошёл тест', r.content.decode())

@@ -137,6 +137,16 @@
                         {% endif %}
                     {% endfor %}
                 </div>
+                {% if first_failed %}{% with r=first_failed %}
+                    <div class="small mb-2 p-2 rounded-3 border bg-white">
+                        <div class="fw-semibold mb-1">{% t "Не прошёл тест" %} №{{ r.number }}</div>
+                        {% if r.input %}<div class="text-muted">{% t "Входные данные" %}:</div><pre class="mb-1 small">{{ r.input }}</pre>{% endif %}
+                        {% if r.error == 'timeout' %}<div>⏱ {% t "Превышено время выполнения" %}</div>
+                        {% elif r.error == 'memory' %}<div>💾 {% t "Превышена память" %}</div>
+                        {% elif r.error %}<div class="text-danger">{% t "Ошибка выполнения" %}: <code>{{ r.error }}</code></div>
+                        {% else %}<div class="text-muted">{% t "Ваш вывод" %}:</div><pre class="mb-0 small">{% if r.actual %}{{ r.actual }}{% else %}{% t "(пусто)" %}{% endif %}</pre>{% endif %}
+                    </div>
+                {% endwith %}{% endif %}
                 <p class="text-muted small mb-0">{% t "За каждый пройденный тест — 2 балла (5 из 5 = 10). Преподаватель может изменить оценку." %}</p>
             </div>
             {% endif %}

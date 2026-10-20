@@ -152,6 +152,7 @@ def run_autotests(task, code):
             results.append({
                 'ok': ok,
                 'error': error,
+                'input': stdin_text[:OUTPUT_PREVIEW_LIMIT],
                 'expected': expected[:OUTPUT_PREVIEW_LIMIT],
                 'actual': actual.strip()[:OUTPUT_PREVIEW_LIMIT],
             })
