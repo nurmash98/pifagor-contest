@@ -31,6 +31,8 @@
                 </div>
             </div>
 
+            {% include 'badges_block.html' %}
+
             <div class="mt-4 border-top pt-3">
                 <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm w-100 rounded-pill">
                     {% t "Выйти из аккаунта" %}

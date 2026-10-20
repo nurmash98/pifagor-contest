@@ -376,11 +376,21 @@ def profile_view(request):
         for sub in solved_submissions
     )
 
+    from . import badges as badge_module
+    groups, new_badges = badge_module.profile_badges(student, _get_content_lang(request))
+    badge_groups = [
+        ('Значки за задачи', {'items': groups['tasks'], 'earned_count': sum(1 for b in groups['tasks'] if b['earned'])}, '🏅'),
+        ('Значки за СОР/СОЧ', {'items': groups['exam'], 'earned_count': sum(1 for b in groups['exam'] if b['earned'])}, '⭐'),
+    ]
+    badge_module.mark_seen(student)
+
     context = {
         'student': student,
         'solved_submissions': solved_submissions,
         'solved_count': solved_count,
         'total_score': total_score,
+        'groups': badge_groups,
+        'new_badges': new_badges,
     }
     return render(request, 'profile.html', context)
 

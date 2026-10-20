@@ -315,6 +315,22 @@ class LoginEvent(models.Model):
         ordering = ['-at']
 
 
+class StudentBadge(models.Model):
+    """Полученный учеником значок (каталог значков — contest/badges.py). Строка создаётся один
+    раз; seen=False — ученик ещё не видел всплывающее «Новый значок!»."""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='badges')
+    key = models.CharField(max_length=40)
+    awarded_at = models.DateTimeField()
+    seen = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['student', 'key'], name='unique_student_badge')]
+        ordering = ['awarded_at']
+
+    def __str__(self):
+        return f"{self.student} — {self.key}"
+
+
 class Exam(models.Model):
     """СОР / СОЧ (БЖБ / ТЖБ): учитель выбирает класс, время начала, длительность и задачи.
     Каждая задача — до 10 баллов (по автотестам), оценка за экзамен — средний балл по всем

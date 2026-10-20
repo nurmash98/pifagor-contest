@@ -1,0 +1,7 @@
+<svg width="{{ size|default:70 }}" height="{{ size_h|default:76 }}" viewBox="0 0 110 120" aria-hidden="true">
+    <defs><linearGradient id="bg-{{ b.key }}-{{ uid|default:'x' }}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{{ b.c2 }}"/><stop offset="1" stop-color="{{ b.c1 }}"/></linearGradient></defs>
+    <polygon points="55,4 100,30 100,82 55,112 10,82 10,30" fill="url(#bg-{{ b.key }}-{{ uid|default:'x' }})" stroke="{{ b.c1 }}" stroke-width="3"/>
+    <polygon points="55,14 91,35 91,77 55,102 19,77 19,35" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2"/>
+    <text x="55" y="{% if b.kind == 'tasks' %}52{% else %}68{% endif %}" text-anchor="middle" font-size="{% if b.kind == 'tasks' %}26{% else %}36{% endif %}">{% if b.earned %}{{ b.emoji }}{% else %}🔒{% endif %}</text>
+    {% if b.kind == 'tasks' %}<text x="55" y="84" text-anchor="middle" font-size="24" font-weight="800" fill="#fff" stroke="rgba(0,0,0,.25)" stroke-width=".6">{{ b.need }}</text>{% endif %}
+</svg>

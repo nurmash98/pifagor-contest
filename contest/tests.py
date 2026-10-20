@@ -537,3 +537,98 @@ class HardWhileTasksTests(TestCase):
         for title, code in sols.items():
             r = run_autotests(Task.objects.get(title=title), code)
             self.assertEqual(r['passed'], r['total'], title)
+
+
+class BadgeTests(TestCase):
+    def setUp(self):
+        from .models import Submission
+        self.user = User.objects.create_user('bs', password='x')
+        self.student = Student.objects.create(user=self.user, full_name='Бадж', school_class='7F')
+        self.teacher_u = User.objects.create_user('bt', password='x', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.teacher_u, full_name='T', classes='7F')
+        self.tasks = [Task.objects.create(title=f'B{i}', description='d', level='A', test_cases=[]) for i in range(12)]
+
+    def solve(self, n, score=10):
+        from .models import Submission
+        for t in self.tasks[:n]:
+            Submission.objects.update_or_create(student=self.student, task=t, defaults={'status': 'DONE', 'score': score, 'is_graded': True})
+
+    def exam_with_grade(self, kind, hours_ago, grade_score, retake=False, exam=None):
+        now = timezone.now()
+        if exam is None:
+            exam = Exam.objects.create(kind=kind, title='E', school_class='7F', start_at=now - timedelta(hours=hours_ago),
+                                       duration_minutes=40, created_by=self.teacher)
+            exam.tasks.set(self.tasks[:2])
+        rt = None
+        ids = []
+        if retake:
+            rt = ExamRetake.objects.create(exam=exam, start_at=now - timedelta(hours=hours_ago - 1),
+                                           duration_minutes=30, created_by=self.teacher)
+            rt.students.add(self.student)
+            ids = [t.id for t in self.tasks[2:4]]
+        a = ExamAttempt.objects.create(exam=exam, student=self.student, retake=rt, task_ids=ids,
+                                       started_at=now - timedelta(hours=hours_ago), finished_at=now - timedelta(hours=hours_ago - 0.5))
+        for t in a.task_list():
+            ExamAnswer.objects.create(attempt=a, task=t, best_score=grade_score, submissions_count=1)
+        return exam
+
+    def keys(self):
+        from .badges import compute
+        return set(compute(self.student)[0])
+
+    def test_task_badges_thresholds(self):
+        self.assertEqual(self.keys(), set())
+        self.solve(9); self.assertNotIn('t10', self.keys())
+        self.solve(10); self.assertEqual(self.keys(), {'t10'})
+        self.solve(12, score=9)   # перезапись на 9 — решённых 0
+        self.assertEqual(self.keys(), set())
+
+    def test_exam_badges(self):
+        self.exam_with_grade('SOR', 30, 10)
+        self.assertEqual(self.keys(), {'e_first', 'e_sor'})
+        self.exam_with_grade('SOCH', 20, 10)
+        self.assertEqual(self.keys(), {'e_first', 'e_sor', 'e_soch'})
+        self.exam_with_grade('SOR', 10, 10)
+        self.assertIn('e_streak', self.keys())
+
+    def test_streak_broken_by_low_grade_not_by_absence(self):
+        self.exam_with_grade('SOR', 40, 10)
+        self.exam_with_grade('SOR', 30, 5)
+        self.exam_with_grade('SOR', 20, 10)
+        self.exam_with_grade('SOR', 10, 10)
+        self.assertNotIn('e_streak', self.keys())
+
+    def test_fixed_by_retake_and_five_tens(self):
+        e = self.exam_with_grade('SOR', 30, 4)
+        self.assertNotIn('e_fixed', self.keys())
+        self.exam_with_grade('SOR', 30, 9, retake=True, exam=e)
+        self.assertIn('e_fixed', self.keys())
+        self.assertNotIn('e_first', self.keys())
+        for h in (60, 50, 40, 25, 15):
+            self.exam_with_grade('SOR', h, 10)
+        self.assertIn('e_five', self.keys())
+
+    def test_profile_shows_badges_modal_text_and_marks_seen(self):
+        from .models import StudentBadge
+        self.solve(10)
+        self.client.login(username='bs', password='x')
+        html = self.client.get('/profile/').content.decode()
+        self.assertIn('Новичок', html)
+        self.assertIn('Решите 10 задач на оценку 10/10.', html)
+        self.assertIn('id="badge-toast"', html)       # новый значок — всплывашка
+        self.assertTrue(StudentBadge.objects.get(student=self.student, key='t10').seen)
+        self.assertNotIn('id="badge-toast"', self.client.get('/profile/').content.decode())  # второй раз не показываем
+        s = self.client.session; s['content_lang'] = 'kk'; s.save()
+        kz = self.client.get('/profile/').content.decode()
+        self.assertIn('Бастаушы', kz)
+        self.assertIn('10/10 бағамен 10 есеп шешіңіз.', kz)
+
+    def test_badge_date_is_when_condition_met(self):
+        from .models import Submission, StudentBadge
+        from .badges import sync_badges
+        self.solve(10)
+        old = timezone.now() - timedelta(days=30)
+        Submission.objects.filter(student=self.student).update(updated_at=old)
+        sync_badges(self.student)
+        b = StudentBadge.objects.get(student=self.student, key='t10')
+        self.assertLess(abs((b.awarded_at - old).total_seconds()), 5)

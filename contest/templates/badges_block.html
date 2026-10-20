@@ -1,0 +1,103 @@
+{% load ui_i18n %}
+<!-- Значки ученика: сетка + окно с описанием по клику (без внешних библиотек) -->
+<style>
+    .badge-item { background: none; border: 0; padding: 4px 0; width: 100%; text-align: center; cursor: pointer; color: inherit; }
+    .badge-item:hover svg { transform: translateY(-2px) scale(1.04); }
+    .badge-item svg { transition: transform .15s ease; }
+    .badge-item.locked svg { filter: grayscale(1); opacity: .45; }
+    .badge-item .bn { font-size: .68rem; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+    .badge-item.locked .bn { color: var(--bs-secondary-color); font-weight: 600; }
+    .badge-overlay { position: fixed; inset: 0; background: rgba(20,22,50,.6); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+    .badge-overlay.open { display: flex; }
+    .badge-modal { background: var(--bs-body-bg); color: var(--bs-body-color); border-radius: 24px; width: 100%; max-width: 340px; padding: 26px 24px 22px; text-align: center; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .badge-modal .bx { position: absolute; right: 14px; top: 8px; background: none; border: 0; font-size: 26px; line-height: 1; color: var(--bs-secondary-color); cursor: pointer; }
+    .badge-modal .bt { font-size: 1.25rem; font-weight: 800; margin-top: 6px; }
+    .badge-modal .bs { display: inline-block; margin-top: 6px; font-size: .72rem; font-weight: 700; border-radius: 99px; padding: 3px 10px; background: var(--bs-tertiary-bg); color: var(--bs-secondary-color); }
+    .badge-modal .bs.ok { background: rgba(25,135,84,.15); color: #198754; }
+    .badge-modal .bd { margin-top: 14px; color: var(--bs-secondary-color); line-height: 1.45; }
+    .badge-modal .bp { height: 8px; border-radius: 9px; background: var(--bs-tertiary-bg); margin: 14px 0 4px; overflow: hidden; }
+    .badge-modal .bp i { display: block; height: 100%; background: linear-gradient(90deg, #2ea58a, #8ff0d4); }
+    .badge-modal .bl { font-size: .78rem; color: var(--bs-secondary-color); font-weight: 600; }
+    .badge-toast { position: fixed; right: 20px; bottom: 20px; z-index: 1900; background: var(--bs-body-bg); color: var(--bs-body-color); border: 2px solid #ffd048; border-radius: 16px; padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 8px 26px rgba(26,26,75,.25); cursor: pointer; max-width: 320px; }
+</style>
+
+{% for group_title, group, icon in groups %}
+<div class="mt-4 border-top pt-3 text-start">
+    <h6 class="fw-bold d-flex justify-content-between mb-2" style="font-size: .85rem;">
+        <span>{{ icon }} {% t group_title %}</span><span class="text-muted fw-semibold">{{ group.earned_count }} {% t "из" %} {{ group.items|length }}</span>
+    </h6>
+    <div class="row row-cols-3 g-1">
+        {% for b in group.items %}
+        <div class="col">
+            <button type="button" class="badge-item {% if not b.earned %}locked{% endif %}" data-badge-open
+                    data-title="{{ b.title }}" data-desc="{{ b.desc }}" data-earned="{% if b.earned %}1{% endif %}"
+                    data-date="{{ b.awarded_at|date:'d.m.Y' }}" data-current="{{ b.current }}" data-total="{{ b.total }}"
+                    data-percent="{{ b.percent }}" data-left="{{ b.left }}" data-kind="{{ b.kind }}" data-key="{{ b.key }}">
+                {% include 'badge_hex.html' with b=b uid='g' %}
+                <div class="bn">{{ b.title }}</div>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<div class="badge-overlay" id="badge-overlay" role="dialog" aria-modal="true">
+    <div class="badge-modal">
+        <button type="button" class="bx" id="badge-close" aria-label="{% t 'Закрыть' %}">×</button>
+        <div id="badge-art"></div>
+        <div class="bt" id="badge-title"></div>
+        <span class="bs" id="badge-status"></span>
+        <div class="bd" id="badge-desc"></div>
+        <div id="badge-progress" style="display:none">
+            <div class="bp"><i id="badge-bar"></i></div>
+            <div class="bl" id="badge-left"></div>
+        </div>
+    </div>
+</div>
+
+{% if new_badges %}
+<div class="badge-toast" id="badge-toast" data-key="{{ new_badges.0.key }}">
+    <div style="width:44px">{% include 'badge_hex.html' with b=new_badges.0 uid='t' size=44 size_h=48 %}</div>
+    <div class="small"><strong>{% t "Новый значок!" %}</strong><br>{{ new_badges.0.title }}{% if new_badges|length > 1 %} <span class="text-muted">+{{ new_badges|length|add:"-1" }}</span>{% endif %}</div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+    var overlay = document.getElementById('badge-overlay');
+    var T = {got: '{% t "Получен" %}', notyet: '{% t "Ещё не получен" %}', left: '{% t "Осталось" %}', of: '{% t "из" %}', unit_tasks: '{% t "задач" %}', unit_exams: '{% t "экзаменов" %}'};
+    function open(btn) {
+        var d = btn.dataset;
+        var art = document.getElementById('badge-art');
+        art.innerHTML = btn.querySelector('svg').outerHTML;
+        var svg = art.querySelector('svg'); svg.setAttribute('width', 120); svg.setAttribute('height', 130);
+        svg.style.filter = d.earned ? 'none' : 'grayscale(1)'; svg.style.opacity = d.earned ? 1 : .5;
+        document.getElementById('badge-title').textContent = d.title;
+        document.getElementById('badge-desc').textContent = d.desc;
+        var st = document.getElementById('badge-status');
+        st.className = 'bs' + (d.earned ? ' ok' : '');
+        st.textContent = d.earned ? '✓ ' + T.got + ' ' + d.date : '🔒 ' + T.notyet;
+        var pr = document.getElementById('badge-progress');
+        if (!d.earned && +d.total > 1) {
+            pr.style.display = '';
+            document.getElementById('badge-bar').style.width = d.percent + '%';
+            document.getElementById('badge-left').textContent = T.left + ' ' + d.left + ' ' + (d.kind === 'tasks' ? T.unit_tasks : T.unit_exams) + ' (' + d.current + ' ' + T.of + ' ' + d.total + ')';
+        } else { pr.style.display = 'none'; }
+        overlay.classList.add('open');
+    }
+    document.querySelectorAll('[data-badge-open]').forEach(function (b) { b.addEventListener('click', function () { open(b); }); });
+    function close() { overlay.classList.remove('open'); }
+    document.getElementById('badge-close').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    var toast = document.getElementById('badge-toast');
+    if (toast) {
+        toast.addEventListener('click', function () {
+            var b = document.querySelector('[data-badge-open][data-key="' + toast.dataset.key + '"]');
+            toast.remove(); if (b) open(b);
+        });
+        setTimeout(function () { if (toast.parentNode) toast.remove(); }, 9000);
+    }
+})();
+</script>
