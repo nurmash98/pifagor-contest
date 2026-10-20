@@ -145,7 +145,7 @@
                         {% elif r.error == 'memory' %}<div>💾 {% t "Превышена память" %}</div>
                         {% elif r.error %}{% error_hint r.error as hint %}{% if hint %}<div class="mt-2 p-2 rounded-3 fw-semibold" style="background:#198754;color:#fff;">💡 {{ hint }}</div>{% else %}<div class="text-danger">{% t "Ошибка выполнения" %}: <code>{{ r.error }}</code></div>{% endif %}
                         {% else %}<div class="fw-semibold" style="color:#b02a37;">{% t "Ваш вывод" %}:</div><pre class="mb-2 small p-2 rounded-2" style="background:#f8d7da;color:#842029;border:1px solid #f1aeb5;">{% if r.actual %}{{ r.actual }}{% else %}{% t "(пусто)" %}{% endif %}</pre>
-                        {% if r.expected %}<div class="fw-semibold" style="color:#146c43;">{% t "Ожидалось" %}:</div><pre class="mb-0 small p-2 rounded-2" style="background:#d1f2dc;color:#0a3622;border:1px solid #9fd8b5;">{{ r.expected }}</pre>{% endif %}{% endif %}
+                        <div class="fw-semibold" style="color:#146c43;">{% t "Ожидалось" %}:</div><pre class="mb-0 small p-2 rounded-2" style="background:#d1f2dc;color:#0a3622;border:1px solid #9fd8b5;">{% if r.expected %}{{ r.expected }}{% else %}{% t "(пусто)" %}{% endif %}</pre>{% endif %}
                     </div>
                 {% endwith %}{% endif %}
                 <p class="text-muted small mb-0">{% t "За каждый пройденный тест — 2 балла (5 из 5 = 10). Преподаватель может изменить оценку." %}</p>

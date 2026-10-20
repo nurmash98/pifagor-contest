@@ -682,3 +682,16 @@ class OldSubmissionInputFallbackTests(FailedTestDetailsTests):
             autotest_results=[{'ok': False, 'error': None, 'expected': '5', 'actual': '0'}])
         r = self.client.get(reverse('task_detail', args=[self.task.id]))
         self.assertIn('Входные данные', r.content.decode())
+
+
+class EmptyExpectedTests(TestCase):
+    def test_empty_expected_shown(self):
+        u = User.objects.create_user('ee', password='pw12345')
+        st = Student.objects.create(user=u, full_name='Э', school_class='7F')
+        task = Task.objects.create(title='Пусто', description='d', level='A',
+                                   test_cases=[{'input': '1', 'output': ''}])
+        self.client.login(username='ee', password='pw12345')
+        r = self.client.post(reverse('task_detail', args=[task.id]), {'code': 'print(1)'}, follow=True)
+        html = r.content.decode()
+        self.assertIn('Ожидалось', html)
+        self.assertIn('(пусто)', html)
