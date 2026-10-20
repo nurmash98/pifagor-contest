@@ -671,3 +671,14 @@ class ErrorHintTests(FailedTestDetailsTests):
         s = self.client.session; s['content_lang'] = 'kk'; s.save()
         r = self.client.get(reverse('task_detail', args=[self.task.id]))
         self.assertIn('Нөлге бөлу', r.content.decode())
+
+
+class OldSubmissionInputFallbackTests(FailedTestDetailsTests):
+    def test_old_submission_without_input_uses_task_case(self):
+        from .models import Submission
+        sub = Submission.objects.create(
+            student=self.student, task=self.task, status='TESTING', code='print(0)',
+            autotest_checked_at=timezone.now(), autotest_passed=0, autotest_total=2,
+            autotest_results=[{'ok': False, 'error': None, 'expected': '5', 'actual': '0'}])
+        r = self.client.get(reverse('task_detail', args=[self.task.id]))
+        self.assertIn('Входные данные', r.content.decode())

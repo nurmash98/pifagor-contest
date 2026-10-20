@@ -350,6 +350,10 @@ def task_detail(request, task_id):
     for i, r in enumerate(submission.autotest_results or [], 1):
         if not r.get('ok'):
             first_failed = dict(r, number=i)
+            if 'input' not in first_failed:  # старые отправки: берём ввод из тест-кейса задачи
+                cases = task.test_cases or []
+                if i <= len(cases):
+                    first_failed['input'] = str(cases[i - 1].get('input', ''))
             break
 
     context = {
