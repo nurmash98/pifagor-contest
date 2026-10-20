@@ -652,7 +652,8 @@ class FailedTestDetailsTests(TestCase):
         self.assertIn('Не прошёл тест', html)
         self.assertIn('Ваш вывод', html)
         self.assertIn('1006', html)         # вывод ученика на первом тесте
-        self.assertNotIn('>5<', html)       # ожидаемый ответ не раскрываем
+        self.assertIn('Ожидалось', html)
+        self.assertIn('>5</pre>', html)     # ожидаемый ответ показан
 
     def test_runtime_error_shown(self):
         r = self.submit('print(1/0)')
