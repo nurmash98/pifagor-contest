@@ -656,7 +656,7 @@ class FailedTestDetailsTests(TestCase):
 
     def test_runtime_error_shown(self):
         r = self.submit('print(1/0)')
-        self.assertIn('ZeroDivisionError', r.content.decode())
+        self.assertIn('Деление на ноль', r.content.decode())
 
     def test_all_passed_no_failure_block(self):
         r = self.submit('a=int(input());b=int(input());print(a+b)')
