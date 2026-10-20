@@ -661,3 +661,12 @@ class FailedTestDetailsTests(TestCase):
     def test_all_passed_no_failure_block(self):
         r = self.submit('a=int(input());b=int(input());print(a+b)')
         self.assertNotIn('Не прошёл тест', r.content.decode())
+
+
+class ErrorHintTests(FailedTestDetailsTests):
+    def test_hint_ru_and_kk(self):
+        r = self.submit('print(1/0)')
+        self.assertIn('Деление на ноль', r.content.decode())
+        s = self.client.session; s['content_lang'] = 'kk'; s.save()
+        r = self.client.get(reverse('task_detail', args=[self.task.id]))
+        self.assertIn('Нөлге бөлу', r.content.decode())
