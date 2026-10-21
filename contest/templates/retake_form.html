@@ -25,13 +25,13 @@
                 <ul class="list-group list-group-flush">
                     {% for st in students %}
                     <li class="list-group-item">
-                        <label class="d-flex justify-content-between align-items-center w-100 mb-0" style="cursor: {% if st.existing_retake %}not-allowed{% else %}pointer{% endif %};">
+                        <label class="d-flex justify-content-between align-items-center w-100 mb-0" style="cursor: {% if st.retakes_full %}not-allowed{% else %}pointer{% endif %};">
                             <span>
                                 <input type="checkbox" class="form-check-input me-2 retake-cb" name="students" value="{{ st.id }}"
                                        data-grade="{{ st.exam_grade|stringformat:'s' }}"
-                                       {% if st.id in selected %}checked{% endif %}{% if st.existing_retake %} disabled{% endif %}>
+                                       {% if st.id in selected %}checked{% endif %}{% if st.retakes_full %} disabled{% endif %}>
                                 <strong style="color: #1a1a4b;">{{ st.full_name }}</strong>
-                                {% if st.existing_retake %}<span class="badge bg-warning text-dark ms-1">пересдача уже назначена · {{ st.existing_retake.start_at|date:"d.m H:i" }}</span>{% endif %}
+                                {% if st.retakes_full %}<span class="badge bg-warning text-dark ms-1">пересдачи {{ st.retake_count }} из {{ st.max_retakes }} уже назначены</span>{% elif st.existing_retake %}<span class="badge bg-info text-dark ms-1">пересдача {{ st.retake_count }} из {{ st.max_retakes }} · {{ st.existing_retake.start_at|date:"d.m H:i" }}</span>{% endif %}
                             </span>
                             <span class="small">
                                 {% if not st.took_part %}<span class="text-muted">не участвовал · </span>{% endif %}

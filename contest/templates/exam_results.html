@@ -102,10 +102,12 @@
                     <td class="text-center fw-bold fs-5 {% if row.exam_grade >= 8 %}text-success{% elif row.exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.exam_grade }}</td>
                     {% elif has_retakes %}
                     <td class="text-center">
-                        {% if not row.retake %}<span class="text-muted">—</span>
-                        {% elif row.retake_grade is not None %}<span class="fw-bold fs-5 {% if row.retake_grade >= 8 %}text-success{% elif row.retake_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.retake_grade }}</span>
-                        {% elif row.retake_state == 'active' %}<span class="small text-danger">идёт</span>
-                        {% else %}<span class="small text-muted" title="{{ row.retake.start_at|date:'d.m.Y H:i' }}">{{ row.retake.start_at|date:"d.m H:i" }}</span>{% endif %}
+                        {% if not row.retake_items %}<span class="text-muted">—</span>
+                        {% else %}{% for it in row.retake_items %}{% if not forloop.first %}<span class="text-muted"> · </span>{% endif %}
+                            {% if it.grade is not None %}<span class="fw-bold fs-5 {% if it.grade >= 8 %}text-success{% elif it.grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ it.grade }}</span>
+                            {% elif it.state == 'active' %}<span class="small text-danger">идёт</span>
+                            {% else %}<span class="small text-muted" title="{{ it.retake.start_at|date:'d.m.Y H:i' }}">{{ it.retake.start_at|date:"d.m H:i" }}</span>{% endif %}
+                        {% endfor %}{% endif %}
                     </td>
                     {% endif %}
                 </tr>
@@ -116,5 +118,5 @@
         </table>
     </div>
 </div>
-<p class="text-muted small mt-2">Нажмите на балл, чтобы посмотреть код с лучшим результатом.{% if has_retakes and not retake %} У учеников, которые пересдавали, в колонке «Пересдача» стоит вторая оценка — оценка за экзамен остаётся прежней.{% endif %}</p>
+<p class="text-muted small mt-2">Нажмите на балл, чтобы посмотреть код с лучшим результатом.{% if has_retakes and not retake %} У учеников, которые пересдавали, в колонке «Пересдача» стоит оценка за пересдачу (если их две — обе по порядку) — оценка за экзамен остаётся прежней.{% endif %}</p>
 {% endblock %}

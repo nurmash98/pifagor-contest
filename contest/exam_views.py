@@ -75,6 +75,9 @@ def _random_match(candidates):
     return result
 
 
+MAX_RETAKES = 2  # сколько пересдач одного СОР/СОЧ можно назначить одному ученику
+
+
 def _retake_slots(exam, prev_attempt):
     """Условия задач для пересдачи: те же, что у экзамена (тег + сложность). Если экзамен
     был с «определёнными» задачами — условие берётся от каждой его задачи (её сложность и тег)."""
@@ -103,6 +106,9 @@ def _retake_task_ids(exam, student):
         seen = set(exam.tasks.values_list('id', flat=True))
     else:
         seen = set()
+    # Задачи из прежних пересдач этого же экзамена тоже не повторяем
+    for other in ExamAttempt.objects.filter(exam=exam, student=student, retake__isnull=False):
+        seen |= {t.id for t in other.task_list()}
     slots = _retake_slots(exam, prev)
 
     def relaxed(slot, level):
@@ -270,6 +276,13 @@ def exam_detail(request, exam_id, retake_id=None):
             ExamAttempt.objects.filter(exam=exam, student=student, retake=my_retake).first()
     exam_done, exam_grade = _grade_info(exam, main_attempt, now)
     retake_done, retake_grade = _grade_info(my_retake, retake_attempt, now) if my_retake else (False, None)
+    # Если пересдач две — оценки более ранних показываем отдельной строкой
+    earlier_retakes = []
+    if my_retake is not None:
+        for rt in ExamRetake.objects.filter(exam=exam, students=student).exclude(id=my_retake.id).order_by('start_at'):
+            ra = ExamAttempt.objects.filter(exam=exam, student=student, retake=rt).first()
+            done, g = _grade_info(rt, ra, now)
+            earlier_retakes.append({'retake': rt, 'done': done, 'grade': g})
     my_retake_state = _attempt_state(my_retake, retake_attempt, now) if my_retake else None
 
     return render(request, 'exam_detail.html', {
@@ -278,7 +291,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'grade': (attempt.grade() if attempt else 0) if finished else None,
         'my_retake': my_retake, 'my_retake_state': my_retake_state,
         'exam_done': exam_done, 'exam_grade': exam_grade,
-        'retake_done': retake_done, 'retake_grade': retake_grade,
+        'retake_done': retake_done, 'retake_grade': retake_grade, 'earlier_retakes': earlier_retakes,
     })
 
 
@@ -608,18 +621,21 @@ def exam_results(request, exam_id, retake_id=None):
         retake_attempts = {(a.retake_id, a.student_id): a
                            for a in ExamAttempt.objects.filter(exam=exam, retake__in=retakes)}
         assigned = {}
-        for rt in retakes:
+        for rt in retakes:       # retakes отсортированы по началу: у ученика список по порядку
             for st in rt.students.all():
-                assigned[st.id] = rt
+                assigned.setdefault(st.id, []).append(rt)
         for row in rows:
-            rt = assigned.get(row['student'].id)
-            row['retake'] = rt
-            if rt is None:
-                continue
-            ra = retake_attempts.get((rt.id, row['student'].id))
-            rstate = _attempt_state(rt, ra, now)
-            row['retake_state'] = rstate
-            row['retake_grade'] = (ra.grade() if ra else 0) if rstate == 'finished' else None
+            items = []
+            for rt in assigned.get(row['student'].id, []):
+                ra = retake_attempts.get((rt.id, row['student'].id))
+                rstate = _attempt_state(rt, ra, now)
+                items.append({'retake': rt, 'state': rstate,
+                              'grade': (ra.grade() if ra else 0) if rstate == 'finished' else None})
+            row['retake_items'] = items
+            row['retake'] = items[-1]['retake'] if items else None
+            if items:    # «последняя» пересдача — для совместимости и краткого показа
+                row['retake_state'] = items[-1]['state']
+                row['retake_grade'] = items[-1]['grade']
     for rt in retakes:
         rt.state = rt.status(now)
         rt.student_names = ', '.join(s.full_name for s in rt.students.all())
@@ -649,14 +665,18 @@ def retake_create(request, exam_id):
     in_retake = {}
     for rt in exam.retakes.prefetch_related('students'):
         for st in rt.students.all():
-            in_retake[st.id] = rt
+            in_retake.setdefault(st.id, []).append(rt)
     students = list(Student.objects.filter(school_class=exam.school_class).order_by('full_name'))
     for st in students:
         attempt = exam_attempts.get(st.id)
         st.exam_grade = attempt.grade() if attempt else 0
         st.took_part = attempt is not None
-        st.existing_retake = in_retake.get(st.id)
-    allowed = {st.id for st in students if st.existing_retake is None}
+        mine = in_retake.get(st.id, [])
+        st.retake_count = len(mine)
+        st.max_retakes = MAX_RETAKES
+        st.existing_retake = mine[-1] if mine else None
+        st.retakes_full = len(mine) >= MAX_RETAKES
+    allowed = {st.id for st in students if not st.retakes_full}
 
     if request.method == 'POST':
         errors = []

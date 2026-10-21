@@ -75,6 +75,10 @@
     </div>
     {% endif %}
 
+    {% if earlier_retakes and not retake %}
+    <div class="small text-muted mb-2">{% for er in earlier_retakes %}🔁 {% t "Предыдущая пересдача" %} ({{ er.retake.start_at|date:"d.m.Y" }}): {% if er.done %}<strong>{{ er.grade }}/10</strong>{% else %}—{% endif %} · <a href="{% url 'retake_detail' exam.id er.retake.id %}">{% t "открыть" %}</a>{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>
+    {% endif %}
+
     {% if not retake and my_retake and not retake_done %}
     <div class="card border-0 shadow-sm rounded-4 p-3 mb-3 border-start border-4 border-warning d-flex flex-row justify-content-between align-items-center flex-wrap gap-2">
         <div>

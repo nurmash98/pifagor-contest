@@ -98,13 +98,27 @@ class RetakeCreateTests(RetakeTestBase):
         self.client.post(url, {'students': [self.students[0].id], 'start_at': future, 'duration_minutes': '0'})
         self.assertEqual(ExamRetake.objects.count(), 0)
 
-    def test_student_already_in_retake_cannot_be_added_again(self):
+    def test_student_can_get_two_retakes_but_not_three(self):
         self.retake(self.exam, [self.students[0]], start_delta=60)
         self.client.force_login(self.teacher_user)
         future = (timezone.localtime() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
-        self.client.post(reverse('retake_create', args=[self.exam.id]),
-                         {'students': [self.students[0].id], 'start_at': future, 'duration_minutes': '30'})
-        self.assertEqual(ExamRetake.objects.count(), 1)
+        post = lambda: self.client.post(reverse('retake_create', args=[self.exam.id]),
+                                        {'students': [self.students[0].id], 'start_at': future, 'duration_minutes': '30'})
+        post()
+        self.assertEqual(ExamRetake.objects.count(), 2)
+        post()   # третья — уже нельзя
+        self.assertEqual(ExamRetake.objects.count(), 2)
+
+    def test_second_retake_avoids_tasks_of_first_retake(self):
+        from .exam_views import _retake_task_ids
+        st = self.students[0]
+        self.attempt(self.random_exam, st, 3, task_ids=[self.a_tasks[0].id, self.b_tasks[0].id])
+        rt1 = self.retake(self.random_exam, [st], start_delta=-60)
+        first = self.attempt(self.random_exam, st, 3, retake=rt1, task_ids=[self.a_tasks[1].id, self.b_tasks[1].id])
+        self.retake(self.random_exam, [st], start_delta=60)
+        for _ in range(10):
+            ids = set(_retake_task_ids(self.random_exam, st))
+            self.assertFalse(ids & {self.a_tasks[0].id, self.b_tasks[0].id, self.a_tasks[1].id, self.b_tasks[1].id})
 
     def test_other_teacher_cannot_manage(self):
         u = User.objects.create_user('t2', password='x')
@@ -784,3 +798,19 @@ class TaskStatusFilterTests(TestCase):
 
     def test_invalid_status_ignored(self):
         self.assertEqual(self.titles('?status=zzz'), {'Сделанная', 'Рабочая', 'Новая', 'Девятка'})
+
+
+class TwoRetakesPagesTests(RetakeTestBase):
+    def test_pages_render_with_two_retakes(self):
+        st = self.students[0]
+        self.attempt(self.exam, st, 3, task_ids=[self.a_tasks[0].id, self.b_tasks[0].id])
+        rt1 = self.retake(self.exam, [st], start_delta=-120, minutes=30)
+        self.attempt(self.exam, st, 6, retake=rt1, task_ids=[self.a_tasks[1].id, self.b_tasks[1].id])
+        rt2 = self.retake(self.exam, [st], start_delta=-5, minutes=60)
+        self.client.force_login(st.user)
+        r = self.client.get(reverse('exam_detail', args=[self.exam.id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('Предыдущая пересдача', r.content.decode())
+        self.client.force_login(self.teacher_user)
+        self.assertEqual(self.client.get(reverse('exam_results', args=[self.exam.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('retake_create', args=[self.exam.id])).status_code, 200)
