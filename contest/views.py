@@ -1555,3 +1555,28 @@ def grade_submission(request, submission_id):
         # Сколько решений в очереди останется после этого (без текущего).
         'queue_left': _pending_queue(request.user).exclude(id=submission.id).count(),
     })
+
+def web_manifest(request):
+    """Манифест веб-приложения: иконка и название при добавлении сайта на экран телефона."""
+    from django.templatetags.static import static
+    data = {
+        'name': 'Pifagor Contest',
+        'short_name': 'Pifagor',
+        'description': 'Задачи по программированию, курсы и экзамены школы Pifagor',
+        'start_url': '/',
+        'scope': '/',
+        'display': 'standalone',
+        'background_color': '#ffffff',
+        'theme_color': '#1a1a4b',
+        'icons': [
+            {'src': static('icons/icon-192.png'), 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'},
+            {'src': static('icons/icon-512.png'), 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any'},
+            {'src': static('icons/icon-maskable-512.png'), 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'},
+        ],
+    }
+    return HttpResponse(json.dumps(data, ensure_ascii=False), content_type='application/manifest+json')
+
+
+def favicon(request):
+    from django.templatetags.static import static
+    return redirect(static('icons/favicon.ico'))

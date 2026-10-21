@@ -1,3 +1,4 @@
+{% load static %}
 {# Ночной / дневной режим: применяем сохранённую тему ДО отрисовки (без мигания) и стили тёмной темы. #}
 <script>
 (function () {
@@ -93,3 +94,13 @@
     [data-bs-theme="dark"] .form-control::placeholder { color: rgba(228, 231, 240, .4); }
     [data-bs-theme="dark"] img[src$="logo.svg"] { background: #f8f9fa; border-radius: 12px; padding: 6px 10px; }
 </style>
+
+{# Иконка сайта: вкладка браузера, «Добавить на экран «Домой»» (iOS/Android), манифест веб-приложения #}
+<link rel="icon" href="{% static 'icons/favicon.ico' %}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
+<link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+<link rel="manifest" href="{% url 'manifest' %}">
+<meta name="theme-color" content="#1a1a4b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pifagor">

@@ -5,6 +5,8 @@ from . import moderation_views
 from . import duel_views
 
 urlpatterns = [
+    path('manifest.webmanifest', views.web_manifest, name='manifest'),
+    path('favicon.ico', views.favicon),
     # Дуэли
     path('duels/', duel_views.duels_home, name='duels'),
     path('duels/find/', duel_views.duels_find, name='duels_find'),

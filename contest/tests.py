@@ -1230,3 +1230,18 @@ class CourseClassVisibilityTests(TestCase):
         self.client.post(reverse('course_edit', args=[c.id]), {'name': 'X', 'visible_classes': ['8A']})
         c.refresh_from_db()
         self.assertEqual(c.visible_class_list(), ['8A'])
+
+
+class SiteIconTests(TestCase):
+    def test_manifest_and_head_links(self):
+        r = self.client.get('/manifest.webmanifest')
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data['short_name'], 'Pifagor')
+        self.assertTrue(any(i['sizes'] == '512x512' for i in data['icons']))
+        h = self.client.get('/login/').content.decode()
+        for needle in ('rel="icon"', 'apple-touch-icon', 'rel="manifest"'):
+            self.assertIn(needle, h)
+
+    def test_favicon_redirect(self):
+        self.assertEqual(self.client.get('/favicon.ico').status_code, 302)
