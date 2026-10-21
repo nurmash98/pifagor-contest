@@ -142,6 +142,10 @@ def student_toggle_block(request, student_id):
 @require_POST
 def student_toggle_duel_tester(request, student_id):
     """Включает/выключает ученику роль «тестер дуэлей» (видит дуэли в режиме «только тестеры»)."""
+    from .duels import is_duels_admin
+    if not is_duels_admin(request.user):
+        messages.error(request, 'Назначать тестеров дуэлей может только администратор дуэлей.')
+        return redirect('student_list')
     student = _managed_student_or_none(request, student_id)
     if student is None:
         messages.error(request, 'Это ученик не вашего класса.')

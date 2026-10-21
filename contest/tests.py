@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -816,6 +816,7 @@ class TwoRetakesPagesTests(RetakeTestBase):
         self.assertEqual(self.client.get(reverse('retake_create', args=[self.exam.id])).status_code, 200)
 
 
+@override_settings(DUELS_ADMIN_USERNAMES=['dt'])
 class DuelTests(TestCase):
     def setUp(self):
         from . import duels
@@ -1015,6 +1016,7 @@ class DuelTests(TestCase):
         self.assertIn('Игрок a', ca.get(reverse('duels')).content.decode())
 
 
+@override_settings(DUELS_ADMIN_USERNAMES=['tv'])
 class DuelsTeacherViewTests(TestCase):
     def test_teacher_sees_link_and_overview_students_do_not(self):
         t = User.objects.create_user('tv', password='x', is_staff=True)
@@ -1127,3 +1129,39 @@ class CodeEditorPartialTests(DuelTests):
         self.assertNotIn('{#', html)
         self.assertNotIn('Подключается один раз', html)
         self.assertEqual(html.count('<textarea'), 1)
+
+
+@override_settings(DUELS_ADMIN_USERNAMES=['boss'])
+class DuelsAdminOnlyTests(TestCase):
+    def setUp(self):
+        for name in ('boss', 'other'):
+            u = User.objects.create_user(name, password='x', is_staff=True)
+            Teacher.objects.create(user=u, full_name=name, classes='7F')
+
+    def test_other_teacher_does_not_see_or_control_duels(self):
+        from .models import SiteSettings
+        self.client.login(username='other', password='x')
+        self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        self.assertRedirects(self.client.get(reverse('duels')), reverse('teacher_dashboard'))
+        self.client.post(reverse('duels_toggle'))
+        self.assertEqual(SiteSettings.get().duels_mode, 'testers')            # не переключился
+        self.assertNotIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
+
+    def test_admin_teacher_sees_and_controls(self):
+        from .models import SiteSettings
+        self.client.login(username='boss', password='x')
+        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
+        self.assertIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
+        self.client.post(reverse('duels_toggle'))
+        self.assertEqual(SiteSettings.get().duels_mode, 'all')
+        self.client.login(username='other', password='x')                      # при «для всех» остальным тоже видно
+        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+
+    def test_other_teacher_cannot_mark_testers(self):
+        su = User.objects.create_user('stud', password='x')
+        st = Student.objects.create(user=su, full_name='Ученик', school_class='7F')
+        self.client.login(username='other', password='x')
+        self.client.post(reverse('student_toggle_duel_tester', args=[st.id]))
+        st.refresh_from_db()
+        self.assertFalse(st.duel_tester)

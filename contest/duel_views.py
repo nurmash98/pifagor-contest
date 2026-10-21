@@ -27,6 +27,8 @@ def duels_home(request):
     ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
     top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
     ctx['top'] = list(top)
+    if student is None and request.user.is_staff and not duels.teacher_sees_duels(request.user):
+        return redirect('teacher_dashboard')      # дуэли пока не открыты для этого преподавателя
     if student is None and request.user.is_staff:
         # Обзор для преподавателя: режим, тестеры, идущие и недавние дуэли (только просмотр)
         ctx.update({
@@ -213,6 +215,9 @@ def duel_leave(request, duel_id):
 @require_POST
 def duels_toggle(request):
     """Переключает режим дуэлей по кругу: выключены → только тестеры → для всех."""
+    if not duels.is_duels_admin(request.user):
+        messages.error(request, 'Управлять дуэлями может только администратор дуэлей.')
+        return redirect('teacher_dashboard')
     order = ['off', 'testers', 'all']
     settings_obj = SiteSettings.get()
     settings_obj.duels_mode = order[(order.index(settings_obj.duels_mode) + 1) % len(order)]

@@ -115,9 +115,11 @@
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>
                             </li>
+                            {% if duels_visible %}
                             <li class="nav-item me-3">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'duels' %}">⚔️ {% t "Дуэли" %}</a>
                             </li>
+                            {% endif %}
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->
                         {% else %}

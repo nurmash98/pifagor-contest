@@ -54,6 +54,19 @@ def duels_enabled():
     return duels_mode() != 'off'
 
 
+def is_duels_admin(user):
+    """Преподаватель, который управляет дуэлями: суперпользователь или логин из DUELS_ADMIN_USERNAMES."""
+    from django.conf import settings
+    return bool(user and user.is_authenticated and user.is_staff and (
+        user.is_superuser or user.username in settings.DUELS_ADMIN_USERNAMES))
+
+
+def teacher_sees_duels(user):
+    """Видит ли преподаватель пункт «Дуэли»: админ дуэлей — всегда, остальные — когда они открыты для всех."""
+    return bool(user and user.is_authenticated and user.is_staff and (
+        is_duels_admin(user) or duels_mode() == 'all'))
+
+
 def visible_to(student):
     """Видны ли дуэли ученику: режим «для всех», либо «только тестеры» и он тестер."""
     mode = duels_mode()

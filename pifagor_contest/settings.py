@@ -34,6 +34,10 @@ SECRET_KEY = os.environ.get(
 # Регистрация новых учеников. Сейчас закрыта; чтобы открыть — DJANGO_REGISTRATION_OPEN=True.
 REGISTRATION_OPEN = os.environ.get('DJANGO_REGISTRATION_OPEN', 'False') == 'True'
 
+# Кто из преподавателей видит дуэли и управляет ими (пока они не открыты для всех).
+# Логины через запятую; суперпользователь может всегда.
+DUELS_ADMIN_USERNAMES = [u.strip() for u in os.environ.get('DUELS_ADMIN_USERNAMES', 'nurmash').split(',') if u.strip()]
+
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
 # На сервере задайте DJANGO_ALLOWED_HOSTS, например: "1.2.3.4,pifagor.example.com"

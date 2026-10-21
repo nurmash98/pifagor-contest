@@ -19,11 +19,14 @@ def registration(request):
 
 
 def duels_visible(request):
-    """Показывать ли ученику пункт «Дуэли» в меню (режим дуэлей + он тестер)."""
+    """Показывать ли пункт «Дуэли» в меню: ученику — в режиме тестеров/для всех (если он тестер),
+    преподавателю — админу дуэлей всегда, остальным только когда дуэли открыты для всех."""
     user = getattr(request, 'user', None)
-    if user is None or not user.is_authenticated or user.is_staff:
-        return {'duels_visible': False}
-    from .duels import visible_to
+    if user is None or not user.is_authenticated:
+        return {'duels_visible': False, 'duels_admin': False}
+    from .duels import is_duels_admin, teacher_sees_duels, visible_to
     from .models import Student
+    if user.is_staff:
+        return {'duels_visible': teacher_sees_duels(user), 'duels_admin': is_duels_admin(user)}
     student = Student.objects.filter(user=user).first()
-    return {'duels_visible': student is not None and visible_to(student)}
+    return {'duels_visible': student is not None and visible_to(student), 'duels_admin': False}
