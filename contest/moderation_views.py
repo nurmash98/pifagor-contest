@@ -136,3 +136,17 @@ def student_toggle_block(request, student_id):
     messages.success(request, f'Ученик «{student.full_name}» {note}')
     nxt = request.POST.get('next')
     return redirect('suspicious_students' if nxt == 'suspicious' else 'student_list')
+
+
+@staff_member_required
+@require_POST
+def student_toggle_duel_tester(request, student_id):
+    """Включает/выключает ученику роль «тестер дуэлей» (видит дуэли в режиме «только тестеры»)."""
+    student = _managed_student_or_none(request, student_id)
+    if student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+        return redirect('student_list')
+    student.duel_tester = not student.duel_tester
+    student.save(update_fields=['duel_tester'])
+    messages.success(request, f'«{student.full_name}»: тестер дуэлей — {"да" if student.duel_tester else "нет"}.')
+    return redirect(request.POST.get('next') or 'student_list')

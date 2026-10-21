@@ -83,6 +83,7 @@ TEMPLATES = [
                 'contest.context_processors.content_lang',
                 'contest.context_processors.active_exam',
                 'contest.context_processors.registration',
+                'contest.context_processors.duels_visible',
             ],
         },
     },

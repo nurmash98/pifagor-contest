@@ -16,3 +16,14 @@ def registration(request):
     """Открыта ли регистрация (settings.REGISTRATION_OPEN) — для кнопок в шапке и на входе."""
     from django.conf import settings
     return {'registration_open': settings.REGISTRATION_OPEN}
+
+
+def duels_visible(request):
+    """Показывать ли ученику пункт «Дуэли» в меню (режим дуэлей + он тестер)."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'duels_visible': False}
+    from .duels import visible_to
+    from .models import Student
+    student = Student.objects.filter(user=user).first()
+    return {'duels_visible': student is not None and visible_to(student)}

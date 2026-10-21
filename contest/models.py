@@ -34,6 +34,8 @@ class Student(models.Model):
     # Рейтинг дуэлей (Эло). Все начинают с 800.
     duel_rating = models.IntegerField(default=800, verbose_name="Рейтинг дуэлей")
     duel_games = models.PositiveIntegerField(default=0, verbose_name="Сыграно дуэлей")
+    # Тестер дуэлей: пока режим «только тестеры», дуэли видят и могут играть только они.
+    duel_tester = models.BooleanField(default=False, verbose_name="Тестер дуэлей")
 
     def save(self, *args, **kwargs):
         self.school_class = normalize_school_class(self.school_class)
@@ -521,8 +523,9 @@ class ExamAnswer(models.Model):
 
 
 class SiteSettings(models.Model):
-    """Общие переключатели сайта (одна строка, pk=1). Пока — включены ли дуэли."""
-    duels_enabled = models.BooleanField(default=True, verbose_name="Дуэли включены")
+    """Общие переключатели сайта (одна строка, pk=1). Пока — режим дуэлей."""
+    DUEL_MODES = [('off', 'Выключены'), ('testers', 'Только тестеры'), ('all', 'Для всех')]
+    duels_mode = models.CharField(max_length=10, choices=DUEL_MODES, default='testers', verbose_name="Режим дуэлей")
 
     @classmethod
     def get(cls):

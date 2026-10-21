@@ -21,6 +21,8 @@ def _student(request):
 @login_required
 def duels_home(request):
     student = _student(request)
+    if student is not None and not duels.visible_to(student):
+        return redirect('all_tasks')          # дуэли скрыты от этого ученика
     enabled = duels.duels_enabled()
     ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
     top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
@@ -51,6 +53,8 @@ def duels_find(request):
     student = _student(request)
     if student is None:
         return redirect('duels')
+    if not duels.visible_to(student):
+        return redirect('all_tasks')
     if active_attempt_for(request.user):
         messages.warning(request, 'Во время СОР/СОЧ дуэли недоступны.')
         return redirect('duels')
@@ -81,7 +85,7 @@ def duels_leave(request):
 def duels_status(request):
     """Опрос из браузера пока игрок ждёт соперника: подбирает пару и сообщает, началась ли дуэль."""
     student = _student(request)
-    if student is None:
+    if student is None or not duels.visible_to(student):
         return JsonResponse({'state': 'idle'})
     active = duels.active_duel_for(student)
     if active is None and DuelQueueEntry.objects.filter(student=student).exists():
@@ -181,8 +185,11 @@ def duel_resign(request, duel_id):
 @staff_member_required
 @require_POST
 def duels_toggle(request):
+    """Переключает режим дуэлей по кругу: выключены → только тестеры → для всех."""
+    order = ['off', 'testers', 'all']
     settings_obj = SiteSettings.get()
-    settings_obj.duels_enabled = not settings_obj.duels_enabled
+    settings_obj.duels_mode = order[(order.index(settings_obj.duels_mode) + 1) % len(order)]
     settings_obj.save()
-    messages.success(request, 'Дуэли включены.' if settings_obj.duels_enabled else 'Дуэли выключены.')
+    labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только тестеры.', 'all': 'Дуэли открыты для всех.'}
+    messages.success(request, labels[settings_obj.duels_mode])
     return redirect(request.POST.get('next') or 'teacher_dashboard')

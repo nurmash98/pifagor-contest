@@ -42,13 +42,23 @@ def rating_delta(rating, opponent_rating, score):
 
 
 # ------------------------------------------------------------------ допуск
+def duels_mode():
+    return SiteSettings.get().duels_mode
+
+
 def duels_enabled():
-    return SiteSettings.get().duels_enabled
+    return duels_mode() != 'off'
+
+
+def visible_to(student):
+    """Видны ли дуэли ученику: режим «для всех», либо «только тестеры» и он тестер."""
+    mode = duels_mode()
+    return mode == 'all' or (mode == 'testers' and student is not None and student.duel_tester)
 
 
 def can_play(student):
-    """(можно ли, причина) — дуэли включены, ученик не в списке подозрительных."""
-    if not duels_enabled():
+    """(можно ли, причина) — дуэли видны ученику и он не в списке подозрительных."""
+    if not visible_to(student):
         return False, 'Дуэли сейчас выключены преподавателем.'
     from .moderation_views import _reasons
     if _reasons(Student.objects.filter(id=student.id)):
