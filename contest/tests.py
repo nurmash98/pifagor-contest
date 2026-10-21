@@ -750,3 +750,35 @@ class InputHelpTests(TestCase):
 
     def test_kk(self):
         self.assertIn('Кіріс деректерін', self.page('3 7', 'kk'))
+
+
+class TaskStatusFilterTests(TestCase):
+    def setUp(self):
+        from .models import Submission
+        u = User.objects.create_user('sf', password='pw12345')
+        st = Student.objects.create(user=u, full_name='Ф', school_class='7F')
+        self.done = Task.objects.create(title='Сделанная', description='d', level='A', test_cases=[])
+        self.work = Task.objects.create(title='Рабочая', description='d', level='A', test_cases=[])
+        self.new = Task.objects.create(title='Новая', description='d', level='B', test_cases=[])
+        Submission.objects.create(student=st, task=self.done, status='DONE', score=10, is_graded=True)
+        Submission.objects.create(student=st, task=self.work, status='IN_PROGRESS')
+        self.client.login(username='sf', password='pw12345')
+
+    def titles(self, qs):
+        h = self.client.get('/' + qs).content.decode()
+        return {n for n in ('Сделанная', 'Рабочая', 'Новая') if f'>{n}<' in h or n in h}
+
+    def test_filters(self):
+        self.assertEqual(self.titles('?status=done'), {'Сделанная'})
+        self.assertEqual(self.titles('?status=progress'), {'Рабочая'})
+        self.assertEqual(self.titles('?status=unsolved'), {'Рабочая', 'Новая'})
+        self.assertEqual(self.titles(''), {'Сделанная', 'Рабочая', 'Новая'})
+
+    def test_combines_with_level_and_keeps_params_in_links(self):
+        self.assertEqual(self.titles('?status=unsolved&level=B'), {'Новая'})
+        h = self.client.get('/?status=done').content.decode()
+        self.assertIn('status=done', h)
+        self.assertIn('level=A&amp;status=done', h)
+
+    def test_invalid_status_ignored(self):
+        self.assertEqual(self.titles('?status=zzz'), {'Сделанная', 'Рабочая', 'Новая'})

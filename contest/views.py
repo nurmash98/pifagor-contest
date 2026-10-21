@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from datetime import timedelta
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -276,6 +276,10 @@ def all_tasks_view(request):
     tasks = list(_tasks_by_level_and_solved(tasks))
     _apply_task_language(tasks, lang)
 
+    status_filter = request.GET.get('status', '')
+    if status_filter not in ('done', 'unsolved', 'progress') or student is None:
+        status_filter = ''
+
     if student is not None:
         # Привязываем существующие решения ученика к задачам
         user_submissions = {
@@ -284,16 +288,45 @@ def all_tasks_view(request):
         }
         for task in tasks:
             task.user_sub = user_submissions.get(task.id)
+        if status_filter:
+            def _keep(task):
+                sub = task.user_sub
+                done = bool(sub and sub.status == 'DONE')
+                if status_filter == 'done':
+                    return done
+                if status_filter == 'unsolved':
+                    return not done
+                return bool(sub) and not done  # progress: начата, но не решена
+            tasks = [t for t in tasks if _keep(t)]
     else:
         for task in tasks:
             task.user_sub = None
 
+    def _url(level=None, tag=None, status=None):
+        params = {}
+        if (level if level is not None else level_filter) in ('A', 'B', 'C'):
+            params['level'] = level if level is not None else level_filter
+        tag_value = tag if tag is not None else selected_tag_id
+        if tag_value:
+            params['tag'] = tag_value
+        status_value = status if status is not None else status_filter
+        if status_value:
+            params['status'] = status_value
+        base = reverse('all_tasks')
+        return f'{base}?{urlencode(params)}' if params else base
+
+    all_tags = list(Tag.objects.all())
     context = {
         'tasks': tasks,
         'current_level': level_filter,
         'current_tag': selected_tag_id,
-        'all_tags': Tag.objects.all(),
+        'current_status': status_filter,
+        'all_tags': all_tags,
         'readonly': student is None,
+        'level_urls': {(k or 'all'): _url(level=k) for k in ('', 'A', 'B', 'C')},
+        'status_urls': {(k or 'all'): _url(status=k) for k in ('', 'done', 'unsolved', 'progress')},
+        'all_tags_url': _url(tag=0),
+        'tag_urls': [(tag, _url(tag=tag.id)) for tag in all_tags],
     }
     return render(request, 'all_tasks.html', context)
 
