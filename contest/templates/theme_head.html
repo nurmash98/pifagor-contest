@@ -92,9 +92,10 @@
         background-color: #151b30; color: var(--bs-body-color); border-color: #34c27a; box-shadow: 0 0 0 .2rem rgba(52, 194, 122, .2);
     }
     [data-bs-theme="dark"] .form-control::placeholder { color: rgba(228, 231, 240, .4); }
-    /* Ночной режим: логотип становится белым (на тёмном фоне иначе не виден) */
-    [data-bs-theme="dark"] img[src$="logo.svg"],
-    [data-bs-theme="dark"] img.nav-logo { filter: brightness(0) invert(1); }
+    /* Логотип: в ночном режиме — светлая версия (белые знаки, ярко-зелёное дерево) */
+    .logo-dark { display: none; }
+    [data-bs-theme="dark"] .logo-dark { display: inline-block; }
+    [data-bs-theme="dark"] .logo-light { display: none; }
 </style>
 
 {# Иконка сайта: вкладка браузера, «Добавить на экран «Домой»» (iOS/Android), манифест веб-приложения #}
