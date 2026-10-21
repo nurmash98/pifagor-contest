@@ -291,12 +291,12 @@ def all_tasks_view(request):
         if status_filter:
             def _keep(task):
                 sub = task.user_sub
-                done = bool(sub and sub.status == 'DONE')
+                done = bool(sub and sub.status == 'DONE' and sub.score == 10)  # решено = ровно 10/10
                 if status_filter == 'done':
                     return done
                 if status_filter == 'unsolved':
                     return not done
-                return bool(sub) and not done  # progress: начата, но не решена
+                return bool(sub) and not done  # progress: начата, но не 10/10 (в т.ч. 0/10, 9/10)
             tasks = [t for t in tasks if _keep(t)]
     else:
         for task in tasks:

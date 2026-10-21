@@ -762,17 +762,19 @@ class TaskStatusFilterTests(TestCase):
         self.new = Task.objects.create(title='Новая', description='d', level='B', test_cases=[])
         Submission.objects.create(student=st, task=self.done, status='DONE', score=10, is_graded=True)
         Submission.objects.create(student=st, task=self.work, status='IN_PROGRESS')
+        self.partial = Task.objects.create(title='Девятка', description='d', level='A', test_cases=[])
+        Submission.objects.create(student=st, task=self.partial, status='DONE', score=9, is_graded=True)
         self.client.login(username='sf', password='pw12345')
 
     def titles(self, qs):
         h = self.client.get('/' + qs).content.decode()
-        return {n for n in ('Сделанная', 'Рабочая', 'Новая') if f'>{n}<' in h or n in h}
+        return {n for n in ('Сделанная', 'Рабочая', 'Новая', 'Девятка') if f'>{n}<' in h or n in h}
 
     def test_filters(self):
         self.assertEqual(self.titles('?status=done'), {'Сделанная'})
-        self.assertEqual(self.titles('?status=progress'), {'Рабочая'})
-        self.assertEqual(self.titles('?status=unsolved'), {'Рабочая', 'Новая'})
-        self.assertEqual(self.titles(''), {'Сделанная', 'Рабочая', 'Новая'})
+        self.assertEqual(self.titles('?status=progress'), {'Рабочая', 'Девятка'})
+        self.assertEqual(self.titles('?status=unsolved'), {'Рабочая', 'Новая', 'Девятка'})
+        self.assertEqual(self.titles(''), {'Сделанная', 'Рабочая', 'Новая', 'Девятка'})
 
     def test_combines_with_level_and_keeps_params_in_links(self):
         self.assertEqual(self.titles('?status=unsolved&level=B'), {'Новая'})
@@ -781,4 +783,4 @@ class TaskStatusFilterTests(TestCase):
         self.assertIn('level=A&amp;status=done', h)
 
     def test_invalid_status_ignored(self):
-        self.assertEqual(self.titles('?status=zzz'), {'Сделанная', 'Рабочая', 'Новая'})
+        self.assertEqual(self.titles('?status=zzz'), {'Сделанная', 'Рабочая', 'Новая', 'Девятка'})
