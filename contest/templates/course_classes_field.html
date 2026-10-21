@@ -1,0 +1,14 @@
+<div class="mb-3">
+    <label class="form-label fw-semibold">Каким классам виден курс</label>
+    <div class="d-flex flex-wrap gap-2">
+        {% for cls, checked in class_choices %}
+        <div class="form-check form-check-inline me-0">
+            <input type="checkbox" name="visible_classes" value="{{ cls }}" class="form-check-input" id="vc_{{ cls }}" {% if checked %}checked{% endif %}>
+            <label class="form-check-label" for="vc_{{ cls }}">{{ cls }}</label>
+        </div>
+        {% empty %}
+        <span class="text-muted small">Нет доступных классов.</span>
+        {% endfor %}
+    </div>
+    <div class="form-text">Если ничего не отмечено — курс увидят все классы (когда включено «Показывать ученикам»).</div>
+</div>

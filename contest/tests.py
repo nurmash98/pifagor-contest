@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import (Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher)
+from .models import (Course, Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher)
 
 
 def make_task(title, level, tag, ok=True):
@@ -1165,3 +1165,49 @@ class DuelsAdminOnlyTests(TestCase):
         self.client.post(reverse('student_toggle_duel_tester', args=[st.id]))
         st.refresh_from_db()
         self.assertFalse(st.duel_tester)
+
+
+class CourseClassVisibilityTests(TestCase):
+    def setUp(self):
+        self.tu = User.objects.create_user('tc', password='p', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.tu, full_name='Нур Омарбек', classes='7F, 8A')
+        self.s7 = User.objects.create_user('s7', password='p')
+        Student.objects.create(user=self.s7, full_name='A', school_class='7F')
+        self.s9 = User.objects.create_user('s9', password='p')
+        Student.objects.create(user=self.s9, full_name='B', school_class='9A')
+
+    def test_teacher_creates_course_for_chosen_classes(self):
+        self.client.login(username='tc', password='p')
+        page = self.client.get(reverse('course_create'))
+        self.assertContains(page, 'value="7F"')
+        self.assertContains(page, 'value="8A"')
+        self.client.post(reverse('course_create'), {
+            'name': 'Python', 'is_visible': 'on', 'visible_classes': ['7F', '9A']})
+        course = Course.objects.get(name='Python')
+        # 9A не класс этого учителя — отбрасывается
+        self.assertEqual(course.visible_class_list(), ['7F'])
+        self.assertEqual(course.created_by, self.teacher)
+
+    def test_students_see_only_their_class_courses(self):
+        c = Course.objects.create(name='Только 7F', is_visible=True, visible_classes='7F', created_by=self.teacher)
+        Course.objects.create(name='Для всех', is_visible=True)
+        self.client.login(username='s7', password='p')
+        r = self.client.get(reverse('courses'))
+        self.assertContains(r, 'Только 7F')
+        self.assertContains(r, 'Для всех')
+        self.assertContains(r, 'Нур Омарбек')
+        self.client.logout()
+        self.client.login(username='s9', password='p')
+        r = self.client.get(reverse('courses'))
+        self.assertNotContains(r, 'Только 7F')
+        self.assertContains(r, 'Для всех')
+        r = self.client.get(reverse('course_detail', args=[c.id]))
+        self.assertRedirects(r, reverse('courses'))
+
+    def test_edit_updates_classes(self):
+        c = Course.objects.create(name='X', is_visible=True, visible_classes='7F')
+        self.teacher.courses.add(c)
+        self.client.login(username='tc', password='p')
+        self.client.post(reverse('course_edit', args=[c.id]), {'name': 'X', 'visible_classes': ['8A']})
+        c.refresh_from_db()
+        self.assertEqual(c.visible_class_list(), ['8A'])

@@ -14,6 +14,7 @@
         <span class="badge bg-secondary">{% t "Скрыт от учеников" %}</span>
     {% endif %}
 </div>
+<p class="text-muted small mb-2">{% t "Автор:" %} {{ course.created_by.full_name|default:"—" }}</p>
 <p class="text-muted mb-4">{{ course.description|default:"" }}</p>
 
 {% for topic in topics %}

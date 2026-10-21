@@ -23,7 +23,8 @@
                     {% endif %}
                 </div>
                 <p class="text-muted small flex-grow-1">{{ course.description|default:"Без описания"|truncatewords:20 }}</p>
-                <p class="text-muted small mb-3">{% t "Тем:" %} {{ course.topics.count }}</p>
+                <p class="text-muted small mb-1">{% t "Тем:" %} {{ course.topics.count }}</p>
+                <p class="text-muted small mb-3">{% t "Автор:" %} {{ course.created_by.full_name|default:"—" }}{% if request.user.is_staff %} · {% if course.visible_classes %}{{ course.visible_classes }}{% else %}все классы{% endif %}{% endif %}</p>
                 <a href="{% url 'course_detail' course.id %}" class="btn btn-pifagor-green btn-sm align-self-start">
                     {% t "Открыть курс →" %}
                 </a>

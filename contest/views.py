@@ -744,20 +744,51 @@ def logout_view(request):
     return redirect('login')
 
 
+def _course_open_for(user, course):
+    """Ученик видит курс, если он включён и открыт его классу. Учителя/админ — всегда."""
+    if user.is_staff:
+        return True
+    if not course.is_visible:
+        return False
+    student = Student.objects.filter(user=user).first()
+    return student is not None and course.visible_to_class(student.school_class)
+
+
+def _class_choices(user):
+    """Классы, которые учитель может отметить: его классы; админу — все существующие."""
+    classes = _managed_classes(user)
+    if classes is None:
+        classes = sorted({c for c in Student.objects.values_list('school_class', flat=True) if c})
+    return classes
+
+
+def _class_form_context(user, course=None):
+    chosen = set(course.visible_class_list()) if course else set()
+    choices = _class_choices(user)
+    # Классы курса, которых нет в списке учителя (выбрал админ), не теряем.
+    extra = sorted(chosen - set(choices))
+    return {'class_choices': [(c, c in chosen) for c in list(choices) + extra]}
+
+
+def _read_visible_classes(request):
+    allowed = set(_class_choices(request.user))
+    return [c for c in request.POST.getlist('visible_classes') if normalize_school_class(c) in allowed]
+
+
 @login_required
 def courses_view(request):
     """Каталог курсов, видимых ученикам (и открытый учителям/админу для проверки)."""
-    courses = Course.objects.prefetch_related('topics__tasks')
+    courses = Course.objects.select_related('created_by').prefetch_related('topics__tasks')
     if not request.user.is_staff:
-        courses = courses.filter(is_visible=True)
+        courses = [c for c in courses.filter(is_visible=True) if _course_open_for(request.user, c)]
     return render(request, 'courses.html', {'courses': courses})
 
 
 @login_required
 def course_detail(request, course_id):
     """Темы и задачи внутри одного курса — со статусом решения для ученика."""
-    course = get_object_or_404(Course, id=course_id)
-    if not course.is_visible and not request.user.is_staff:
+    course = get_object_or_404(Course.objects.select_related('created_by'), id=course_id)
+    if not _course_open_for(request.user, course):
         messages.warning(request, 'Этот курс пока недоступен.')
         return redirect('courses')
 
@@ -810,12 +841,14 @@ def course_create(request):
                 is_visible=request.POST.get('is_visible') == 'on',
                 created_by=teacher,
             )
+            course.set_visible_classes(_read_visible_classes(request))
+            course.save(update_fields=['visible_classes'])
             if teacher is not None:
                 teacher.courses.add(course)
             messages.success(request, f'Курс «{course.name}» создан. Теперь добавьте темы.')
             return redirect('course_manage', course_id=course.id)
 
-    return render(request, 'course_form.html', {})
+    return render(request, 'course_form.html', _class_form_context(request.user))
 
 
 @staff_member_required
@@ -827,7 +860,9 @@ def course_manage(request, course_id):
         return redirect('teacher_dashboard')
 
     topics = course.topics.prefetch_related('tasks').defer('theory_html')
-    return render(request, 'course_manage.html', {'course': course, 'topics': topics})
+    context = {'course': course, 'topics': topics}
+    context.update(_class_form_context(request.user, course))
+    return render(request, 'course_manage.html', context)
 
 
 @staff_member_required
@@ -904,6 +939,10 @@ def course_edit(request, course_id):
             course.name = name
         course.description = request.POST.get('description', '').strip()
         course.is_visible = request.POST.get('is_visible') == 'on'
+        # Классы вне списка учителя (их выбрал админ) остаются как были.
+        allowed = set(_class_choices(request.user))
+        kept = [c for c in course.visible_class_list() if c not in allowed]
+        course.set_visible_classes(kept + _read_visible_classes(request))
         course.save()
         messages.success(request, 'Курс обновлён.')
 
@@ -980,8 +1019,8 @@ def topic_theory(request, topic_id):
     """HTML-теория темы. Показывается в песочнице (CSP sandbox, без allow-same-origin):
     даже если в загруженном файле есть скрипты, они работают с «чужого» происхождения и
     не видят сессию/cookie сайта. Открывается внутри страницы курса или в новой вкладке."""
-    topic = get_object_or_404(Topic, id=topic_id)
-    if not topic.course.is_visible and not request.user.is_staff:
+    topic = get_object_or_404(Topic.objects.select_related('course'), id=topic_id)
+    if not _course_open_for(request.user, topic.course):
         raise Http404
     if not topic.theory_html:
         raise Http404
@@ -1393,7 +1432,7 @@ def topic_video(request, topic_id):
     чтобы само видео не занимало много места в списке задач."""
     topic = get_object_or_404(Topic, id=topic_id)
     course = topic.course
-    if not course.is_visible and not request.user.is_staff:
+    if not _course_open_for(request.user, course):
         messages.warning(request, 'Этот курс пока недоступен.')
         return redirect('courses')
     if not topic.theory_video_url:

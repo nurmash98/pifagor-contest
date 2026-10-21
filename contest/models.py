@@ -116,6 +116,9 @@ class Course(models.Model):
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                     related_name='created_courses', verbose_name="Кем создан")
     created_at = models.DateTimeField(auto_now_add=True)
+    visible_classes = models.CharField(
+        max_length=255, blank=True, verbose_name="Классы, которым виден курс",
+        help_text="Через запятую, например: 7F, 10A. Пусто — виден всем классам")
 
     class Meta:
         verbose_name = "Курс"
@@ -124,6 +127,17 @@ class Course(models.Model):
 
     def __str__(self):
         return self.name
+
+    def visible_class_list(self):
+        return [normalize_school_class(c) for c in self.visible_classes.split(',') if c.strip()]
+
+    def set_visible_classes(self, classes):
+        self.visible_classes = ', '.join(dict.fromkeys(normalize_school_class(c) for c in classes if c))
+
+    def visible_to_class(self, school_class):
+        """Пустой список классов — курс для всех."""
+        classes = self.visible_class_list()
+        return not classes or normalize_school_class(school_class) in classes
 
 
 class Topic(models.Model):
