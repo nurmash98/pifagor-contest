@@ -29,7 +29,8 @@
             {% if my_change > 0 %}+{% endif %}{{ my_change }} {% t "к рейтингу" %} → {{ me.duel_rating }}
         </div>
         <div class="small text-muted mt-1">
-            {% if duel.end_reason == 'resign' %}{% if result == 'win' %}{% t "Соперник сдался." %}{% else %}{% t "Вы сдались." %}{% endif %}
+            {% if duel.end_reason == 'left' %}{% if result == 'win' %}{% t "Соперник покинул страницу дуэли." %}{% else %}{% t "Вы покинули страницу дуэли — засчитано поражение." %}{% endif %}
+            {% elif duel.end_reason == 'resign' %}{% if result == 'win' %}{% t "Соперник сдался." %}{% else %}{% t "Вы сдались." %}{% endif %}
             {% elif duel.end_reason == 'inactive' %}{% t "Матч закрыт: 20 минут никто не отправлял решения." %}{% endif %}
         </div>
         <a href="{% url 'duels' %}" class="btn btn-pifagor-green rounded-pill px-4 mt-3">{% t "К дуэлям" %}</a>
@@ -39,31 +40,50 @@
     {% endif %}
 
 
+    {% if not finished %}
+    <div class="alert alert-warning rounded-3 small">⚠️ {% t "Не уходите со страницы дуэли: переключение вкладки или сворачивание окна сразу засчитывается как поражение." %}
+        {% t "Задачи открываются по одной: следующая появится, когда эта будет решена или закрыта." %}</div>
+    {% endif %}
+
     <div class="row g-4">
         {% for dt in tasks %}
         <div class="col-12" id="task-{{ dt.id }}">
-            <div class="card border-0 shadow-sm rounded-4 p-4 {% if dt.mine_won %}border-start border-5 border-success{% elif dt.opp_won %}border-start border-5 border-danger{% endif %}">
+            {% if dt.is_future %}
+            <div class="card border-0 shadow-sm rounded-4 p-3 text-muted" style="opacity:.7;">
+                🔒 {% t "Задача" %} {{ forloop.counter }} — {% t "откроется после предыдущей" %}
+            </div>
+            {% elif dt.closed %}
+            <div class="card border-0 shadow-sm rounded-4 p-3 {% if dt.mine_won %}border-start border-5 border-success{% elif dt.opp_won %}border-start border-5 border-danger{% endif %}">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong style="color:#1a1a4b;">{% t "Задача" %} {{ forloop.counter }}: {{ dt.task.display_title }}</strong>
+                    {% if dt.mine_won %}<span class="badge bg-success">✔ {% t "Очко ваше" %}</span>
+                    {% elif dt.opp_won %}<span class="badge bg-danger">{% t "Очко у соперника" %}</span>
+                    {% elif dt.timed_out_flag %}<span class="badge bg-secondary">⏱ {% t "Время вышло" %}</span>
+                    {% else %}<span class="badge bg-secondary">{% t "Закрыта: попытки кончились" %}</span>{% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card border-0 shadow-sm rounded-4 p-4 border-start border-5 border-primary">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                    <h5 class="fw-bold mb-0" style="color:#1a1a4b;">{% t "Задача" %} {{ forloop.counter }}: {{ dt.task.display_title }}
+                    <h5 class="fw-bold mb-0" style="color:#1a1a4b;">{% t "Задача" %} {{ forloop.counter }} {% t "из" %} {{ tasks|length }}: {{ dt.task.display_title }}
                         <span class="badge badge-level-{{ dt.task.level }} ms-2">{% t "Уровень" %} {{ dt.task.level }}</span></h5>
-                    <div>
-                        {% if dt.mine_won %}<span class="badge bg-success fs-6">✔ {% t "Очко ваше" %}</span>
-                        {% elif dt.opp_won %}<span class="badge bg-danger fs-6">{% t "Очко у соперника" %}</span>
-                        {% elif dt.closed %}<span class="badge bg-secondary fs-6">{% t "Закрыта: попытки кончились" %}</span>
-                        {% else %}<span class="badge bg-light text-dark border fs-6">{% t "Ваши попытки" %}: {{ dt.my_left }} / {{ attempts_per_task }} · {% t "у соперника" %}: {{ dt.opp_left }} / {{ attempts_per_task }}</span>{% endif %}
-                    </div>
+                    <span class="badge bg-dark fs-6 duel-timer" data-left="{{ dt.seconds_left }}">⏱ <span class="t-val">5:00</span></span>
+                    <span class="badge bg-light text-dark border fs-6">{% t "Ваши попытки" %}: {{ dt.my_left }} / {{ attempts_per_task }} · {% t "у соперника" %}: {{ dt.opp_left }} / {{ attempts_per_task }}</span>
                 </div>
                 <div class="mb-3" style="white-space:pre-wrap;">{{ dt.task.display_description }}</div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-6"><div class="small text-muted">{% t "Пример ввода" %}</div><pre class="bg-light rounded-3 p-2 small mb-0">{{ dt.task.display_input_example }}</pre></div>
                     <div class="col-md-6"><div class="small text-muted">{% t "Пример вывода" %}</div><pre class="bg-light rounded-3 p-2 small mb-0">{{ dt.task.display_output_example }}</pre></div>
                 </div>
-                {% if not finished and not dt.closed and dt.my_left and enabled %}
-                <form method="post" action="{% url 'duel_submit' duel.id dt.id %}">{% csrf_token %}
-                    <textarea name="code" data-task="{{ dt.id }}" class="form-control rounded-3 font-monospace p-3 mb-2 duel-code" rows="9"
-                              style="background-color:#272822;color:#f8f8f2;" placeholder="{% t '# Напишите ваш код здесь...' %}" required>{{ dt.last_code }}</textarea>
+                {% if dt.my_left and enabled %}
+                <form method="post" action="{% url 'duel_submit' duel.id dt.id %}" class="duel-form">{% csrf_token %}
+                    <textarea name="code" data-task="{{ dt.id }}" data-height="280" class="form-control rounded-3 font-monospace p-3 mb-2 code-editor duel-code" rows="9"
+                              autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
+                              style="background-color:#272822;color:#f8f8f2;" placeholder="{% t '# Напишите ваш код здесь...' %}">{{ dt.last_code }}</textarea>
                     <div class="text-end"><button class="btn btn-pifagor-green rounded-pill px-4">{% t "Отправить" %} →</button></div>
                 </form>
+                {% elif not dt.my_left %}
+                <div class="alert alert-secondary rounded-3 mb-0">{% t "Ваши попытки закончились — ждём, пока соперник использует свои или решит задачу." %}</div>
                 {% endif %}
                 {% if dt.my_attempts %}
                 <div class="small text-muted mt-2">
@@ -71,6 +91,7 @@
                 </div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -79,19 +100,58 @@
     <form method="post" action="{% url 'duel_resign' duel.id %}" class="text-end mt-4" onsubmit="return confirm('{% t "Сдаться? Победа достанется сопернику." %}');">{% csrf_token %}
         <button class="btn btn-outline-danger btn-sm rounded-pill px-4">🏳 {% t "Сдаться" %}</button>
     </form>
+    {% include 'code_editor.html' %}
     <script>
     (function () {
         var sig = "{{ signature }}";
+        var safe = false;          // true — страница уходит по нашей воле (отправка, обновление): это не нарушение
+        var leaveUrl = "{% url 'duel_leave' duel.id %}";
+        var token = "{{ csrf_token }}";
+
         // Черновики кода сохраняем на время обновления страницы
+        var editors = window.codeEditors || {};
         document.querySelectorAll('.duel-code').forEach(function (ta) {
-            var key = 'duel{{ duel.id }}-' + ta.dataset.task;
-            try { var saved = sessionStorage.getItem(key); if (saved && !ta.value) ta.value = saved; } catch (e) {}
-            ta.addEventListener('input', function () { try { sessionStorage.setItem(key, ta.value); } catch (e) {} });
+            var key = 'duel{{ duel.id }}-' + ta.dataset.task, cm = editors[ta.dataset.task];
+            try {
+                var saved = sessionStorage.getItem(key);
+                if (saved && !ta.value) { if (cm) { cm.setValue(saved); } else { ta.value = saved; } }
+            } catch (e) {}
+            var onChange = function () { try { sessionStorage.setItem(key, cm ? cm.getValue() : ta.value); } catch (e) {} };
+            if (cm) { cm.on('change', onChange); } else { ta.addEventListener('input', onChange); }
         });
+        document.querySelectorAll('form').forEach(function (f) { f.addEventListener('submit', function () { safe = true; }); });
+
+        // Ушёл со страницы (другая вкладка, свёрнутое окно, переход) — сразу поражение
+        function leave() {
+            if (safe) { return; }
+            safe = true;
+            var fd = new FormData();
+            fd.append('csrfmiddlewaretoken', token);
+            if (navigator.sendBeacon) { navigator.sendBeacon(leaveUrl, fd); }
+            else { fetch(leaveUrl, {method: 'POST', body: fd, credentials: 'same-origin', keepalive: true}); }
+        }
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { leave(); } });
+
+        // Таймер текущей задачи (5 минут). По нулю обновляем страницу — откроется следующая задача.
+        var timer = document.querySelector('.duel-timer');
+        if (timer) {
+            var left = parseInt(timer.dataset.left, 10), val = timer.querySelector('.t-val');
+            function draw() {
+                var m = Math.floor(left / 60), s = left % 60;
+                val.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+                if (left <= 60) { timer.className = 'badge bg-danger fs-6 duel-timer'; }
+            }
+            draw();
+            setInterval(function () {
+                left = Math.max(left - 1, 0); draw();
+                if (left === 0) { safe = true; setTimeout(function () { location.reload(); }, 1200); }
+            }, 1000);
+        }
+
         setInterval(function () {
             fetch("{% url 'duel_state' duel.id %}", {credentials: 'same-origin'})
                 .then(function (r) { return r.json(); })
-                .then(function (d) { if (d.signature && d.signature !== sig) { location.reload(); } })
+                .then(function (d) { if (d.signature && d.signature !== sig) { safe = true; location.reload(); } })
                 .catch(function () {});
         }, 3000);
     })();

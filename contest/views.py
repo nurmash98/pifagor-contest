@@ -380,8 +380,10 @@ def task_detail(request, task_id):
             # Преподаватель решает задачу «для себя»: прогон тестов без сохранения
             # (нет ни посылки, ни баллов, ни значков, ни места в лидерборде).
             teacher_code = request.POST.get('code', '')
-            run = run_autotests(task, teacher_code)
-            if run.get('available'):
+            run = run_autotests(task, teacher_code) if teacher_code.strip() else {'available': False, 'empty': True}
+            if run.get('empty'):
+                messages.info(request, 'Вставьте код решения — поле пустое.')
+            elif run.get('available'):
                 from types import SimpleNamespace
                 teacher_result = SimpleNamespace(
                     autotest_checked_at=timezone.now(), autotest_total=run['total'],
@@ -421,6 +423,9 @@ def task_detail(request, task_id):
             return redirect(task_url_with_back)
 
         code = request.POST.get('code', '')
+        if not code.strip():
+            messages.warning(request, 'Вставьте код решения — поле пустое.')
+            return redirect(task_url_with_back)
         submission.code = code
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()

@@ -117,9 +117,10 @@
                 {% include 'input_help.html' %}
                 <form method="post" class="d-flex flex-column flex-grow-1">
                     {% csrf_token %}
-                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3"
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3 code-editor" data-height="340"
+                              autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="{% t '# Напишите ваш код здесь...' %}" required>{{ teacher_code|default:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}">{{ teacher_code|default:'' }}</textarea>
                     <div class="text-end">
                         <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">{% t "Проверить решение →" %}</button>
                     </div>
@@ -148,9 +149,10 @@
                 <input type="hidden" name="pointer_count" id="f-pointer" value="0">
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
                     <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
-                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3"
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 code-editor" data-height="340"
+                              autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="{% t '# Напишите ваш код здесь...' %}" required {% if cooldown_minutes %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}" {% if cooldown_minutes %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">
@@ -180,4 +182,5 @@
         {% endif %}
     </div>
 </div>
+{% include 'code_editor.html' %}
 {% endblock %}

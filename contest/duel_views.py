@@ -106,7 +106,10 @@ def duels_status(request):
 
 
 def _duel_context(duel, student, lang):
+    """Задачи дуэли по порядку. Открыта одна (current); закрытые показываем кратко;
+    будущие скрыты — их условия ученик не видит, пока не дойдёт очередь."""
     tasks = []
+    current = duels.current_task(duel) if duel.status == 'ACTIVE' else None
     for dt in duel.duel_tasks.select_related('task', 'winner').prefetch_related('attempts'):
         _apply_task_language([dt.task], lang)
         mine = [a for a in dt.attempts.all() if a.player_id == student.id]
@@ -117,6 +120,10 @@ def _duel_context(duel, student, lang):
         dt.mine_won = dt.winner_id == student.id
         dt.opp_won = bool(dt.winner_id) and dt.winner_id != student.id
         dt.last_code = mine[-1].code if mine else ''
+        dt.is_current = current is not None and dt.id == current.id
+        dt.is_future = duel.status == 'ACTIVE' and not dt.closed and not dt.is_current
+        dt.seconds_left = duels.seconds_left(dt) if dt.is_current else None
+        dt.timed_out_flag = dt.timed_out and not dt.winner_id
         tasks.append(dt)
     return tasks
 
@@ -189,6 +196,17 @@ def duel_resign(request, duel_id):
     if student is not None and duel.has_player(student):
         duels.resign(duel, student)
     return redirect('duel_match', duel_id=duel.id)
+
+
+@login_required
+@require_POST
+def duel_leave(request, duel_id):
+    """Вызывается из браузера (sendBeacon), когда ученик ушёл со страницы дуэли: сразу поражение."""
+    duel = get_object_or_404(Duel, id=duel_id)
+    student = _student(request)
+    if student is not None and duel.has_player(student):
+        duels.resign(duel, student, reason='left')
+    return JsonResponse({'ok': True})
 
 
 @staff_member_required

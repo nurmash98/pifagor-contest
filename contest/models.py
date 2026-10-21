@@ -587,6 +587,9 @@ class DuelTask(models.Model):
     order = models.PositiveSmallIntegerField(default=0)
     winner = models.ForeignKey(Student, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     solved_at = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(null=True, blank=True)    # когда задача стала текущей
+    closed_at = models.DateTimeField(null=True, blank=True)    # когда закрылась (очко, попытки или время)
+    timed_out = models.BooleanField(default=False)             # закрыта по истечении времени
 
     class Meta:
         ordering = ['order']

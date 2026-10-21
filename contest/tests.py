@@ -1029,3 +1029,101 @@ class DuelsTeacherViewTests(TestCase):
         self.client.login(username='sv', password='x')
         self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertRedirects(self.client.get(reverse('duels')), reverse('all_tasks'))
+
+
+class DuelSequentialAndLeaveTests(DuelTests):
+    def test_only_current_task_accepts_code(self):
+        duel = self.start()
+        t1, t2, t3 = list(duel.duel_tasks.all())
+        ok, msg, _ = self.duels.submit_code(duel, self.st[0], t2, self.good)
+        self.assertFalse(ok)
+        self.assertIn('не открыта', msg)
+        self.assertTrue(self.duels.submit_code(duel, self.st[0], t1, self.good)[0])
+        self.assertEqual(self.duels.current_task(duel).id, t2.id)       # решили — сразу следующая
+        self.assertTrue(self.duels.submit_code(duel, self.st[1], t2, self.bad)[0])
+
+    def test_next_task_opens_when_attempts_exhausted(self):
+        duel = self.start()
+        t1, t2, _t3 = list(duel.duel_tasks.all())
+        for p in self.st[:2]:
+            for _ in range(3):
+                self.duels.submit_code(duel, p, t1, self.bad)
+        self.assertEqual(self.duels.current_task(duel).id, t2.id)
+
+    def test_future_tasks_hidden_on_page(self):
+        duel = self.start()
+        self.client.login(username='da', password='pw12345')
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertIn('откроется после предыдущей', html)
+        self.assertEqual(html.count('откроется после предыдущей'), 2)
+
+    def test_leaving_page_is_instant_loss(self):
+        duel = self.start()
+        self.client.login(username='da', password='pw12345')
+        self.assertEqual(self.client.post(reverse('duel_leave', args=[duel.id])).status_code, 200)
+        duel.refresh_from_db()
+        self.assertEqual(duel.status, 'FINISHED')
+        self.assertEqual(duel.winner_id, self.st[1].id)
+        self.assertEqual(duel.end_reason, 'left')
+        self.st[0].refresh_from_db()
+        self.assertEqual(self.st[0].duel_rating, 784)
+
+    def test_stranger_cannot_make_others_leave(self):
+        duel = self.start()
+        self.client.login(username='dc', password='pw12345')
+        self.client.post(reverse('duel_leave', args=[duel.id]))
+        duel.refresh_from_db()
+        self.assertEqual(duel.status, 'ACTIVE')
+
+
+class DuelTimeLimitTests(DuelTests):
+    def age(self, duel, minutes):
+        """Сдвигает начало дуэли назад — как будто прошло minutes минут."""
+        shift = timedelta(minutes=minutes)
+        Duel.objects.filter(pk=duel.pk).update(created_at=duel.created_at - shift, last_activity=timezone.now())
+        duel.duel_tasks.filter(opened_at__isnull=False).update(opened_at=timezone.now() - shift)
+
+    def test_task_times_out_after_five_minutes_and_next_opens(self):
+        duel = self.start()
+        t1, t2, t3 = list(duel.duel_tasks.all())
+        self.age(duel, 6)
+        duel = self.duels.refresh(duel)
+        t1.refresh_from_db()
+        self.assertTrue(t1.timed_out)
+        self.assertIsNone(t1.winner_id)
+        self.assertEqual(self.duels.current_task(duel).id, t2.id)
+        ok, msg, _ = self.duels.submit_code(duel, self.st[0], t1, self.good)     # старая уже закрыта
+        self.assertFalse(ok)
+        self.assertTrue(self.duels.submit_code(duel, self.st[0], t2, self.good)[0])
+
+    def test_each_task_gets_its_own_five_minutes(self):
+        duel = self.start()
+        t1, t2, _t3 = list(duel.duel_tasks.all())
+        self.duels.submit_code(duel, self.st[0], t1, self.good)                  # решили сразу
+        t2.refresh_from_db()
+        self.assertIsNotNone(t2.opened_at)
+        self.assertGreater(self.duels.seconds_left(t2), 290)
+
+    def test_all_tasks_timed_out_ends_in_draw(self):
+        duel = self.start()
+        self.age(duel, 20)
+        duel = self.duels.refresh(duel)
+        self.assertEqual(duel.status, 'FINISHED')
+        self.assertIsNone(duel.winner_id)
+
+    def test_timer_shown_on_page(self):
+        duel = self.start()
+        self.client.login(username='da', password='pw12345')
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertIn('duel-timer', html)
+
+
+class CodeEditorPartialTests(DuelTests):
+    def test_editor_partial_has_no_stray_markup(self):
+        duel = self.start()
+        self.client.login(username='da', password='pw12345')
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertIn('codemirror.min.js', html)
+        self.assertNotIn('{#', html)
+        self.assertNotIn('Подключается один раз', html)
+        self.assertEqual(html.count('<textarea'), 1)

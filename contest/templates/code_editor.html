@@ -1,0 +1,55 @@
+{% comment %}Редактор кода как в IDE: цвета Python, автоотступ после «:», Tab = 4 пробела, без автозаглавной буквы.
+Подключается один раз внизу страницы; превращает все textarea.code-editor в редактор.{% endcomment %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+<style>
+    .CodeMirror { border-radius: .75rem; font-size: 14px; line-height: 1.5; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+    .cm-s-monokai.CodeMirror { background: #272822; }
+    .cm-s-monokai .cm-keyword  { color: #ff6ac1; font-weight: 600; }   /* if, for, while, def, in, return … */
+    .cm-s-monokai .cm-builtin  { color: #5ad4e6; }                      /* print, input, int, range, len … */
+    .cm-s-monokai .cm-def      { color: #a6e22e; }                      /* имя функции после def */
+    .cm-s-monokai .cm-variable { color: #ffd479; }                      /* переменные */
+    .cm-s-monokai .cm-variable-2 { color: #ffd479; }
+    .cm-s-monokai .cm-property { color: #9cdcfe; }
+    .cm-s-monokai .cm-string   { color: #98c379; }
+    .cm-s-monokai .cm-number   { color: #bd93f9; }
+    .cm-s-monokai .cm-comment  { color: #7f8c8d; font-style: italic; }
+    .cm-s-monokai .cm-operator { color: #f8f8f2; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script>
+(function () {
+    if (!window.CodeMirror) { return; }   // нет сети/CDN — остаётся обычное поле ввода
+    window.codeEditors = {};
+    document.querySelectorAll('textarea.code-editor').forEach(function (ta, i) {
+        var cm = CodeMirror.fromTextArea(ta, {
+            mode: 'python', theme: 'monokai', lineNumbers: true,
+            indentUnit: 4, tabSize: 4, smartIndent: true, indentWithTabs: false,
+            lineWrapping: false, viewportMargin: Infinity,
+            extraKeys: {
+                Tab: function (c) { if (c.somethingSelected()) { c.indentSelection('add'); } else { c.execCommand('insertSoftTab'); } },
+                'Shift-Tab': function (c) { c.indentSelection('subtract'); },
+                // Backspace в начале строки стирает сразу целый отступ (4 пробела), как в IDE
+                Backspace: function (c) {
+                    if (c.somethingSelected()) { c.execCommand('delCharBefore'); return; }
+                    var cur = c.getCursor(), before = c.getLine(cur.line).slice(0, cur.ch);
+                    if (cur.ch > 0 && /^ +$/.test(before)) {
+                        var n = before.length % 4 || 4;
+                        c.replaceRange('', {line: cur.line, ch: cur.ch - n}, cur);
+                    } else { c.execCommand('delCharBefore'); }
+                }
+            }
+        });
+        var inp = cm.getInputField();
+        inp.setAttribute('autocapitalize', 'off');
+        inp.setAttribute('autocorrect', 'off');
+        inp.setAttribute('autocomplete', 'off');
+        inp.setAttribute('spellcheck', 'false');
+        cm.setSize('100%', ta.getAttribute('data-height') || 280);
+        if (ta.disabled) { cm.setOption('readOnly', 'nocursor'); }
+        cm.on('change', function () { cm.save(); });
+        window.codeEditors[ta.getAttribute('data-task') || ('e' + i)] = cm;
+    });
+})();
+</script>

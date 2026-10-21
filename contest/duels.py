@@ -7,7 +7,10 @@
 - «10/10» = все тесты задачи пройдены; кто первым — тот забирает очко, задача закрывается;
 - матч заканчивается, когда кто-то набрал 2 очка, или все задачи закрыты (очко взято или у
   обоих кончились попытки). Если очков поровну — ничья;
-- «Сдаться» отдаёт победу сопернику;
+- задачи открываются по одной: следующая появляется, когда предыдущая закрыта;
+- на каждую задачу 5 минут: не успели — задача закрывается без очка и открывается следующая;
+- «Сдаться» отдаёт победу сопернику; уход со страницы дуэли (другая вкладка, свёрнутое окно)
+  — сразу поражение;
 - лимита времени нет, но если 20 минут никто ничего не отправлял, матч закрывается сам:
   побеждает тот, у кого больше очков (поровну — ничья).
 """
@@ -27,6 +30,7 @@ K_FACTOR = 32
 POINTS_TO_WIN = 2
 TASKS_PER_DUEL = 3
 ATTEMPTS_PER_TASK = 3
+TASK_TIME_LIMIT = timedelta(minutes=5)     # время на каждую задачу
 INACTIVITY = timedelta(minutes=20)
 QUEUE_TTL = timedelta(minutes=10)
 
@@ -116,7 +120,7 @@ def try_match(student):
             player1=p1, player2=p2, p1_rating_before=p1.duel_rating, p2_rating_before=p2.duel_rating,
             last_activity=now)
         for i, task in enumerate(tasks):
-            DuelTask.objects.create(duel=duel, task=task, order=i)
+            DuelTask.objects.create(duel=duel, task=task, order=i, opened_at=now if i == 0 else None)
         DuelQueueEntry.objects.filter(student__in=[p1, p2]).delete()
         return duel
 
@@ -158,13 +162,67 @@ def attempts_left(duel_task, student):
 
 def task_closed(duel_task, duel):
     """Задача закрыта: очко уже взято или у обоих кончились попытки."""
-    if duel_task.winner_id:
+    if duel_task.winner_id or duel_task.timed_out:
         return True
     return all(attempts_left(duel_task, p) == 0 for p in duel.players())
 
 
+def advance(duel, now=None):
+    """Проставляет времена открытия/закрытия задач и закрывает просроченные.
+    Вызывать под блокировкой дуэли. Возвращает текущую (открытую) задачу или None."""
+    now = now or timezone.now()
+    prev_close = duel.created_at
+    for dt in duel.duel_tasks.order_by('order'):
+        if dt.closed_at is None:
+            if dt.opened_at is None:
+                dt.opened_at = prev_close
+            deadline = dt.opened_at + TASK_TIME_LIMIT
+            if dt.winner_id:
+                dt.closed_at = dt.solved_at or now
+            elif all(attempts_left(dt, p) == 0 for p in duel.players()):
+                last = dt.attempts.order_by('-created_at').first()
+                dt.closed_at = last.created_at if last else now
+            elif now >= deadline:
+                dt.timed_out = True
+                dt.closed_at = deadline
+            else:
+                dt.save(update_fields=['opened_at'])
+                return dt
+            dt.save(update_fields=['opened_at', 'closed_at', 'timed_out'])
+        prev_close = dt.closed_at
+    return None
+
+
+def refresh(duel):
+    """Актуализирует дуэль: закрывает просроченные задачи и, если всё закончилось, саму дуэль."""
+    with transaction.atomic():
+        locked = Duel.objects.select_for_update().get(pk=duel.pk)
+        if locked.status == 'ACTIVE':
+            advance(locked)
+            _maybe_finish(locked)
+        return locked
+
+
+def seconds_left(dt, now=None):
+    """Сколько секунд осталось на открытую задачу (0 — время вышло)."""
+    now = now or timezone.now()
+    if dt.opened_at is None:
+        return int(TASK_TIME_LIMIT.total_seconds())
+    return max(int((dt.opened_at + TASK_TIME_LIMIT - now).total_seconds()), 0)
+
+
+def current_task(duel):
+    """Задача, которая сейчас открыта: первая ещё не закрытая (или None, если все закрыты)."""
+    for dt in duel.duel_tasks.order_by('order'):
+        if not task_closed(dt, duel):
+            return dt
+    return None
+
+
 def submit_code(duel, student, duel_task, code):
     """Прогоняет код и фиксирует попытку. Возвращает (ok, сообщение, результат|None)."""
+    duel = refresh(duel)
+    duel_task = DuelTask.objects.get(pk=duel_task.pk)
     if duel.status != 'ACTIVE':
         return False, 'Дуэль уже завершена.', None
     if not duel.has_player(student) or duel_task.duel_id != duel.id:
@@ -173,6 +231,9 @@ def submit_code(duel, student, duel_task, code):
         return False, 'Вставьте код решения.', None
     if duel_task.winner_id:
         return False, 'Эта задача уже закрыта — очко взято.', None
+    current = current_task(duel)
+    if current is None or current.id != duel_task.id:
+        return False, 'Эта задача сейчас не открыта.', None
     if attempts_left(duel_task, student) == 0:
         return False, 'Попытки на эту задачу закончились.', None
 
@@ -187,7 +248,7 @@ def submit_code(duel, student, duel_task, code):
         dt = DuelTask.objects.select_for_update().get(pk=duel_task.pk)
         if locked.status != 'ACTIVE':
             return False, 'Дуэль уже завершена.', None
-        if dt.winner_id or attempts_left(dt, student) == 0:
+        if dt.winner_id or dt.timed_out or attempts_left(dt, student) == 0:
             return False, 'Эта задача уже закрыта.', None
         from .views import autotest_score
         DuelAttempt.objects.create(duel_task=dt, player=student, code=code, score=autotest_score(passed, total),
@@ -204,6 +265,8 @@ def submit_code(duel, student, duel_task, code):
                 locked.p2_points += 1
             won_point = True
         locked.save()
+        dt.refresh_from_db()
+        advance(locked)
         _maybe_finish(locked)
     msg = ('Верно! Вы получили очко.' if won_point
            else f'Пройдено тестов: {passed} из {total}. Попыток осталось: {attempts_left(dt, student)}.')
@@ -249,14 +312,18 @@ def _finish(duel, winner, reason):
     duel.save()
 
 
-def resign(duel, student):
+def resign(duel, student, reason='resign'):
+    """Игрок сдался (reason='resign') или покинул страницу (reason='left') — победа сопернику."""
     with transaction.atomic():
         locked = Duel.objects.select_for_update().get(pk=duel.pk)
         if locked.status == 'ACTIVE' and locked.has_player(student):
-            _finish(locked, locked.opponent_of(student), 'resign')
+            _finish(locked, locked.opponent_of(student), reason)
 
 
 def close_if_inactive(duel):
+    if duel.status == 'ACTIVE':
+        refresh(duel)
+        duel.refresh_from_db()
     if duel.status == 'ACTIVE' and timezone.now() - duel.last_activity > INACTIVITY:
         with transaction.atomic():
             locked = Duel.objects.select_for_update().get(pk=duel.pk)
