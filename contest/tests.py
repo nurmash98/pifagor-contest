@@ -743,27 +743,46 @@ class TeacherSolveTests(TestCase):
 
 
 class InputHelpTests(TestCase):
+    """Подсказка про ввод данных — только после ValueError/EOFError, а не всегда."""
     def setUp(self):
+        from .models import Submission
+        self.Submission = Submission
         u = User.objects.create_user('ih', password='pw12345')
-        Student.objects.create(user=u, full_name='И', school_class='7F')
+        self.st = Student.objects.create(user=u, full_name='И', school_class='7F')
         self.client.login(username='ih', password='pw12345')
 
-    def page(self, example, lang=None):
-        t = Task.objects.create(title='X', description='d', level='A', input_example=example, test_cases=[])
+    def page(self, example, error=None, lang=None):
+        t = Task.objects.create(title='X', description='d', level='A', input_example=example,
+                                test_cases=[{'input': '3\n7', 'output': '10'}])
+        if error:
+            self.Submission.objects.create(
+                student=self.st, task=t, status='DONE', score=0, is_graded=True,
+                autotest_checked_at=timezone.now(), autotest_total=1, autotest_passed=0,
+                autotest_results=[{'ok': False, 'error': error, 'input': '3 7'}])
         if lang:
             s = self.client.session; s['content_lang'] = lang; s.save()
         return self.client.get(reverse('task_detail', args=[t.id])).content.decode()
 
+    def test_hidden_without_error(self):
+        self.assertNotIn('Обратите внимание на ввод данных', self.page('3\n7'))
+
+    def test_hidden_for_other_errors(self):
+        self.assertNotIn('Обратите внимание на ввод данных', self.page('3\n7', 'ZeroDivisionError: x'))
+
     def test_lines(self):
-        h = self.page('3\n7')
-        self.assertIn('Как читать входные данные', h)
+        h = self.page('3\n7', 'ValueError: invalid literal')
+        self.assertIn('Обратите внимание на ввод данных', h)
         self.assertIn('на РАЗНЫХ строках', h)
+        self.assertNotIn('input().split()))', h)
+        self.assertNotIn('ValueError: invalid', h)
 
-    def test_one_line(self):
-        self.assertIn('в ОДНОЙ строке', self.page('3 7'))
+    def test_one_line_suggests_map(self):
+        h = self.page('3 7', 'ValueError: x')
+        self.assertIn('в ОДНОЙ строке', h)
+        self.assertIn('map(int, input().split())', h)
 
-    def test_kk(self):
-        self.assertIn('Кіріс деректерін', self.page('3 7', 'kk'))
+    def test_eof_and_kk(self):
+        self.assertIn('Кіріс деректеріне', self.page('3 7', 'EOFError: EOF', 'kk'))
 
 
 class TaskStatusFilterTests(TestCase):
