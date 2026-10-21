@@ -1245,3 +1245,11 @@ class SiteIconTests(TestCase):
 
     def test_favicon_redirect(self):
         self.assertEqual(self.client.get('/favicon.ico').status_code, 302)
+
+
+class NavbarLogoTests(TestCase):
+    def test_logo_in_navbar(self):
+        u = User.objects.create_user('nl', password='pw12345')
+        Student.objects.create(user=u, full_name='Н', school_class='7F')
+        self.client.login(username='nl', password='pw12345')
+        self.assertIn('icons/logo-tree', self.client.get('/').content.decode())

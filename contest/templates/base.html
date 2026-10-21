@@ -1,4 +1,4 @@
-{% load ui_i18n %}
+{% load ui_i18n static %}
 <!DOCTYPE html>
 <html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
 <head>
@@ -70,6 +70,8 @@
             <!-- Логотип / Название -->
             <div class="d-flex align-items-center gap-3">
                 <a class="navbar-brand fw-bold d-flex align-items-center me-0" href="/">
+                    <img src="{% static 'icons/logo-tree.png' %}" alt="" height="42" class="me-2 rounded-2"
+                         style="background:#fff;padding:2px 3px;">
                     <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
                     <span style="color: #008b42; font-size: 1.5rem;" class="ms-1">CONTEST</span>
                 </a>
