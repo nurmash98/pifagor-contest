@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}{% t "Дуэль" %}{% endblock %}
+{% block content %}
+<div class="mt-4">
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4" style="background:linear-gradient(135deg,#1a1a4b,#3b3b9c);color:#fff;">
+        <div class="row align-items-center text-center g-3">
+            <div class="col-4">
+                <div class="fw-bold fs-5">{{ me.full_name }}</div>
+                <div class="small opacity-75">{% t "Рейтинг" %} {{ my_rating_before }}</div>
+            </div>
+            <div class="col-4">
+                <div class="display-3 fw-bold" id="score">{{ my_points }} : {{ opp_points }}</div>
+                <div class="small opacity-75">{% t "до" %} {{ points_to_win }} {% t "очков" %}</div>
+            </div>
+            <div class="col-4">
+                <div class="fw-bold fs-5">{{ opp.full_name }}</div>
+                <div class="small opacity-75">{% t "Рейтинг" %} {{ opp_rating_before }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% if finished %}
+    <div class="alert rounded-4 text-center py-4 {% if result == 'win' %}alert-success{% elif result == 'loss' %}alert-danger{% else %}alert-secondary{% endif %}">
+        <div class="display-6 fw-bold">
+            {% if result == 'win' %}🏆 {% t "Победа!" %}{% elif result == 'loss' %}{% t "Поражение" %}{% else %}🤝 {% t "Ничья" %}{% endif %}
+        </div>
+        <div class="fs-4 mt-1 fw-bold {% if my_change > 0 %}text-success{% elif my_change < 0 %}text-danger{% endif %}">
+            {% if my_change > 0 %}+{% endif %}{{ my_change }} {% t "к рейтингу" %} → {{ me.duel_rating }}
+        </div>
+        <div class="small text-muted mt-1">
+            {% if duel.end_reason == 'resign' %}{% if result == 'win' %}{% t "Соперник сдался." %}{% else %}{% t "Вы сдались." %}{% endif %}
+            {% elif duel.end_reason == 'inactive' %}{% t "Матч закрыт: 20 минут никто не отправлял решения." %}{% endif %}
+        </div>
+        <a href="{% url 'duels' %}" class="btn btn-pifagor-green rounded-pill px-4 mt-3">{% t "К дуэлям" %}</a>
+    </div>
+    {% elif not enabled %}
+    <div class="alert alert-secondary rounded-3">🔒 {% t "Дуэли выключены преподавателем — отправка кода временно недоступна." %}</div>
+    {% endif %}
+
+
+    <div class="row g-4">
+        {% for dt in tasks %}
+        <div class="col-12" id="task-{{ dt.id }}">
+            <div class="card border-0 shadow-sm rounded-4 p-4 {% if dt.mine_won %}border-start border-5 border-success{% elif dt.opp_won %}border-start border-5 border-danger{% endif %}">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                    <h5 class="fw-bold mb-0" style="color:#1a1a4b;">{% t "Задача" %} {{ forloop.counter }}: {{ dt.task.display_title }}
+                        <span class="badge badge-level-{{ dt.task.level }} ms-2">{% t "Уровень" %} {{ dt.task.level }}</span></h5>
+                    <div>
+                        {% if dt.mine_won %}<span class="badge bg-success fs-6">✔ {% t "Очко ваше" %}</span>
+                        {% elif dt.opp_won %}<span class="badge bg-danger fs-6">{% t "Очко у соперника" %}</span>
+                        {% elif dt.closed %}<span class="badge bg-secondary fs-6">{% t "Закрыта: попытки кончились" %}</span>
+                        {% else %}<span class="badge bg-light text-dark border fs-6">{% t "Ваши попытки" %}: {{ dt.my_left }} / {{ attempts_per_task }} · {% t "у соперника" %}: {{ dt.opp_left }} / {{ attempts_per_task }}</span>{% endif %}
+                    </div>
+                </div>
+                <div class="mb-3" style="white-space:pre-wrap;">{{ dt.task.display_description }}</div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6"><div class="small text-muted">{% t "Пример ввода" %}</div><pre class="bg-light rounded-3 p-2 small mb-0">{{ dt.task.display_input_example }}</pre></div>
+                    <div class="col-md-6"><div class="small text-muted">{% t "Пример вывода" %}</div><pre class="bg-light rounded-3 p-2 small mb-0">{{ dt.task.display_output_example }}</pre></div>
+                </div>
+                {% if not finished and not dt.closed and dt.my_left and enabled %}
+                <form method="post" action="{% url 'duel_submit' duel.id dt.id %}">{% csrf_token %}
+                    <textarea name="code" data-task="{{ dt.id }}" class="form-control rounded-3 font-monospace p-3 mb-2 duel-code" rows="9"
+                              style="background-color:#272822;color:#f8f8f2;" placeholder="{% t '# Напишите ваш код здесь...' %}" required>{{ dt.last_code }}</textarea>
+                    <div class="text-end"><button class="btn btn-pifagor-green rounded-pill px-4">{% t "Отправить" %} →</button></div>
+                </form>
+                {% endif %}
+                {% if dt.my_attempts %}
+                <div class="small text-muted mt-2">
+                    {% for a in dt.my_attempts %}<span class="badge {% if a.tests_passed == a.tests_total %}bg-success{% else %}bg-secondary{% endif %} me-1">{% t "Попытка" %} {{ forloop.counter }}: {{ a.tests_passed }}/{{ a.tests_total }}</span>{% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not finished %}
+    <form method="post" action="{% url 'duel_resign' duel.id %}" class="text-end mt-4" onsubmit="return confirm('{% t "Сдаться? Победа достанется сопернику." %}');">{% csrf_token %}
+        <button class="btn btn-outline-danger btn-sm rounded-pill px-4">🏳 {% t "Сдаться" %}</button>
+    </form>
+    <script>
+    (function () {
+        var sig = "{{ signature }}";
+        // Черновики кода сохраняем на время обновления страницы
+        document.querySelectorAll('.duel-code').forEach(function (ta) {
+            var key = 'duel{{ duel.id }}-' + ta.dataset.task;
+            try { var saved = sessionStorage.getItem(key); if (saved && !ta.value) ta.value = saved; } catch (e) {}
+            ta.addEventListener('input', function () { try { sessionStorage.setItem(key, ta.value); } catch (e) {} });
+        });
+        setInterval(function () {
+            fetch("{% url 'duel_state' duel.id %}", {credentials: 'same-origin'})
+                .then(function (r) { return r.json(); })
+                .then(function (d) { if (d.signature && d.signature !== sig) { location.reload(); } })
+                .catch(function () {});
+        }, 3000);
+    })();
+    </script>
+    {% endif %}
+</div>
+{% endblock %}

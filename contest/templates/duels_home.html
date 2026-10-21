@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}{% t "Дуэли" %}{% endblock %}
+{% block content %}
+<div class="row mt-4 g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 p-4 mb-4" style="background:linear-gradient(135deg,#1a1a4b,#3b3b9c);color:#fff;">
+            <h2 class="fw-bold mb-1 text-white">⚔️ {% t "Дуэли" %}</h2>
+            <p class="mb-3 opacity-75">{% t "Два ученика — три случайные задачи. Кто первым получит 10/10 на задаче, тот забирает очко. До двух очков, на каждую задачу по 3 попытки." %}</p>
+            {% if student %}
+            <div class="d-flex flex-wrap gap-4 align-items-end">
+                <div><div class="small opacity-75">{% t "Ваш рейтинг" %}</div><div class="display-5 fw-bold">{{ student.duel_rating }}</div></div>
+                <div><div class="small opacity-75">{% t "Сыграно" %}</div><div class="fs-3 fw-bold">{{ student.duel_games }}</div></div>
+                {% if place %}<div><div class="small opacity-75">{% t "Место" %}</div><div class="fs-3 fw-bold">#{{ place }}</div></div>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if readonly %}
+            <div class="alert alert-info rounded-3">{% t "Дуэли доступны ученикам. Здесь — таблица лидеров." %}</div>
+        {% elif not enabled %}
+            <div class="alert alert-secondary rounded-3">🔒 {% t "Дуэли сейчас выключены преподавателем." %}</div>
+        {% elif not can_play %}
+            <div class="alert alert-warning rounded-3">{% t cant_reason %}</div>
+        {% elif in_queue %}
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 text-center" id="queue-box">
+                <div class="spinner-border text-success mx-auto mb-3" role="status"></div>
+                <h5 class="fw-bold mb-1">{% t "Ищем соперника…" %}</h5>
+                <p class="text-muted small mb-3">{% t "Подбираем игрока с близким рейтингом. Не закрывайте страницу." %}</p>
+                <form method="post" action="{% url 'duels_leave' %}">{% csrf_token %}
+                    <button class="btn btn-outline-secondary btn-sm rounded-pill px-4">{% t "Отменить поиск" %}</button>
+                </form>
+            </div>
+            <script>
+            (function () {
+                function poll() {
+                    fetch("{% url 'duels_status' %}", {credentials: 'same-origin'})
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (d.state === 'active') { location.href = d.url; }
+                            else if (d.state === 'idle') { location.reload(); }
+                        }).catch(function () {});
+                }
+                setInterval(poll, 3000);
+            })();
+            </script>
+        {% else %}
+            <form method="post" action="{% url 'duels_find' %}" class="mb-4">{% csrf_token %}
+                <button type="submit" class="btn btn-pifagor-green btn-lg rounded-pill px-5 py-3 fw-bold">⚔️ {% t "Найти игру" %}</button>
+            </form>
+        {% endif %}
+
+        {% if history %}
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3" style="color:#1a1a4b;">{% t "Последние дуэли" %}</h5>
+            <ul class="list-unstyled mb-0">
+                {% for d in history %}
+                <li class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %}">
+                    <span>
+                        {% if d.result == 'win' %}<span class="badge bg-success">{% t "Победа" %}</span>
+                        {% elif d.result == 'loss' %}<span class="badge bg-danger">{% t "Поражение" %}</span>
+                        {% else %}<span class="badge bg-secondary">{% t "Ничья" %}</span>{% endif %}
+                        <span class="ms-2">{% t "против" %} <strong>{{ d.opponent.full_name }}</strong></span>
+                    </span>
+                    <span class="fw-bold {% if d.change > 0 %}text-success{% elif d.change < 0 %}text-danger{% else %}text-muted{% endif %}">{% if d.change > 0 %}+{% endif %}{{ d.change }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3" style="color:#1a1a4b;">🏆 {% t "Таблица лидеров" %}</h5>
+            {% if top %}
+            <ol class="list-unstyled mb-0">
+                {% for st in top %}
+                <li class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %} {% if student and st.id == student.id %}fw-bold{% endif %}">
+                    <span><span class="text-muted me-2">{{ forloop.counter }}.</span>{{ st.full_name }} <span class="text-muted small">{{ st.school_class }}</span></span>
+                    <span class="badge bg-warning text-dark fs-6">{{ st.duel_rating }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-muted mb-0">{% t "Пока никто не сыграл. Станьте первым!" %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

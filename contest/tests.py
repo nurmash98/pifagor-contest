@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher)
+from .models import (Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher)
 
 
 def make_task(title, level, tag, ok=True):
@@ -814,3 +814,175 @@ class TwoRetakesPagesTests(RetakeTestBase):
         self.client.force_login(self.teacher_user)
         self.assertEqual(self.client.get(reverse('exam_results', args=[self.exam.id])).status_code, 200)
         self.assertEqual(self.client.get(reverse('retake_create', args=[self.exam.id])).status_code, 200)
+
+
+class DuelTests(TestCase):
+    def setUp(self):
+        from . import duels
+        self.duels = duels
+        self.teacher_u = User.objects.create_user('dt', password='x', is_staff=True)
+        Teacher.objects.create(user=self.teacher_u, full_name='Т', classes='7F')
+        self.users = []
+        self.st = []
+        for name in ('a', 'b', 'c'):
+            u = User.objects.create_user(f'd{name}', password='pw12345')
+            self.users.append(u)
+            self.st.append(Student.objects.create(user=u, full_name=f'Игрок {name}', school_class='7F'))
+        Task.objects.all().delete()     # задачи из миграций не нужны — берём только свои
+        self.tasks = [Task.objects.create(title=f'T{i}', description='d', level='A',
+                                          input_example='1', output_example='1',
+                                          test_cases=[{'input': '2', 'output': '4'}, {'input': '3', 'output': '9'}])
+                      for i in range(4)]
+        self.good = 'n=int(input());print(n*n)'
+        self.bad = 'print(0)'
+
+    def start(self):
+        self.duels.join_queue(self.st[0]); self.duels.join_queue(self.st[1])
+        duel = self.duels.try_match(self.st[0])
+        self.assertIsNotNone(duel)
+        return duel
+
+    # --- Эло
+    def test_elo_math(self):
+        d = self.duels
+        self.assertEqual(d.rating_delta(800, 800, 1), 16)
+        self.assertEqual(d.rating_delta(800, 800, 0), -16)
+        self.assertEqual(d.rating_delta(800, 800, 0.5), 0)
+        self.assertGreater(d.rating_delta(700, 900, 1), 16)     # неожиданная победа — больше очков
+
+    def test_everyone_starts_at_800(self):
+        self.assertEqual(self.st[0].duel_rating, 800)
+
+    # --- подбор
+    def test_match_creates_duel_with_three_tasks_and_clears_queue(self):
+        duel = self.start()
+        self.assertEqual(duel.duel_tasks.count(), 3)
+        self.assertEqual(DuelQueueEntry.objects.count(), 0)
+
+    def test_far_ratings_do_not_match_immediately(self):
+        Student.objects.filter(pk=self.st[1].pk).update(duel_rating=1600)
+        self.st[1].refresh_from_db()
+        self.duels.join_queue(self.st[0]); self.duels.join_queue(self.st[1])
+        self.assertIsNone(self.duels.try_match(self.st[0]))
+
+    def test_levels_by_rating(self):
+        self.assertEqual(self.duels.levels_for(800), ['A'])
+        self.assertEqual(self.duels.levels_for(1100), ['A', 'B'])
+        self.assertEqual(self.duels.levels_for(1300), ['B', 'C'])
+
+    # --- игра
+    def test_first_full_solution_takes_point_and_closes_task(self):
+        duel = self.start()
+        dt = duel.duel_tasks.first()
+        ok, msg, _ = self.duels.submit_code(duel, self.st[0], dt, self.good)
+        self.assertTrue(ok)
+        duel.refresh_from_db(); dt.refresh_from_db()
+        self.assertEqual(dt.winner_id, self.st[0].id)
+        self.assertEqual(duel.points_of(self.st[0]), 1)
+        ok, msg, _ = self.duels.submit_code(duel, self.st[1], dt, self.good)   # закрыта
+        self.assertFalse(ok)
+
+    def test_three_attempts_limit(self):
+        duel = self.start()
+        dt = duel.duel_tasks.first()
+        for _ in range(3):
+            self.assertTrue(self.duels.submit_code(duel, self.st[0], dt, self.bad)[0])
+        ok, msg, _ = self.duels.submit_code(duel, self.st[0], dt, self.good)
+        self.assertFalse(ok)
+        self.assertEqual(self.duels.attempts_left(dt, self.st[0]), 0)
+
+    def test_two_points_finish_and_rating_change(self):
+        duel = self.start()
+        for dt in list(duel.duel_tasks.all())[:2]:
+            self.duels.submit_code(duel, self.st[0], dt, self.good)
+        duel.refresh_from_db()
+        self.assertEqual(duel.status, 'FINISHED')
+        self.assertEqual(duel.winner_id, self.st[0].id)
+        for s in self.st[:2]:
+            s.refresh_from_db()
+        self.assertEqual(self.st[0].duel_rating, 816)
+        self.assertEqual(self.st[1].duel_rating, 784)
+        self.assertEqual(self.st[0].duel_games, 1)
+
+    def test_resign_gives_win_to_opponent(self):
+        duel = self.start()
+        self.duels.resign(duel, self.st[0])
+        duel.refresh_from_db()
+        self.assertEqual(duel.winner_id, self.st[1].id)
+        self.assertEqual(duel.end_reason, 'resign')
+
+    def test_all_tasks_exhausted_is_draw_when_points_equal(self):
+        duel = self.start()
+        for dt in duel.duel_tasks.all():
+            for p in self.st[:2]:
+                for _ in range(3):
+                    self.duels.submit_code(duel, p, dt, self.bad)
+        duel.refresh_from_db()
+        self.assertEqual(duel.status, 'FINISHED')
+        self.assertIsNone(duel.winner_id)
+
+    def test_inactive_duel_closes_by_points(self):
+        duel = self.start()
+        dt = duel.duel_tasks.first()
+        self.duels.submit_code(duel, self.st[1], dt, self.good)
+        Duel.objects.filter(pk=duel.pk).update(last_activity=timezone.now() - timedelta(minutes=30))
+        duel.refresh_from_db()
+        self.duels.close_if_inactive(duel)
+        duel.refresh_from_db()
+        self.assertEqual(duel.status, 'FINISHED')
+        self.assertEqual(duel.winner_id, self.st[1].id)
+        self.assertEqual(duel.end_reason, 'inactive')
+
+    def test_finish_is_idempotent(self):
+        duel = self.start()
+        self.duels.resign(duel, self.st[0]); self.duels.resign(duel, self.st[0])
+        self.st[0].refresh_from_db()
+        self.assertEqual(self.st[0].duel_games, 1)
+
+    # --- допуск
+    def test_disabled_blocks_play(self):
+        from .models import SiteSettings
+        s = SiteSettings.get(); s.duels_enabled = False; s.save()
+        self.client.login(username='da', password='pw12345')
+        self.client.post(reverse('duels_find'))
+        self.assertEqual(DuelQueueEntry.objects.count(), 0)
+
+    def test_suspicious_student_cannot_play(self):
+        from unittest import mock
+        with mock.patch('contest.moderation_views._reasons', return_value={self.st[0].id: ['x']}):
+            self.client.login(username='da', password='pw12345')
+            self.client.post(reverse('duels_find'))
+        self.assertEqual(DuelQueueEntry.objects.count(), 0)
+
+    def test_teacher_toggle(self):
+        from .models import SiteSettings
+        self.client.login(username='dt', password='x')
+        self.client.post(reverse('duels_toggle'))
+        self.assertFalse(SiteSettings.get().duels_enabled)
+        self.client.post(reverse('duels_toggle'))
+        self.assertTrue(SiteSettings.get().duels_enabled)
+
+    # --- страницы
+    def test_pages_and_full_flow_over_http(self):
+        ca, cb = self.client_class(), self.client_class()
+        ca.login(username='da', password='pw12345'); cb.login(username='db', password='pw12345')
+        self.assertEqual(ca.get(reverse('duels')).status_code, 200)
+        ca.post(reverse('duels_find'))
+        self.assertIn('Ищем соперника', ca.get(reverse('duels')).content.decode())
+        r = cb.post(reverse('duels_find'))                      # второй игрок — сразу пара
+        duel = Duel.objects.get()
+        self.assertRedirects(r, reverse('duel_match', args=[duel.id]))
+        self.assertEqual(ca.get(reverse('duels_status')).json()['state'], 'active')
+        page = ca.get(reverse('duel_match', args=[duel.id]))
+        self.assertEqual(page.status_code, 200)
+        html = page.content.decode()
+        self.assertIn('Игрок b', html)
+        dt = duel.duel_tasks.first()
+        ca.post(reverse('duel_submit', args=[duel.id, dt.id]), {'code': self.good})
+        self.assertEqual(ca.get(reverse('duel_state', args=[duel.id])).json()['signature'].split('-')[1], '1')
+        out = self.client_class(); out.login(username='dc', password='pw12345')
+        out.get(reverse('duel_match', args=[duel.id]))          # чужой — редирект, не ошибка
+        self.assertEqual(out.get(reverse('duel_state', args=[duel.id])).status_code, 403)
+        cb.post(reverse('duel_resign', args=[duel.id]))
+        self.assertIn('Победа', ca.get(reverse('duel_match', args=[duel.id])).content.decode())
+        self.assertIn('Игрок a', ca.get(reverse('duels')).content.decode())

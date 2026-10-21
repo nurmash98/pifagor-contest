@@ -1427,12 +1427,14 @@ def teacher_dashboard(request):
     pending_submissions = pending_submissions.order_by('updated_at')
     graded_submissions = graded_submissions.order_by('-updated_at')[:20]
 
+    from .duels import duels_enabled
     context = {
         'pending_submissions': pending_submissions,
         'graded_submissions': graded_submissions,
         'teacher': teacher,
         'my_courses': my_courses,
     }
+    context['duels_enabled'] = duels_enabled()
     return render(request, 'teacher_dashboard.html', context)
 
 

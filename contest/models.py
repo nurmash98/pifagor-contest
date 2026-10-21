@@ -1,6 +1,7 @@
 import re
 
 from django.db import models
+from django.utils import timezone
 from django.contrib.auth.models import User, Group
 
 
@@ -30,6 +31,9 @@ class Student(models.Model):
     # Блокировка до этого времени (аккаунт user.is_active=False). Пусто при заблокированном
     # аккаунте — блокировка бессрочная, пока учитель не разблокирует.
     blocked_until = models.DateTimeField(null=True, blank=True, verbose_name="Заблокирован до")
+    # Рейтинг дуэлей (Эло). Все начинают с 800.
+    duel_rating = models.IntegerField(default=800, verbose_name="Рейтинг дуэлей")
+    duel_games = models.PositiveIntegerField(default=0, verbose_name="Сыграно дуэлей")
 
     def save(self, *args, **kwargs):
         self.school_class = normalize_school_class(self.school_class)
@@ -514,3 +518,85 @@ class ExamAnswer(models.Model):
         verbose_name = "Ответ на СОР/СОЧ"
         verbose_name_plural = "Ответы на СОР/СОЧ"
         unique_together = [('attempt', 'task')]
+
+
+class SiteSettings(models.Model):
+    """Общие переключатели сайта (одна строка, pk=1). Пока — включены ли дуэли."""
+    duels_enabled = models.BooleanField(default=True, verbose_name="Дуэли включены")
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    class Meta:
+        verbose_name = "Настройки сайта"
+        verbose_name_plural = "Настройки сайта"
+
+
+class DuelQueueEntry(models.Model):
+    """Ученик, который ждёт соперника в очереди «Найти игру»."""
+    student = models.OneToOneField(Student, on_delete=models.CASCADE, related_name='duel_queue')
+    rating = models.IntegerField()
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+
+class Duel(models.Model):
+    """Дуэль двух учеников: 3 случайные задачи, первое 10/10 на задаче — очко, до 2 очков."""
+    STATUS_CHOICES = [('ACTIVE', 'Идёт'), ('FINISHED', 'Завершена')]
+    player1 = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='duels_as_p1')
+    player2 = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='duels_as_p2')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ACTIVE')
+    p1_points = models.PositiveSmallIntegerField(default=0)
+    p2_points = models.PositiveSmallIntegerField(default=0)
+    winner = models.ForeignKey(Student, null=True, blank=True, on_delete=models.SET_NULL, related_name='duels_won')
+    end_reason = models.CharField(max_length=20, blank=True)   # score / all_closed / resign / inactive
+    p1_rating_before = models.IntegerField(default=800)
+    p2_rating_before = models.IntegerField(default=800)
+    p1_rating_change = models.IntegerField(default=0)
+    p2_rating_change = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def players(self):
+        return [self.player1, self.player2]
+
+    def has_player(self, student):
+        return student.id in (self.player1_id, self.player2_id)
+
+    def opponent_of(self, student):
+        return self.player2 if student.id == self.player1_id else self.player1
+
+    def points_of(self, student):
+        return self.p1_points if student.id == self.player1_id else self.p2_points
+
+    def rating_change_of(self, student):
+        return self.p1_rating_change if student.id == self.player1_id else self.p2_rating_change
+
+
+class DuelTask(models.Model):
+    duel = models.ForeignKey(Duel, on_delete=models.CASCADE, related_name='duel_tasks')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    order = models.PositiveSmallIntegerField(default=0)
+    winner = models.ForeignKey(Student, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    solved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['order']
+
+
+class DuelAttempt(models.Model):
+    duel_task = models.ForeignKey(DuelTask, on_delete=models.CASCADE, related_name='attempts')
+    player = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='+')
+    code = models.TextField(blank=True)
+    score = models.IntegerField(default=0)
+    tests_passed = models.IntegerField(default=0)
+    tests_total = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']

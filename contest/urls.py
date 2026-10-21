@@ -2,8 +2,20 @@ from django.urls import path
 from . import views
 from . import exam_views
 from . import moderation_views
+from . import duel_views
 
 urlpatterns = [
+    # Дуэли
+    path('duels/', duel_views.duels_home, name='duels'),
+    path('duels/find/', duel_views.duels_find, name='duels_find'),
+    path('duels/leave/', duel_views.duels_leave, name='duels_leave'),
+    path('duels/status/', duel_views.duels_status, name='duels_status'),
+    path('duels/toggle/', duel_views.duels_toggle, name='duels_toggle'),
+    path('duels/<int:duel_id>/', duel_views.duel_match, name='duel_match'),
+    path('duels/<int:duel_id>/state/', duel_views.duel_state, name='duel_state'),
+    path('duels/<int:duel_id>/resign/', duel_views.duel_resign, name='duel_resign'),
+    path('duels/<int:duel_id>/task/<int:duel_task_id>/submit/', duel_views.duel_submit, name='duel_submit'),
+
     # Главная страница - каталог задач
     path('', views.all_tasks_view, name='all_tasks'),
 

@@ -14,6 +14,9 @@
             <a href="{% url 'task_tags_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📝 Задачи</a>
             <a href="{% url 'exam_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">⏱ СОР/СОЧ</a>
             <a href="{% url 'suspicious_students' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3">⚠ Подозрительные</a>
+            <form method="post" action="{% url 'duels_toggle' %}" class="d-inline">{% csrf_token %}
+                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if duels_enabled %}btn-success{% else %}btn-outline-secondary{% endif %}" title="Включить или выключить дуэли для учеников">⚔️ Дуэли: {% if duels_enabled %}включены{% else %}выключены{% endif %}</button>
+            </form>
         </div>
     </div>
 

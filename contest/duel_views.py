@@ -1,0 +1,188 @@
+# -*- coding: utf-8 -*-
+"""Страницы дуэлей: главная (рейтинг, очередь, история), сама дуэль, отправка кода."""
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
+
+from . import duels
+from .exam_views import active_attempt_for
+from .models import Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student
+from .views import _apply_task_language, _get_content_lang
+
+
+def _student(request):
+    return Student.objects.filter(user=request.user).first()
+
+
+@login_required
+def duels_home(request):
+    student = _student(request)
+    enabled = duels.duels_enabled()
+    ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
+    top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
+    ctx['top'] = list(top)
+    if student is not None:
+        active = duels.active_duel_for(student)
+        if active is not None:
+            return redirect('duel_match', duel_id=active.id)
+        allowed, reason = duels.can_play(student)
+        history = list(Duel.objects.filter(Q(player1=student) | Q(player2=student), status='FINISHED')
+                       .select_related('player1', 'player2', 'winner').order_by('-finished_at')[:10])
+        for d in history:
+            d.opponent = d.opponent_of(student)
+            d.change = d.rating_change_of(student)
+            d.result = 'draw' if d.winner_id is None else ('win' if d.winner_id == student.id else 'loss')
+        better = Student.objects.filter(duel_games__gt=0, duel_rating__gt=student.duel_rating).count()
+        ctx.update({
+            'can_play': allowed, 'cant_reason': reason, 'history': history,
+            'in_queue': DuelQueueEntry.objects.filter(student=student).exists(),
+            'place': better + 1 if student.duel_games else None,
+        })
+    return render(request, 'duels_home.html', ctx)
+
+
+@login_required
+@require_POST
+def duels_find(request):
+    student = _student(request)
+    if student is None:
+        return redirect('duels')
+    if active_attempt_for(request.user):
+        messages.warning(request, 'Во время СОР/СОЧ дуэли недоступны.')
+        return redirect('duels')
+    allowed, reason = duels.can_play(student)
+    if not allowed:
+        messages.warning(request, reason)
+        return redirect('duels')
+    active = duels.active_duel_for(student)
+    if active is not None:
+        return redirect('duel_match', duel_id=active.id)
+    duels.join_queue(student)
+    duel = duels.try_match(student)
+    if duel is not None:
+        return redirect('duel_match', duel_id=duel.id)
+    return redirect('duels')
+
+
+@login_required
+@require_POST
+def duels_leave(request):
+    student = _student(request)
+    if student is not None:
+        duels.leave_queue(student)
+    return redirect('duels')
+
+
+@login_required
+def duels_status(request):
+    """Опрос из браузера пока игрок ждёт соперника: подбирает пару и сообщает, началась ли дуэль."""
+    student = _student(request)
+    if student is None:
+        return JsonResponse({'state': 'idle'})
+    active = duels.active_duel_for(student)
+    if active is None and DuelQueueEntry.objects.filter(student=student).exists():
+        active = duels.try_match(student)
+    if active is not None:
+        return JsonResponse({'state': 'active', 'url': f'/duels/{active.id}/'})
+    waiting = DuelQueueEntry.objects.filter(student=student).exists()
+    return JsonResponse({'state': 'waiting' if waiting else 'idle'})
+
+
+def _duel_context(duel, student, lang):
+    tasks = []
+    for dt in duel.duel_tasks.select_related('task', 'winner').prefetch_related('attempts'):
+        _apply_task_language([dt.task], lang)
+        mine = [a for a in dt.attempts.all() if a.player_id == student.id]
+        dt.my_attempts = mine
+        dt.my_left = duels.attempts_left(dt, student)
+        dt.opp_left = duels.attempts_left(dt, duel.opponent_of(student))
+        dt.closed = duels.task_closed(dt, duel)
+        dt.mine_won = dt.winner_id == student.id
+        dt.opp_won = bool(dt.winner_id) and dt.winner_id != student.id
+        dt.last_code = mine[-1].code if mine else ''
+        tasks.append(dt)
+    return tasks
+
+
+@login_required
+def duel_match(request, duel_id):
+    duel = get_object_or_404(Duel.objects.select_related('player1', 'player2', 'winner'), id=duel_id)
+    student = _student(request)
+    if student is None or not duel.has_player(student):
+        if request.user.is_staff:
+            return redirect('duels')
+        messages.error(request, 'Это не ваша дуэль.')
+        return redirect('duels')
+    duels.close_if_inactive(duel)
+    duel.refresh_from_db()
+    lang = _get_content_lang(request)
+    me, opp = student, duel.opponent_of(student)
+    ctx = {
+        'duel': duel, 'me': me, 'opp': opp, 'tasks': _duel_context(duel, student, lang),
+        'my_points': duel.points_of(me), 'opp_points': duel.points_of(opp),
+        'finished': duel.status == 'FINISHED',
+        'result': None if duel.status != 'FINISHED' else (
+            'draw' if duel.winner_id is None else ('win' if duel.winner_id == me.id else 'loss')),
+        'my_change': duel.rating_change_of(me),
+        'my_rating_before': duel.p1_rating_before if me.id == duel.player1_id else duel.p2_rating_before,
+        'opp_rating_before': duel.p2_rating_before if me.id == duel.player1_id else duel.p1_rating_before,
+        'enabled': duels.duels_enabled(),
+        'points_to_win': duels.POINTS_TO_WIN, 'attempts_per_task': duels.ATTEMPTS_PER_TASK,
+    }
+    ctx['signature'] = '{}-{}-{}'.format(duel.status, duel.p1_points + duel.p2_points,
+                                          ''.join('1' if t.closed else '0' for t in ctx['tasks']))
+    return render(request, 'duel_match.html', ctx)
+
+
+@login_required
+def duel_state(request, duel_id):
+    """Короткий снимок для опроса страницы дуэли: если изменился — страница перезагружается."""
+    duel = get_object_or_404(Duel, id=duel_id)
+    student = _student(request)
+    if student is None or not duel.has_player(student):
+        return JsonResponse({'signature': ''}, status=403)
+    duels.close_if_inactive(duel)
+    duel.refresh_from_db()
+    closed = ''.join('1' if duels.task_closed(dt, duel) else '0' for dt in duel.duel_tasks.all())
+    return JsonResponse({'signature': f'{duel.status}-{duel.p1_points + duel.p2_points}-{closed}'})
+
+
+@login_required
+@require_POST
+def duel_submit(request, duel_id, duel_task_id):
+    duel = get_object_or_404(Duel, id=duel_id)
+    student = _student(request)
+    if student is None or not duel.has_player(student):
+        messages.error(request, 'Это не ваша дуэль.')
+        return redirect('duels')
+    if not duels.duels_enabled():
+        messages.warning(request, 'Дуэли сейчас выключены преподавателем.')
+        return redirect('duel_match', duel_id=duel.id)
+    duel_task = get_object_or_404(DuelTask, id=duel_task_id, duel=duel)
+    ok, msg, _result = duels.submit_code(duel, student, duel_task, request.POST.get('code', ''))
+    (messages.success if ok and 'Верно' in msg else messages.info if ok else messages.warning)(request, msg)
+    return redirect(f'/duels/{duel.id}/#task-{duel_task.id}')
+
+
+@login_required
+@require_POST
+def duel_resign(request, duel_id):
+    duel = get_object_or_404(Duel, id=duel_id)
+    student = _student(request)
+    if student is not None and duel.has_player(student):
+        duels.resign(duel, student)
+    return redirect('duel_match', duel_id=duel.id)
+
+
+@staff_member_required
+@require_POST
+def duels_toggle(request):
+    settings_obj = SiteSettings.get()
+    settings_obj.duels_enabled = not settings_obj.duels_enabled
+    settings_obj.save()
+    messages.success(request, 'Дуэли включены.' if settings_obj.duels_enabled else 'Дуэли выключены.')
+    return redirect(request.POST.get('next') or 'teacher_dashboard')
