@@ -27,6 +27,15 @@ def duels_home(request):
     ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
     top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
     ctx['top'] = list(top)
+    if student is None and request.user.is_staff:
+        # Обзор для преподавателя: режим, тестеры, идущие и недавние дуэли (только просмотр)
+        ctx.update({
+            'mode': duels.duels_mode(),
+            'testers': list(Student.objects.filter(duel_tester=True).order_by('school_class', 'full_name')),
+            'active_duels': list(Duel.objects.filter(status='ACTIVE').select_related('player1', 'player2')),
+            'recent_duels': list(Duel.objects.filter(status='FINISHED').select_related('player1', 'player2', 'winner')
+                                 .order_by('-finished_at')[:10]),
+        })
     if student is not None:
         active = duels.active_duel_for(student)
         if active is not None:

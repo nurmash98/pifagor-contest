@@ -17,7 +17,19 @@
         </div>
 
         {% if readonly %}
-            <div class="alert alert-info rounded-3">{% t "Дуэли доступны ученикам. Здесь — таблица лидеров." %}</div>
+            {% if mode %}
+            <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+                <h5 class="fw-bold mb-2" style="color:#1a1a4b;">👨‍🏫 Для преподавателя</h5>
+                <p class="mb-2">Режим: <strong>{% if mode == 'all' %}для всех{% elif mode == 'testers' %}только тестеры{% else %}выключены{% endif %}</strong>
+                    <span class="text-muted small">(переключатель — в кабинете преподавателя)</span></p>
+                <p class="mb-2">Тестеры{% if not testers %}: пока никого — отметьте учеников кнопкой «⚔️» в списке «Ученики»{% endif %}:
+                    {% for st in testers %}<span class="badge bg-warning text-dark me-1">{{ st.full_name }} · {{ st.school_class }}</span>{% endfor %}</p>
+                <div class="small fw-semibold mt-3">Идут сейчас: {{ active_duels|length }}</div>
+                {% for d in active_duels %}<div class="small">{{ d.player1.full_name }} <strong>{{ d.p1_points }} : {{ d.p2_points }}</strong> {{ d.player2.full_name }}</div>{% endfor %}
+                {% if recent_duels %}<div class="small fw-semibold mt-3">Недавние:</div>
+                {% for d in recent_duels %}<div class="small text-muted">{{ d.player1.full_name }} {{ d.p1_points }} : {{ d.p2_points }} {{ d.player2.full_name }} · {% if d.winner %}победил {{ d.winner.full_name }}{% else %}ничья{% endif %}</div>{% endfor %}{% endif %}
+            </div>
+            {% endif %}
         {% elif not enabled %}
             <div class="alert alert-secondary rounded-3">🔒 {% t "Дуэли сейчас выключены преподавателем." %}</div>
         {% elif not can_play %}

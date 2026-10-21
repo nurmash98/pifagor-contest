@@ -1013,3 +1013,19 @@ class DuelTests(TestCase):
         cb.post(reverse('duel_resign', args=[duel.id]))
         self.assertIn('Победа', ca.get(reverse('duel_match', args=[duel.id])).content.decode())
         self.assertIn('Игрок a', ca.get(reverse('duels')).content.decode())
+
+
+class DuelsTeacherViewTests(TestCase):
+    def test_teacher_sees_link_and_overview_students_do_not(self):
+        t = User.objects.create_user('tv', password='x', is_staff=True)
+        Teacher.objects.create(user=t, full_name='Т', classes='7F')
+        su = User.objects.create_user('sv', password='x')
+        Student.objects.create(user=su, full_name='Обычный', school_class='7F')
+        self.client.login(username='tv', password='x')
+        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        page = self.client.get(reverse('duels')).content.decode()
+        self.assertIn('Для преподавателя', page)
+        self.assertIn('только тестеры', page)
+        self.client.login(username='sv', password='x')
+        self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        self.assertRedirects(self.client.get(reverse('duels')), reverse('all_tasks'))
