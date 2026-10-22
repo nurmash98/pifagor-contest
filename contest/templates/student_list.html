@@ -45,7 +45,7 @@
                 {% if duels_admin %}
                 <form method="post" action="{% url 'student_toggle_duel_tester' student.id %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm rounded-pill px-3 {% if student.duel_tester %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Тестер дуэлей: видит дуэли, пока они в режиме «только тестеры»">⚔️ {% if student.duel_tester %}Тестер{% else %}Не тестер{% endif %}</button>
+                    <button type="submit" class="btn btn-sm rounded-pill px-3 {% if student.duel_tester %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Тестер дуэлей: видит дуэли, пока они в режиме «по классам и тестерам»">⚔️ {% if student.duel_tester %}Тестер{% else %}Не тестер{% endif %}</button>
                 </form>
                 {% endif %}
                 {% if not student.user.is_active %}

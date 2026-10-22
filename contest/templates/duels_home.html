@@ -20,8 +20,8 @@
             {% if mode %}
             <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
                 <h5 class="fw-bold mb-2" style="color:#1a1a4b;">👨‍🏫 Для преподавателя</h5>
-                <p class="mb-2">Режим: <strong>{% if mode == 'all' %}для всех{% elif mode == 'testers' %}только тестеры{% else %}выключены{% endif %}</strong>
-                    <span class="text-muted small">(общий переключатель — у администратора дуэлей)</span></p>
+                <p class="mb-2">Режим: <strong>{% if mode == 'all' %}для всех{% elif mode == 'testers' %}по классам и тестерам{% else %}выключены{% endif %}</strong>
+                    <span class="text-muted small">(общий переключатель — у администратора дуэлей; классы ниже работают в режиме «по классам и тестерам», а при «для всех» дуэли видят все)</span></p>
                 {% if mode == 'off' %}<div class="alert alert-secondary py-2 small">Дуэли выключены администратором — классы ниже откроются, когда их включат.</div>{% endif %}
                 <div class="fw-semibold mb-1">Доступ по классам</div>
                 <p class="text-muted small mb-2">Откройте дуэли классам, которым хотите: ученики этих классов увидят пункт «Дуэли» и смогут играть.</p>

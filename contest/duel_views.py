@@ -231,7 +231,7 @@ def duel_leave(request, duel_id):
 @staff_member_required
 @require_POST
 def duels_toggle(request):
-    """Переключает режим дуэлей по кругу: выключены → только тестеры → для всех."""
+    """Переключает режим дуэлей по кругу: выключены → по классам и тестерам → для всех."""
     if not duels.is_duels_admin(request.user):
         messages.error(request, 'Управлять дуэлями может только администратор дуэлей.')
         return redirect('teacher_dashboard')
@@ -239,7 +239,7 @@ def duels_toggle(request):
     settings_obj = SiteSettings.get()
     settings_obj.duels_mode = order[(order.index(settings_obj.duels_mode) + 1) % len(order)]
     settings_obj.save()
-    labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только тестеры.', 'all': 'Дуэли открыты для всех.'}
+    labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только открытые классы и тестеры.', 'all': 'Дуэли открыты для всех.'}
     messages.success(request, labels[settings_obj.duels_mode])
     return redirect(request.POST.get('next') or 'teacher_dashboard')
 

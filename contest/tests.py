@@ -1046,7 +1046,7 @@ class DuelsTeacherViewTests(TestCase):
         self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         page = self.client.get(reverse('duels')).content.decode()
         self.assertIn('Для преподавателя', page)
-        self.assertIn('только тестеры', page)
+        self.assertIn('по классам и тестерам', page)
         self.client.login(username='sv', password='x')
         self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertRedirects(self.client.get(reverse('duels')), reverse('all_tasks'))

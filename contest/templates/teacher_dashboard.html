@@ -16,7 +16,7 @@
             <a href="{% url 'suspicious_students' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3">⚠ Подозрительные</a>
             {% if duels_admin %}
             <form method="post" action="{% url 'duels_toggle' %}" class="d-inline">{% csrf_token %}
-                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if duels_mode == 'all' %}btn-success{% elif duels_mode == 'testers' %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Нажмите, чтобы переключить: выключены → только тестеры → для всех">⚔️ Дуэли: {% if duels_mode == 'all' %}для всех{% elif duels_mode == 'testers' %}только тестеры{% else %}выключены{% endif %}</button>
+                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if duels_mode == 'all' %}btn-success{% elif duels_mode == 'testers' %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Нажмите, чтобы переключить: выключены → по классам и тестерам → для всех">⚔️ Дуэли: {% if duels_mode == 'all' %}для всех{% elif duels_mode == 'testers' %}по классам и тестерам{% else %}выключены{% endif %}</button>
             </form>
             {% endif %}
         </div>
