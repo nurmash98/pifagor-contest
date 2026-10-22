@@ -367,6 +367,7 @@ class Exam(models.Model):
     # компьютер случайно выбирает N задач из выбранных учителем (у соседей — разные варианты).
     random_count = models.PositiveIntegerField(default=0, verbose_name="Случайных задач каждому (0 — все)")
     # Случайный режим: условия для каждой задачи — [{"tag": id тега или null, "level": "A"/"B"/"C"/""}].
+    # Необязательное "tasks": [id, ...] — учитель сам выбрал, какие именно задачи могут выпасть.
     # При старте каждому ученику для каждого условия выпадает своя случайная задача с тестами.
     random_slots = models.JSONField(default=list, blank=True, verbose_name="Условия случайных задач")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
@@ -402,6 +403,8 @@ class Exam(models.Model):
                 parts.append('#' + tag_names.get(sl['tag'], '?'))
             if sl.get('level'):
                 parts.append(sl['level'])
+            if sl.get('tasks'):
+                parts.append(f"выбрано задач: {len(sl['tasks'])}")
             out.append({'tag': sl.get('tag'), 'level': sl.get('level') or '',
                         'label': ' · '.join(parts) or 'любая'})
         return out

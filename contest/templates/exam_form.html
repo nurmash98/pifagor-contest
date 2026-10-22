@@ -74,11 +74,16 @@
                         {% for code, label in levels %}<option value="{{ code }}" {% if sl.level == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
                     </select>
                     <span class="small slot-fit text-muted"></span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm slot-pick">Выбрать задачи</button>
+                    <input type="hidden" name="slot_pool" value="{{ sl.pool }}">
+                    <div class="slot-panel border rounded-3 p-2 w-100" style="display: none; max-height: 260px; overflow-y: auto;"></div>
                 </div>
                 {% endfor %}
             </div>
             <div class="form-text">При нажатии «Начать» компьютер каждому ученику по каждому условию выбирает случайную задачу с тестами.
-                Задачи у одного ученика не повторяются, у соседей обычно разные.</div>
+                Задачи у одного ученика не повторяются, у соседей обычно разные.
+                Кнопка «Выбрать задачи» позволяет оставить для условия только нужные задачи: случайно выпадет одна из отмеченных.
+                Если ничего не отмечать, выбор идёт из всех подходящих по тегу и сложности.</div>
         </div>
         <div id="fixed-box" class="card border-0 shadow-sm rounded-4 p-4" {% if v.mode == 'random' %}style="display: none;"{% endif %}>
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -144,26 +149,89 @@
     });
     // --- случайный режим: условия «тег + сложность» для каждой задачи
     var slotsBox = document.getElementById('slots'), slotCount = document.getElementById('slot-count');
+    function matching(tg, lv) {
+        var out = [];
+        rows().forEach(function (r) {
+            if ((!tg || r.dataset.tagids.indexOf('|' + tg + '|') !== -1) && (!lv || r.dataset.level === lv)) {
+                var cb = r.querySelector('input[name=tasks]');
+                out.push({id: cb.value, level: r.dataset.level, label: r.querySelector('label').textContent.replace(/\s+/g, ' ').trim()});
+            }
+        });
+        return out;
+    }
+    function poolOf(row) {
+        var v = row.querySelector('[name=slot_pool]').value;
+        return v ? v.split(',').filter(Boolean) : [];
+    }
+    function renderPanel(row) {
+        var panel = row.querySelector('.slot-panel'),
+            list = matching(row.querySelector('[name=slot_tag]').value, row.querySelector('[name=slot_level]').value),
+            pool = poolOf(row), all = pool.length === 0;
+        panel.innerHTML = '<div class="d-flex gap-3 small mb-1"><span class="text-muted slot-sel"></span>'
+            + '<button type="button" class="btn btn-link btn-sm p-0 pool-all">отметить все</button>'
+            + '<button type="button" class="btn btn-link btn-sm p-0 text-danger pool-none">снять все</button></div>'
+            + list.map(function (t) {
+                var on = all || pool.indexOf(t.id) !== -1;
+                return '<div class="form-check py-0"><input class="form-check-input pool-cb" type="checkbox" value="' + t.id + '"' + (on ? ' checked' : '')
+                    + '><label class="form-check-label small">' + t.label.replace(/</g, '&lt;') + '</label></div>';
+            }).join('') || '<div class="text-muted small">Нет подходящих задач с тестами.</div>';
+        syncPool(row);
+    }
+    function syncPool(row) {
+        var panel = row.querySelector('.slot-panel'), cbs = panel.querySelectorAll('.pool-cb'), ids = [];
+        cbs.forEach(function (cb) { if (cb.checked) ids.push(cb.value); });
+        // все отмечены — значит выбор из всех подходящих (пустой набор)
+        row.querySelector('[name=slot_pool]').value = (ids.length === cbs.length) ? '' : ids.join(',');
+        var sel = panel.querySelector('.slot-sel');
+        if (sel) sel.textContent = 'выбрано: ' + ids.length + ' из ' + cbs.length;
+        refreshSlots();
+    }
     function refreshSlots() {
         var used = {};
         slotsBox.querySelectorAll('.slot-row').forEach(function (row, i) {
             row.querySelector('.slot-num').textContent = 'Задача ' + (i + 1);
-            var tg = row.querySelector('[name=slot_tag]').value, lv = row.querySelector('[name=slot_level]').value, n = 0;
-            rows().forEach(function (r) {
-                if ((!tg || r.dataset.tagids.indexOf('|' + tg + '|') !== -1) && (!lv || r.dataset.level === lv)) n++;
-            });
-            var key = tg + '/' + lv; used[key] = (used[key] || 0) + 1;
+            var tg = row.querySelector('[name=slot_tag]').value, lv = row.querySelector('[name=slot_level]').value;
+            var list = matching(tg, lv), pool = poolOf(row), n = list.length;
+            if (pool.length) n = list.filter(function (t) { return pool.indexOf(t.id) !== -1; }).length;
+            var key = tg + '/' + lv + '/' + pool.join('+'); used[key] = (used[key] || 0) + 1;
             var fit = row.querySelector('.slot-fit');
-            fit.textContent = 'подходит задач: ' + n;
+            fit.textContent = (pool.length ? 'выбрано задач: ' : 'подходит задач: ') + n;
             fit.className = 'small slot-fit ' + (n === 0 || used[key] > n ? 'text-danger fw-semibold' : 'text-muted');
+            row.querySelector('.slot-pick').textContent = pool.length ? 'Выбрано: ' + n : 'Выбрать задачи';
         });
     }
+    slotsBox.addEventListener('click', function (e) {
+        var row = e.target.closest('.slot-row'); if (!row) return;
+        var panel = row.querySelector('.slot-panel');
+        if (e.target.classList.contains('slot-pick')) {
+            if (panel.style.display === 'none') { renderPanel(row); panel.style.display = ''; } else panel.style.display = 'none';
+        } else if (e.target.classList.contains('pool-all') || e.target.classList.contains('pool-none')) {
+            var on = e.target.classList.contains('pool-all');
+            panel.querySelectorAll('.pool-cb').forEach(function (cb) { cb.checked = on; });
+            // «снять все» не должно превращаться в «все»: пустой список — ошибка при сохранении, показываем счётчик
+            syncPool(row);
+            if (!on) { row.querySelector('[name=slot_pool]').value = '0'; refreshSlots(); }
+        }
+    });
+    slotsBox.addEventListener('change', function (e) {
+        var row = e.target.closest('.slot-row'); if (!row) return;
+        if (e.target.classList.contains('pool-cb')) { syncPool(row); }
+        else if (e.target.name === 'slot_tag' || e.target.name === 'slot_level') {
+            // другое условие — прежний выбор задач сбрасывается
+            row.querySelector('[name=slot_pool]').value = '';
+            row.querySelector('.slot-panel').style.display = 'none';
+            refreshSlots();
+        }
+    });
     slotCount.addEventListener('input', function () {
         var want = Math.max(1, Math.min({{ max_slots }}, parseInt(slotCount.value, 10) || 1));
         var list = slotsBox.querySelectorAll('.slot-row');
         for (var i = list.length; i < want; i++) {
             var copy = list[list.length - 1].cloneNode(true);
             copy.querySelectorAll('select').forEach(function (sel) { sel.selectedIndex = 0; });
+            copy.querySelector('[name=slot_pool]').value = '';
+            copy.querySelector('.slot-panel').style.display = 'none';
+            copy.querySelector('.slot-panel').innerHTML = '';
             slotsBox.appendChild(copy);
         }
         list = slotsBox.querySelectorAll('.slot-row');
@@ -173,7 +241,6 @@
     refreshSlots();
     document.addEventListener('change', function (e) {
         if (e.target.name === 'tasks') countPicked();
-        if (e.target.name === 'slot_tag' || e.target.name === 'slot_level') refreshSlots();
         if (e.target.name === 'mode') {
             var rnd = e.target.value === 'random';
             document.getElementById('random-box').style.display = rnd ? '' : 'none';

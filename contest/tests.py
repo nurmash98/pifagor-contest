@@ -1253,3 +1253,58 @@ class NavbarLogoTests(TestCase):
         Student.objects.create(user=u, full_name='Н', school_class='7F')
         self.client.login(username='nl', password='pw12345')
         self.assertIn('icons/logo-tree', self.client.get('/').content.decode())
+
+
+class RandomSlotPoolTests(RetakeTestBase):
+    """Учитель выбирает, какие именно задачи могут выпасть по условию «тег + сложность»."""
+
+    def post(self, pools, exam=None):
+        self.client.force_login(self.teacher_user)
+        start = (timezone.localtime() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
+        n = len(pools)
+        data = {'kind': 'SOR', 'title': 'Пул', 'school_class': '7F', 'start_at': start,
+                'duration_minutes': '40', 'mode': 'random',
+                'slot_tag': [str(self.tag1.id)] * n, 'slot_level': ['A'] * n, 'slot_pool': pools}
+        url = reverse('exam_create') if exam is None else reverse('exam_edit', args=[exam.id])
+        return self.client.post(url, data)
+
+    def test_pool_saved_and_limits_candidates(self):
+        keep = [self.a_tasks[0].id, self.a_tasks[1].id]
+        self.post([','.join(map(str, keep))])
+        exam = Exam.objects.get(title='Пул')
+        self.assertEqual(exam.random_slots[0]['tasks'], sorted(keep))
+        from .exam_views import _slot_candidates
+        self.assertEqual(set(_slot_candidates(exam.random_slots[0])), set(keep))
+        self.assertIn('выбрано задач: 2', exam.slot_list()[0]['label'])
+
+    def test_students_get_only_pool_tasks(self):
+        keep = [self.a_tasks[2].id, self.a_tasks[3].id]
+        self.post([','.join(map(str, keep))])
+        exam = Exam.objects.get(title='Пул')
+        exam.start_at = timezone.now() - timedelta(minutes=5); exam.save()
+        for st in self.students:
+            self.client.force_login(st.user)
+            self.client.post(reverse('exam_start', args=[exam.id]))
+            att = ExamAttempt.objects.get(exam=exam, student=st)
+            self.assertTrue(set(att.task_ids) <= set(keep))
+
+    def test_all_selected_means_no_restriction(self):
+        everything = ','.join(str(t.id) for t in self.a_tasks)
+        self.post([everything])
+        self.assertNotIn('tasks', Exam.objects.get(title='Пул').random_slots[0])
+
+    def test_foreign_tasks_ignored_and_empty_rejected(self):
+        self.post([str(self.b_tasks[0].id)])   # задача другого тега/сложности
+        self.assertFalse(Exam.objects.filter(title='Пул').exists())
+
+    def test_not_enough_tasks_in_pool_rejected(self):
+        one = str(self.a_tasks[0].id)
+        self.post([one, one])   # два условия, а в наборе одна задача
+        self.assertFalse(Exam.objects.filter(title='Пул').exists())
+
+    def test_edit_form_keeps_pool(self):
+        keep = [self.a_tasks[0].id, self.a_tasks[1].id]
+        self.post([','.join(map(str, keep))])
+        exam = Exam.objects.get(title='Пул')
+        html = self.client.get(reverse('exam_edit', args=[exam.id])).content.decode()
+        self.assertIn(f'name="slot_pool" value="{keep[0]},{keep[1]}"', html)

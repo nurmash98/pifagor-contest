@@ -48,6 +48,8 @@ def _slot_candidates(slot, exclude=()):
         qs = qs.filter(tags__id=slot['tag'])
     if slot.get('level'):
         qs = qs.filter(level=slot['level'])
+    if slot.get('tasks'):   # учитель сам выбрал, какие задачи могут выпасть
+        qs = qs.filter(id__in=slot['tasks'])
     return list(qs.values_list('id', flat=True).distinct())
 
 
@@ -113,7 +115,8 @@ def _retake_task_ids(exam, student):
 
     def relaxed(slot, level):
         return {'tag': slot.get('tag') if level < 1 else None,
-                'level': slot.get('level') if level < 2 else ''}
+                'level': slot.get('level') if level < 2 else '',
+                'tasks': slot.get('tasks') if level < 2 else None}
 
     result = [None] * len(slots)
     taken = set(seen)
@@ -442,6 +445,7 @@ def _exam_form(request, exam):
         mode = 'random' if request.POST.get('mode') == 'random' else 'fixed'
         slot_tags = request.POST.getlist('slot_tag')
         slot_levels = request.POST.getlist('slot_level')
+        slot_pools = request.POST.getlist('slot_pool')
 
         if kind not in ('SOR', 'SOCH'):
             errors.append('Выберите тип: СОР или СОЧ.')
@@ -470,12 +474,22 @@ def _exam_form(request, exam):
                 errors.append('Добавьте хотя бы одну задачу.')
         else:
             tag_ids = set(Tag.objects.values_list('id', flat=True))
-            for tag_raw, level in zip(slot_tags, slot_levels):
+            for i, (tag_raw, level) in enumerate(zip(slot_tags, slot_levels)):
                 tag = int(tag_raw) if tag_raw.isdigit() and int(tag_raw) in tag_ids else None
-                slots.append({'tag': tag, 'level': level if level in ('A', 'B', 'C') else ''})
+                slot = {'tag': tag, 'level': level if level in ('A', 'B', 'C') else ''}
+                raw_pool = slot_pools[i] if i < len(slot_pools) else ''
+                wanted = {int(x) for x in raw_pool.split(',') if x.strip().isdigit()}
+                if wanted:
+                    matching = set(_slot_candidates(slot))
+                    pool = sorted(wanted & matching)
+                    if not pool:
+                        errors.append(f'Задача №{i + 1}: выбранные задачи не подходят под тег и сложность.')
+                    elif len(pool) < len(matching):   # выбраны не все — запоминаем набор
+                        slot['tasks'] = pool
+                slots.append(slot)
             if not 1 <= len(slots) <= EXAM_MAX_RANDOM_SLOTS:
                 errors.append(f'Количество случайных задач — от 1 до {EXAM_MAX_RANDOM_SLOTS}.')
-            else:
+            elif not errors:
                 candidates = [_slot_candidates(sl) for sl in slots]
                 empty = [i for i, c in enumerate(candidates, 1) if not c]
                 if empty:
@@ -483,7 +497,7 @@ def _exam_form(request, exam):
                                   + ' — выберите другой тег или сложность.')
                 elif None in _random_match(candidates):
                     errors.append('Под одинаковые условия не хватает разных задач — одному ученику '
-                                  'задачи не повторяются. Измените тег или сложность.')
+                                  'задачи не повторяются. Измените тег, сложность или набор задач.')
         random_count = len(slots)
 
         if not errors:
@@ -504,7 +518,7 @@ def _exam_form(request, exam):
             messages.error(request, e)
         values = {'kind': kind, 'title': title, 'school_class': school_class, 'start_at': start_raw,
                   'duration_minutes': duration_raw, 'mode': mode}
-        slot_values = [{'tag': sl['tag'], 'level': sl['level']} for sl in slots] if mode == 'random' else None
+        slot_values = [{'tag': sl['tag'], 'level': sl['level'], 'pool': ','.join(map(str, sl.get('tasks', [])))} for sl in slots] if mode == 'random' else None
         selected = set(task_ids)
     else:
         values = {
@@ -513,7 +527,7 @@ def _exam_form(request, exam):
             'duration_minutes': exam.duration_minutes or 40,
             'mode': 'random' if exam.random_count else 'fixed',
         }
-        slot_values = [{'tag': sl.get('tag'), 'level': sl.get('level') or ''} for sl in exam.random_slots] or None
+        slot_values = [{'tag': sl.get('tag'), 'level': sl.get('level') or '', 'pool': ','.join(map(str, sl.get('tasks') or []))} for sl in exam.random_slots] or None
         selected = set(exam.tasks.values_list('id', flat=True)) if not is_new else set()
 
     return render(request, 'exam_form.html', {
@@ -521,7 +535,7 @@ def _exam_form(request, exam):
         'class_choices': sorted(set(classes)) if classes is not None else None,
         'all_tags': Tag.objects.all(), 'max_duration': EXAM_MAX_DURATION,
         'levels': Task.LEVEL_CHOICES, 'max_slots': EXAM_MAX_RANDOM_SLOTS,
-        'slots': slot_values or [{'tag': None, 'level': ''} for _ in range(3)],
+        'slots': slot_values or [{'tag': None, 'level': '', 'pool': ''} for _ in range(3)],
     })
 
 
