@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load ui_i18n %}
+{% load ui_i18n badge_tags %}
 
 {% block title %}{% t "Мой профиль" %} - Pifagor Contest{% endblock %}
 
@@ -10,9 +10,7 @@
     <div class="col-md-4 mb-4">
         <div class="card border-0 shadow-sm rounded-4 text-center p-4 sticky-top" style="top: 2rem;">
             <div class="mb-3">
-                <div class="d-inline-flex align-items-center justify-content-center bg-light text-primary rounded-circle shadow-sm" style="width: 90px; height: 90px; font-size: 2.5rem;">
-                    🎓
-                </div>
+                {% student_avatar solved_count 104 True 'p' %}
             </div>
 
             <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ student.full_name }}</h4>

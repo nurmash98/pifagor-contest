@@ -1,4 +1,4 @@
-{% load ui_i18n %}
+{% load ui_i18n badge_tags %}
 <!-- Значки ученика: сетка + окно с описанием по клику (без внешних библиотек) -->
 <style>
     .badge-item { background: none; border: 0; padding: 4px 0; width: 100%; text-align: center; cursor: pointer; color: inherit; }
@@ -33,8 +33,8 @@
                     data-title="{{ b.title }}" data-desc="{{ b.desc }}" data-earned="{% if b.earned %}1{% endif %}"
                     data-date="{{ b.awarded_at|date:'d.m.Y' }}" data-current="{{ b.current }}" data-total="{{ b.total }}"
                     data-percent="{{ b.percent }}" data-left="{{ b.left }}" data-kind="{{ b.kind }}" data-key="{{ b.key }}">
-                {% include 'badge_hex.html' with b=b uid='g' %}
-                <div class="bn">{{ b.title }}</div>
+                {% if b.kind == 'tasks' %}{% tier_badge b 'g' b.earned 92 102 %}{% else %}{% include 'badge_hex.html' with b=b uid='g' %}
+                <div class="bn">{{ b.title }}</div>{% endif %}
             </button>
         </div>
         {% endfor %}
@@ -58,7 +58,7 @@
 
 {% if new_badges %}
 <div class="badge-toast" id="badge-toast" data-key="{{ new_badges.0.key }}">
-    <div style="width:44px">{% include 'badge_hex.html' with b=new_badges.0 uid='t' size=44 size_h=48 %}</div>
+    <div style="width:48px">{% if new_badges.0.kind == 'tasks' %}{% tier_badge new_badges.0 't' True 48 54 %}{% else %}{% include 'badge_hex.html' with b=new_badges.0 uid='t' size=44 size_h=48 %}{% endif %}</div>
     <div class="small"><strong>{% t "Новый значок!" %}</strong><br>{{ new_badges.0.title }}{% if new_badges|length > 1 %} <span class="text-muted">+{{ new_badges|length|add:"-1" }}</span>{% endif %}</div>
 </div>
 {% endif %}

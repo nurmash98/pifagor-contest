@@ -12,6 +12,7 @@ from . import duels
 from .exam_views import active_attempt_for
 from .models import Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student, Tag
 from .models import normalize_school_class
+from .badge_art import solved_counts
 from .views import _apply_task_language, _get_content_lang, _managed_classes
 
 
@@ -50,6 +51,9 @@ def duels_home(request):
     ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
     top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
     ctx['top'] = list(top)
+    counts = solved_counts([s.id for s in ctx['top']])
+    for s in ctx['top']:
+        s.solved = counts.get(s.id, 0)
     if student is None and request.user.is_staff:
         # Обзор для преподавателя: режим, тестеры, идущие и недавние дуэли (только просмотр)
         ctx.update({
@@ -166,6 +170,7 @@ def duel_match(request, duel_id):
     lang = _get_content_lang(request)
     me, opp = student, duel.opponent_of(student)
     ctx = {
+        'me_solved': solved_counts([me.id]).get(me.id, 0), 'opp_solved': solved_counts([opp.id]).get(opp.id, 0),
         'duel': duel, 'me': me, 'opp': opp, 'tasks': _duel_context(duel, student, lang),
         'my_points': duel.points_of(me), 'opp_points': duel.points_of(opp),
         'finished': duel.status == 'FINISHED',

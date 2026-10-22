@@ -1439,3 +1439,45 @@ class DuelNoRepeatTests(TestCase):
         self.assertEqual(len(picked), 3)
         new = {t.id for t in self.tasks[5:]}
         self.assertTrue(new <= {t.id for t in picked})   # обе свежие задачи обязательно взяты
+
+
+class TierBadgeAndAvatarTests(TestCase):
+    def setUp(self):
+        self.u = User.objects.create_user('tier', password='x')
+        self.st = Student.objects.create(user=self.u, full_name='Тир', school_class='7F')
+        Task.objects.all().delete()
+        from .models import Submission
+        for i in range(12):
+            t = Task.objects.create(title=f'Q{i}', description='d', level='A', test_cases=[])
+            Submission.objects.create(student=self.st, task=t, status='DONE', score=10, is_graded=True)
+
+    def test_tier_for_count(self):
+        from .badge_art import tier_for_count
+        self.assertIsNone(tier_for_count(9))
+        self.assertEqual(tier_for_count(10)['tier'], 'wood')
+        self.assertEqual(tier_for_count(120)['tier'], 'silver')
+        self.assertEqual(tier_for_count(5000)['tier'], 'legend')
+
+    def test_profile_shows_wood_frame_and_material_badges(self):
+        self.client.login(username='tier', password='x')
+        html = self.client.get(reverse('profile')).content.decode()
+        self.assertIn('pf-avatar pf-wood', html)
+        self.assertIn('tier-badge tier-wood', html)       # новый значок «Новичок»
+        self.assertIn('НОВИЧОК', html)
+        self.assertIn('БОЕЦ', html)                       # закрытый «Боец» тоже нарисован (с замком)
+        self.assertNotIn('tier-badge tier-bronze', html)
+
+    def test_leaderboard_has_frames(self):
+        self.client.login(username='tier', password='x')
+        html = self.client.get(reverse('leaderboard')).content.decode()
+        self.assertIn('pf-avatar pf-wood', html)
+
+    def test_no_frame_below_10(self):
+        from .models import Submission
+        Submission.objects.filter(student=self.st).first().delete()
+        Submission.objects.filter(student=self.st).first().delete()
+        Submission.objects.filter(student=self.st).first().delete()
+        self.client.login(username='tier', password='x')
+        html = self.client.get(reverse('profile')).content.decode()
+        self.assertIn('class="pf-avatar"', html)
+        self.assertNotIn('pf-avatar pf-', html)

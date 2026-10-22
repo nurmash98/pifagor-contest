@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
-{% load ui_i18n %}
+{% load ui_i18n badge_tags %}
 {% block title %}{% t "Дуэль" %}{% endblock %}
 {% block content %}
 <div class="mt-4">
     <div class="card border-0 shadow-sm rounded-4 p-4 mb-4" style="background:linear-gradient(135deg,#1a1a4b,#3b3b9c);color:#fff;">
         <div class="row align-items-center text-center g-3">
             <div class="col-4">
+                <div class="mb-2">{% student_avatar me_solved 64 True 'me' %}</div>
                 <div class="fw-bold fs-5">{{ me.full_name }}</div>
                 <div class="small opacity-75">{% t "Рейтинг" %} {{ my_rating_before }}</div>
             </div>
@@ -14,6 +15,7 @@
                 <div class="small opacity-75">{% t "до" %} {{ points_to_win }} {% t "очков" %}</div>
             </div>
             <div class="col-4">
+                <div class="mb-2">{% student_avatar opp_solved 64 True 'op' %}</div>
                 <div class="fw-bold fs-5">{{ opp.full_name }}</div>
                 <div class="small opacity-75">{% t "Рейтинг" %} {{ opp_rating_before }}</div>
             </div>

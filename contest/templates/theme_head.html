@@ -92,6 +92,25 @@
         background-color: #151b30; color: var(--bs-body-color); border-color: #34c27a; box-shadow: 0 0 0 .2rem rgba(52, 194, 122, .2);
     }
     [data-bs-theme="dark"] .form-control::placeholder { color: rgba(228, 231, 240, .4); }
+    /* Аватар с рамкой по самому высокому значку за задачи */
+    .pf-avatar { position: relative; display: inline-block; flex: none; vertical-align: middle; }
+    .pf-avatar .pf-ring { position: absolute; inset: 0; border-radius: 50%; background: var(--bs-tertiary-bg); }
+    .pf-avatar .pf-face { position: absolute; inset: 8%; border-radius: 50%; background: var(--bs-body-bg);
+        display: flex; align-items: center; justify-content: center; line-height: 1; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+    .pf-avatar .pf-mini { position: absolute; right: -9%; bottom: -7%; }
+    .pf-avatar .pf-mini svg { width: 100%; height: 100%; }
+    .pf-wood .pf-ring { background: repeating-linear-gradient(115deg,#a86b35 0 6px,#8f5a2b 6px 9px,#b97a41 9px 14px); box-shadow: 0 0 0 2px #5a3415; }
+    .pf-bronze .pf-ring { background: conic-gradient(#f3b880,#c47b3c,#7a461b,#c47b3c,#f3b880,#c47b3c,#7a461b,#f3b880); box-shadow: 0 0 0 2px #5a3410; }
+    .pf-silver .pf-ring { background: conic-gradient(#fff,#c3cad6,#7d8797,#c3cad6,#fff,#c3cad6,#7d8797,#fff); box-shadow: 0 0 0 2px #6b7484; }
+    .pf-gold .pf-ring { background: conic-gradient(#fff1b8,#f2c230,#a8740a,#f2c230,#fff1b8,#f2c230,#a8740a,#fff1b8); box-shadow: 0 0 0 2px #8a6008, 0 0 12px rgba(242,194,48,.45); }
+    .pf-diamond .pf-ring { background: conic-gradient(#f0fdff,#8fe3f5,#2d8fb3,#8fe3f5,#f0fdff,#8fe3f5,#2d8fb3,#f0fdff); box-shadow: 0 0 0 2px #2d8fb3, 0 0 16px rgba(110,220,255,.7); }
+    @keyframes pf-spin { to { transform: rotate(360deg); } }
+    @keyframes pf-glow { 0%,100% { box-shadow: 0 0 10px #a855f7, 0 0 4px #f97316; } 50% { box-shadow: 0 0 22px #c084fc, 0 0 10px #fb923c; } }
+    .pf-legend .pf-ring { background: conic-gradient(#f97316,#a855f7,#7c3aed,#f97316,#fde047,#a855f7,#f97316); animation: pf-spin 6s linear infinite, pf-glow 2.4s ease-in-out infinite; }
+    @keyframes tier-pulse { 0%,100% { filter: drop-shadow(0 0 4px #a855f7) drop-shadow(0 0 2px #f97316); } 50% { filter: drop-shadow(0 0 12px #c084fc) drop-shadow(0 0 6px #fb923c); } }
+    .tier-legend { animation: tier-pulse 2.4s ease-in-out infinite; }
+    .tier-diamond { filter: drop-shadow(0 0 6px rgba(110,220,255,.55)); }
+    @media (prefers-reduced-motion: reduce) { .pf-legend .pf-ring, .tier-legend { animation: none; } }
     /* Логотип: в ночном режиме — светлая версия (белые знаки, ярко-зелёное дерево) */
     .logo-dark { display: none; }
     [data-bs-theme="dark"] .logo-dark { display: inline-block; }

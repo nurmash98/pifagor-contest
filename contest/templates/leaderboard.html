@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load ui_i18n %}
+{% load ui_i18n badge_tags %}
 
 {% block title %}{% t "Лидерборд" %} - Pifagor Contest{% endblock %}
 
@@ -59,7 +59,7 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 fw-bold" style="color: #1a1a4b;">
-                                {{ student.full_name }}
+                                <span class="d-inline-flex align-items-center gap-2">{% student_avatar student.calc_solved_count 38 False forloop.counter %}{{ student.full_name }}</span>
                             </td>
                             <td class="text-center text-muted">
                                 {{ student.school_class }}

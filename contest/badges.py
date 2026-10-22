@@ -52,6 +52,10 @@ CATALOG = [
          ru_d='Получите 10/10 на пяти разных СОР или СОЧ.',
          kk_d='Бес түрлі БЖБ немесе ТЖБ-дан 10/10 алыңыз.'),
 ]
+from .badge_art import TIERS  # noqa: E402  материалы значков за задачи
+for _b in CATALOG:
+    if _b['key'] in TIERS:
+        _b['tier'] = TIERS[_b['key']]['tier']
 BY_KEY = {b['key']: b for b in CATALOG}
 
 
