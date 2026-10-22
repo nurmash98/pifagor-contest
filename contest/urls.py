@@ -13,6 +13,7 @@ urlpatterns = [
     path('duels/leave/', duel_views.duels_leave, name='duels_leave'),
     path('duels/status/', duel_views.duels_status, name='duels_status'),
     path('duels/toggle/', duel_views.duels_toggle, name='duels_toggle'),
+    path('duels/class/', duel_views.duels_class_toggle, name='duels_class_toggle'),
     path('duels/<int:duel_id>/', duel_views.duel_match, name='duel_match'),
     path('duels/<int:duel_id>/state/', duel_views.duel_state, name='duel_state'),
     path('duels/<int:duel_id>/leave/', duel_views.duel_leave, name='duel_leave'),

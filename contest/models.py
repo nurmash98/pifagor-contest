@@ -543,6 +543,14 @@ class SiteSettings(models.Model):
     """Общие переключатели сайта (одна строка, pk=1). Пока — режим дуэлей."""
     DUEL_MODES = [('off', 'Выключены'), ('testers', 'Только тестеры'), ('all', 'Для всех')]
     duels_mode = models.CharField(max_length=10, choices=DUEL_MODES, default='testers', verbose_name="Режим дуэлей")
+    # Классы, которым преподаватели открыли дуэли (через запятую). Работает, пока режим не «выключены».
+    duels_classes = models.CharField(max_length=500, blank=True, default='', verbose_name="Классы с доступом к дуэлям")
+
+    def duel_class_list(self):
+        return [normalize_school_class(c) for c in self.duels_classes.split(',') if c.strip()]
+
+    def set_duel_classes(self, classes):
+        self.duels_classes = ', '.join(dict.fromkeys(normalize_school_class(c) for c in classes if c))
 
     @classmethod
     def get(cls):

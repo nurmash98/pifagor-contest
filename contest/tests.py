@@ -1157,13 +1157,13 @@ class DuelsAdminOnlyTests(TestCase):
             u = User.objects.create_user(name, password='x', is_staff=True)
             Teacher.objects.create(user=u, full_name=name, classes='7F')
 
-    def test_other_teacher_does_not_see_or_control_duels(self):
+    def test_other_teacher_sees_page_but_cannot_switch_global_mode(self):
         from .models import SiteSettings
         self.client.login(username='other', password='x')
-        self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
-        self.assertRedirects(self.client.get(reverse('duels')), reverse('teacher_dashboard'))
+        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
         self.client.post(reverse('duels_toggle'))
-        self.assertEqual(SiteSettings.get().duels_mode, 'testers')            # не переключился
+        self.assertEqual(SiteSettings.get().duels_mode, 'testers')            # общий режим не переключился
         self.assertNotIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
 
     def test_admin_teacher_sees_and_controls(self):
@@ -1174,8 +1174,6 @@ class DuelsAdminOnlyTests(TestCase):
         self.assertIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
         self.client.post(reverse('duels_toggle'))
         self.assertEqual(SiteSettings.get().duels_mode, 'all')
-        self.client.login(username='other', password='x')                      # при «для всех» остальным тоже видно
-        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
 
     def test_other_teacher_cannot_mark_testers(self):
         su = User.objects.create_user('stud', password='x')
@@ -1308,3 +1306,50 @@ class RandomSlotPoolTests(RetakeTestBase):
         exam = Exam.objects.get(title='Пул')
         html = self.client.get(reverse('exam_edit', args=[exam.id])).content.decode()
         self.assertIn(f'name="slot_pool" value="{keep[0]},{keep[1]}"', html)
+
+
+class DuelsClassAccessTests(TestCase):
+    def setUp(self):
+        from .models import SiteSettings
+        self.tu = User.objects.create_user('tcls', password='x', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Учитель', classes='7F')
+        self.s7 = Student.objects.create(user=User.objects.create_user('a7', password='x'), full_name='A', school_class='7F')
+        self.s8 = Student.objects.create(user=User.objects.create_user('b8', password='x'), full_name='B', school_class='8A')
+        self.settings = SiteSettings.get()
+
+    def open_class(self, name, action='open'):
+        self.client.login(username='tcls', password='x')
+        return self.client.post(reverse('duels_class_toggle'), {'school_class': name, 'action': action})
+
+    def test_teacher_opens_own_class(self):
+        from . import duels
+        self.assertFalse(duels.visible_to(self.s7))
+        self.open_class('7F')
+        self.assertTrue(duels.visible_to(self.s7))
+        self.assertFalse(duels.visible_to(self.s8))
+        self.client.login(username='a7', password='x')
+        self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
+        self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
+
+    def test_close_class(self):
+        from . import duels
+        self.open_class('7F'); self.open_class('7F', 'close')
+        self.assertFalse(duels.visible_to(self.s7))
+
+    def test_cannot_open_foreign_class(self):
+        from . import duels
+        self.open_class('8A')
+        self.assertFalse(duels.visible_to(self.s8))
+
+    def test_global_off_overrides_classes(self):
+        from . import duels
+        self.open_class('7F')
+        self.settings.duels_mode = 'off'; self.settings.save()
+        self.assertFalse(duels.visible_to(self.s7))
+
+    def test_overview_shows_class_buttons(self):
+        self.open_class('7F')
+        html = self.client.get(reverse('duels')).content.decode()
+        self.assertIn('Доступ по классам', html)
+        self.assertIn('✓ 7F', html)
+        self.assertNotIn('name="school_class" value="8A"', html)

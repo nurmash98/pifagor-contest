@@ -21,7 +21,19 @@
             <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
                 <h5 class="fw-bold mb-2" style="color:#1a1a4b;">👨‍🏫 Для преподавателя</h5>
                 <p class="mb-2">Режим: <strong>{% if mode == 'all' %}для всех{% elif mode == 'testers' %}только тестеры{% else %}выключены{% endif %}</strong>
-                    <span class="text-muted small">(переключатель — в кабинете преподавателя)</span></p>
+                    <span class="text-muted small">(общий переключатель — у администратора дуэлей)</span></p>
+                {% if mode == 'off' %}<div class="alert alert-secondary py-2 small">Дуэли выключены администратором — классы ниже откроются, когда их включат.</div>{% endif %}
+                <div class="fw-semibold mb-1">Доступ по классам</div>
+                <p class="text-muted small mb-2">Откройте дуэли классам, которым хотите: ученики этих классов увидят пункт «Дуэли» и смогут играть.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% for row in class_rows %}
+                    <form method="post" action="{% url 'duels_class_toggle' %}">{% csrf_token %}
+                        <input type="hidden" name="school_class" value="{{ row.name }}">
+                        <input type="hidden" name="action" value="{% if row.open %}close{% else %}open{% endif %}">
+                        <button type="submit" class="btn btn-sm rounded-pill px-3 {% if row.open %}btn-success{% else %}btn-outline-secondary{% endif %}" title="{{ row.students }} уч. Нажмите, чтобы {% if row.open %}закрыть{% else %}открыть{% endif %}">{% if row.open %}✓ {% else %}🔒 {% endif %}{{ row.name }}</button>
+                    </form>
+                    {% empty %}<span class="text-muted small">Нет доступных классов.</span>{% endfor %}
+                </div>
                 <p class="mb-2">Тестеры{% if not testers %}: пока никого — отметьте учеников кнопкой «⚔️» в списке «Ученики»{% endif %}:
                     {% for st in testers %}<span class="badge bg-warning text-dark me-1">{{ st.full_name }} · {{ st.school_class }}</span>{% endfor %}</p>
                 <div class="small fw-semibold mt-3">Идут сейчас: {{ active_duels|length }}</div>

@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from .autotest import run_autotests
 from .models import (Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student,
-                     Submission, Task)
+                     Submission, Task, normalize_school_class)
 
 START_RATING = 800
 RATING_FLOOR = 100
@@ -62,15 +62,26 @@ def is_duels_admin(user):
 
 
 def teacher_sees_duels(user):
-    """Видит ли преподаватель пункт «Дуэли»: админ дуэлей — всегда, остальные — когда они открыты для всех."""
-    return bool(user and user.is_authenticated and user.is_staff and (
-        is_duels_admin(user) or duels_mode() == 'all'))
+    """Страницу «Дуэли» видит любой преподаватель: там он открывает дуэли своим классам."""
+    return bool(user and user.is_authenticated and user.is_staff)
+
+
+def open_classes():
+    """Классы, которым преподаватели открыли дуэли."""
+    return SiteSettings.get().duel_class_list()
 
 
 def visible_to(student):
-    """Видны ли дуэли ученику: режим «для всех», либо «только тестеры» и он тестер."""
-    mode = duels_mode()
-    return mode == 'all' or (mode == 'testers' and student is not None and student.duel_tester)
+    """Видны ли дуэли ученику. «Выключены» — никому. Иначе: режим «для всех», либо его класс
+    открыт преподавателем, либо режим «только тестеры» и он тестер."""
+    if student is None:
+        return False
+    obj = SiteSettings.get()
+    if obj.duels_mode == 'off':
+        return False
+    if obj.duels_mode == 'all' or normalize_school_class(student.school_class) in obj.duel_class_list():
+        return True
+    return obj.duels_mode == 'testers' and student.duel_tester
 
 
 def can_play(student):

@@ -11,11 +11,29 @@ from django.views.decorators.http import require_POST
 from . import duels
 from .exam_views import active_attempt_for
 from .models import Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student
-from .views import _apply_task_language, _get_content_lang
+from .models import normalize_school_class
+from .views import _apply_task_language, _get_content_lang, _managed_classes
 
 
 def _student(request):
     return Student.objects.filter(user=request.user).first()
+
+
+def _manageable_classes(user):
+    """Классы, которым преподаватель может открыть дуэли: свои; админу — все существующие."""
+    classes = _managed_classes(user)
+    if classes is None:
+        classes = sorted({c for c in Student.objects.values_list('school_class', flat=True) if c})
+    return sorted(set(classes))
+
+
+def _class_rows(user):
+    opened = set(duels.open_classes())
+    rows = []
+    for name in _manageable_classes(user):
+        rows.append({'name': name, 'open': name in opened,
+                     'students': Student.objects.filter(school_class=name).count()})
+    return rows
 
 
 @login_required
@@ -27,12 +45,11 @@ def duels_home(request):
     ctx = {'enabled': enabled, 'student': student, 'readonly': student is None}
     top = Student.objects.filter(duel_games__gt=0).order_by('-duel_rating', '-duel_games', 'full_name')[:20]
     ctx['top'] = list(top)
-    if student is None and request.user.is_staff and not duels.teacher_sees_duels(request.user):
-        return redirect('teacher_dashboard')      # дуэли пока не открыты для этого преподавателя
     if student is None and request.user.is_staff:
         # Обзор для преподавателя: режим, тестеры, идущие и недавние дуэли (только просмотр)
         ctx.update({
             'mode': duels.duels_mode(),
+            'class_rows': _class_rows(request.user),
             'testers': list(Student.objects.filter(duel_tester=True).order_by('school_class', 'full_name')),
             'active_duels': list(Duel.objects.filter(status='ACTIVE').select_related('player1', 'player2')),
             'recent_duels': list(Duel.objects.filter(status='FINISHED').select_related('player1', 'player2', 'winner')
@@ -225,3 +242,24 @@ def duels_toggle(request):
     labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только тестеры.', 'all': 'Дуэли открыты для всех.'}
     messages.success(request, labels[settings_obj.duels_mode])
     return redirect(request.POST.get('next') or 'teacher_dashboard')
+
+
+@staff_member_required
+@require_POST
+def duels_class_toggle(request):
+    """Преподаватель открывает или закрывает дуэли одному из своих классов."""
+    name = normalize_school_class(request.POST.get('school_class', ''))
+    if name not in _manageable_classes(request.user):
+        messages.error(request, 'Можно управлять дуэлями только своих классов.')
+        return redirect('duels')
+    obj = SiteSettings.get()
+    current = obj.duel_class_list()
+    if request.POST.get('action') == 'close':
+        current = [c for c in current if c != name]
+        messages.success(request, f'Дуэли для класса {name} закрыты.')
+    else:
+        current.append(name)
+        messages.success(request, f'Дуэли для класса {name} открыты.')
+    obj.set_duel_classes(current)
+    obj.save(update_fields=['duels_classes'])
+    return redirect('duels')
