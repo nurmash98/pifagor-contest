@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from . import duels
 from .exam_views import active_attempt_for
-from .models import Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student
+from .models import Duel, DuelAttempt, DuelQueueEntry, DuelTask, SiteSettings, Student, Tag
 from .models import normalize_school_class
 from .views import _apply_task_language, _get_content_lang, _managed_classes
 
@@ -28,11 +28,16 @@ def _manageable_classes(user):
 
 
 def _class_rows(user):
-    opened = set(duels.open_classes())
+    obj = SiteSettings.get()
+    opened = set(obj.duel_class_list())
+    all_tags = list(Tag.objects.order_by('name'))
     rows = []
     for name in _manageable_classes(user):
+        chosen = set((obj.duels_class_tags or {}).get(name) or [])
         rows.append({'name': name, 'open': name in opened,
-                     'students': Student.objects.filter(school_class=name).count()})
+                     'students': Student.objects.filter(school_class=name).count(),
+                     'tag_count': len(chosen),
+                     'tag_options': [(t, t.id in chosen) for t in all_tags]})
     return rows
 
 
@@ -262,4 +267,27 @@ def duels_class_toggle(request):
         messages.success(request, f'Дуэли для класса {name} открыты.')
     obj.set_duel_classes(current)
     obj.save(update_fields=['duels_classes'])
+    return redirect('duels')
+
+
+@staff_member_required
+@require_POST
+def duels_class_tags(request):
+    """Преподаватель выбирает, задачи каких тегов выпадают в дуэлях его класса (пусто — любые)."""
+    name = normalize_school_class(request.POST.get('school_class', ''))
+    if name not in _manageable_classes(request.user):
+        messages.error(request, 'Можно управлять дуэлями только своих классов.')
+        return redirect('duels')
+    valid = set(Tag.objects.values_list('id', flat=True))
+    chosen = sorted({int(t) for t in request.POST.getlist('tags') if t.isdigit() and int(t) in valid})
+    obj = SiteSettings.get()
+    data = dict(obj.duels_class_tags or {})
+    if chosen:
+        data[name] = chosen
+        messages.success(request, f'Класс {name}: в дуэлях будут задачи выбранных тегов ({len(chosen)}).')
+    else:
+        data.pop(name, None)
+        messages.success(request, f'Класс {name}: в дуэлях будут задачи любых тегов.')
+    obj.duels_class_tags = data
+    obj.save(update_fields=['duels_class_tags'])
     return redirect('duels')

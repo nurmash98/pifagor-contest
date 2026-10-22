@@ -157,11 +157,28 @@ def levels_for(avg_rating):
     return ['B', 'C']
 
 
+def allowed_tags(a, b):
+    """Теги, из которых берутся задачи дуэли (id), или пустое множество — любые. Учитель задаёт
+    теги для класса; у двух игроков — пересечение их тегов (если оно пустое — объединение)."""
+    data = SiteSettings.get().duels_class_tags or {}
+    sets = [set(data.get(normalize_school_class(s.school_class)) or []) for s in (a, b)]
+    sets = [x for x in sets if x]
+    if not sets:
+        return set()
+    return set.intersection(*sets) or set.union(*sets)
+
+
 def pick_tasks(a, b):
-    """3 случайные задачи с автотестами подходящего уровня; сначала те, которые оба ещё не
-    решали на 10/10 (если таких не хватает — добираем остальные)."""
+    """3 случайные задачи с автотестами подходящего уровня и (если учитель выбрал) нужных тегов;
+    сначала те, которые оба ещё не решали на 10/10 (если таких не хватает — добираем остальные)."""
     levels = levels_for((a.duel_rating + b.duel_rating) / 2)
     pool = [(tid, lvl) for tid, lvl, tc in Task.objects.values_list('id', 'level', 'test_cases') if tc]
+    tag_ids = allowed_tags(a, b)
+    if tag_ids:
+        tagged = set(Task.objects.filter(tags__id__in=tag_ids).values_list('id', flat=True))
+        pool_tagged = [x for x in pool if x[0] in tagged]
+        if len(pool_tagged) >= TASKS_PER_DUEL:     # хватает задач нужных тегов — берём только их
+            pool = pool_tagged
     chosen = [tid for tid, lvl in pool if lvl in levels]
     if len(chosen) < TASKS_PER_DUEL:
         chosen = [tid for tid, _ in pool]

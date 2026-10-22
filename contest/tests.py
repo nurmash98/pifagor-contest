@@ -1353,3 +1353,58 @@ class DuelsClassAccessTests(TestCase):
         self.assertIn('Доступ по классам', html)
         self.assertIn('✓ 7F', html)
         self.assertNotIn('name="school_class" value="8A"', html)
+
+
+class DuelClassTagsTests(TestCase):
+    def setUp(self):
+        self.tu = User.objects.create_user('tg', password='x', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Т', classes='7F')
+        self.a = Student.objects.create(user=User.objects.create_user('ga', password='x'), full_name='A', school_class='7F')
+        self.b = Student.objects.create(user=User.objects.create_user('gb', password='x'), full_name='B', school_class='7F')
+        Task.objects.all().delete()
+        self.t_loop, _ = Tag.objects.get_or_create(name='циклы-тест')
+        self.t_str, _ = Tag.objects.get_or_create(name='строки-тест')
+        tc = [{'input': '1', 'output': '1'}]
+        self.loops = []
+        self.strs = []
+        for i in range(4):
+            t = Task.objects.create(title=f'L{i}', description='d', level='A', test_cases=tc); t.tags.add(self.t_loop); self.loops.append(t)
+            t = Task.objects.create(title=f'S{i}', description='d', level='A', test_cases=tc); t.tags.add(self.t_str); self.strs.append(t)
+
+    def set_tags(self, tag_ids, cls='7F'):
+        self.client.login(username='tg', password='x')
+        return self.client.post(reverse('duels_class_tags'), {'school_class': cls, 'tags': tag_ids})
+
+    def test_duel_tasks_only_from_chosen_tags(self):
+        from . import duels
+        self.set_tags([self.t_loop.id])
+        for _ in range(10):
+            picked = duels.pick_tasks(self.a, self.b)
+            self.assertEqual({t.id for t in picked} - {t.id for t in self.loops}, set())
+            self.assertEqual(len(picked), 3)
+
+    def test_no_tags_means_any(self):
+        from . import duels
+        self.set_tags([self.t_loop.id]); self.set_tags([])
+        seen = set()
+        for _ in range(40):
+            seen |= {t.id for t in duels.pick_tasks(self.a, self.b)}
+        self.assertTrue(seen & {t.id for t in self.loops} and seen & {t.id for t in self.strs})
+
+    def test_too_few_tagged_tasks_falls_back(self):
+        from . import duels
+        for t in self.loops[1:]:
+            t.tags.clear()          # осталась одна задача с тегом «циклы»
+        self.set_tags([self.t_loop.id])
+        self.assertEqual(len(duels.pick_tasks(self.a, self.b)), 3)
+
+    def test_cannot_set_tags_for_foreign_class(self):
+        from .models import SiteSettings
+        self.set_tags([self.t_loop.id], cls='9Z')
+        self.assertNotIn('9Z', SiteSettings.get().duels_class_tags)
+
+    def test_overview_lists_tags(self):
+        self.set_tags([self.t_loop.id])
+        html = self.client.get(reverse('duels')).content.decode()
+        self.assertIn('Теги задач: 1', html)
+        self.assertIn('#циклы-тест', html)

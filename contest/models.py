@@ -546,6 +546,9 @@ class SiteSettings(models.Model):
     # Классы, которым преподаватели открыли дуэли (через запятую). Работает, пока режим не «выключены».
     duels_classes = models.CharField(max_length=500, blank=True, default='', verbose_name="Классы с доступом к дуэлям")
 
+    # Теги задач для дуэлей по классам: {"7F": [tag_id, ...]}. Нет записи или пусто — задачи любых тегов.
+    duels_class_tags = models.JSONField(default=dict, blank=True, verbose_name="Теги дуэлей по классам")
+
     def duel_class_list(self):
         return [normalize_school_class(c) for c in self.duels_classes.split(',') if c.strip()]
 
