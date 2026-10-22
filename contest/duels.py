@@ -85,12 +85,9 @@ def visible_to(student):
 
 
 def can_play(student):
-    """(можно ли, причина) — дуэли видны ученику и он не в списке подозрительных."""
+    """(можно ли, причина) — дуэли видны ученику. Список «Подозрительные» дуэли не ограничивает."""
     if not visible_to(student):
         return False, 'Дуэли сейчас выключены преподавателем.'
-    from .moderation_views import _reasons
-    if _reasons(Student.objects.filter(id=student.id)):
-        return False, 'Для вашего аккаунта дуэли недоступны — обратитесь к преподавателю.'
     return True, ''
 
 

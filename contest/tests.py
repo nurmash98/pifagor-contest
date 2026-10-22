@@ -993,12 +993,12 @@ class DuelTests(TestCase):
         self.st[2].refresh_from_db()
         self.assertTrue(self.st[2].duel_tester)
 
-    def test_suspicious_student_cannot_play(self):
+    def test_suspicious_student_can_still_play(self):
         from unittest import mock
         with mock.patch('contest.moderation_views._reasons', return_value={self.st[0].id: ['x']}):
             self.client.login(username='da', password='pw12345')
             self.client.post(reverse('duels_find'))
-        self.assertEqual(DuelQueueEntry.objects.count(), 0)
+        self.assertEqual(DuelQueueEntry.objects.count(), 1)
 
     def test_teacher_toggle_cycles_modes(self):
         from .models import SiteSettings
