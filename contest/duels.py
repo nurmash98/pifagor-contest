@@ -18,6 +18,7 @@ import random
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .autotest import run_autotests
@@ -181,13 +182,21 @@ def pick_tasks(a, b):
         chosen = [tid for tid, _ in pool]
     solved = set(Submission.objects.filter(student__in=[a, b], is_graded=True, score=10)
                  .values_list('task_id', flat=True))
-    fresh = [t for t in chosen if t not in solved]
-    random.shuffle(fresh)
-    picked = fresh[:TASKS_PER_DUEL]
-    if len(picked) < TASKS_PER_DUEL:
-        rest = [t for t in chosen if t not in picked]
-        random.shuffle(rest)
-        picked += rest[:TASKS_PER_DUEL - len(picked)]
+    # Задачи, которые уже выпадали этим игрокам в прошлых дуэлях — не повторяем, пока есть другие
+    seen = set(DuelTask.objects.filter(Q(duel__player1__in=[a, b]) | Q(duel__player2__in=[a, b]))
+               .values_list('task_id', flat=True))
+    tiers = [
+        [t for t in chosen if t not in solved and t not in seen],   # новые и ещё не решённые
+        [t for t in chosen if t in solved and t not in seen],       # не выпадали в дуэлях
+        [t for t in chosen if t not in solved and t in seen],       # выпадали, но не решены
+        [t for t in chosen if t in solved and t in seen],           # крайний случай: всё уже было
+    ]
+    picked = []
+    for tier in tiers:
+        random.shuffle(tier)
+        picked += tier[:TASKS_PER_DUEL - len(picked)]
+        if len(picked) >= TASKS_PER_DUEL:
+            break
     order = {t.id: t for t in Task.objects.filter(id__in=picked)}
     return [order[i] for i in picked if i in order]
 

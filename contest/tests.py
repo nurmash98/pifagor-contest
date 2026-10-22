@@ -1408,3 +1408,34 @@ class DuelClassTagsTests(TestCase):
         html = self.client.get(reverse('duels')).content.decode()
         self.assertIn('Теги задач: 1', html)
         self.assertIn('#циклы-тест', html)
+
+
+class DuelNoRepeatTests(TestCase):
+    def setUp(self):
+        from . import duels
+        self.duels = duels
+        self.a = Student.objects.create(user=User.objects.create_user('na', password='x'), full_name='A', school_class='7F')
+        self.b = Student.objects.create(user=User.objects.create_user('nb', password='x'), full_name='B', school_class='7F')
+        Task.objects.all().delete()
+        self.tasks = [Task.objects.create(title=f'N{i}', description='d', level='A',
+                                          test_cases=[{'input': '1', 'output': '1'}]) for i in range(7)]
+
+    def test_tasks_from_previous_duels_are_not_repeated_while_others_exist(self):
+        from .models import Duel, DuelTask
+        d = Duel.objects.create(player1=self.a, player2=self.b)
+        for i, t in enumerate(self.tasks[:3]):
+            DuelTask.objects.create(duel=d, task=t, order=i)
+        old = {t.id for t in self.tasks[:3]}
+        for _ in range(20):
+            picked = {t.id for t in self.duels.pick_tasks(self.a, self.b)}
+            self.assertFalse(picked & old)
+
+    def test_repeats_allowed_only_when_not_enough_other_tasks(self):
+        from .models import Duel, DuelTask
+        d = Duel.objects.create(player1=self.a, player2=self.b)
+        for i, t in enumerate(self.tasks[:5]):
+            DuelTask.objects.create(duel=d, task=t, order=i)
+        picked = self.duels.pick_tasks(self.a, self.b)
+        self.assertEqual(len(picked), 3)
+        new = {t.id for t in self.tasks[5:]}
+        self.assertTrue(new <= {t.id for t in picked})   # обе свежие задачи обязательно взяты
