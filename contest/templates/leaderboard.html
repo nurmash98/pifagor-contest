@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load ui_i18n badge_tags %}
+{% load ui_i18n badge_tags static %}
 
 {% block title %}{% t "Лидерборд" %} - Pifagor Contest{% endblock %}
 
@@ -36,52 +36,65 @@
         </div>
         {% endif %}
 
-        <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead style="background-color: #f4f6f9; color: #1a1a4b;">
-                        <tr>
-                            <th class="py-4 text-center" style="width: 10%;">{% t "Место" %}</th>
-                            <th class="py-4">{% t "Ученик" %}</th>
-                            <th class="py-4 text-center">{% t "Класс" %}</th>
-                            <th class="py-4 text-center">{% t "Решено задач" %}</th>
-                            <th class="py-4 text-center pe-4">{% t "Общий балл" %}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for student in students %}
-                        <tr class="{% if forloop.counter <= 3 %}bg-light{% endif %}">
-                            <td class="text-center fw-bold fs-5">
-                                {% if forloop.counter == 1 %}🥇
-                                {% elif forloop.counter == 2 %}🥈
-                                {% elif forloop.counter == 3 %}🥉
-                                {% else %}<span class="text-muted">{{ forloop.counter }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 fw-bold" style="color: #1a1a4b;">
-                                <span class="d-inline-flex align-items-center gap-2">{% student_avatar student.calc_solved_count 38 False forloop.counter student.avatar %}{% student_name student %}</span>
-                            </td>
-                            <td class="text-center text-muted">
-                                {{ student.school_class }}
-                            </td>
-                            <td class="text-center fw-semibold">
-                                {{ student.calc_solved_count }}
-                            </td>
-                            <td class="text-center pe-4 fw-bold fs-5" style="color: #008b42;">
-                                {{ student.calc_total_score }}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                {% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white p-2 p-sm-3">
+            <div class="lb-head">
+                <span class="text-center lb-place-h">{% t "Место" %}</span>
+                <span>{% t "Ученик" %}</span>
+                <span class="text-center lb-hide-sm">{% t "Класс" %}</span>
+                <span class="text-center lb-hide-sm">{% t "Решено задач" %}</span>
+                <span class="text-center">{% t "Общий балл" %}</span>
             </div>
+            {% for student in students %}
+            <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% elif forloop.counter <= 3 %} lb-top{% endif %}">
+                <span class="lb-place">
+                    {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
+                </span>
+                <span class="lb-name">
+                    {% student_avatar student.calc_solved_count 40 False forloop.counter student.avatar %}
+                    <span class="lb-name-text"><span class="lb-full">{{ student.full_name }}</span>
+                        <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}</span></span>
+                </span>
+                <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
+                <span class="lb-cell lb-hide-sm fw-semibold">{{ student.calc_solved_count }}</span>
+                <span class="lb-cell lb-score">{{ student.calc_total_score }}</span>
+            </div>
+            {% empty %}
+            <div class="text-center py-5 text-muted">{% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}</div>
+            {% endfor %}
         </div>
+        <style>
+            .lb-head, .lb-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 80px 130px 120px; align-items: center; column-gap: 8px; }
+            .lb-head { padding: 10px 14px 12px; font-weight: 700; color: var(--bs-body-color); border-bottom: 1px solid var(--bs-border-color); margin-bottom: 6px; }
+            .lb-row { position: relative; overflow: hidden; padding: 10px 14px; border-radius: 14px; margin: 4px 0; min-height: 62px; }
+            .lb-row:not(.has-b) { border-bottom: 1px solid var(--bs-border-color); border-radius: 0; }
+            .lb-row.lb-top { background: var(--bs-tertiary-bg); border-radius: 14px; border-bottom: 0; }
+            .lb-place { text-align: center; font-weight: 800; font-size: 1.25rem; color: var(--bs-secondary-color); position: relative; z-index: 1; }
+            .lb-name { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #1a1a4b; min-width: 0; position: relative; z-index: 1; }
+            [data-bs-theme="dark"] .lb-name { color: #c3c9ff; }
+            .lb-name-text { min-width: 0; display: flex; flex-direction: column; }
+            .lb-full { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .lb-sub { display: none; font-size: .78rem; font-weight: 600; opacity: .8; }
+            .lb-cell { text-align: center; position: relative; z-index: 1; }
+            .lb-muted { color: var(--bs-secondary-color); }
+            .lb-score { font-weight: 800; font-size: 1.25rem; color: #008b42; }
+            [data-bs-theme="dark"] .lb-score { color: #34c27a; }
+            /* строка с баннером: фон баннера на всю строку, весь текст — цвета баннера */
+            .lb-row.has-b, .lb-row.has-b .lb-name, .lb-row.has-b .lb-place, .lb-row.has-b .lb-muted, .lb-row.has-b .lb-score { color: inherit; }
+            .lb-row.has-b .lb-muted { opacity: .85; }
+            .lb-row.has-b { padding: 10px 14px !important; white-space: normal; font-weight: 700; }
+            .lb-row.b-code::before, .lb-row.b-fire::before, .lb-row.b-gold::before { content: none; }
+            .lb-row.b-kz_flag { background-position: left 8px center, 52% center; background-size: auto 115%, auto 140%; }
+            @media (max-width: 575.98px) {
+                .lb-head, .lb-row { grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: 6px; }
+                .lb-hide-sm { display: none; }
+                .lb-sub { display: block; }
+                .lb-place, .lb-score { font-size: 1.05rem; }
+                .lb-row { padding: 8px 10px; }
+                .lb-row.b-kz_flag { background: url("{% static 'icons/kz-orn.png' %}") left 4px center / auto 115% no-repeat, #00a6c8; }
+                .lb-row.b-oyu { padding-left: 24px !important; padding-right: 26px !important; }
+                .lb-head .lb-place-h { font-size: 0; } .lb-head .lb-place-h::before { content: "#"; font-size: 1rem; }
+            }
+        </style>
 
         {% if class_leaderboards %}
         <div class="mt-5">

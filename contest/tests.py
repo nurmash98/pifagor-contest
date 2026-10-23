@@ -1575,7 +1575,7 @@ class AvatarAndRepublicBannerTests(TestCase):
         self.client.get(reverse('republic_day'))
         self.st.refresh_from_db()
         self.assertEqual(self.st.name_banner, 'kz_flag')
-        self.assertIn('nb b-kz_flag sm">Айгерим С', self.client.get(reverse('leaderboard')).content.decode())
+        self.assertIn('has-b b-kz_flag', self.client.get(reverse('leaderboard')).content.decode())
         self.client.post(reverse('profile_banner'), {'banner': ''})
         self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, '')
 
