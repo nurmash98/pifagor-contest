@@ -757,6 +757,9 @@ def leaderboard(request):
     students = quarters.student_ranking(list(students_query), window['start'], window['end'], quarter_n=window['n'])
     if limit is not None:
         students = students[:limit]
+    # Награда за место по итогам четверти — видна всем в таблице
+    for place, st in enumerate(students, 1):
+        st.prize = quarters.award_for(place) if quarter else 0
 
     # ---- Рейтинг классов этой параллели (или параллелей, если у учителя классы из
     # разных параллелей / у админа нет выбранного фильтра) ----
@@ -806,7 +809,7 @@ def leaderboard(request):
         excluded = [e for e in ex if mc is None or e.student.school_class in mc]
 
     return render(request, 'leaderboard.html', {
-        'excluded': excluded,
+        'excluded': excluded, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST,
         'quarter': quarter, 'quarter_days_left': quarters.days_left(quarter) if quarter else None,
         'last_frozen': last_frozen, 'winner': winner,
         'students': students,

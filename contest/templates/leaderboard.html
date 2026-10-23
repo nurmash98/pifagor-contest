@@ -52,6 +52,15 @@
         </div>
         {% endif %}
 
+        {% if quarter %}
+        <div class="lb-prizes mb-3">
+            <span class="fw-bold">🏛 {% if content_lang == 'kk' %}Тоқсан соңында марапат:{% else %}Награды по итогам четверти:{% endif %}</span>
+            <span class="pz pz1">🥇 +{{ awards.1 }} <img src="{% static 'icons/coin-64.png' %}" alt=""> + {% if content_lang == 'kk' %}«Чемпион» баннері{% else %}баннер «Чемпион»{% endif %}</span>
+            <span class="pz pz2">🥈 +{{ awards.2 }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
+            <span class="pz pz3">🥉 +{{ awards.3 }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
+            <span class="pz">4–10 {% if content_lang == 'kk' %}орын{% else %}места{% endif %} +{{ award_rest }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
+        </div>
+        {% endif %}
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white p-2 p-sm-3">
             <div class="lb-head">
                 <span class="text-center lb-place-h">{% t "Место" %}</span>
@@ -59,6 +68,7 @@
                 <span class="text-center lb-hide-sm">{% t "Класс" %}</span>
                 <span class="text-center lb-hide-sm">{% t "Решено задач" %}</span>
                 <span class="text-center">{% t "Общий балл" %}</span>
+                <span class="text-center lb-hide-sm">{% if quarter %}{% if content_lang == 'kk' %}Марапат{% else %}Награда{% endif %}{% endif %}</span>
             </div>
             {% for student in students %}
             <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% if student.name_banner == 'custom' %} fx-{{ student.custom_banner.fx|default:'shine' }}{% endif %}{% elif forloop.counter <= 3 %} lb-top{% endif %}"{% if student.name_banner == 'custom' %} style="{{ student.custom_banner_style }}"{% endif %}>
@@ -68,13 +78,14 @@
                 <span class="lb-name">
                     {% student_avatar student.calc_solved_count 40 False forloop.counter student.avatar %}
                     <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% endif %}{{ student.full_name }}</span>
-                        <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}</span></span>
+                        <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}{% if student.prize %} · 🎁 +{{ student.prize }}{% if forloop.counter == 1 %} + 🏆{% endif %}{% endif %}</span></span>
                 </span>
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
                 <span class="lb-cell lb-hide-sm fw-semibold">{{ student.calc_solved_count }}</span>
                 <span class="lb-cell lb-score">{{ student.calc_total_score }}
                     {% if user.is_staff and quarter %}<form method="post" action="{% url 'leaderboard_exclude' student.id %}" class="lb-ex" onsubmit="return confirm('Убрать {{ student.full_name|escapejs }} из рейтинга этой четверти (например, за списывание)? Задачи и монеты у ученика останутся.');">{% csrf_token %}
                         <button type="submit" title="Убрать из рейтинга четверти">🚫</button></form>{% endif %}</span>
+                <span class="lb-cell lb-hide-sm">{% if student.prize %}<span class="lb-prize">+{{ student.prize }} <img src="{% static 'icons/coin-64.png' %}" alt="">{% if forloop.counter == 1 %} + 🏆{% endif %}</span>{% endif %}</span>
             </div>
             {% empty %}
             <div class="text-center py-5 text-muted">{% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}</div>
@@ -93,7 +104,13 @@
         </div>
         {% endif %}
         <style>
-            .lb-head, .lb-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 80px 130px 120px; align-items: center; column-gap: 8px; }
+            .lb-head, .lb-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 70px 110px 100px 120px; align-items: center; column-gap: 8px; }
+            .lb-prizes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; font-size: .9rem; }
+            .lb-prizes .pz { display: inline-flex; align-items: center; gap: 4px; background: var(--bs-tertiary-bg); border-radius: 99px; padding: 4px 12px; font-weight: 700; }
+            .lb-prizes .pz1 { background: rgba(247,214,74,.3); } .lb-prizes .pz2 { background: rgba(180,188,204,.35); } .lb-prizes .pz3 { background: rgba(240,168,104,.3); }
+            .lb-prizes img, .lb-prize img { width: 18px; height: 18px; }
+            .lb-prize { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; font-size: .85rem; background: rgba(255,255,255,.55); color: #6b4e00; border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+            [data-bs-theme="dark"] .lb-prize { background: rgba(0,0,0,.35); color: #ffd75e; }
             .lb-head { padding: 10px 14px 12px; font-weight: 700; color: var(--bs-body-color); border-bottom: 1px solid var(--bs-border-color); margin-bottom: 6px; }
             .lb-row { position: relative; overflow: hidden; padding: 10px 14px; border-radius: 14px; margin: 4px 0; min-height: 62px; }
             .lb-row:not(.has-b) { border-bottom: 1px solid var(--bs-border-color); border-radius: 0; }
@@ -115,7 +132,7 @@
             .lb-row.has-b .lb-muted { opacity: .85; }
             .lb-row.has-b { padding: 10px 14px !important; white-space: normal; font-weight: 700; }
             .lb-row.b-code::before, .lb-row.b-fire::before, .lb-row.b-gold::before, .lb-row.b-champion::before { content: none; }
-            .lb-row.b-kz_flag { background-position: left 8px center, 52% center; background-size: auto 115%, auto 140%; }
+            .lb-row.b-kz_flag { background-position: left 8px center, 40% center; background-size: auto 115%, auto 140%; }
             @media (max-width: 575.98px) {
                 .lb-head, .lb-row { grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: 6px; }
                 .lb-hide-sm { display: none; }
