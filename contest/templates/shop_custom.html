@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}{% if content_lang == 'kk' %}Өз баннерің{% else %}Свой баннер{% endif %} - Pifagor Contest{% endblock %}
+{% block content %}
+{% with kk=content_lang %}
+<div class="mb-3"><a href="{% url 'shop' %}" class="text-decoration-none text-muted small">← {% t "Магазин" %}</a></div>
+<div class="row justify-content-center">
+<div class="col-lg-7">
+<div class="card border-0 shadow-sm rounded-4 p-4">
+    <h4 class="fw-bold mb-1 text-pifagor-blue">🎨 {% if kk == 'kk' %}Өз баннеріңді жаса{% else %}Свой баннер{% endif %}</h4>
+    <p class="text-muted small mb-4">{% if kk == 'kk' %}Түстерді, белгіні және әсерді таңдаңыз — баннер аттың астында рейтингте, профильде және дуэльдерде көрінеді.{% else %}Выберите цвета, значок и эффект — баннер будет под вашим именем в лидерборде, профиле и дуэлях.{% endif %}</p>
+
+    <div class="text-center mb-4 p-3 rounded-4" style="background: var(--bs-tertiary-bg);">
+        <span id="cb-preview" class="nb b-custom fx-{{ c.fx }}" style="--cb1:{{ c.c1 }};--cb2:{{ c.c2 }};--cbfg:{{ c.fg }};font-size:1.15rem;"><span class="cb-icon" id="cb-icon">{{ c.icon }}</span>{{ student.full_name }}</span>
+    </div>
+
+    <form method="post">{% csrf_token %}
+        <div class="row g-3 mb-3">
+            <div class="col-4 text-center"><label class="form-label small fw-semibold d-block">{% if kk == 'kk' %}Түс 1{% else %}Цвет 1{% endif %}</label><input type="color" name="c1" value="{{ c.c1 }}" class="form-control form-control-color mx-auto cb-in"></div>
+            <div class="col-4 text-center"><label class="form-label small fw-semibold d-block">{% if kk == 'kk' %}Түс 2{% else %}Цвет 2{% endif %}</label><input type="color" name="c2" value="{{ c.c2 }}" class="form-control form-control-color mx-auto cb-in"></div>
+            <div class="col-4 text-center"><label class="form-label small fw-semibold d-block">{% if kk == 'kk' %}Мәтін{% else %}Текст{% endif %}</label><input type="color" name="fg" value="{{ c.fg }}" class="form-control form-control-color mx-auto cb-in"></div>
+        </div>
+        <label class="form-label small fw-semibold">{% if kk == 'kk' %}Белгі{% else %}Значок{% endif %}</label>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            {% for ic in icons %}
+            <input type="radio" class="btn-check cb-in" name="icon" id="ic{{ forloop.counter }}" value="{{ ic }}" {% if ic == c.icon %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm rounded-3" for="ic{{ forloop.counter }}" style="min-width:42px;">{% if ic %}{{ ic }}{% else %}—{% endif %}</label>
+            {% endfor %}
+        </div>
+        <label class="form-label small fw-semibold">{% if kk == 'kk' %}Әсер{% else %}Эффект{% endif %}</label>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            {% for fx in fxs %}
+            <input type="radio" class="btn-check cb-in" name="fx" id="fx{{ fx }}" value="{{ fx }}" {% if fx == c.fx %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="fx{{ fx }}">
+                {% if fx == 'none' %}{% if kk == 'kk' %}Жоқ{% else %}Без эффекта{% endif %}{% elif fx == 'shine' %}✨ {% if kk == 'kk' %}Жарқыл{% else %}Блеск{% endif %}{% elif fx == 'pulse' %}💫 {% if kk == 'kk' %}Жарық{% else %}Свечение{% endif %}{% else %}🌊 {% if kk == 'kk' %}Толқын{% else %}Перелив{% endif %}{% endif %}</label>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">{% if kk == 'kk' %}Сақтау{% else %}Сохранить{% endif %}</button>
+    </form>
+</div>
+</div>
+</div>
+<script>
+(function () {
+    var prev = document.getElementById('cb-preview'), icon = document.getElementById('cb-icon'), form = prev.closest('.row').querySelector('form') || document.querySelector('form[method=post]');
+    function update() {
+        var f = document.querySelector('form[method=post]');
+        prev.style.setProperty('--cb1', f.c1.value); prev.style.setProperty('--cb2', f.c2.value); prev.style.setProperty('--cbfg', f.fg.value);
+        var ic = f.querySelector('[name=icon]:checked'); icon.textContent = ic ? ic.value : '';
+        var fx = f.querySelector('[name=fx]:checked'); prev.className = 'nb b-custom fx-' + (fx ? fx.value : 'none');
+    }
+    document.querySelectorAll('.cb-in').forEach(function (el) { el.addEventListener('input', update); el.addEventListener('change', update); });
+})();
+</script>
+{% endwith %}
+{% endblock %}

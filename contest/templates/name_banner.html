@@ -1,1 +1,1 @@
-{% if banner %}<span class="nb b-{{ banner }}{% if small %} sm{% endif %}">{{ name }}</span>{% else %}{{ name }}{% endif %}
+{% if banner == 'custom' %}<span class="nb b-custom fx-{{ custom.fx }}{% if small %} sm{% endif %}" style="{{ custom_style }}">{% if custom.icon %}<span class="cb-icon">{{ custom.icon }}</span>{% endif %}{{ name }}</span>{% elif banner %}<span class="nb b-{{ banner }}{% if small %} sm{% endif %}">{{ name }}</span>{% else %}{{ name }}{% endif %}

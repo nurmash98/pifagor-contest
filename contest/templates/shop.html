@@ -28,10 +28,13 @@
                 {% elif b.kind == 'gift' %}<span style="color:#00a6c8;">🎁 {% if kk == 'kk' %}сыйлық{% else %}подарок{% endif %}</span>
                 {% else %}<span class="text-warning-emphasis"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ b.price }}</span>{% endif %}
             </div>
-            <div class="mb-2"><span class="nb b-{{ b.key }} sm">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
+            <div class="mb-2">{% if b.key == 'custom' %}<span class="nb b-custom fx-{{ b.custom.fx }} sm" style="{{ b.custom_style }}{% if not b.owned %};--cb1:#ff5f6d;--cb2:#4f8df0{% endif %}">{% if b.custom.icon %}<span class="cb-icon">{{ b.custom.icon }}</span>{% endif %}{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span>{% else %}<span class="nb b-{{ b.key }} sm">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span>{% endif %}</div>
             <div class="fw-semibold small mb-2">{{ b.title }}</div>
             <div class="mt-auto">
             {% if not student %}
+            {% elif b.key == 'custom' and b.owned %}
+                {% if b.on %}<span class="badge bg-success rounded-pill px-3 py-2 me-1">✓</span>{% endif %}
+                <a href="{% url 'shop_custom' %}" class="btn btn-sm btn-outline-primary rounded-pill px-3">🎨 {% if kk == 'kk' %}Баптау{% else %}Настроить{% endif %}</a>
             {% elif b.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓ {% if kk == 'kk' %}Тағылған{% else %}Надет{% endif %}</span>
             {% elif b.owned %}
                 <form method="post" action="{% url 'profile_banner' %}">{% csrf_token %}<input type="hidden" name="banner" value="{{ b.key }}"><input type="hidden" name="next" value="shop">

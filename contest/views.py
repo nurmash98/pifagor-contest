@@ -566,6 +566,8 @@ def shop(request):
     banners = []
     for key, b in banner_module.CATALOG.items():
         banners.append({'key': key, 'kind': b['kind'], 'price': b.get('price', 0), 'title': b['kk'] if lang == 'kk' else b['ru'],
+                        'custom_style': banner_module.custom_style(student.custom_banner if student else {}) if key == 'custom' else '',
+                        'custom': banner_module.clean_custom(student.custom_banner if student else {}) if key == 'custom' else None,
                         'owned': key in mine, 'on': bool(student and student.name_banner == key),
                         'short': max(b.get('price', 0) - bal, 0)})
     avatar_list = [{'key': '', 'img': '', 'kind': 'free', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
@@ -599,10 +601,36 @@ def shop_buy(request):
             banner_module.give(student, key)
             student.name_banner = key
             student.save(update_fields=['name_banner'])
+            if key == 'custom':
+                student.custom_banner = banner_module.clean_custom(student.custom_banner)
+                student.save(update_fields=['custom_banner'])
+                messages.success(request, 'Өз баннеріңізді жасаңыз!' if kk else 'Теперь настройте свой баннер!')
+                return redirect('shop_custom')
             messages.success(request, (f'«{item["kk"]}» баннері сатып алынды!' if kk else f'Баннер «{item["ru"]}» куплен и стоит под вашим именем!'))
         else:
             messages.warning(request, 'Тиын жетпейді.' if kk else 'Не хватает монет.')
     return redirect('shop')
+
+
+@login_required
+def shop_custom(request):
+    """Редактор «своего баннера»: два цвета фона, цвет текста, значок и эффект."""
+    from . import banners as banner_module
+    student = get_object_or_404(Student, user=request.user)
+    if 'custom' not in banner_module.owned(student):
+        return redirect('shop')
+    if request.method == 'POST':
+        student.custom_banner = banner_module.clean_custom({
+            'c1': request.POST.get('c1'), 'c2': request.POST.get('c2'), 'fg': request.POST.get('fg'),
+            'icon': request.POST.get('icon', ''), 'fx': request.POST.get('fx')})
+        student.name_banner = 'custom'
+        student.save(update_fields=['custom_banner', 'name_banner'])
+        messages.success(request, 'Баннер сақталды!' if _get_content_lang(request) == 'kk' else 'Баннер сохранён!')
+        return redirect('shop')
+    return render(request, 'shop_custom.html', {
+        'student': student, 'c': banner_module.clean_custom(student.custom_banner),
+        'icons': banner_module.CUSTOM_ICONS, 'fxs': banner_module.CUSTOM_FX,
+    })
 
 
 @login_required

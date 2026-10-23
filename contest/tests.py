@@ -1662,3 +1662,36 @@ class CoinsAndShopTests(TestCase):
         ExamAnswer.objects.create(attempt=att, task=t, best_score=10, submissions_count=1)
         coins.sync(self.st)
         self.assertEqual(coins.balance(self.st), 1 + 5 + 50)
+
+
+class CustomBannerTests(TestCase):
+    def setUp(self):
+        from .models import CoinTransaction
+        self.u = User.objects.create_user('cb', password='x')
+        self.st = Student.objects.create(user=self.u, full_name='Свой Баннер', school_class='7F')
+        CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=5000, at=timezone.now())
+        self.client.login(username='cb', password='x')
+
+    def test_buy_and_customize(self):
+        from . import coins
+        self.assertRedirects(self.client.get(reverse('shop_custom')), reverse('shop'))   # ещё не куплен
+        r = self.client.post(reverse('shop_buy'), {'banner': 'custom'})
+        self.assertRedirects(r, reverse('shop_custom'))
+        self.assertEqual(coins.balance(self.st), 0)
+        self.client.post(reverse('shop_custom'), {'c1': '#ff0000', 'c2': '#00ff00', 'fg': '#000000', 'icon': '🚀', 'fx': 'pulse'})
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.custom_banner, {'c1': '#ff0000', 'c2': '#00ff00', 'fg': '#000000', 'icon': '🚀', 'fx': 'pulse'})
+        self.assertEqual(self.st.name_banner, 'custom')
+        from .models import Submission
+        t = Task.objects.create(title='CB', description='d', level='A', test_cases=[])
+        Submission.objects.create(student=self.st, task=t, status='DONE', score=10, is_graded=True)
+        html = self.client.get(reverse('leaderboard')).content.decode()
+        self.assertIn('--cb1:#ff0000', html)
+        self.assertIn('fx-pulse', html)
+
+    def test_bad_values_are_cleaned(self):
+        self.client.post(reverse('shop_buy'), {'banner': 'custom'})
+        self.client.post(reverse('shop_custom'), {'c1': 'red;background:url(x)', 'c2': '#12', 'fg': '#fff', 'icon': '<script>', 'fx': 'evil'})
+        self.st.refresh_from_db()
+        from .banners import CUSTOM_DEFAULT
+        self.assertEqual(self.st.custom_banner, CUSTOM_DEFAULT)

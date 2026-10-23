@@ -20,7 +20,33 @@ CATALOG = {
     'fire':   dict(kind='paid', price=900, ru='Огонь', kk='От'),
     'aurora': dict(kind='paid', price=1200, ru='Северное сияние', kk='Солтүстік шұғыла'),
     'gold':   dict(kind='paid', price=2000, ru='Алтын', kk='Алтын'),
+    'custom': dict(kind='paid', price=5000, ru='Свой баннер', kk='Өз баннерің'),
 }
+
+# «Свой баннер»: цвета выбирает ученик, значок и эффект — из готовых списков
+CUSTOM_ICONS = ['', '⭐', '🔥', '💎', '👑', '🚀', '⚡', '🏆', '🎯', '🧠', '💻', '🐍', '🦅', '🐺', '🌙', '☀️', '🌸', '🍀', '🎵', '⚽', '🇰🇿']
+CUSTOM_FX = ['none', 'shine', 'pulse', 'flow']
+CUSTOM_DEFAULT = {'c1': '#1a1a4b', 'c2': '#008b42', 'fg': '#ffffff', 'icon': '⭐', 'fx': 'shine'}
+
+
+def _hex(value, fallback):
+    import re
+    return value if isinstance(value, str) and re.fullmatch(r'#[0-9a-fA-F]{6}', value) else fallback
+
+
+def clean_custom(data):
+    """Проверенные настройки «своего баннера» (всё лишнее отбрасывается)."""
+    data = data if isinstance(data, dict) else {}
+    d = CUSTOM_DEFAULT
+    return {'c1': _hex(data.get('c1'), d['c1']), 'c2': _hex(data.get('c2'), d['c2']), 'fg': _hex(data.get('fg'), d['fg']),
+            'icon': data.get('icon') if data.get('icon') in CUSTOM_ICONS else d['icon'],
+            'fx': data.get('fx') if data.get('fx') in CUSTOM_FX else d['fx']}
+
+
+def custom_style(data):
+    c = clean_custom(data)
+    return f"--cb1:{c['c1']};--cb2:{c['c2']};--cbfg:{c['fg']}"
+
 FREE = [k for k, b in CATALOG.items() if b['kind'] == 'free']
 
 

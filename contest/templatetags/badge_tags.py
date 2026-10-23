@@ -30,4 +30,7 @@ def student_avatar(context, solved=0, size=90, mini=False, uid='a', avatar=''):
 @register.inclusion_tag('name_banner.html')
 def student_name(student, small=True, name=None):
     """Имя ученика с баннером под ним (если ученик его поставил)."""
-    return {'name': name or getattr(student, 'full_name', ''), 'banner': getattr(student, 'name_banner', ''), 'small': small}
+    from ..banners import clean_custom, custom_style
+    raw = getattr(student, 'custom_banner', None) or {}
+    return {'name': name or getattr(student, 'full_name', ''), 'banner': getattr(student, 'name_banner', ''), 'small': small,
+            'custom': clean_custom(raw), 'custom_style': custom_style(raw)}

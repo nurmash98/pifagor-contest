@@ -41,6 +41,13 @@ class Student(models.Model):
     # Баннер под именем (ключ из contest/banners.py) и список полученных баннеров через запятую.
     name_banner = models.CharField(max_length=30, blank=True, default='', verbose_name="Баннер под именем")
     owned_banners = models.CharField(max_length=255, blank=True, default='', verbose_name="Полученные баннеры")
+    # «Свой баннер» (покупается за 5000 монет): {"c1": "#hex", "c2": "#hex", "fg": "#hex", "icon": "⭐", "fx": "shine"}
+    custom_banner = models.JSONField(default=dict, blank=True, verbose_name="Свой баннер")
+
+    def custom_banner_style(self):
+        """CSS для «своего баннера» (цвета уже проверены при сохранении)."""
+        from .banners import custom_style
+        return custom_style(self.custom_banner)
 
     def save(self, *args, **kwargs):
         self.school_class = normalize_school_class(self.school_class)

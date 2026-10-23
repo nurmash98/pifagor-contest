@@ -37,6 +37,7 @@ urlpatterns = [
     path('republic-day/', views.republic_day, name='republic_day'),
     path('shop/', views.shop, name='shop'),
     path('shop/buy/', views.shop_buy, name='shop_buy'),
+    path('shop/custom/', views.shop_custom, name='shop_custom'),
 
     # Курсы
     path('courses/', views.courses_view, name='courses'),

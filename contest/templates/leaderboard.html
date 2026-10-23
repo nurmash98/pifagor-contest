@@ -45,13 +45,13 @@
                 <span class="text-center">{% t "Общий балл" %}</span>
             </div>
             {% for student in students %}
-            <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% elif forloop.counter <= 3 %} lb-top{% endif %}">
+            <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% if student.name_banner == 'custom' %} fx-{{ student.custom_banner.fx|default:'shine' }}{% endif %}{% elif forloop.counter <= 3 %} lb-top{% endif %}"{% if student.name_banner == 'custom' %} style="{{ student.custom_banner_style }}"{% endif %}>
                 <span class="lb-place">
                     {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
                 </span>
                 <span class="lb-name">
                     {% student_avatar student.calc_solved_count 40 False forloop.counter student.avatar %}
-                    <span class="lb-name-text"><span class="lb-full">{{ student.full_name }}</span>
+                    <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% endif %}{{ student.full_name }}</span>
                         <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}</span></span>
                 </span>
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
