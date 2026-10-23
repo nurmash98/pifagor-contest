@@ -1737,8 +1737,9 @@ class QuartersHallOfFameTests(TestCase):
         self.assertEqual(QuarterFreeze.objects.filter(quarter=1).count(), 1)
         top7 = list(HallEntry.objects.filter(quarter=1, kind='student', grade='7').order_by('place'))
         self.assertEqual([e.name for e in top7], ['Ученик 0', 'Ученик 2', 'Ученик 1'])
-        self.assertEqual(coins.balance(self.st[0]), 300)
-        self.assertEqual(coins.balance(self.st[2]), 200)
+        self.assertEqual(coins.balance(self.st[0]), 200)
+        self.assertEqual(coins.balance(self.st[2]), 150)
+        self.assertEqual(coins.balance(self.st[1]), 100)
         self.st[0].refresh_from_db(); self.assertIn('champion', self.st[0].owned_banners)
         classes7 = list(HallEntry.objects.filter(quarter=1, kind='class', grade='7').order_by('place'))
         self.assertEqual([c.name for c in classes7], ['7A', '7B'])
@@ -1832,3 +1833,9 @@ class QuarterExclusionTests(TestCase):
         self.assertEqual(top, ['Честный Первый', 'Честный Второй'])
         from . import coins
         self.assertEqual(coins.balance(studs[0]) - quarters.AWARD_COINS.get(0, 0), 0)   # без наград
+
+
+class AwardForPlaceTests(TestCase):
+    def test_award_table(self):
+        from .quarters import award_for
+        self.assertEqual([award_for(p) for p in range(1, 12)], [200, 150, 100, 50, 50, 50, 50, 50, 50, 50, 0])

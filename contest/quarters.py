@@ -12,7 +12,13 @@ from django.utils import timezone
 YEAR = '2026-2027'
 COEF = {'A': 1, 'B': 2, 'C': 3}
 TOP = 10
-AWARD_COINS = {1: 300, 2: 200, 3: 100}
+AWARD_COINS = {1: 200, 2: 150, 3: 100}
+AWARD_COINS_REST = 50        # 4–10 места
+
+
+def award_for(place):
+    """Монеты за место в топ-10 параллели по итогам четверти."""
+    return AWARD_COINS.get(place, AWARD_COINS_REST if place <= TOP else 0)
 
 
 def _dt(y, m, d, h=0, mi=0, s=0):
@@ -183,10 +189,10 @@ def _freeze(q):
             entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
                                      name=st.full_name, school_class=st.school_class,
                                      score=st.calc_total_score, solved=st.calc_solved_count))
-            if place in AWARD_COINS:
+            if award_for(place):
                 CoinTransaction.objects.get_or_create(
                     student=st, key=f'q:{YEAR}:{q["n"]}', defaults=dict(
-                        kind='award', amount=AWARD_COINS[place], at=q['end'],
+                        kind='award', amount=award_for(place), at=q['end'],
                         note=f'{q["n"]} четверть — {place} место ({grade} классы)'))
             if place == 1:
                 banner_module.give(st, 'champion')

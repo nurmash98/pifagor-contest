@@ -554,6 +554,7 @@ def profile_banner(request):
 def shop(request):
     """Магазин: баннеры под именем (3 бесплатных, подарок, 7 за монеты), аватары, история монет."""
     from django.templatetags.static import static
+    from . import quarters
     from . import avatars as avatar_module
     from . import banners as banner_module
     from . import coins as coin_module
@@ -580,7 +581,7 @@ def shop(request):
     history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
     return render(request, 'shop.html', {
         'student': student, 'balance': bal, 'banners': banners, 'avatars': avatar_list, 'history': history,
-        'rules': coin_module, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
+        'rules': coin_module, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
         'republic_need': banner_module.REPUBLIC_NEED,
     })
 
@@ -682,7 +683,7 @@ def hall_of_fame(request):
         r['all_solved'] = counts.get(r['st'].id, 0) if r['st'] else 0
     return render(request, 'hall_of_fame.html', {
         'tabs': tabs, 'sel': sel, 'grades': grades, 'grade': grade, 'podium': rows[:3], 'rest': rows[3:],
-        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS,
+        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST,
     })
 
 
