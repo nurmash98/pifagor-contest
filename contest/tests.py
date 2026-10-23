@@ -1629,10 +1629,10 @@ class CoinsAndShopTests(TestCase):
     def test_buy_banner(self):
         from . import coins
         from .models import CoinTransaction
-        CoinTransaction.objects.create(student=self.st, key='test', kind='task', amount=160, at=timezone.now())
-        self.client.post(reverse('shop_buy'), {'banner': 'gold'})          # 1000 — не хватает
+        CoinTransaction.objects.create(student=self.st, key='test', kind='task', amount=310, at=timezone.now())
+        self.client.post(reverse('shop_buy'), {'banner': 'gold'})          # 2000 — не хватает
         self.st.refresh_from_db(); self.assertNotIn('gold', self.st.owned_banners)
-        self.client.post(reverse('shop_buy'), {'banner': 'oyu'})           # 150
+        self.client.post(reverse('shop_buy'), {'banner': 'oyu'})           # 300
         self.st.refresh_from_db()
         self.assertIn('oyu', self.st.owned_banners)
         self.assertEqual(self.st.name_banner, 'oyu')

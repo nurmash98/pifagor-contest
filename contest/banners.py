@@ -13,13 +13,13 @@ CATALOG = {
     'mint':   dict(kind='free', ru='Мятный', kk='Жалбыз'),
     'sky':    dict(kind='free', ru='Небо', kk='Аспан'),
     'kz_flag': dict(kind='gift', ru='Флаг Казахстана', kk='Қазақстан туы', tag=REPUBLIC_TAG, need=REPUBLIC_NEED),
-    'oyu':    dict(kind='paid', price=150, ru='Ою-өрнек', kk='Ою-өрнек'),
-    'code':   dict(kind='paid', price=200, ru='Терминал', kk='Терминал'),
-    'neon':   dict(kind='paid', price=250, ru='Неон', kk='Неон'),
-    'galaxy': dict(kind='paid', price=300, ru='Галактика', kk='Галактика'),
-    'fire':   dict(kind='paid', price=400, ru='Огонь', kk='От'),
-    'aurora': dict(kind='paid', price=500, ru='Северное сияние', kk='Солтүстік шұғыла'),
-    'gold':   dict(kind='paid', price=1000, ru='Алтын', kk='Алтын'),
+    'oyu':    dict(kind='paid', price=300, ru='Ою-өрнек', kk='Ою-өрнек'),
+    'code':   dict(kind='paid', price=400, ru='Терминал', kk='Терминал'),
+    'neon':   dict(kind='paid', price=500, ru='Неон', kk='Неон'),
+    'galaxy': dict(kind='paid', price=700, ru='Галактика', kk='Галактика'),
+    'fire':   dict(kind='paid', price=900, ru='Огонь', kk='От'),
+    'aurora': dict(kind='paid', price=1200, ru='Северное сияние', kk='Солтүстік шұғыла'),
+    'gold':   dict(kind='paid', price=2000, ru='Алтын', kk='Алтын'),
 }
 FREE = [k for k, b in CATALOG.items() if b['kind'] == 'free']
 
