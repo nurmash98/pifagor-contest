@@ -30,20 +30,14 @@
                 <summary class="btn btn-sm btn-outline-secondary rounded-pill px-3">🏷 {% t "Баннер под именем" %}</summary>
                 <div class="d-flex flex-column align-items-center gap-2 mt-3">
                     {% for b in banner_options %}
-                    {% if b.owned %}
                     <form method="post" action="{% url 'profile_banner' %}">{% csrf_token %}
                         <input type="hidden" name="banner" value="{{ b.key }}">
-                        <button type="submit" class="btn btn-sm rounded-pill px-3 {% if b.on %}btn-success{% else %}btn-outline-secondary{% endif %}">
-                            {% if b.on %}✓ {% endif %}{% if b.key == 'kz_flag' %}<span class="nb b-flag sm">{{ student.full_name }}</span>{% else %}{{ b.title }}{% endif %}
+                        <button type="submit" class="btn btn-sm rounded-pill px-2 {% if b.on %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                            {% if b.on %}✓ {% endif %}{% if b.key %}<span class="nb b-{{ b.key }} sm">{{ student.full_name }}</span>{% else %}{{ b.title }}{% endif %}
                         </button>
                     </form>
-                    {% else %}
-                    <a href="{% url 'republic_day' %}" class="text-decoration-none small" style="opacity:.75">
-                        🔒 <span class="nb b-flag sm" style="filter:grayscale(.6)">{{ student.full_name }}</span><br>
-                        <span class="text-muted">{% t "Решите задачи «Республика күні»:" %} {{ republic_progress }}/{{ republic_need }}</span>
-                    </a>
-                    {% endif %}
                     {% endfor %}
+                    <a href="{% url 'shop' %}" class="small fw-semibold">🛒 {% t "Ещё баннеры в магазине" %}</a>
                 </div>
             </details>
 

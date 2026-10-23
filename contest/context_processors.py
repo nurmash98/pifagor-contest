@@ -46,3 +46,14 @@ def holiday(request):
     if today.month == 12 and 14 <= today.day <= 18:
         return {'holiday': 'independence'}
     return {'holiday': ''}
+
+
+def coins(request):
+    """Баланс монет ученика для шапки сайта."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'coin_balance': None}
+    from .coins import balance
+    from .models import Student
+    student = Student.objects.filter(user=user).first()
+    return {'coin_balance': balance(student) if student else None}

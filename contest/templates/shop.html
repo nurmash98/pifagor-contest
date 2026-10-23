@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load ui_i18n static %}
+{% block title %}{% t "Магазин" %} - Pifagor Contest{% endblock %}
+{% block content %}
+{% with kk=content_lang %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <h3 class="fw-bold mb-0 text-pifagor-blue">🛒 {% t "Магазин" %}</h3>
+    {% if student %}<span class="coin-chip fs-5"><img src="{% static 'icons/coin-64.png' %}" alt="">{{ balance }}</span>{% endif %}
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-4 small">
+    <div class="fw-bold mb-1">{% if kk == 'kk' %}Тиынды қалай табуға болады{% else %}Как заработать монеты{% endif %}</div>
+    <div class="d-flex flex-wrap gap-3">
+        <span><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {% if kk == 'kk' %}Есеп 10/10: A — {{ rules.LEVEL_COINS.A }}, B — {{ rules.LEVEL_COINS.B }}, C — {{ rules.LEVEL_COINS.C }}{% else %}Задача на 10/10: A — {{ rules.LEVEL_COINS.A }}, B — {{ rules.LEVEL_COINS.B }}, C — {{ rules.LEVEL_COINS.C }}{% endif %}</span>
+        <span>☀️ {% if kk == 'kk' %}Күннің алғашқы есебі: +{{ rules.DAILY_BONUS }}{% else %}Первая задача дня: +{{ rules.DAILY_BONUS }}{% endif %}</span>
+        <span>🎯 {% if kk == 'kk' %}Әр {{ rules.MILESTONE_EVERY }} есеп: +{{ rules.MILESTONE_COINS }}{% else %}Каждые {{ rules.MILESTONE_EVERY }} задач: +{{ rules.MILESTONE_COINS }}{% endif %}</span>
+        <span>⭐ {% if kk == 'kk' %}БЖБ/ТЖБ 10/10: +{{ rules.EXAM_TEN_COINS }}{% else %}СОР/СОЧ на 10/10: +{{ rules.EXAM_TEN_COINS }}{% endif %}</span>
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3 text-pifagor-blue">🏷 {% t "Баннер под именем" %}</h5>
+<div class="row g-3 mb-4">
+    {% for b in banners %}
+    <div class="col-sm-6 col-lg-4 col-xl-3">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 text-center shop-card {% if b.on %}on{% endif %}">
+            <div class="small fw-bold mb-2 text-uppercase" style="letter-spacing:.04em;">
+                {% if b.kind == 'free' %}<span class="text-success">{% if kk == 'kk' %}тегін{% else %}бесплатно{% endif %}</span>
+                {% elif b.kind == 'gift' %}<span style="color:#00a6c8;">🎁 {% if kk == 'kk' %}сыйлық{% else %}подарок{% endif %}</span>
+                {% else %}<span class="text-warning-emphasis"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ b.price }}</span>{% endif %}
+            </div>
+            <div class="mb-2"><span class="nb b-{{ b.key }} sm">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
+            <div class="fw-semibold small mb-2">{{ b.title }}</div>
+            <div class="mt-auto">
+            {% if not student %}
+            {% elif b.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓ {% if kk == 'kk' %}Тағылған{% else %}Надет{% endif %}</span>
+            {% elif b.owned %}
+                <form method="post" action="{% url 'profile_banner' %}">{% csrf_token %}<input type="hidden" name="banner" value="{{ b.key }}"><input type="hidden" name="next" value="shop">
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">{% if kk == 'kk' %}Тағу{% else %}Надеть{% endif %}</button></form>
+            {% elif b.kind == 'gift' %}
+                <a href="{% url 'republic_day' %}" class="btn btn-sm btn-info rounded-pill px-3">{% if kk == 'kk' %}Есептер{% else %}Задачи{% endif %} {{ republic_progress }}/{{ republic_need }}</a>
+            {% elif b.short %}
+                <span class="btn btn-sm btn-light rounded-pill px-3 disabled">{% if kk == 'kk' %}Жетпейді{% else %}Не хватает{% endif %} {{ b.short }}</span>
+            {% else %}
+                <form method="post" action="{% url 'shop_buy' %}">{% csrf_token %}<input type="hidden" name="banner" value="{{ b.key }}">
+                    <button class="btn btn-sm btn-warning fw-bold rounded-pill px-3">{% if kk == 'kk' %}Сатып алу{% else %}Купить{% endif %} · {{ b.price }}</button></form>
+            {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h5 class="fw-bold mb-3 text-pifagor-blue">🖼 {% if kk == 'kk' %}Аватарлар{% else %}Аватары{% endif %}</h5>
+<div class="row g-3 mb-4">
+    {% for a in avatars %}
+    <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100 text-center shop-card {% if a.on %}on{% endif %} {% if a.kind == 'soon' %}soon{% endif %}">
+            <div class="shop-ava mx-auto mb-2">{% if a.img %}<img src="{{ a.img }}" alt="" loading="lazy">{% elif a.key %}<span>👤</span>{% else %}<span>🎓</span>{% endif %}</div>
+            <div class="fw-semibold small mb-2">{{ a.title }}</div>
+            <div class="mt-auto">
+            {% if a.kind == 'soon' %}<span class="badge bg-secondary rounded-pill px-3 py-2">🔒 {% if kk == 'kk' %}Жақында{% else %}Скоро{% endif %}</span>
+            {% elif not student %}
+            {% elif a.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓</span>
+            {% else %}
+                <form method="post" action="{% url 'profile_avatar' %}">{% csrf_token %}<input type="hidden" name="avatar" value="{{ a.key }}"><input type="hidden" name="next" value="shop">
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">{% if kk == 'kk' %}Таңдау{% else %}Выбрать{% endif %}</button></form>
+            {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if student %}
+<h5 class="fw-bold mb-3 text-pifagor-blue">📒 {% if kk == 'kk' %}Тиындар тарихы{% else %}История монет{% endif %}</h5>
+<div class="card border-0 shadow-sm rounded-4 mb-4">
+    <ul class="list-group list-group-flush">
+        {% for tx in history %}
+        <li class="list-group-item d-flex justify-content-between align-items-center small">
+            <span>
+                {% if tx.kind == 'task' %}✅ {{ tx.note }}
+                {% elif tx.kind == 'day' %}☀️ {% if kk == 'kk' %}Күннің алғашқы есебі{% else %}Первая задача дня{% endif %}
+                {% elif tx.kind == 'milestone' %}🎯 {% if kk == 'kk' %}Шешілген есептер:{% else %}Решено задач:{% endif %} {{ tx.note }}
+                {% elif tx.kind == 'exam' %}⭐ {{ tx.note }} — 10/10
+                {% else %}🛒 {{ tx.note }}{% endif %}
+                <span class="text-muted ms-1">{{ tx.at|date:"d.m.Y" }}</span>
+            </span>
+            <span class="fw-bold {% if tx.amount > 0 %}text-success{% else %}text-danger{% endif %}">{% if tx.amount > 0 %}+{% endif %}{{ tx.amount }}</span>
+        </li>
+        {% empty %}<li class="list-group-item text-muted small">{% if kk == 'kk' %}Әзірге тиын жоқ — есеп шешіңіз!{% else %}Пока монет нет — решайте задачи!{% endif %}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+<style>
+    .shop-card.on { outline: 2px solid #34c27a; }
+    .shop-card.soon { opacity: .7; }
+    .shop-ava { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; background: var(--bs-tertiary-bg); display: flex; align-items: center; justify-content: center; font-size: 40px; }
+    .shop-ava img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; background: #fff; }
+    .shop-card.soon .shop-ava img { filter: grayscale(.7); }
+</style>
+{% endwith %}
+{% endblock %}

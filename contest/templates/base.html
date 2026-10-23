@@ -155,6 +155,11 @@
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'profile' %}">{% t "Профиль" %}</a>
                             </li>
+                            {% if coin_balance is not None %}
+                            <li class="nav-item">
+                                <a class="coin-chip" href="{% url 'shop' %}" title="{% t "Магазин" %}"><img src="{% static 'icons/coin-64.png' %}" alt="">{{ coin_balance }}</a>
+                            </li>
+                            {% endif %}
                         {% endif %}
 
                         <!-- Общее для всех авторизованных (Имя и Выход) -->

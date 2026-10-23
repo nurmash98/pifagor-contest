@@ -10,7 +10,7 @@
         {% else %}Наши предки — основатели Казахского ханства, батыры, бии, деятели Алаш — боролись за свободу нашей земли. Решайте задачи о них и узнавайте нашу историю. Решите {{ need }} задач на 10/10 — и получите баннер <b>«Флаг Казахстана»</b> под вашим именем!{% endif %}
     </p>
     <div class="d-inline-block bg-white bg-opacity-10 rounded-4 px-4 py-3">
-        <div class="mb-2"><span class="nb b-flag">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
+        <div class="mb-2"><span class="nb b-kz_flag">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
         {% if student %}
             {% if has_banner %}
             <div class="fw-bold" style="color:#ffe066;">✓ {% if content_lang == 'kk' %}Баннер сіздікі! Ол профильде, рейтингте және дуэльдерде көрінеді.{% else %}Баннер ваш! Он виден в профиле, лидерборде и дуэлях.{% endif %}</div>
@@ -22,13 +22,13 @@
     </div>
 </div>
 
-<h5 class="fw-bold mb-3" style="color:#1a1a4b;">📜 {% if content_lang == 'kk' %}Тарих туралы есептер{% else %}Задачи об истории Казахстана{% endif %}</h5>
+<h5 class="fw-bold mb-3 text-pifagor-blue">📜 {% if content_lang == 'kk' %}Тарих туралы есептер{% else %}Задачи об истории Казахстана{% endif %}</h5>
 <div class="row g-3">
     {% for task in tasks %}
     <div class="col-md-6">
         <a href="{% url 'task_detail' task.id %}?back={{ request.path|urlencode }}" class="card border-0 shadow-sm rounded-4 p-3 h-100 text-decoration-none d-flex flex-row align-items-center gap-3">
             <span class="badge badge-level-{{ task.level }}">{{ task.level }}</span>
-            <span class="fw-semibold flex-grow-1" style="color:#1a1a4b;">{{ task.display_title }}</span>
+            <span class="fw-semibold flex-grow-1" class="text-pifagor-blue">{{ task.display_title }}</span>
             {% if task.user_sub and task.user_sub.score == 10 and task.user_sub.is_graded %}<span class="badge bg-success rounded-pill">✓ 10/10</span>
             {% elif task.user_sub %}<span class="badge bg-warning text-dark rounded-pill">{% if content_lang == 'kk' %}үдерісте{% else %}в работе{% endif %}</span>{% endif %}
         </a>

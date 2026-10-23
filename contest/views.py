@@ -433,6 +433,10 @@ def task_detail(request, task_id):
         messages.success(request, _submit_attempt(
             submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
         from . import banners as banner_module
+        from . import coins as coin_module
+        got = coin_module.sync(student)
+        if got:
+            messages.success(request, f'🪙 +{got} {"тиын" if _get_content_lang(request) == "kk" else "монет"}')
         if banner_module.sync(student):
             messages.success(request, 'Тәуелсіз Қазақстанның тарихын білесіз! Сізге «Қазақстан туы» баннері берілді 🇰🇿'
                              if _get_content_lang(request) == 'kk' else
@@ -492,11 +496,14 @@ def profile_view(request):
                                'on': student.avatar == a['key']})
 
     from . import banners as banner_module
+    from . import coins as coin_module
     banner_module.sync(student)
+    coin_module.sync(student)
     owned_banners = banner_module.owned(student)
     banner_options = [{'key': '', 'title': 'Жоқ' if lang == 'kk' else 'Без баннера', 'on': not student.name_banner, 'owned': True}]
-    for key, b in banner_module.CATALOG.items():
-        banner_options.append({'key': key, 'title': b['kk'] if lang == 'kk' else b['ru'], 'owned': key in owned_banners,
+    for key in owned_banners:
+        b = banner_module.CATALOG[key]
+        banner_options.append({'key': key, 'title': b['kk'] if lang == 'kk' else b['ru'], 'owned': True,
                                'on': student.name_banner == key})
 
     context = {
@@ -525,7 +532,7 @@ def profile_avatar(request):
         if key == '' or key in allowed:
             student.avatar = key
             student.save(update_fields=['avatar'])
-    return redirect('profile')
+    return redirect('shop' if request.POST.get('next') == 'shop' else 'profile')
 
 
 @login_required
@@ -538,7 +545,64 @@ def profile_banner(request):
         if key == '' or key in banner_module.owned(student):
             student.name_banner = key
             student.save(update_fields=['name_banner'])
-    return redirect('profile')
+    return redirect('shop' if request.POST.get('next') == 'shop' else 'profile')
+
+
+@login_required
+def shop(request):
+    """Магазин: баннеры под именем (3 бесплатных, подарок, 7 за монеты), аватары, история монет."""
+    from django.templatetags.static import static
+    from . import avatars as avatar_module
+    from . import banners as banner_module
+    from . import coins as coin_module
+    from .models import CoinTransaction
+    student = Student.objects.filter(user=request.user).first()
+    lang = _get_content_lang(request)
+    if student is not None:
+        banner_module.sync(student)
+        coin_module.sync(student)
+    mine = banner_module.owned(student) if student else banner_module.FREE
+    bal = coin_module.balance(student)
+    banners = []
+    for key, b in banner_module.CATALOG.items():
+        banners.append({'key': key, 'kind': b['kind'], 'price': b.get('price', 0), 'title': b['kk'] if lang == 'kk' else b['ru'],
+                        'owned': key in mine, 'on': bool(student and student.name_banner == key),
+                        'short': max(b.get('price', 0) - bal, 0)})
+    avatar_list = [{'key': '', 'img': '', 'kind': 'free', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
+                    'on': bool(student and not student.avatar)}]
+    for a in avatar_module.CATALOG:
+        avatar_list.append({'key': a['key'], 'img': static(a['file']) if a['file'] else '', 'kind': a['kind'],
+                            'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key'])})
+    history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
+    return render(request, 'shop.html', {
+        'student': student, 'balance': bal, 'banners': banners, 'avatars': avatar_list, 'history': history,
+        'rules': coin_module, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
+        'republic_need': banner_module.REPUBLIC_NEED,
+    })
+
+
+@login_required
+def shop_buy(request):
+    """Покупка баннера за монеты; купленный баннер сразу ставится под имя."""
+    from . import banners as banner_module
+    from . import coins as coin_module
+    student = get_object_or_404(Student, user=request.user)
+    kk = _get_content_lang(request) == 'kk'
+    if request.method == 'POST':
+        key = request.POST.get('banner', '')
+        item = banner_module.CATALOG.get(key)
+        if item is None or item['kind'] != 'paid':
+            messages.error(request, 'Бұл баннерді сатып алуға болмайды.' if kk else 'Этот баннер нельзя купить.')
+        elif key in banner_module.owned(student):
+            messages.info(request, 'Бұл баннер сізде бар.' if kk else 'Этот баннер у вас уже есть.')
+        elif coin_module.spend(student, f'buy:banner:{key}', item['price'], item['ru']):
+            banner_module.give(student, key)
+            student.name_banner = key
+            student.save(update_fields=['name_banner'])
+            messages.success(request, (f'«{item["kk"]}» баннері сатып алынды!' if kk else f'Баннер «{item["ru"]}» куплен и стоит под вашим именем!'))
+        else:
+            messages.warning(request, 'Тиын жетпейді.' if kk else 'Не хватает монет.')
+    return redirect('shop')
 
 
 @login_required

@@ -639,3 +639,26 @@ class DuelAttempt(models.Model):
 
     class Meta:
         ordering = ['created_at']
+
+
+class CoinTransaction(models.Model):
+    """Движение монет ученика: начисление (+) или покупка (−). Баланс — сумма amount.
+    key уникален для ученика — одно и то же начисление не может прийти дважды
+    (например, 'task:15', 'day:2026-10-23', 'm:50', 'exam:7', 'buy:banner:gold')."""
+    KIND_CHOICES = [('task', 'Задача 10/10'), ('day', 'Первая задача дня'), ('milestone', 'Каждые 50 задач'),
+                    ('exam', 'СОР/СОЧ на 10'), ('buy', 'Покупка')]
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='coin_transactions')
+    key = models.CharField(max_length=60)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    amount = models.IntegerField()
+    note = models.CharField(max_length=200, blank=True)
+    at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['student', 'key'], name='unique_student_coin_key')]
+        ordering = ['-at', '-id']
+        verbose_name = "Монеты"
+        verbose_name_plural = "Монеты"
+
+    def __str__(self):
+        return f'{self.student}: {self.amount:+d} ({self.key})'

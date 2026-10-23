@@ -1575,7 +1575,7 @@ class AvatarAndRepublicBannerTests(TestCase):
         self.client.get(reverse('republic_day'))
         self.st.refresh_from_db()
         self.assertEqual(self.st.name_banner, 'kz_flag')
-        self.assertIn('nb b-flag sm">Айгерим С', self.client.get(reverse('leaderboard')).content.decode())
+        self.assertIn('nb b-kz_flag sm">Айгерим С', self.client.get(reverse('leaderboard')).content.decode())
         self.client.post(reverse('profile_banner'), {'banner': ''})
         self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, '')
 
@@ -1590,3 +1590,75 @@ class AvatarAndRepublicBannerTests(TestCase):
             html = self.client.get(reverse('all_tasks')).content.decode()
         self.assertIn('Хочешь подарок?', html)
         self.assertIn(reverse('republic_day'), html)
+
+
+class CoinsAndShopTests(TestCase):
+    def setUp(self):
+        from .models import Submission
+        self.Submission = Submission
+        self.u = User.objects.create_user('coin', password='x')
+        self.st = Student.objects.create(user=self.u, full_name='Монета', school_class='7F')
+        Task.objects.all().delete()
+        self.client.login(username='coin', password='x')
+
+    def solve(self, level, when):
+        from .models import Attempt
+        t = Task.objects.create(title=f'T{Task.objects.count()}', description='d', level=level, test_cases=[])
+        s = self.Submission.objects.create(student=self.st, task=t, status='DONE', score=10, is_graded=True)
+        Attempt.objects.create(submission=s, number=1, submitted_at=when, score=10)
+        return t
+
+    def test_level_coins_daily_bonus_and_idempotent(self):
+        from . import coins
+        import datetime
+        d1 = timezone.make_aware(datetime.datetime(2026, 10, 20, 10))
+        self.solve('A', d1); self.solve('B', d1 + timedelta(hours=1)); self.solve('C', d1 + timedelta(days=1))
+        coins.sync(self.st); coins.sync(self.st)
+        # 1+2+3 за задачи + 5 + 5 за два дня
+        self.assertEqual(coins.balance(self.st), 16)
+
+    def test_milestone_every_50(self):
+        from . import coins
+        now = timezone.now()
+        for i in range(50):
+            self.solve('A', now - timedelta(days=60) + timedelta(minutes=i))
+        coins.sync(self.st)
+        # 50 задач по 1 + один день +5 + за 50 задач +25
+        self.assertEqual(coins.balance(self.st), 50 + 5 + 25)
+
+    def test_buy_banner(self):
+        from . import coins
+        from .models import CoinTransaction
+        CoinTransaction.objects.create(student=self.st, key='test', kind='task', amount=160, at=timezone.now())
+        self.client.post(reverse('shop_buy'), {'banner': 'gold'})          # 1000 — не хватает
+        self.st.refresh_from_db(); self.assertNotIn('gold', self.st.owned_banners)
+        self.client.post(reverse('shop_buy'), {'banner': 'oyu'})           # 150
+        self.st.refresh_from_db()
+        self.assertIn('oyu', self.st.owned_banners)
+        self.assertEqual(self.st.name_banner, 'oyu')
+        self.assertEqual(coins.balance(self.st), 10)
+        self.client.post(reverse('shop_buy'), {'banner': 'oyu'})           # повторно не списывает
+        self.assertEqual(coins.balance(self.st), 10)
+        self.client.post(reverse('shop_buy'), {'banner': 'kz_flag'})       # подарок купить нельзя
+        self.st.refresh_from_db(); self.assertNotIn('kz_flag', self.st.owned_banners)
+
+    def test_free_banners_and_shop_page(self):
+        self.client.post(reverse('profile_banner'), {'banner': 'mint'})
+        self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, 'mint')
+        html = self.client.get(reverse('shop')).content.decode()
+        self.assertIn('b-gold', html)
+        self.assertIn('Скоро', html)
+        self.assertIn('coin-chip', html)
+
+    def test_exam_ten_gives_50(self):
+        from . import coins
+        teacher = Teacher.objects.create(user=User.objects.create_user('tt', password='x'), full_name='T', classes='7F')
+        t = self.solve('A', timezone.now() - timedelta(days=3))
+        exam = Exam.objects.create(kind='SOR', title='СОР', school_class='7F', start_at=timezone.now() - timedelta(hours=3),
+                                   duration_minutes=40, created_by=teacher)
+        exam.tasks.set([t])
+        att = ExamAttempt.objects.create(exam=exam, student=self.st, started_at=timezone.now() - timedelta(hours=3),
+                                         finished_at=timezone.now() - timedelta(hours=2))
+        ExamAnswer.objects.create(attempt=att, task=t, best_score=10, submissions_count=1)
+        coins.sync(self.st)
+        self.assertEqual(coins.balance(self.st), 1 + 5 + 50)

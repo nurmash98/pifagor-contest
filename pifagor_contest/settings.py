@@ -93,6 +93,7 @@ TEMPLATES = [
                 'contest.context_processors.registration',
                 'contest.context_processors.duels_visible',
                 'contest.context_processors.holiday',
+                'contest.context_processors.coins',
             ],
         },
     },
