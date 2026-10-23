@@ -120,15 +120,30 @@
             {% if top %}
             <ol class="list-unstyled mb-0">
                 {% for st in top %}
-                <li class="d-flex justify-content-between align-items-center py-2 {% if not forloop.last %}border-bottom{% endif %} {% if student and st.id == student.id %}fw-bold{% endif %}">
-                    <span class="d-inline-flex align-items-center gap-2"><span class="text-muted">{{ forloop.counter }}.</span>{% student_avatar st.solved 32 False forloop.counter st.avatar %}<span>{% student_name st %} <span class="text-muted small">{{ st.school_class }}</span></span></span>
-                    <span class="badge bg-warning text-dark fs-6">{{ st.duel_rating }}</span>
+                <li class="dl-row{% if st.name_banner %} has-b b-{{ st.name_banner }}{% if st.name_banner == 'custom' %} fx-{{ st.custom_banner.fx|default:'shine' }}{% endif %}{% endif %}{% if student and st.id == student.id %} dl-me{% endif %}"{% if st.name_banner == 'custom' %} style="{{ st.custom_banner_style }}"{% endif %}>
+                    <span class="dl-pl">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}</span>
+                    {% student_avatar st.solved 34 False forloop.counter st.avatar %}
+                    <span class="dl-nm">{% if st.name_banner == 'custom' and st.custom_banner.icon %}{{ st.custom_banner.icon }} {% endif %}{{ st.full_name }} <span class="dl-cl">{{ st.school_class }}</span></span>
+                    <span class="badge bg-warning text-dark fs-6 dl-rt">{{ st.duel_rating }}</span>
                 </li>
                 {% endfor %}
             </ol>
             {% else %}
             <p class="text-muted mb-0">{% t "Пока никто не сыграл. Станьте первым!" %}</p>
             {% endif %}
+            <style>
+                .dl-row { position: relative; overflow: hidden; display: grid; grid-template-columns: 30px auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+                    padding: 8px 10px; margin: 4px 0; border-radius: 12px; font-weight: 600; }
+                .dl-row:not(.has-b) { border-bottom: 1px solid var(--bs-border-color); border-radius: 0; }
+                .dl-row.dl-me { font-weight: 800; }
+                .dl-row.has-b { padding: 8px 10px !important; white-space: normal; font-weight: 700; }
+                .dl-pl { text-align: center; font-weight: 800; opacity: .8; position: relative; z-index: 1; }
+                .dl-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; z-index: 1; }
+                .dl-cl { font-size: .8rem; opacity: .7; font-weight: 600; }
+                .dl-rt { position: relative; z-index: 1; }
+                .dl-row.b-code::before, .dl-row.b-fire::before, .dl-row.b-gold::before, .dl-row.b-champion::before { content: none; }
+                .dl-row.b-kz_flag { background-position: left 4px center, right 62px center; background-size: auto 115%, auto 120%; padding-left: 22px !important; }
+            </style>
         </div>
     </div>
 </div>
