@@ -1763,3 +1763,21 @@ class QuartersHallOfFameTests(TestCase):
         # профиль: решённые задачи не обнулились
         self.client.login(username='q0', password='x')
         self.assertIn('>1<', self.client.get(reverse('profile')).content.decode().replace(' ', '').replace('\n', ''))
+
+
+class HallOwnParallelTests(TestCase):
+    def test_student_sees_only_own_parallel(self):
+        from . import quarters
+        from .models import HallEntry, QuarterFreeze
+        u = User.objects.create_user('hp', password='x')
+        Student.objects.create(user=u, full_name='Ученик 7', school_class='7A')
+        u8 = User.objects.create_user('hp8', password='x')
+        Student.objects.create(user=u8, full_name='Ученик 8', school_class='8A')
+        QuarterFreeze.objects.create(year=quarters.YEAR, quarter=1, frozen_at=timezone.now())
+        HallEntry.objects.create(year=quarters.YEAR, quarter=1, kind='student', grade='7', place=1, name='Семиклассник')
+        HallEntry.objects.create(year=quarters.YEAR, quarter=1, kind='student', grade='8', place=1, name='Восьмиклассник')
+        self.client.force_login(u)
+        html = self.client.get(reverse('hall_of_fame') + '?q=1&g=8').content.decode()
+        self.assertIn('Семиклассник', html)
+        self.assertNotIn('Восьмиклассник', html)
+        self.assertNotIn('g=8', html)

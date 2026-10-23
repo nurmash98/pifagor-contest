@@ -19,7 +19,7 @@
   {% endfor %}
 </div>
 <div class="d-flex flex-wrap gap-2 mb-3">
-  {% for g in grades %}<a href="?q={{ sel }}&g={{ g }}" class="hf-chip{% if g == grade %} on{% endif %}">{{ g }} {% if kk == 'kk' %}сыныптар{% else %}классы{% endif %}</a>{% endfor %}
+  {% if grades|length == 1 %}<span class="hf-chip on">{{ grade }} {% if kk == 'kk' %}сыныптар{% else %}классы{% endif %}</span>{% else %}{% for g in grades %}<a href="?q={{ sel }}&g={{ g }}" class="hf-chip{% if g == grade %} on{% endif %}">{{ g }} {% if kk == 'kk' %}сыныптар{% else %}классы{% endif %}</a>{% endfor %}{% endif %}
 </div>
 {% if frozen_q %}
 <div class="hf-fixed mb-4">🔒 {% if kk == 'kk' %}{{ frozen_q.n }} тоқсанның қорытындысы бекітілді — енді өзгермейді.{% else %}Итоги {{ frozen_q.n }} четверти зафиксированы {{ frozen_q.end|date:"d.m.Y" }} в 23:59 — больше не меняются.{% endif %}

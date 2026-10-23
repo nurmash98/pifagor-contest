@@ -649,10 +649,16 @@ def hall_of_fame(request):
         ready = [t['key'] for t in tabs if t['ready'] and t['key'] != 'year']
         sel = ready[-1] if ready else 'year'
     all_classes = sorted({c for c in Student.objects.values_list('school_class', flat=True) if c})
-    grades = sorted({quarters.grade_of(c) for c in all_classes}, key=lambda g: (len(g), g))
-    grade = request.GET.get('g') or (quarters.grade_of(student.school_class) if student else (grades[0] if grades else ''))
-    if grade not in grades and grades:
-        grade = grades[0]
+    if student is not None:
+        # ученик видит только свою параллель
+        grades = [quarters.grade_of(student.school_class)]
+    else:
+        managed = _managed_classes(request.user)      # учитель — параллели своих классов, админ — все
+        source = all_classes if managed is None else managed
+        grades = sorted({quarters.grade_of(c) for c in source}, key=lambda g: (len(g), g))
+    grade = request.GET.get('g') or (grades[0] if grades else '')
+    if grade not in grades:
+        grade = grades[0] if grades else ''
     if sel == 'year':
         studs = [s for s in Student.objects.all() if quarters.grade_of(s.school_class) == grade]
         top = quarters.student_ranking(studs, None, quarters.YEAR_WINDOW['end'])[:quarters.TOP]
