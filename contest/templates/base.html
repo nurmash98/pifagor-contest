@@ -1,4 +1,4 @@
-{% load ui_i18n static %}
+{% load ui_i18n static badge_tags %}
 <!DOCTYPE html>
 <html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
 <head>
@@ -168,7 +168,7 @@
                                 {% if request.user.is_staff %}
                                     <strong>{{ request.user.username }}</strong> (Admin)
                                 {% else %}
-                                    <strong>{{ user.student.full_name }}</strong> ({{ user.student.school_class }})
+                                    <strong>{{ user.student.full_name }}</strong> ({{ user.student.school_class }}) {% rank_chip my_solved 'nav' 'sm' %}
                                 {% endif %}
                             </span>
                         </li>

@@ -77,7 +77,7 @@
                 </span>
                 <span class="lb-name">
                     {% student_avatar student.calc_solved_count 40 False forloop.counter student.avatar %}
-                    <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% endif %}{{ student.full_name }}</span>
+                    <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% endif %}{{ student.full_name }}</span> {% rank_chip student.calc_solved_count forloop.counter 'sm' %}
                         <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}{% if student.prize %} · 🎁 +{{ student.prize }}{% if forloop.counter == 1 %} + 🏆{% endif %}{% endif %}</span></span>
                 </span>
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>

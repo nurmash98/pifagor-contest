@@ -116,3 +116,17 @@ def solved_counts(student_ids):
     rows = (Submission.objects.filter(student_id__in=list(student_ids), is_graded=True, score=10)
             .values('student_id').annotate(n=Count('id')))
     return {r['student_id']: r['n'] for r in rows}
+
+
+def rank_svg(badge, uid='r', size=22):
+    """Маленький шестиугольник значка (без ленты) — для плашки ранга рядом с именем."""
+    t = TIERS[badge['key']]
+    c0, c1, c2 = t['c']
+    g = f"rk-{badge['key']}-{uid}"
+    return mark_safe(
+        f'<svg viewBox="18 4 104 122" width="{size}" height="{int(size * 1.17)}" aria-hidden="true" class="rank-hex">'
+        f'<defs><linearGradient id="{g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{c0}"/>'
+        f'<stop offset=".5" stop-color="{c1}"/><stop offset="1" stop-color="{c2}"/></linearGradient></defs>'
+        f'<polygon points="{HEX}" fill="url(#{g})" stroke="{c2}" stroke-width="5"/>'
+        f'<polygon points="{INNER}" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="3"/>'
+        f'<g transform="translate(70 62) scale(1.25) translate(-70 -58)">{ICONS[t["icon"]]}</g></svg>')

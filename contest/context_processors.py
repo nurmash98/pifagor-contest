@@ -52,8 +52,11 @@ def coins(request):
     """Баланс монет ученика для шапки сайта."""
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated or user.is_staff:
-        return {'coin_balance': None}
+        return {'coin_balance': None, 'my_solved': 0}
     from .coins import balance
-    from .models import Student
+    from .models import Student, Submission
     student = Student.objects.filter(user=user).first()
-    return {'coin_balance': balance(student) if student else None}
+    if not student:
+        return {'coin_balance': None, 'my_solved': 0}
+    solved = Submission.objects.filter(student=student, is_graded=True, score=10).count()
+    return {'coin_balance': balance(student), 'my_solved': solved}

@@ -3,7 +3,9 @@ from django import template
 from django.templatetags.static import static
 
 from .. import avatars
-from ..badge_art import tier_for_count, tier_svg
+from django.utils.html import format_html
+
+from ..badge_art import rank_svg, tier_for_count, tier_svg
 
 register = template.Library()
 
@@ -34,3 +36,15 @@ def student_name(student, small=True, name=None):
     raw = getattr(student, 'custom_banner', None) or {}
     return {'name': name or getattr(student, 'full_name', ''), 'banner': getattr(student, 'name_banner', ''), 'small': small,
             'custom': clean_custom(raw), 'custom_style': custom_style(raw)}
+
+
+@register.simple_tag
+def rank_chip(solved, uid='r', size='md'):
+    """Плашка ранга рядом с именем: Intern / Junior / Middle / Senior / Team Lead / Architect."""
+    tier = tier_for_count(solved or 0)
+    if tier is None:
+        return ''
+    from ..badge_art import TIERS
+    return format_html('<span class="rank-chip rk-{} rk-{}" title="{} · {}+ ✓">{}<span class="rk-t">{}</span></span>',
+                       TIERS[tier['key']]['tier'], size, tier['ru'], tier['need'],
+                       rank_svg(tier, uid=uid, size=16 if size == 'sm' else 20), tier['ru'])

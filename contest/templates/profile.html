@@ -42,6 +42,7 @@
             </details>
 
             <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{% student_name student True %}</h4>
+            <div class="mb-1">{% rank_chip solved_count 'pf' %}</div>
             <p class="text-muted small mb-4">{% t "Класс:" %} {{ student.school_class }}</p>
 
             <!-- Блок статистики: решено задач и общий балл (средний балл не показываем) -->

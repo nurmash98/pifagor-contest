@@ -197,6 +197,25 @@
     .logo-dark { display: none; }
     [data-bs-theme="dark"] .logo-dark { display: inline-block; }
     [data-bs-theme="dark"] .logo-light { display: none; }
+/* Плашка ранга рядом с именем (Intern … Architect) */
+.rank-chip{display:inline-flex;align-items:center;gap:.3rem;padding:.12rem .55rem .12rem .25rem;border-radius:999px;
+  font:800 .72rem/1.2 Montserrat,Arial,sans-serif;letter-spacing:.04em;white-space:nowrap;vertical-align:middle;color:#fff;
+  text-shadow:0 1px 1px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.35);box-shadow:0 1px 3px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.35);
+  position:relative;overflow:hidden}
+.rank-chip.rk-sm{font-size:.62rem;padding:.06rem .45rem .06rem .2rem;gap:.2rem}
+.rank-chip .rank-hex{flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.rank-chip::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;transform:skewX(-20deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);pointer-events:none}
+.rank-chip.rk-wood{background:linear-gradient(135deg,#c48a52,#8a5428)}
+.rank-chip.rk-bronze{background:linear-gradient(135deg,#e39a5a,#a35f26)}
+.rank-chip.rk-silver{background:linear-gradient(135deg,#e7ebf1,#9aa3b2);color:#2b3442;text-shadow:0 1px 0 rgba(255,255,255,.6)}
+.rank-chip.rk-gold{background:linear-gradient(135deg,#ffe27a,#d39b12);color:#5a3b00;text-shadow:0 1px 0 rgba(255,255,255,.5)}
+.rank-chip.rk-diamond{background:linear-gradient(135deg,#b9f3ff,#3fa9cf);color:#063a52;text-shadow:0 1px 0 rgba(255,255,255,.55)}
+.rank-chip.rk-legend{background:linear-gradient(135deg,#a855f7,#4c1d95 60%,#f59e0b);box-shadow:0 0 8px rgba(168,85,247,.6),inset 0 1px 0 rgba(255,255,255,.35)}
+.rank-chip.rk-silver::after,.rank-chip.rk-gold::after,.rank-chip.rk-diamond::after,.rank-chip.rk-legend::after{animation:rk-shine 3.2s ease-in-out infinite}
+@keyframes rk-shine{0%,60%{left:-60%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.rank-chip::after{animation:none!important}}
+.lb-name-text .rank-chip,.dl-nm .rank-chip{margin-left:.15rem;align-self:flex-start;width:auto}
 </style>
 
 {# Иконка сайта: вкладка браузера, «Добавить на экран «Домой»» (iOS/Android), манифест веб-приложения #}

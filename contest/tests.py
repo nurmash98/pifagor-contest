@@ -1839,3 +1839,14 @@ class AwardForPlaceTests(TestCase):
     def test_award_table(self):
         from .quarters import award_for
         self.assertEqual([award_for(p) for p in range(1, 12)], [200, 150, 100, 50, 50, 50, 50, 50, 50, 50, 0])
+
+
+class RankChipTests(TestCase):
+    def test_rank_chip_levels(self):
+        from contest.templatetags.badge_tags import rank_chip
+        self.assertEqual(rank_chip(3), '')
+        self.assertIn('Intern', rank_chip(10))
+        self.assertIn('rk-bronze', rank_chip(60))
+        self.assertIn('Junior', rank_chip(60))
+        self.assertIn('Team Lead', rank_chip(700))
+        self.assertIn('Architect', rank_chip(1000))
