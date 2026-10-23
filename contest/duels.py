@@ -148,11 +148,8 @@ def try_match(student):
 
 
 def levels_for(avg_rating):
-    if avg_rating < 1000:
-        return ['A']
-    if avg_rating < 1200:
-        return ['A', 'B']
-    return ['B', 'C']
+    """Уровни задач в дуэлях: только A и B (сложные C не выпадают) при любом рейтинге."""
+    return ['A', 'B']
 
 
 def allowed_tags(a, b):

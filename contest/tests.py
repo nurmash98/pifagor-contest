@@ -887,9 +887,8 @@ class DuelTests(TestCase):
         self.assertIsNone(self.duels.try_match(self.st[0]))
 
     def test_levels_by_rating(self):
-        self.assertEqual(self.duels.levels_for(800), ['A'])
-        self.assertEqual(self.duels.levels_for(1100), ['A', 'B'])
-        self.assertEqual(self.duels.levels_for(1300), ['B', 'C'])
+        self.assertEqual(self.duels.levels_for(800), ['A', 'B'])
+        self.assertEqual(self.duels.levels_for(1500), ['A', 'B'])
 
     # --- игра
     def test_first_full_solution_takes_point_and_closes_task(self):
