@@ -95,12 +95,18 @@
     /* Аватар с рамкой по самому высокому значку за задачи */
     .pf-avatar { position: relative; display: inline-block; flex: none; vertical-align: middle; }
     .pf-avatar .pf-ring { position: absolute; inset: 0; border-radius: 50%; background: var(--bs-tertiary-bg); }
-    .pf-avatar .pf-face { position: absolute; inset: 8%; border-radius: 50%; background: var(--bs-body-bg);
+    .pf-avatar .pf-face { position: absolute; inset: 10%; border-radius: 50%; background: var(--bs-body-bg);
         display: flex; align-items: center; justify-content: center; line-height: 1; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
     .pf-avatar .pf-mini { position: absolute; right: -9%; bottom: -7%; }
     .pf-avatar .pf-mini svg { width: 100%; height: 100%; }
-    .pf-wood .pf-ring { background: repeating-linear-gradient(115deg,#a86b35 0 6px,#8f5a2b 6px 9px,#b97a41 9px 14px); box-shadow: 0 0 0 2px #5a3415; }
-    .pf-bronze .pf-ring { background: conic-gradient(#f3b880,#c47b3c,#7a461b,#c47b3c,#f3b880,#c47b3c,#7a461b,#f3b880); box-shadow: 0 0 0 2px #5a3410; }
+    /* дерево: светлое, матовое, с годовыми кольцами и тёмными «досками» — не путается с бронзой */
+    .pf-wood .pf-ring { background: repeating-radial-gradient(circle at 50% 50%, #f1dcb2 0 2px, #d9b27a 2px 3.5px, #ead09e 3.5px 5px);
+        box-shadow: 0 0 0 2px #5c3d1e, inset 0 0 0 1.5px #7a5532; }
+    .pf-wood .pf-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+        background: repeating-conic-gradient(#6b4422 0 2.2deg, transparent 2.2deg 45deg); opacity: .8; }
+    /* бронза: насыщенная медно-красная, блестящая металлом */
+    .pf-bronze .pf-ring { background: conic-gradient(from 20deg, #ffd2a8, #e07a3c, #8e3a12, #c8551f, #ffcf9e, #e07a3c, #7a2e0c, #d8692c, #ffd2a8);
+        box-shadow: 0 0 0 2px #5a220a, 0 0 10px rgba(224,122,60,.45); }
     .pf-silver .pf-ring { background: conic-gradient(#fff,#c3cad6,#7d8797,#c3cad6,#fff,#c3cad6,#7d8797,#fff); box-shadow: 0 0 0 2px #6b7484; }
     .pf-gold .pf-ring { background: conic-gradient(#fff1b8,#f2c230,#a8740a,#f2c230,#fff1b8,#f2c230,#a8740a,#fff1b8); box-shadow: 0 0 0 2px #8a6008, 0 0 12px rgba(242,194,48,.45); }
     .pf-diamond .pf-ring { background: conic-gradient(#f0fdff,#8fe3f5,#2d8fb3,#8fe3f5,#f0fdff,#8fe3f5,#2d8fb3,#f0fdff); box-shadow: 0 0 0 2px #2d8fb3, 0 0 16px rgba(110,220,255,.7); }
