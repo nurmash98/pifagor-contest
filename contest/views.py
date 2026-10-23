@@ -663,7 +663,7 @@ def hall_of_fame(request):
         grade = grades[0] if grades else ''
     if sel == 'year':
         studs = [s for s in Student.objects.all() if quarters.grade_of(s.school_class) == grade]
-        top = quarters.student_ranking(studs, None, quarters.YEAR_WINDOW['end'])[:quarters.TOP]
+        top = quarters.student_ranking(studs, None, quarters.YEAR_WINDOW['end'], quarter_n=0)[:quarters.TOP]
         rows = [{'place': i, 'st': s, 'name': s.full_name, 'school_class': s.school_class,
                  'score': s.calc_total_score, 'solved': s.calc_solved_count} for i, s in enumerate(top, 1)]
         cls_rows = [{'place': i, 'name': r['school_class'], 'score': r['total'], 'solved': r['student_count']}
@@ -753,7 +753,7 @@ def leaderboard(request):
             # Без фильтра — все ученики всех классов учителя (точное совпадение, например "10А", "11Б")
             students_query = [s for s in students_query if s.school_class in teacher_classes]
 
-    students = quarters.student_ranking(list(students_query), window['start'], window['end'])
+    students = quarters.student_ranking(list(students_query), window['start'], window['end'], quarter_n=window['n'])
     if limit is not None:
         students = students[:limit]
 
@@ -796,7 +796,16 @@ def leaderboard(request):
         winner = HallEntry.objects.filter(year=quarters.YEAR, quarter=last_frozen['n'], kind='student',
                                           grade=my_grade, place=1).first()
 
+    # Учитель: кто убран из рейтинга этой четверти (только его классы)
+    excluded = []
+    if request.user.is_staff:
+        from .models import QuarterExclusion
+        ex = QuarterExclusion.objects.filter(year=quarters.YEAR, quarter=window['n']).select_related('student')
+        mc = _managed_classes(request.user)
+        excluded = [e for e in ex if mc is None or e.student.school_class in mc]
+
     return render(request, 'leaderboard.html', {
+        'excluded': excluded,
         'quarter': quarter, 'quarter_days_left': quarters.days_left(quarter) if quarter else None,
         'last_frozen': last_frozen, 'winner': winner,
         'students': students,
@@ -810,6 +819,27 @@ def leaderboard(request):
         'bonus_classes': bonus_classes,
         'class_bonus_presets': CLASS_BONUS_PRESETS,
     })
+
+
+@staff_member_required
+def leaderboard_exclude(request, student_id):
+    """Учитель убирает ученика своего класса из рейтинга текущей четверти (или возвращает)."""
+    from . import quarters
+    from .models import QuarterExclusion
+    student = _managed_student_or_none(request, student_id)
+    q = quarters.current()
+    if request.method == 'POST' and student is not None and q is not None:
+        if request.POST.get('action') == 'return':
+            QuarterExclusion.objects.filter(student=student, year=quarters.YEAR, quarter=q['n']).delete()
+            messages.success(request, f'{student.full_name} снова в рейтинге {q["n"]} четверти.')
+        else:
+            QuarterExclusion.objects.get_or_create(student=student, year=quarters.YEAR, quarter=q['n'],
+                                                   defaults={'reason': request.POST.get('reason', '')[:200],
+                                                             'created_by': _teacher_or_none(request)})
+            messages.success(request, f'{student.full_name} убран(а) из рейтинга {q["n"]} четверти. Места ниже сдвинулись вверх.')
+    elif student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+    return redirect(_safe_back_url(request) or 'leaderboard')
 
 
 @staff_member_required

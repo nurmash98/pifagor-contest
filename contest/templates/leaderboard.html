@@ -72,12 +72,26 @@
                 </span>
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
                 <span class="lb-cell lb-hide-sm fw-semibold">{{ student.calc_solved_count }}</span>
-                <span class="lb-cell lb-score">{{ student.calc_total_score }}</span>
+                <span class="lb-cell lb-score">{{ student.calc_total_score }}
+                    {% if user.is_staff and quarter %}<form method="post" action="{% url 'leaderboard_exclude' student.id %}" class="lb-ex" onsubmit="return confirm('Убрать {{ student.full_name|escapejs }} из рейтинга этой четверти (например, за списывание)? Задачи и монеты у ученика останутся.');">{% csrf_token %}
+                        <button type="submit" title="Убрать из рейтинга четверти">🚫</button></form>{% endif %}</span>
             </div>
             {% empty %}
             <div class="text-center py-5 text-muted">{% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}</div>
             {% endfor %}
         </div>
+        {% if excluded %}
+        <div class="card border-0 shadow-sm rounded-4 p-3 mt-3 small">
+            <div class="fw-bold mb-2">🚫 Убраны из рейтинга этой четверти (видно только учителю)</div>
+            {% for e in excluded %}
+            <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <span>{{ e.student.full_name }} · {{ e.student.school_class }}{% if e.reason %} <span class="text-muted">— {{ e.reason }}</span>{% endif %}</span>
+                <form method="post" action="{% url 'leaderboard_exclude' e.student.id %}">{% csrf_token %}<input type="hidden" name="action" value="return">
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">Вернуть</button></form>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         <style>
             .lb-head, .lb-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 80px 130px 120px; align-items: center; column-gap: 8px; }
             .lb-head { padding: 10px 14px 12px; font-weight: 700; color: var(--bs-body-color); border-bottom: 1px solid var(--bs-border-color); margin-bottom: 6px; }
@@ -92,7 +106,9 @@
             .lb-sub { display: none; font-size: .78rem; font-weight: 600; opacity: .8; }
             .lb-cell { text-align: center; position: relative; z-index: 1; }
             .lb-muted { color: var(--bs-secondary-color); }
-            .lb-score { font-weight: 800; font-size: 1.25rem; color: #008b42; }
+            .lb-score { font-weight: 800; font-size: 1.25rem; color: #008b42; position: relative; }
+            .lb-ex { display: inline; } .lb-ex button { border: 0; background: none; font-size: .8rem; opacity: .35; padding: 0 0 0 4px; cursor: pointer; }
+            .lb-ex button:hover { opacity: 1; }
             [data-bs-theme="dark"] .lb-score { color: #34c27a; }
             /* строка с баннером: фон баннера на всю строку, весь текст — цвета баннера */
             .lb-row.has-b, .lb-row.has-b .lb-name, .lb-row.has-b .lb-place, .lb-row.has-b .lb-muted, .lb-row.has-b .lb-score { color: inherit; }

@@ -32,6 +32,7 @@ urlpatterns = [
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     path('hall-of-fame/', views.hall_of_fame, name='hall_of_fame'),
     path('leaderboard/class-bonus/', views.add_class_bonus, name='add_class_bonus'),
+    path('leaderboard/exclude/<int:student_id>/', views.leaderboard_exclude, name='leaderboard_exclude'),
     path('profile/', views.profile_view, name='profile'),
     path('profile/avatar/', views.profile_avatar, name='profile_avatar'),
     path('profile/banner/', views.profile_banner, name='profile_banner'),

@@ -701,6 +701,23 @@ class HallEntry(models.Model):
         verbose_name_plural = "Зал славы"
 
 
+
+class QuarterExclusion(models.Model):
+    """Ученик убран из рейтинга четверти (например, за списывание): не показывается в лидерборде
+    этой четверти, не попадает в Зал славы и не получает наград. Задачи и монеты у него остаются."""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='quarter_exclusions')
+    year = models.CharField(max_length=9)
+    quarter = models.PositiveSmallIntegerField()
+    reason = models.CharField(max_length=200, blank=True)
+    created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['student', 'year', 'quarter'], name='unique_quarter_exclusion')]
+        verbose_name = "Убран из рейтинга четверти"
+        verbose_name_plural = "Убраны из рейтинга четверти"
+
+
 # Любое изменение отправок/попыток/баллов класса сбрасывает кэш рейтинга четверти (contest/quarters.py)
 from django.db.models.signals import post_delete, post_save  # noqa: E402
 
@@ -710,6 +727,6 @@ def _invalidate_quarter_cache(sender, **kwargs):
     invalidate()
 
 
-for _model in (Submission, Attempt, ClassBonus):
+for _model in (Submission, Attempt, ClassBonus, QuarterExclusion):
     post_save.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-save-{_model.__name__}')
     post_delete.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-del-{_model.__name__}')

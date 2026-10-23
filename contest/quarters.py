@@ -109,13 +109,24 @@ def scores(students, start=None, end=None, fresh=False):
     return {s.id: data.get(s.id, empty) for s in students}
 
 
-def student_ranking(students, start=None, end=None, fresh=False):
-    """Ученики с баллами в окне, по убыванию; у каждого calc_total_score / calc_solved_count."""
+def excluded_ids(quarter_n):
+    """Ученики, убранные из рейтинга этой четверти (0 — «за год»: убранные хоть из одной четверти)."""
+    from .models import QuarterExclusion
+    qs = QuarterExclusion.objects.filter(year=YEAR)
+    if quarter_n:
+        qs = qs.filter(quarter=quarter_n)
+    return set(qs.values_list('student_id', flat=True))
+
+
+def student_ranking(students, start=None, end=None, fresh=False, quarter_n=None):
+    """Ученики с баллами в окне, по убыванию; у каждого calc_total_score / calc_solved_count.
+    quarter_n — номер четверти (0 — год): убранные из её рейтинга не показываются."""
     sc = scores(students, start, end, fresh)
+    skip = excluded_ids(quarter_n) if quarter_n is not None else set()
     rows = []
     for st in students:
         r = sc[st.id]
-        if r['graded'] == 0:
+        if r['graded'] == 0 or st.id in skip:
             continue
         st.calc_total_score, st.calc_solved_count, st.calc_graded = r['score'], r['solved'], r['graded']
         rows.append(st)
@@ -168,7 +179,7 @@ def _freeze(q):
         by_grade.setdefault(grade_of(st.school_class), []).append(st)
     entries = []
     for grade, studs in by_grade.items():
-        for place, st in enumerate(student_ranking(studs, q['start'], q['end'], fresh=True)[:TOP], 1):
+        for place, st in enumerate(student_ranking(studs, q['start'], q['end'], fresh=True, quarter_n=q['n'])[:TOP], 1):
             entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
                                      name=st.full_name, school_class=st.school_class,
                                      score=st.calc_total_score, solved=st.calc_solved_count))

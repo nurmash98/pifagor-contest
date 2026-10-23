@@ -1798,3 +1798,37 @@ class QuarterCacheTests(TestCase):
             Submission.objects.create(student=st, task=t, status='DONE', score=10, is_graded=True)
             self.assertEqual(quarters.scores([st])[st.id]['score'], 10)  # новая оценка сбросила кэш
             self.assertEqual(comp.call_count, 2)
+
+
+class QuarterExclusionTests(TestCase):
+    def test_excluded_student_hidden_and_others_move_up(self):
+        from unittest import mock
+        from . import quarters
+        from .models import Attempt, HallEntry, QuarterExclusion, Submission
+        Task.objects.all().delete()
+        t_user = User.objects.create_user('tx', password='x', is_staff=True)
+        Teacher.objects.create(user=t_user, full_name='T', classes='7B, 7C')
+        q1 = quarters.BY_N[1]
+        studs = []
+        for i, (n, c, k) in enumerate([('Iskander Ryskulbekov', '7B', 5), ('Честный Первый', '7B', 4), ('Честный Второй', '7C', 3)]):
+            u = User.objects.create_user(f'x{i}', password='x')
+            st = Student.objects.create(user=u, full_name=n, school_class=c); studs.append(st)
+            for j in range(k):
+                t = Task.objects.create(title=f'X{i}{j}', description='d', level='A', test_cases=[])
+                s = Submission.objects.create(student=st, task=t, status='DONE', score=10, is_graded=True)
+                Attempt.objects.create(submission=s, number=1, submitted_at=q1['end'] - timedelta(days=3), score=10)
+        before = q1['end'] - timedelta(days=1)
+        with mock.patch('django.utils.timezone.now', return_value=before):
+            self.client.force_login(t_user)
+            self.client.post(reverse('leaderboard_exclude', args=[studs[0].id]), {'reason': 'списывание'})
+            html = self.client.get(reverse('leaderboard')).content.decode()
+        self.assertTrue(QuarterExclusion.objects.filter(student=studs[0], quarter=1).exists())
+        board = html.split('lb-head')[1].split('Убраны из рейтинга')[0]
+        self.assertNotIn('Iskander', board)
+        self.assertIn('Убраны из рейтинга', html)
+        with mock.patch('django.utils.timezone.now', return_value=q1['end'] + timedelta(hours=1)):
+            quarters.freeze_due()
+        top = list(HallEntry.objects.filter(quarter=1, kind='student', grade='7').order_by('place').values_list('name', flat=True))
+        self.assertEqual(top, ['Честный Первый', 'Честный Второй'])
+        from . import coins
+        self.assertEqual(coins.balance(studs[0]) - quarters.AWARD_COINS.get(0, 0), 0)   # без наград
