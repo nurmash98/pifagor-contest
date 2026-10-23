@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load ui_i18n badge_tags %}
+{% block title %}{% if content_lang == 'kk' %}Даңқ залы{% else %}Зал славы{% endif %} - Pifagor Contest{% endblock %}
+{% block content %}
+{% with kk=content_lang %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-pifagor-blue">🏛 {% if kk == 'kk' %}Даңқ залы{% else %}Зал славы{% endif %}</h3>
+    <p class="text-muted mb-0">{% if kk == 'kk' %}Әр тоқсанның үздік оқушылары мен сыныптары — мәңгілікке.{% else %}Лучшие ученики и классы каждой четверти — навсегда.{% endif %}</p>
+  </div>
+  <a href="{% url 'leaderboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">← {% if kk == 'kk' %}Ағымдағы рейтинг{% else %}Текущий рейтинг{% endif %}</a>
+</div>
+<div class="hf-tabs my-3">
+  {% for t in tabs %}
+  {% if t.ready %}<a href="?q={{ t.key }}&g={{ grade }}" class="{% if t.key == sel %}on{% endif %}">{% else %}<span class="off">{% endif %}
+    {% if t.key == 'year' %}🏆 {% if kk == 'kk' %}Жыл бойы{% else %}За год{% endif %}{% else %}{{ t.n }} {% if kk == 'kk' %}тоқсан{% else %}четверть{% endif %}{% endif %}
+    <small>{{ t.label }}</small>
+  {% if t.ready %}</a>{% else %}</span>{% endif %}
+  {% endfor %}
+</div>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% for g in grades %}<a href="?q={{ sel }}&g={{ g }}" class="hf-chip{% if g == grade %} on{% endif %}">{{ g }} {% if kk == 'kk' %}сыныптар{% else %}классы{% endif %}</a>{% endfor %}
+</div>
+{% if frozen_q %}
+<div class="hf-fixed mb-4">🔒 {% if kk == 'kk' %}{{ frozen_q.n }} тоқсанның қорытындысы бекітілді — енді өзгермейді.{% else %}Итоги {{ frozen_q.n }} четверти зафиксированы {{ frozen_q.end|date:"d.m.Y" }} в 23:59 — больше не меняются.{% endif %}
+  {% if kk == 'kk' %}Марапат: 1 орын — +{{ awards.1 }} тиын және «Тоқсан чемпионы» баннері, 2 орын — +{{ awards.2 }}, 3 орын — +{{ awards.3 }}.{% else %}Награды: 1 место — +{{ awards.1 }} монет и баннер «Чемпион четверти», 2 место — +{{ awards.2 }}, 3 место — +{{ awards.3 }}.{% endif %}</div>
+{% else %}
+<div class="hf-fixed mb-4">⏳ {% if kk == 'kk' %}Оқу жылы жүріп жатыр — жылдық қорытынды 25.05.2027 бекітіледі.{% else %}Учебный год идёт — итоги года сейчас меняются и зафиксируются 25.05.2027.{% endif %}</div>
+{% endif %}
+
+<div class="row g-4">
+ <div class="col-lg-7">
+  <h5 class="fw-bold text-pifagor-blue mb-3">👩‍🎓 {% if kk == 'kk' %}Үздік 10 оқушы{% else %}Топ-10 учеников{% endif %}</h5>
+  {% if podium %}
+  <div class="podium mb-3">
+   {% for p in podium %}
+   <div class="pd pd{{ p.place }}">
+     <div class="pd-medal">{% if p.place == 1 %}🥇{% elif p.place == 2 %}🥈{% else %}🥉{% endif %}</div>
+     {% student_avatar p.all_solved 74 True p.place p.st.avatar %}
+     <div class="pd-name">{% if p.st %}{% student_name p.st True p.name %}{% else %}{{ p.name }}{% endif %}</div>
+     <div class="pd-cls">{{ p.school_class }} · ✓ {{ p.solved }}</div>
+     <div class="pd-score">{{ p.score }}</div>
+     <div class="pd-step">{{ p.place }}</div>
+   </div>
+   {% endfor %}
+  </div>
+  {% endif %}
+  <div class="card border-0 shadow-sm rounded-4 p-2">
+   {% for r in rest %}
+   <div class="hf-row{% if r.st.name_banner %} has-b b-{{ r.st.name_banner }}{% if r.st.name_banner == 'custom' %} fx-{{ r.st.custom_banner.fx|default:'shine' }}{% endif %}{% endif %}"{% if r.st.name_banner == 'custom' %} style="{{ r.st.custom_banner_style }}"{% endif %}>
+     <span class="hf-pl">{{ r.place }}</span>
+     {% student_avatar r.all_solved 36 False r.place r.st.avatar %}
+     <span class="hf-nm">{{ r.name }}</span><span class="hf-cl">{{ r.school_class }}</span><span class="hf-sc">{{ r.score }}</span>
+   </div>
+   {% empty %}{% if not podium %}<div class="text-muted p-3">{% if kk == 'kk' %}Әзірге бос.{% else %}Пока пусто.{% endif %}</div>{% endif %}{% endfor %}
+  </div>
+ </div>
+ <div class="col-lg-5">
+  <h5 class="fw-bold text-pifagor-blue mb-3">🏫 {% if kk == 'kk' %}Параллель сыныптары{% else %}Классы параллели{% endif %}</h5>
+  <div class="card border-0 shadow-sm rounded-4 p-2">
+   {% for c in class_rows %}
+   <div class="hf-row hf-cls {% if c.place <= 3 %}cl{{ c.place }}{% endif %}">
+     <span class="hf-pl">{% if c.place == 1 %}🥇{% elif c.place == 2 %}🥈{% elif c.place == 3 %}🥉{% else %}{{ c.place }}{% endif %}</span>
+     <span class="hf-nm">{{ c.name }}</span><span class="hf-cl">{{ c.solved }} {% if kk == 'kk' %}оқ.{% else %}уч.{% endif %}</span><span class="hf-sc">{{ c.score }}</span>
+   </div>
+   {% empty %}<div class="text-muted p-3">—</div>{% endfor %}
+  </div>
+ </div>
+</div>
+<style>
+ .hf-tabs{display:flex;gap:8px;flex-wrap:wrap}
+ .hf-tabs a,.hf-tabs span{padding:8px 16px;border-radius:14px;font-weight:700;text-decoration:none;background:var(--bs-tertiary-bg);color:var(--bs-body-color);display:flex;flex-direction:column;line-height:1.15}
+ .hf-tabs small{font-weight:500;font-size:.72rem;opacity:.7}
+ .hf-tabs a.on{background:linear-gradient(135deg,#1a1a4b,#3b3b9c);color:#fff}
+ .hf-tabs span.off{opacity:.45;cursor:default}
+ .hf-chip{padding:5px 14px;border-radius:99px;font-weight:700;font-size:.85rem;text-decoration:none;border:1px solid var(--bs-border-color);color:var(--bs-body-color)}
+ .hf-chip.on{background:#1a1a4b;color:#fff;border-color:#1a1a4b}
+ .hf-fixed{background:rgba(242,194,48,.15);border:1px solid rgba(242,194,48,.5);border-radius:12px;padding:8px 14px;font-size:.9rem}
+ .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:10px}
+ .pd{text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+ .pd1{order:2}.pd2{order:1}.pd3{order:3}
+ .pd-medal{font-size:2rem;line-height:1}
+ .pd-name{font-weight:800;margin-top:4px;max-width:100%}
+ .pd-cls{font-size:.8rem;opacity:.7}
+ .pd-score{font-weight:800;font-size:1.3rem;color:#008b42}[data-bs-theme=dark] .pd-score{color:#34c27a}
+ .pd-step{width:100%;border-radius:14px 14px 0 0;color:#fff;font-weight:900;font-size:2rem;display:flex;align-items:center;justify-content:center}
+ .pd1 .pd-step{height:110px;background:linear-gradient(180deg,#f7d64a,#c99a06)}
+ .pd2 .pd-step{height:80px;background:linear-gradient(180deg,#e6e9ef,#8d96a8)}
+ .pd3 .pd-step{height:60px;background:linear-gradient(180deg,#f0a868,#b0602a)}
+ .hf-row{position:relative;overflow:hidden;display:grid;grid-template-columns:40px auto minmax(0,1fr) 54px 64px;gap:10px;align-items:center;padding:8px 12px;border-radius:12px;margin:3px 0;font-weight:700}
+ .hf-row.hf-cls{grid-template-columns:40px minmax(0,1fr) 70px 64px}
+ .hf-row:not(.has-b):not(.cl1):not(.cl2):not(.cl3){border-bottom:1px solid var(--bs-border-color);border-radius:0}
+ .hf-pl{text-align:center;font-weight:800;opacity:.8;position:relative;z-index:1}.hf-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1}
+ .hf-cl{opacity:.75;font-size:.85rem;text-align:center;position:relative;z-index:1}.hf-sc{text-align:right;font-weight:800;position:relative;z-index:1}
+ .hf-row.has-b{padding:8px 12px!important;white-space:normal}
+ .hf-row.b-code::before,.hf-row.b-fire::before,.hf-row.b-gold::before,.hf-row.b-champion::before{content:none}
+ .hf-row.b-kz_flag{background-position:left 6px center,55% center;background-size:auto 115%,auto 140%}
+ .cl1{background:linear-gradient(90deg,rgba(247,214,74,.35),transparent)}.cl2{background:linear-gradient(90deg,rgba(180,188,204,.35),transparent)}.cl3{background:linear-gradient(90deg,rgba(240,168,104,.35),transparent)}
+ @media(max-width:575.98px){.hf-row{grid-template-columns:30px auto minmax(0,1fr) 54px}.hf-row .hf-cl{display:none}.hf-row.hf-cls{grid-template-columns:30px minmax(0,1fr) 54px}
+  .podium{gap:6px}.pd-score{font-size:1.1rem}.hf-row.b-kz_flag{background-size:auto 115%,0 0}}
+</style>
+{% endwith %}
+{% endblock %}

@@ -26,6 +26,7 @@
             <div class="small fw-bold mb-2 text-uppercase" style="letter-spacing:.04em;">
                 {% if b.kind == 'free' %}<span class="text-success">{% if kk == 'kk' %}тегін{% else %}бесплатно{% endif %}</span>
                 {% elif b.kind == 'gift' %}<span style="color:#00a6c8;">🎁 {% if kk == 'kk' %}сыйлық{% else %}подарок{% endif %}</span>
+                {% elif b.kind == 'award' %}<span style="color:#b8860b;">🏅 {% if kk == 'kk' %}марапат{% else %}награда{% endif %}</span>
                 {% else %}<span class="text-warning-emphasis"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ b.price }}</span>{% endif %}
             </div>
             <div class="mb-2">{% if b.key == 'custom' %}<span class="nb b-custom fx-{{ b.custom.fx }} sm" style="{{ b.custom_style }}{% if not b.owned %};--cb1:#ff5f6d;--cb2:#4f8df0{% endif %}">{% if b.custom.icon %}<span class="cb-icon">{{ b.custom.icon }}</span>{% endif %}{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span>{% else %}<span class="nb b-{{ b.key }} sm">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span>{% endif %}</div>
@@ -39,6 +40,8 @@
             {% elif b.owned %}
                 <form method="post" action="{% url 'profile_banner' %}">{% csrf_token %}<input type="hidden" name="banner" value="{{ b.key }}"><input type="hidden" name="next" value="shop">
                     <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">{% if kk == 'kk' %}Тағу{% else %}Надеть{% endif %}</button></form>
+            {% elif b.kind == 'award' %}
+                <a href="{% url 'hall_of_fame' %}" class="btn btn-sm btn-outline-warning rounded-pill px-3">{% if kk == 'kk' %}Тоқсанда 1-орын{% else %}1 место в четверти{% endif %}</a>
             {% elif b.kind == 'gift' %}
                 <a href="{% url 'republic_day' %}" class="btn btn-sm btn-info rounded-pill px-3">{% if kk == 'kk' %}Есептер{% else %}Задачи{% endif %} {{ republic_progress }}/{{ republic_need }}</a>
             {% elif b.short %}
@@ -85,6 +88,7 @@
                 {% elif tx.kind == 'day' %}☀️ {% if kk == 'kk' %}Күннің алғашқы есебі{% else %}Первая задача дня{% endif %}
                 {% elif tx.kind == 'milestone' %}🎯 {% if kk == 'kk' %}Шешілген есептер:{% else %}Решено задач:{% endif %} {{ tx.note }}
                 {% elif tx.kind == 'exam' %}⭐ {{ tx.note }} — 10/10
+                {% elif tx.kind == 'award' %}🏛 {{ tx.note }}
                 {% else %}🛒 {{ tx.note }}{% endif %}
                 <span class="text-muted ms-1">{{ tx.at|date:"d.m.Y" }}</span>
             </span>

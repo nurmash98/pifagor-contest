@@ -634,6 +634,51 @@ def shop_custom(request):
 
 
 @login_required
+def hall_of_fame(request):
+    """Зал славы: зафиксированные топ-10 учеников и рейтинг классов каждой параллели по четвертям,
+    плюс текущие итоги учебного года."""
+    from . import quarters
+    from .models import HallEntry
+    quarters.freeze_due()
+    student = Student.objects.filter(user=request.user).first()
+    frozen = set(HallEntry.objects.filter(year=quarters.YEAR).values_list('quarter', flat=True))
+    tabs = [{'key': str(q['n']), 'n': q['n'], 'label': q['label'], 'ready': q['n'] in frozen} for q in quarters.QUARTERS]
+    tabs.append({'key': 'year', 'n': 0, 'label': quarters.YEAR_WINDOW['label'], 'ready': True})
+    sel = request.GET.get('q', '')
+    if sel not in [t['key'] for t in tabs if t['ready']]:
+        ready = [t['key'] for t in tabs if t['ready'] and t['key'] != 'year']
+        sel = ready[-1] if ready else 'year'
+    all_classes = sorted({c for c in Student.objects.values_list('school_class', flat=True) if c})
+    grades = sorted({quarters.grade_of(c) for c in all_classes}, key=lambda g: (len(g), g))
+    grade = request.GET.get('g') or (quarters.grade_of(student.school_class) if student else (grades[0] if grades else ''))
+    if grade not in grades and grades:
+        grade = grades[0]
+    if sel == 'year':
+        studs = [s for s in Student.objects.all() if quarters.grade_of(s.school_class) == grade]
+        top = quarters.student_ranking(studs, None, quarters.YEAR_WINDOW['end'])[:quarters.TOP]
+        rows = [{'place': i, 'st': s, 'name': s.full_name, 'school_class': s.school_class,
+                 'score': s.calc_total_score, 'solved': s.calc_solved_count} for i, s in enumerate(top, 1)]
+        cls_rows = [{'place': i, 'name': r['school_class'], 'score': r['total'], 'solved': r['student_count']}
+                    for i, r in enumerate(quarters.class_rows([c for c in all_classes if quarters.grade_of(c) == grade],
+                                                              None, quarters.YEAR_WINDOW['end']), 1)]
+        frozen_q = None
+    else:
+        qs = HallEntry.objects.filter(year=quarters.YEAR, quarter=int(sel), grade=grade).select_related('student')
+        rows = [{'place': e.place, 'st': e.student, 'name': e.name, 'school_class': e.school_class, 'score': e.score,
+                 'solved': e.solved} for e in qs if e.kind == 'student']
+        cls_rows = [{'place': e.place, 'name': e.name, 'score': e.score, 'solved': e.solved} for e in qs if e.kind == 'class'][:quarters.TOP]
+        frozen_q = quarters.BY_N[int(sel)]
+    from .badge_art import solved_counts
+    counts = solved_counts([r['st'].id for r in rows if r['st']])
+    for r in rows:
+        r['all_solved'] = counts.get(r['st'].id, 0) if r['st'] else 0
+    return render(request, 'hall_of_fame.html', {
+        'tabs': tabs, 'sel': sel, 'grades': grades, 'grade': grade, 'podium': rows[:3], 'rest': rows[3:],
+        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS,
+    })
+
+
+@login_required
 def republic_day(request):
     """Страница подарка ко Дню Республики: 5 задач по истории Казахстана → баннер «Флаг»."""
     from . import banners as banner_module
@@ -680,15 +725,13 @@ def leaderboard(request):
             scope_label = selected_class or ', '.join(teacher_classes)
             limit = None  # Учитель видит полный список своих классов, без топ-10
 
-    # Общий балл = сумма (коэффициент сложности задачи * оценка учителя) по КАЖДОЙ проверенной
-    # задаче. «Решено» — это только задачи с оценкой 10/10 (perfect_count), а не любые
-    # проверенные (graded_count используем лишь чтобы не показывать тех, кто ничего не
-    # отправлял или ещё ничего не проверено).
-    students_query = Student.objects.annotate(
-        total_score=Sum(LEADERBOARD_SCORE_EXPR, filter=Q(submissions__is_graded=True)),
-        graded_count=Count('submissions', filter=Q(submissions__is_graded=True)),
-        perfect_count=Count('submissions', filter=Q(submissions__is_graded=True, submissions__score=10)),
-    ).filter(graded_count__gt=0).order_by('-total_score', '-perfect_count', '-graded_count')
+    # Рейтинг по четвертям: считаются только баллы за задачи, лучший балл по которым получен в
+    # текущей четверти (contest/quarters.py). Закончившиеся четверти фиксируются в «Зале славы».
+    from . import quarters
+    quarters.freeze_due()
+    quarter = quarters.current()
+    window = quarter or quarters.YEAR_WINDOW
+    students_query = list(Student.objects.all())
 
     if my_grade is not None:
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
@@ -702,16 +745,9 @@ def leaderboard(request):
             # Без фильтра — все ученики всех классов учителя (точное совпадение, например "10А", "11Б")
             students_query = [s for s in students_query if s.school_class in teacher_classes]
 
-    students_list = list(students_query)
+    students = quarters.student_ranking(list(students_query), window['start'], window['end'])
     if limit is not None:
-        students_list = students_list[:limit]
-
-    students = []
-    for student_row in students_list:
-        student_row.calc_total_score = student_row.total_score or 0
-        # "Решено задач" в таблице — это perfect_count (оценка 10/10), не graded_count.
-        student_row.calc_solved_count = student_row.perfect_count or 0
-        students.append(student_row)
+        students = students[:limit]
 
     # ---- Рейтинг классов этой параллели (или параллелей, если у учителя классы из
     # разных параллелей / у админа нет выбранного фильтра) ----
@@ -734,7 +770,7 @@ def leaderboard(request):
     for grade in relevant_grades:
         classes_in_grade = sorted({c for c in all_school_classes if _grade_of(c) == grade})
         if classes_in_grade:
-            class_leaderboards.append({'grade': grade, 'rows': _class_leaderboard_rows(classes_in_grade)})
+            class_leaderboards.append({'grade': grade, 'rows': quarters.class_rows(classes_in_grade, window['start'], window['end'])})
 
     # Классы, которым текущий пользователь (учитель/админ) может ставить бонусные баллы.
     can_add_class_bonus = request.user.is_staff
@@ -742,7 +778,19 @@ def leaderboard(request):
         all_school_classes if request.user.is_superuser else []
     )
 
+    # Объявление об итогах прошлой четверти — первые 10 дней после её конца
+    from .models import HallEntry
+    last_frozen, winner = None, None
+    for q in quarters.QUARTERS:
+        if q['end'] < timezone.now() and (timezone.now() - q['end']).days < 10:
+            last_frozen = q
+    if last_frozen and my_grade is not None:
+        winner = HallEntry.objects.filter(year=quarters.YEAR, quarter=last_frozen['n'], kind='student',
+                                          grade=my_grade, place=1).first()
+
     return render(request, 'leaderboard.html', {
+        'quarter': quarter, 'quarter_days_left': quarters.days_left(quarter) if quarter else None,
+        'last_frozen': last_frozen, 'winner': winner,
         'students': students,
         'my_grade': my_grade,
         'scope_label': scope_label,

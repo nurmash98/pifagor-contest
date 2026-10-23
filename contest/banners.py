@@ -12,6 +12,7 @@ CATALOG = {
     'plain':  dict(kind='free', ru='Простой', kk='Қарапайым'),
     'mint':   dict(kind='free', ru='Мятный', kk='Жалбыз'),
     'sky':    dict(kind='free', ru='Небо', kk='Аспан'),
+    'champion': dict(kind='award', ru='Чемпион четверти', kk='Тоқсан чемпионы'),
     'kz_flag': dict(kind='gift', ru='Флаг Казахстана', kk='Қазақстан туы', tag=REPUBLIC_TAG, need=REPUBLIC_NEED),
     'oyu':    dict(kind='paid', price=300, ru='Ою-өрнек', kk='Ою-өрнек'),
     'code':   dict(kind='paid', price=400, ru='Терминал', kk='Терминал'),

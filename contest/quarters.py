@@ -1,0 +1,153 @@
+"""Четверти учебного года: рейтинг считается заново в каждой четверти, итоги фиксируются
+в «Зале славы». Решённые задачи, монеты, значки и баннеры ученика при этом не обнуляются.
+
+Задача засчитывается в ту четверть, когда ученик получил за неё свой лучший (итоговый) балл.
+Каникулы засчитываются в следующую четверть: окна четвертей идут подряд без пропусков."""
+from datetime import datetime
+
+from django.db import IntegrityError, transaction
+from django.db.models import Sum
+from django.utils import timezone
+
+YEAR = '2026-2027'
+COEF = {'A': 1, 'B': 2, 'C': 3}
+TOP = 10
+AWARD_COINS = {1: 300, 2: 200, 3: 100}
+
+
+def _dt(y, m, d, h=0, mi=0, s=0):
+    return timezone.make_aware(datetime(y, m, d, h, mi, s))
+
+
+# (номер, подпись дат, начало окна или None, конец окна)
+QUARTERS = [
+    dict(n=1, label='01.09–25.10', start=None, end=_dt(2026, 10, 25, 23, 59, 59)),
+    dict(n=2, label='02.11–27.12', start=_dt(2026, 10, 26), end=_dt(2026, 12, 27, 23, 59, 59)),
+    dict(n=3, label='11.01–21.03', start=_dt(2026, 12, 28), end=_dt(2027, 3, 21, 23, 59, 59)),
+    dict(n=4, label='29.03–25.05', start=_dt(2027, 3, 22), end=_dt(2027, 5, 25, 23, 59, 59)),
+]
+BY_N = {q['n']: q for q in QUARTERS}
+YEAR_WINDOW = dict(n=0, label='2026–2027', start=None, end=QUARTERS[-1]['end'])
+
+
+def current(now=None):
+    """Идущая четверть (окно, куда попадают новые баллы) или None — после конца учебного года."""
+    now = now or timezone.now()
+    for q in QUARTERS:
+        if now <= q['end']:
+            return q
+    return None
+
+
+def days_left(q, now=None):
+    now = now or timezone.now()
+    return max((timezone.localtime(q['end']).date() - timezone.localtime(now).date()).days, 0)
+
+
+def grade_of(school_class):
+    import re
+    match = re.match(r'\d+', (school_class or '').strip())
+    return match.group() if match else (school_class or '').strip()
+
+
+def scores(students, start=None, end=None):
+    """{student_id: {'score', 'solved', 'graded'}} — баллы только за задачи, лучший балл по которым
+    получен в окне [start, end]."""
+    from .models import Attempt, Submission
+    ids = [s.id for s in students]
+    subs = list(Submission.objects.filter(student_id__in=ids, is_graded=True)
+                .values('id', 'student_id', 'score', 'task__level', 'updated_at'))
+    best_time = {}
+    for a in (Attempt.objects.filter(submission_id__in=[s['id'] for s in subs], score__isnull=False)
+              .values('submission_id', 'score', 'submitted_at')):
+        best_time.setdefault((a['submission_id'], a['score']), []).append(a['submitted_at'])
+    out = {sid: {'score': 0, 'solved': 0, 'graded': 0} for sid in ids}
+    for s in subs:
+        times = best_time.get((s['id'], s['score']))
+        when = min(times) if times else s['updated_at']
+        if (start is not None and when < start) or (end is not None and when > end):
+            continue
+        row = out[s['student_id']]
+        row['graded'] += 1
+        row['score'] += (s['score'] or 0) * COEF.get(s['task__level'], 0)
+        if s['score'] == 10:
+            row['solved'] += 1
+    return out
+
+
+def student_ranking(students, start=None, end=None):
+    """Ученики с баллами в окне, по убыванию; у каждого calc_total_score / calc_solved_count."""
+    sc = scores(students, start, end)
+    rows = []
+    for st in students:
+        r = sc[st.id]
+        if r['graded'] == 0:
+            continue
+        st.calc_total_score, st.calc_solved_count, st.calc_graded = r['score'], r['solved'], r['graded']
+        rows.append(st)
+    rows.sort(key=lambda s: (-s.calc_total_score, -s.calc_solved_count, -s.calc_graded, s.full_name))
+    return rows
+
+
+def class_rows(school_classes, start=None, end=None):
+    """Рейтинг классов за окно: средний балл всех учеников класса + баллы учителя за это окно."""
+    from .models import ClassBonus, Student
+    rows = []
+    for cls in school_classes:
+        studs = list(Student.objects.filter(school_class=cls))
+        sc = scores(studs, start, end)
+        vals = [sc[s.id]['score'] for s in studs]
+        avg = round(sum(vals) / len(vals)) if vals else 0
+        bq = ClassBonus.objects.filter(school_class=cls)
+        if start is not None:
+            bq = bq.filter(created_at__gte=start)
+        if end is not None:
+            bq = bq.filter(created_at__lte=end)
+        bonus = bq.aggregate(t=Sum('points'))['t'] or 0
+        rows.append({'school_class': cls, 'student_count': len(vals), 'avg_score': avg, 'bonus': bonus, 'total': avg + bonus})
+    rows.sort(key=lambda r: r['total'], reverse=True)
+    return rows
+
+
+def freeze_due(now=None):
+    """Фиксирует итоги всех закончившихся и ещё не зафиксированных четвертей: топ-10 учеников и
+    все классы каждой параллели; награды 1–3 местам (монеты, баннер «Чемпион четверти» за 1 место)."""
+    from .models import QuarterFreeze
+    now = now or timezone.now()
+    done = set(QuarterFreeze.objects.filter(year=YEAR).values_list('quarter', flat=True))
+    for q in QUARTERS:
+        if q['end'] < now and q['n'] not in done:
+            try:
+                with transaction.atomic():
+                    QuarterFreeze.objects.create(year=YEAR, quarter=q['n'], frozen_at=now)
+                    _freeze(q)
+            except IntegrityError:
+                pass    # параллельный запрос уже зафиксировал
+
+
+def _freeze(q):
+    from . import banners as banner_module
+    from .models import CoinTransaction, HallEntry, Student
+    all_students = list(Student.objects.all())
+    by_grade = {}
+    for st in all_students:
+        by_grade.setdefault(grade_of(st.school_class), []).append(st)
+    entries = []
+    for grade, studs in by_grade.items():
+        for place, st in enumerate(student_ranking(studs, q['start'], q['end'])[:TOP], 1):
+            entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
+                                     name=st.full_name, school_class=st.school_class,
+                                     score=st.calc_total_score, solved=st.calc_solved_count))
+            if place in AWARD_COINS:
+                CoinTransaction.objects.get_or_create(
+                    student=st, key=f'q:{YEAR}:{q["n"]}', defaults=dict(
+                        kind='award', amount=AWARD_COINS[place], at=q['end'],
+                        note=f'{q["n"]} четверть — {place} место ({grade} классы)'))
+            if place == 1:
+                banner_module.give(st, 'champion')
+        classes = sorted({s.school_class for s in studs if s.school_class})
+        for place, row in enumerate(class_rows(classes, q['start'], q['end']), 1):
+            entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='class', grade=grade, place=place,
+                                     name=row['school_class'], school_class=row['school_class'],
+                                     score=row['total'], solved=row['student_count']))
+    HallEntry.objects.bulk_create(entries)

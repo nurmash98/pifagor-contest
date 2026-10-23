@@ -168,6 +168,11 @@
     .b-gold::before { content: "👑"; }
     .b-gold::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.75), transparent); animation: nb-shine 3s ease-in-out infinite; }
     @keyframes nb-shine { 0% { left: -40%; } 60%, 100% { left: 120%; } }
+    /* Награда: «Чемпион четверти» */
+    .b-champion { background: linear-gradient(120deg, #2e1065, #6d28d9 45%, #b8860b 100%); color: #ffe066 !important; border: 2px solid #f7c600;
+        box-shadow: 0 0 12px rgba(247,198,0,.45); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+    .b-champion::before { content: "🏆"; }
+    .b-champion::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,240,180,.55), transparent); animation: nb-shine 3.5s ease-in-out infinite; }
     /* «Свой баннер»: цвета из переменных --cb1/--cb2/--cbfg, эффект fx-* */
     .b-custom { background: linear-gradient(90deg, var(--cb1), var(--cb2)); color: var(--cbfg) !important; border: 1px solid rgba(255,255,255,.25); }
     .b-custom.fx-flow { background: linear-gradient(90deg, var(--cb1), var(--cb2), var(--cb1)); background-size: 200% 100%; animation: nb-fire 4s linear infinite; }

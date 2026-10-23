@@ -23,7 +23,23 @@
             <p class="text-muted small mb-0">
                 {% t "Общий балл = оценка учителя × коэффициент сложности задачи (лёгкая ×1, средняя ×2, сложная ×3), просуммировано по всем решённым задачам." %}
             </p>
+            <div class="d-inline-flex flex-wrap align-items-center justify-content-center gap-2 mt-2">
+                {% if quarter %}
+                <span class="badge rounded-pill px-3 py-2" style="background:#1a1a4b;">{{ quarter.n }} {% if content_lang == 'kk' %}тоқсан{% else %}четверть{% endif %} · {{ quarter.label }}</span>
+                <span class="text-muted small">{% if content_lang == 'kk' %}Қалды{% else %}Осталось{% endif %} {{ quarter_days_left }} {% if content_lang == 'kk' %}күн{% else %}дн.{% endif %}</span>
+                {% else %}
+                <span class="badge rounded-pill px-3 py-2" style="background:#1a1a4b;">{% if content_lang == 'kk' %}Оқу жылының қорытындысы{% else %}Итоги учебного года{% endif %}</span>
+                {% endif %}
+                <a href="{% url 'hall_of_fame' %}" class="btn btn-warning btn-sm fw-bold rounded-pill px-3">🏛 {% if content_lang == 'kk' %}Даңқ залы{% else %}Зал славы{% endif %}</a>
+            </div>
+            {% if quarter and quarter.n > 1 %}
+            <p class="text-muted small mt-2 mb-0">{% if content_lang == 'kk' %}Жаңа тоқсан — рейтинг нөлден басталады. Шешілген есептер, тиындар, белгілер мен баннерлер сізде қалады.{% else %}Новая четверть — все начинают с нуля в рейтинге. Решённые задачи, монеты, значки и баннеры остаются у вас.{% endif %}</p>
+            {% endif %}
         </div>
+        {% if last_frozen %}
+        <div class="alert alert-warning rounded-4 text-center">🔔 {{ last_frozen.n }} {% if content_lang == 'kk' %}тоқсан аяқталды! Қорытынды «Даңқ залында».{% else %}четверть завершена! Итоги зафиксированы в «Зале славы».{% endif %}
+            {% if winner %}<b>{% if content_lang == 'kk' %}{{ my_grade }}-сыныптар жеңімпазы{% else %}Победитель {{ my_grade }} классов{% endif %} — {{ winner.name }} ({{ winner.score }})</b>{% endif %}</div>
+        {% endif %}
 
         {% if teacher_classes %}
         <div class="text-center mb-4">
@@ -82,7 +98,7 @@
             .lb-row.has-b, .lb-row.has-b .lb-name, .lb-row.has-b .lb-place, .lb-row.has-b .lb-muted, .lb-row.has-b .lb-score { color: inherit; }
             .lb-row.has-b .lb-muted { opacity: .85; }
             .lb-row.has-b { padding: 10px 14px !important; white-space: normal; font-weight: 700; }
-            .lb-row.b-code::before, .lb-row.b-fire::before, .lb-row.b-gold::before { content: none; }
+            .lb-row.b-code::before, .lb-row.b-fire::before, .lb-row.b-gold::before, .lb-row.b-champion::before { content: none; }
             .lb-row.b-kz_flag { background-position: left 8px center, 52% center; background-size: auto 115%, auto 140%; }
             @media (max-width: 575.98px) {
                 .lb-head, .lb-row { grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: 6px; }

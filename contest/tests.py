@@ -1695,3 +1695,71 @@ class CustomBannerTests(TestCase):
         self.st.refresh_from_db()
         from .banners import CUSTOM_DEFAULT
         self.assertEqual(self.st.custom_banner, CUSTOM_DEFAULT)
+
+
+class QuartersHallOfFameTests(TestCase):
+    def setUp(self):
+        from .models import Attempt, Submission
+        self.Attempt, self.Submission = Attempt, Submission
+        Task.objects.all().delete()
+        self.users = []
+        self.st = []
+        for i, cls in enumerate(['7A', '7A', '7B', '8A']):
+            u = User.objects.create_user(f'q{i}', password='x'); self.users.append(u)
+            self.st.append(Student.objects.create(user=u, full_name=f'Ученик {i}', school_class=cls))
+
+    def solve(self, st, level, when, score=10):
+        t = Task.objects.create(title=f'QT{Task.objects.count()}', description='d', level=level, test_cases=[])
+        s = self.Submission.objects.create(student=st, task=t, status='DONE', score=score, is_graded=True)
+        self.Attempt.objects.create(submission=s, number=1, submitted_at=when, score=score)
+        return s
+
+    def test_scores_by_quarter_window(self):
+        from . import quarters
+        q1, q2 = quarters.BY_N[1], quarters.BY_N[2]
+        self.solve(self.st[0], 'B', q1['end'] - timedelta(days=3))           # 1 четверть: 20
+        self.solve(self.st[0], 'A', q2['start'] + timedelta(days=1))         # каникулы → 2 четверть: 10
+        r1 = quarters.scores([self.st[0]], q1['start'], q1['end'])[self.st[0].id]
+        r2 = quarters.scores([self.st[0]], q2['start'], q2['end'])[self.st[0].id]
+        self.assertEqual((r1['score'], r2['score']), (20, 10))
+
+    def test_freeze_once_with_awards_and_hall_page(self):
+        from unittest import mock
+        from . import quarters, coins
+        from .models import HallEntry, QuarterFreeze
+        q1 = quarters.BY_N[1]
+        self.solve(self.st[0], 'C', q1['end'] - timedelta(days=5))   # 30
+        self.solve(self.st[1], 'A', q1['end'] - timedelta(days=5))   # 10
+        self.solve(self.st[2], 'B', q1['end'] - timedelta(days=5))   # 20
+        after = q1['end'] + timedelta(hours=1)
+        with mock.patch('django.utils.timezone.now', return_value=after):
+            quarters.freeze_due(); quarters.freeze_due()
+        self.assertEqual(QuarterFreeze.objects.filter(quarter=1).count(), 1)
+        top7 = list(HallEntry.objects.filter(quarter=1, kind='student', grade='7').order_by('place'))
+        self.assertEqual([e.name for e in top7], ['Ученик 0', 'Ученик 2', 'Ученик 1'])
+        self.assertEqual(coins.balance(self.st[0]), 300)
+        self.assertEqual(coins.balance(self.st[2]), 200)
+        self.st[0].refresh_from_db(); self.assertIn('champion', self.st[0].owned_banners)
+        classes7 = list(HallEntry.objects.filter(quarter=1, kind='class', grade='7').order_by('place'))
+        self.assertEqual([c.name for c in classes7], ['7A', '7B'])
+        # зал славы показывает зафиксированное
+        with mock.patch('django.utils.timezone.now', return_value=after):
+            self.client.force_login(self.users[0])
+            html = self.client.get(reverse('hall_of_fame') + '?q=1&g=7').content.decode()
+        self.assertIn('Ученик 0', html)
+        self.assertIn('зафиксированы', html)
+
+    def test_leaderboard_resets_in_new_quarter(self):
+        from unittest import mock
+        from . import quarters
+        q1, q2 = quarters.BY_N[1], quarters.BY_N[2]
+        self.solve(self.st[0], 'C', q1['end'] - timedelta(days=5))
+        with mock.patch('django.utils.timezone.now', return_value=q2['start'] + timedelta(days=8)):
+            self.client.force_login(self.users[1])
+            html = self.client.get(reverse('leaderboard')).content.decode()
+        self.assertNotIn('Ученик 0', html.split('lb-head')[1].split('Рейтинг классов')[0])
+        self.assertIn('2 четверть', html)
+        self.assertIn('Зал славы', html)
+        # профиль: решённые задачи не обнулились
+        self.client.login(username='q0', password='x')
+        self.assertIn('>1<', self.client.get(reverse('profile')).content.decode().replace(' ', '').replace('\n', ''))
