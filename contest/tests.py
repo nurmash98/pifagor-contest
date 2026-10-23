@@ -1249,7 +1249,10 @@ class NavbarLogoTests(TestCase):
         u = User.objects.create_user('nl', password='pw12345')
         Student.objects.create(user=u, full_name='Н', school_class='7F')
         self.client.login(username='nl', password='pw12345')
-        self.assertIn('icons/logo-tree', self.client.get('/').content.decode())
+        from unittest import mock
+        import datetime
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 10)):
+            self.assertIn('icons/logo-tree', self.client.get('/').content.decode())
 
 
 class RandomSlotPoolTests(RetakeTestBase):
@@ -1501,10 +1504,20 @@ class IndependenceDayTests(TestCase):
     def test_hidden_on_ordinary_day(self):
         from unittest import mock
         import datetime
-        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 23)):
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 10)):
             html = self.client.get(reverse('all_tasks')).content.decode()
         self.assertNotIn('class="kz-holiday"', html)
         self.assertIn('logo-tree.png', html)
+
+    def test_republic_day(self):
+        from unittest import mock
+        import datetime
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 25)):
+            html = self.client.get(reverse('all_tasks')).content.decode()
+            self.assertIn('День Республики Казахстан', html)
+            self.assertIn('kzw-nav', html)
+            s = self.client.session; s['content_lang'] = 'kk'; s.save()
+            self.assertIn('Республика күні', self.client.get(reverse('all_tasks')).content.decode())
 
     @override_settings(HOLIDAY_FORCE='independence')
     def test_force_setting(self):

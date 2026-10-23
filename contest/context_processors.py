@@ -33,14 +33,16 @@ def duels_visible(request):
 
 
 def holiday(request):
-    """Праздничное оформление. День Независимости Казахстана — 16 декабря (показываем 14–18 декабря).
-    Для проверки можно включить заранее: переменная окружения HOLIDAY_FORCE=independence."""
+    """Праздничное оформление с флагом Казахстана: День Республики — 25 октября (показываем 23–27 октября),
+    День Независимости — 16 декабря (14–18 декабря). Для проверки заранее: HOLIDAY_FORCE=republic / independence."""
     from django.conf import settings
     from django.utils import timezone
     forced = getattr(settings, 'HOLIDAY_FORCE', '')
     if forced:
         return {'holiday': forced}
     today = timezone.localdate()
+    if today.month == 10 and 23 <= today.day <= 27:
+        return {'holiday': 'republic'}
     if today.month == 12 and 14 <= today.day <= 18:
         return {'holiday': 'independence'}
     return {'holiday': ''}

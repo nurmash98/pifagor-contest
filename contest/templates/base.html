@@ -70,7 +70,7 @@
             <!-- Логотип / Название -->
             <div class="d-flex align-items-center gap-3">
                 <a class="navbar-brand fw-bold d-flex align-items-center me-0" href="/">
-                    {% if holiday == 'independence' %}<span class="me-2 d-inline-flex">{% include "holiday_flag.html" with uid="nav" h=40 %}</span>{% else %}
+                    {% if holiday %}<span class="me-2 d-inline-flex">{% include "holiday_flag.html" with uid="nav" h=40 %}</span>{% else %}
                     <img src="{% static 'icons/logo-tree.png' %}" alt="" height="42" class="me-2 logo-light">
                     <img src="{% static 'icons/logo-tree-dark.png' %}" alt="" height="42" class="me-2 logo-dark">{% endif %}
                     <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
@@ -187,11 +187,11 @@
     </nav>
 
     <!-- Основной контент -->
-    {% if holiday == 'independence' %}
+    {% if holiday %}
     <div class="kz-holiday">
         <div class="container d-flex align-items-center justify-content-center gap-3 py-2">
             {% include "holiday_flag.html" with uid="banner" h=30 %}
-            <span>{% if content_lang == 'kk' %}<b>16 желтоқсан — Қазақстан Республикасының Тәуелсіздік күні!</b> Мерекеңіз құтты болсын!{% else %}<b>16 декабря — День Независимости Республики Казахстан!</b> С праздником!{% endif %}</span>
+            <span>{% if holiday == 'republic' %}{% if content_lang == 'kk' %}<b>25 қазан — Республика күні!</b> Мерекеңіз құтты болсын!{% else %}<b>25 октября — День Республики Казахстан!</b> С праздником!{% endif %}{% else %}{% if content_lang == 'kk' %}<b>16 желтоқсан — Қазақстан Республикасының Тәуелсіздік күні!</b> Мерекеңіз құтты болсын!{% else %}<b>16 декабря — День Независимости Республики Казахстан!</b> С праздником!{% endif %}{% endif %}</span>
         </div>
     </div>
     {% endif %}
