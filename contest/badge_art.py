@@ -9,9 +9,9 @@ TIERS = {
     't10': dict(tier='wood', c=('#d9a066', '#a86b35', '#6e4220'), rib=('#b47a44', '#7a4b23'),
                 icon='sprout', rivets=True, grain=True),
     't50': dict(tier='bronze', c=('#f3b880', '#c47b3c', '#7a461b'), rib=('#c98444', '#874e1f'),
-                icon='sword', rivets=True),
+                icon='bolt', rivets=True),
     't100': dict(tier='silver', c=('#ffffff', '#c3cad6', '#7d8797'), rib=('#d5dbe4', '#8a93a3'),
-                 icon='shield', shine=True),
+                 icon='code', shine=True),
     't200': dict(tier='gold', c=('#fff1b8', '#f2c230', '#a8740a'), rib=('#f5cf4a', '#b8860b'),
                  icon='star', shine=True, wreath='#e8b923'),
     't500': dict(tier='diamond', c=('#f0fdff', '#8fe3f5', '#2d8fb3'), rib=('#9be7f7', '#2f8db0'),
@@ -27,11 +27,10 @@ ICONS = {
     'sprout': '<path d="M70 74 V56" stroke="#3f7d2a" stroke-width="4" stroke-linecap="round"/>'
               '<ellipse cx="60" cy="54" rx="11" ry="6" transform="rotate(-25 60 54)" fill="#6fcf4a" stroke="#3f7d2a" stroke-width="1.5"/>'
               '<ellipse cx="80" cy="50" rx="12" ry="6.5" transform="rotate(25 80 50)" fill="#7fdc58" stroke="#3f7d2a" stroke-width="1.5"/>',
-    'sword': '<g transform="rotate(-35 70 56)"><polygon points="67,30 73,30 73,66 70,71 67,66" fill="#f4f1ea" stroke="#5a3a1a" stroke-width="1.4"/>'
-             '<rect x="58" y="66" width="24" height="5" rx="2" fill="#5a3a1a"/><rect x="67.5" y="71" width="5" height="11" rx="1.5" fill="#7a4b23"/>'
-             '<circle cx="70" cy="84" r="3.2" fill="#e8b923"/></g>',
-    'shield': '<path d="M70 32 L90 39 V56 Q90 72 70 81 Q50 72 50 56 V39Z" fill="#4b5d7a" stroke="#eef2f7" stroke-width="3"/>'
-              '<path d="M70 40 V74 M56 54 H84" stroke="#eef2f7" stroke-width="4" stroke-linecap="round"/>',
+    'bolt': '<polygon points="76,28 52,62 67,62 60,88 90,50 74,50 84,28" fill="#ffe08a" stroke="#5a3a1a" stroke-width="2" stroke-linejoin="round"/>',
+    'code': '<rect x="47" y="33" width="46" height="34" rx="5" fill="#2b3a55" stroke="#eef2f7" stroke-width="2.5"/>'
+            '<text x="70" y="56" text-anchor="middle" font-family="monospace" font-size="15" font-weight="700" fill="#7fffd4">&lt;/&gt;</text>'
+            '<rect x="41" y="69" width="58" height="6" rx="2.5" fill="#eef2f7"/>',
     'star': '<polygon points="70,30 77,46 94,47 81,58 85,75 70,66 55,75 59,58 46,47 63,46" fill="#fff6cc" stroke="#9a6a05" stroke-width="2" stroke-linejoin="round"/>',
     'trophy': '<path d="M56 34 H84 V48 Q84 64 70 66 Q56 64 56 48Z" fill="#fff" stroke="#1f6f8f" stroke-width="2"/>'
               '<path d="M56 38 H48 Q46 52 58 54 M84 38 H92 Q94 52 82 54" stroke="#1f6f8f" stroke-width="2.6" fill="none"/>'
