@@ -699,3 +699,17 @@ class HallEntry(models.Model):
         ordering = ['year', 'quarter', 'kind', 'grade', 'place']
         verbose_name = "Зал славы"
         verbose_name_plural = "Зал славы"
+
+
+# Любое изменение отправок/попыток/баллов класса сбрасывает кэш рейтинга четверти (contest/quarters.py)
+from django.db.models.signals import post_delete, post_save  # noqa: E402
+
+
+def _invalidate_quarter_cache(sender, **kwargs):
+    from .quarters import invalidate
+    invalidate()
+
+
+for _model in (Submission, Attempt, ClassBonus):
+    post_save.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-save-{_model.__name__}')
+    post_delete.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-del-{_model.__name__}')

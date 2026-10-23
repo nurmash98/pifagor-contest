@@ -204,6 +204,8 @@ def _submit_attempt(submission, key_count=None, pointer_count=None):
     attempt.save()
 
     final_score = submission.recalc_final_score()
+    from . import quarters as _quarters
+    _quarters.invalidate()
     submission.teacher_comment = ''
     submission.status = 'DONE'
     submission.save()
@@ -1744,6 +1746,8 @@ def grade_submission(request, submission_id):
 
         # Итоговая оценка по задаче = максимум среди всех проверенных попыток.
         final_score = submission.recalc_final_score()
+        from . import quarters as _quarters
+        _quarters.invalidate()
         submission.teacher_comment = comment
         submission.status = 'DONE'
         submission.save()

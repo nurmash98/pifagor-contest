@@ -50,24 +50,36 @@ def grade_of(school_class):
     return match.group() if match else (school_class or '').strip()
 
 
-def scores(students, start=None, end=None):
-    """{student_id: {'score', 'solved', 'graded'}} — баллы только за задачи, лучший балл по которым
-    получен в окне [start, end]."""
+CACHE_SECONDS = 90
+_CACHE_VERSION_KEY = 'quarters:ver'
+
+
+def invalidate():
+    """Сбросить кэш баллов (после новой оценки) — следующий запрос пересчитает."""
+    from django.core.cache import cache
+    try:
+        cache.incr(_CACHE_VERSION_KEY)
+    except ValueError:
+        cache.set(_CACHE_VERSION_KEY, 1, None)
+
+
+def _compute(start, end):
+    """{student_id: {'score', 'solved', 'graded'}} по ВСЕМ ученикам за окно."""
     from .models import Attempt, Submission
-    ids = [s.id for s in students]
-    subs = list(Submission.objects.filter(student_id__in=ids, is_graded=True)
+    subs = list(Submission.objects.filter(is_graded=True)
                 .values('id', 'student_id', 'score', 'task__level', 'updated_at'))
     best_time = {}
-    for a in (Attempt.objects.filter(submission_id__in=[s['id'] for s in subs], score__isnull=False)
+    for a in (Attempt.objects.filter(submission__is_graded=True, score__isnull=False)
               .values('submission_id', 'score', 'submitted_at')):
-        best_time.setdefault((a['submission_id'], a['score']), []).append(a['submitted_at'])
-    out = {sid: {'score': 0, 'solved': 0, 'graded': 0} for sid in ids}
+        key = (a['submission_id'], a['score'])
+        if key not in best_time or a['submitted_at'] < best_time[key]:
+            best_time[key] = a['submitted_at']
+    out = {}
     for s in subs:
-        times = best_time.get((s['id'], s['score']))
-        when = min(times) if times else s['updated_at']
+        when = best_time.get((s['id'], s['score'])) or s['updated_at']
         if (start is not None and when < start) or (end is not None and when > end):
             continue
-        row = out[s['student_id']]
+        row = out.setdefault(s['student_id'], {'score': 0, 'solved': 0, 'graded': 0})
         row['graded'] += 1
         row['score'] += (s['score'] or 0) * COEF.get(s['task__level'], 0)
         if s['score'] == 10:
@@ -75,9 +87,31 @@ def scores(students, start=None, end=None):
     return out
 
 
-def student_ranking(students, start=None, end=None):
+def _window_map(start, end, fresh=False):
+    """Баллы всех учеников за окно — из кэша (на CACHE_SECONDS) или заново."""
+    if fresh:
+        return _compute(start, end)
+    from django.core.cache import cache
+    ver = cache.get(_CACHE_VERSION_KEY, 0)
+    key = f'quarters:scores:{ver}:{start.timestamp() if start else 0}:{end.timestamp() if end else 0}'
+    data = cache.get(key)
+    if data is None:
+        data = _compute(start, end)
+        cache.set(key, data, CACHE_SECONDS)
+    return data
+
+
+def scores(students, start=None, end=None, fresh=False):
+    """{student_id: {'score', 'solved', 'graded'}} — баллы только за задачи, лучший балл по которым
+    получен в окне [start, end]. Считается один раз для всех учеников и кэшируется."""
+    data = _window_map(start, end, fresh)
+    empty = {'score': 0, 'solved': 0, 'graded': 0}
+    return {s.id: data.get(s.id, empty) for s in students}
+
+
+def student_ranking(students, start=None, end=None, fresh=False):
     """Ученики с баллами в окне, по убыванию; у каждого calc_total_score / calc_solved_count."""
-    sc = scores(students, start, end)
+    sc = scores(students, start, end, fresh)
     rows = []
     for st in students:
         r = sc[st.id]
@@ -89,13 +123,13 @@ def student_ranking(students, start=None, end=None):
     return rows
 
 
-def class_rows(school_classes, start=None, end=None):
+def class_rows(school_classes, start=None, end=None, fresh=False):
     """Рейтинг классов за окно: средний балл всех учеников класса + баллы учителя за это окно."""
     from .models import ClassBonus, Student
     rows = []
     for cls in school_classes:
         studs = list(Student.objects.filter(school_class=cls))
-        sc = scores(studs, start, end)
+        sc = scores(studs, start, end, fresh)
         vals = [sc[s.id]['score'] for s in studs]
         avg = round(sum(vals) / len(vals)) if vals else 0
         bq = ClassBonus.objects.filter(school_class=cls)
@@ -134,7 +168,7 @@ def _freeze(q):
         by_grade.setdefault(grade_of(st.school_class), []).append(st)
     entries = []
     for grade, studs in by_grade.items():
-        for place, st in enumerate(student_ranking(studs, q['start'], q['end'])[:TOP], 1):
+        for place, st in enumerate(student_ranking(studs, q['start'], q['end'], fresh=True)[:TOP], 1):
             entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
                                      name=st.full_name, school_class=st.school_class,
                                      score=st.calc_total_score, solved=st.calc_solved_count))
@@ -146,7 +180,7 @@ def _freeze(q):
             if place == 1:
                 banner_module.give(st, 'champion')
         classes = sorted({s.school_class for s in studs if s.school_class})
-        for place, row in enumerate(class_rows(classes, q['start'], q['end']), 1):
+        for place, row in enumerate(class_rows(classes, q['start'], q['end'], fresh=True), 1):
             entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='class', grade=grade, place=place,
                                      name=row['school_class'], school_class=row['school_class'],
                                      score=row['total'], solved=row['student_count']))

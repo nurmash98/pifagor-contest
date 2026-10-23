@@ -1781,3 +1781,20 @@ class HallOwnParallelTests(TestCase):
         self.assertIn('Семиклассник', html)
         self.assertNotIn('Восьмиклассник', html)
         self.assertNotIn('g=8', html)
+
+
+class QuarterCacheTests(TestCase):
+    def test_cached_until_new_grade(self):
+        from unittest import mock
+        from . import quarters
+        from .models import Submission
+        u = User.objects.create_user('qc', password='x')
+        st = Student.objects.create(user=u, full_name='К', school_class='7A')
+        t = Task.objects.create(title='QC', description='d', level='A', test_cases=[])
+        quarters.invalidate()
+        with mock.patch('contest.quarters._compute', wraps=quarters._compute) as comp:
+            quarters.scores([st]); quarters.scores([st]); quarters.scores([st])
+            self.assertEqual(comp.call_count, 1)                       # дальше — из кэша
+            Submission.objects.create(student=st, task=t, status='DONE', score=10, is_graded=True)
+            self.assertEqual(quarters.scores([st])[st.id]['score'], 10)  # новая оценка сбросила кэш
+            self.assertEqual(comp.call_count, 2)
