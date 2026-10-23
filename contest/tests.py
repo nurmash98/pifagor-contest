@@ -627,14 +627,14 @@ class BadgeTests(TestCase):
         self.solve(10)
         self.client.login(username='bs', password='x')
         html = self.client.get('/profile/').content.decode()
-        self.assertIn('Новичок', html)
+        self.assertIn('Intern', html)
         self.assertIn('Решите 10 задач на оценку 10/10.', html)
         self.assertIn('id="badge-toast"', html)       # новый значок — всплывашка
         self.assertTrue(StudentBadge.objects.get(student=self.student, key='t10').seen)
         self.assertNotIn('id="badge-toast"', self.client.get('/profile/').content.decode())  # второй раз не показываем
         s = self.client.session; s['content_lang'] = 'kk'; s.save()
         kz = self.client.get('/profile/').content.decode()
-        self.assertIn('Бастаушы', kz)
+        self.assertIn('Intern', kz)
         self.assertIn('10/10 бағамен 10 есеп шешіңіз.', kz)
 
     def test_badge_date_is_when_condition_met(self):
@@ -1464,9 +1464,9 @@ class TierBadgeAndAvatarTests(TestCase):
         self.client.login(username='tier', password='x')
         html = self.client.get(reverse('profile')).content.decode()
         self.assertIn('pf-avatar pf-wood', html)
-        self.assertIn('tier-badge tier-wood', html)       # новый значок «Новичок»
-        self.assertIn('НОВИЧОК', html)
-        self.assertIn('БОЕЦ', html)                       # закрытый «Боец» тоже нарисован (с замком)
+        self.assertIn('tier-badge tier-wood', html)       # новый значок «Intern»
+        self.assertIn('INTERN', html)
+        self.assertIn('JUNIOR', html)                     # закрытый «Junior» тоже нарисован (с замком)
         self.assertNotIn('tier-badge tier-bronze', html)
 
     def test_leaderboard_has_frames(self):
