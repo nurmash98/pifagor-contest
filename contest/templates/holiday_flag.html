@@ -1,0 +1,40 @@
+{% comment %}Развевающийся флаг Казахстана (SVG + SMIL-анимация, без скриптов). Параметры: uid, h (высота в px).{% endcomment %}
+<svg viewBox="0 0 214 112" height="{{ h|default:40 }}" style="width:auto;overflow:visible" role="img" aria-label="Флаг Республики Казахстан">
+    <defs>
+        <clipPath id="kzw-{{ uid }}">
+            <path d="M14 8 Q61 0 108 8 T202 8 L202 104 Q155 112 108 104 T14 104 Z">
+                <animate attributeName="d" dur="2.4s" repeatCount="indefinite"
+                         values="M14 8 Q61 0 108 8 T202 8 L202 104 Q155 112 108 104 T14 104 Z;
+                                 M14 8 Q61 16 108 8 T202 8 L202 104 Q155 96 108 104 T14 104 Z;
+                                 M14 8 Q61 0 108 8 T202 8 L202 104 Q155 112 108 104 T14 104 Z"/>
+            </path>
+        </clipPath>
+        <linearGradient id="kzs-{{ uid }}" x1="0" y1="0" x2=".5" y2="0" spreadMethod="repeat">
+            <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+            <stop offset=".5" stop-color="#003b4a" stop-opacity=".22"/>
+            <stop offset="1" stop-color="#fff" stop-opacity=".22"/>
+            <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to=".5 0" dur="2.4s" repeatCount="indefinite"/>
+        </linearGradient>
+        <pattern id="kzo-{{ uid }}" x="0" y="0" width="12" height="16" patternUnits="userSpaceOnUse">
+            <path d="M6 1 C2 1 1 5 4 6 C6 7 6 4 4.5 4 M6 1 C10 1 11 5 8 6 C6 7 6 4 7.5 4 M6 15 C2 15 1 11 4 10 C6 9 6 12 4.5 12 M6 15 C10 15 11 11 8 10 C6 9 6 12 7.5 12 M6 6.5 V9.5"
+                  stroke="#f6c600" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+        </pattern>
+    </defs>
+    <!-- древко -->
+    <rect x="8" y="2" width="5" height="110" rx="2.5" fill="#b9a27a"/>
+    <circle cx="10.5" cy="3" r="4" fill="#f6c600"/>
+    <g clip-path="url(#kzw-{{ uid }})">
+        <rect x="14" y="0" width="190" height="112" fill="#00afca"/>
+        <!-- орнамент «қошқар мүйіз» у древка -->
+        <rect x="18" y="0" width="12" height="112" fill="url(#kzo-{{ uid }})"/>
+        <!-- солнце с 32 лучами -->
+        <g transform="translate(116 42)" fill="#f6c600">
+            <circle r="13"/>
+            <polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(0)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(11.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(22.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(33.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(45)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(56.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(67.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(78.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(90)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(101.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(112.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(123.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(135)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(146.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(157.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(168.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(180)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(191.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(202.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(213.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(225)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(236.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(247.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(258.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(270)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(281.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(292.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(303.75)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(315)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(326.25)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(337.5)"/><polygon points="-1.6,-16 1.6,-16 0,-22" transform="rotate(348.75)"/>
+        </g>
+        <!-- парящий степной орёл -->
+        <path fill="#f6c600" d="M116 66 C106 58 92 56 76 60 C88 62 97 66 103 70 C93 70 85 74 81 78 C93 76 103 76 109 78 L111 84 L116 80 L121 84 L123 78 C129 76 139 76 151 78 C147 74 139 70 129 70 C135 66 144 62 156 60 C140 56 126 58 116 66Z"/>
+        <circle cx="116" cy="64" r="2.6" fill="#f6c600"/>
+        <rect x="14" y="0" width="190" height="112" fill="url(#kzs-{{ uid }})"/>
+    </g>
+</svg>

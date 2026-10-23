@@ -34,6 +34,10 @@ SECRET_KEY = os.environ.get(
 # Регистрация новых учеников. Сейчас закрыта; чтобы открыть — DJANGO_REGISTRATION_OPEN=True.
 REGISTRATION_OPEN = os.environ.get('DJANGO_REGISTRATION_OPEN', 'False') == 'True'
 
+# Праздничное оформление заранее (для проверки): HOLIDAY_FORCE=independence. Обычно пусто —
+# тогда День Независимости включается сам 14–18 декабря.
+HOLIDAY_FORCE = os.environ.get('HOLIDAY_FORCE', '').strip()
+
 # Кто из преподавателей видит дуэли и управляет ими (пока они не открыты для всех).
 # Логины через запятую; суперпользователь может всегда.
 DUELS_ADMIN_USERNAMES = [u.strip() for u in os.environ.get('DUELS_ADMIN_USERNAMES', 'nurmash').split(',') if u.strip()]
@@ -88,6 +92,7 @@ TEMPLATES = [
                 'contest.context_processors.active_exam',
                 'contest.context_processors.registration',
                 'contest.context_processors.duels_visible',
+                'contest.context_processors.holiday',
             ],
         },
     },

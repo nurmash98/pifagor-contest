@@ -1480,3 +1480,32 @@ class TierBadgeAndAvatarTests(TestCase):
         html = self.client.get(reverse('profile')).content.decode()
         self.assertIn('class="pf-avatar"', html)
         self.assertNotIn('pf-avatar pf-', html)
+
+
+class IndependenceDayTests(TestCase):
+    def setUp(self):
+        u = User.objects.create_user('hol', password='x')
+        Student.objects.create(user=u, full_name='Х', school_class='7F')
+        self.client.login(username='hol', password='x')
+
+    def test_shown_on_dec_16_in_both_languages(self):
+        from unittest import mock
+        import datetime
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 12, 16)):
+            html = self.client.get(reverse('all_tasks')).content.decode()
+            self.assertIn('День Независимости', html)
+            self.assertIn('kzw-nav', html)                     # флаг вместо логотипа
+            s = self.client.session; s['content_lang'] = 'kk'; s.save()
+            self.assertIn('Тәуелсіздік күні', self.client.get(reverse('all_tasks')).content.decode())
+
+    def test_hidden_on_ordinary_day(self):
+        from unittest import mock
+        import datetime
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 23)):
+            html = self.client.get(reverse('all_tasks')).content.decode()
+        self.assertNotIn('class="kz-holiday"', html)
+        self.assertIn('logo-tree.png', html)
+
+    @override_settings(HOLIDAY_FORCE='independence')
+    def test_force_setting(self):
+        self.assertIn('День Независимости', self.client.get(reverse('all_tasks')).content.decode())

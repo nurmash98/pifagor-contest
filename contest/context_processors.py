@@ -30,3 +30,17 @@ def duels_visible(request):
         return {'duels_visible': teacher_sees_duels(user), 'duels_admin': is_duels_admin(user)}
     student = Student.objects.filter(user=user).first()
     return {'duels_visible': student is not None and visible_to(student), 'duels_admin': False}
+
+
+def holiday(request):
+    """Праздничное оформление. День Независимости Казахстана — 16 декабря (показываем 14–18 декабря).
+    Для проверки можно включить заранее: переменная окружения HOLIDAY_FORCE=independence."""
+    from django.conf import settings
+    from django.utils import timezone
+    forced = getattr(settings, 'HOLIDAY_FORCE', '')
+    if forced:
+        return {'holiday': forced}
+    today = timezone.localdate()
+    if today.month == 12 and 14 <= today.day <= 18:
+        return {'holiday': 'independence'}
+    return {'holiday': ''}
