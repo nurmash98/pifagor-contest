@@ -1522,3 +1522,71 @@ class IndependenceDayTests(TestCase):
     @override_settings(HOLIDAY_FORCE='independence')
     def test_force_setting(self):
         self.assertIn('День Независимости', self.client.get(reverse('all_tasks')).content.decode())
+
+
+class AvatarAndRepublicBannerTests(TestCase):
+    def setUp(self):
+        self.u = User.objects.create_user('av', password='x')
+        self.st = Student.objects.create(user=self.u, full_name='Айгерим С', school_class='7F')
+        self.client.login(username='av', password='x')
+
+    def test_choose_free_avatar_and_back_to_default(self):
+        self.client.post(reverse('profile_avatar'), {'avatar': 'school_girl'})
+        self.st.refresh_from_db(); self.assertEqual(self.st.avatar, 'school_girl')
+        html = self.client.get(reverse('profile')).content.decode()
+        self.assertIn('avatars/school-girl', html)
+        self.client.post(reverse('profile_avatar'), {'avatar': 'hacker_unknown'})   # чужой ключ — не меняется
+        self.st.refresh_from_db(); self.assertEqual(self.st.avatar, 'school_girl')
+        self.client.post(reverse('profile_avatar'), {'avatar': ''})
+        self.st.refresh_from_db(); self.assertEqual(self.st.avatar, '')
+
+    def test_republic_tasks_exist_with_tests(self):
+        from .banners import REPUBLIC_TAG
+        tasks = Task.objects.filter(tags__name=REPUBLIC_TAG)
+        self.assertGreaterEqual(tasks.count(), 5)
+        self.assertTrue(all(t.test_cases and t.title_kk and t.description_kk for t in tasks))
+
+    def test_reference_solutions_pass(self):
+        from .autotest import run_autotests
+        sols = {
+            'Қазақ хандығы': 'print(int(input())-1465)',
+            'Абылай хан': 'y=int(input());print("YES" if 1711<=y<=1781 else "NO")',
+            'Үш би': 'print(int(input())+int(input())+int(input()))',
+            '«Оян, қазақ!»': 'for _ in range(int(input())): print("Oyan, qazaq!")',
+            'Республика күні': 'd=int(input());m=int(input());y=int(input());print("YES" if d==25 and m==10 and y>=1990 else "NO")',
+            'Кенесары көтерілісі': 'a=int(input());b=int(input());print(max(0,min(b,1847)-max(a,1837)+1))',
+            'Алаш Орда': 'n=int(input());print(sum(1 for _ in range(n) if 1917<=int(input())<=1920))',
+            'Аңырақай шайқасы': 'n=int(input());a=[int(input()) for _ in range(n)];print(a.index(max(a))+1)',
+        }
+        for title, code in sols.items():
+            res = run_autotests(Task.objects.get(title=title), code)
+            self.assertEqual(res['passed'], res['total'], title)
+
+    def test_banner_after_five_tasks(self):
+        from .models import Submission
+        from .banners import REPUBLIC_TAG
+        tasks = list(Task.objects.filter(tags__name=REPUBLIC_TAG)[:5])
+        for t in tasks[:4]:
+            Submission.objects.create(student=self.st, task=t, status='DONE', score=10, is_graded=True)
+        html = self.client.get(reverse('republic_day')).content.decode()
+        self.assertIn('4 / 5', html)
+        self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, '')
+        Submission.objects.create(student=self.st, task=tasks[4], status='DONE', score=10, is_graded=True)
+        self.client.get(reverse('republic_day'))
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.name_banner, 'kz_flag')
+        self.assertIn('nb b-flag sm">Айгерим С', self.client.get(reverse('leaderboard')).content.decode())
+        self.client.post(reverse('profile_banner'), {'banner': ''})
+        self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, '')
+
+    def test_cannot_set_unowned_banner(self):
+        self.client.post(reverse('profile_banner'), {'banner': 'kz_flag'})
+        self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, '')
+
+    def test_gift_button_in_holiday_strip(self):
+        from unittest import mock
+        import datetime
+        with mock.patch('django.utils.timezone.localdate', return_value=datetime.date(2026, 10, 25)):
+            html = self.client.get(reverse('all_tasks')).content.decode()
+        self.assertIn('Хочешь подарок?', html)
+        self.assertIn(reverse('republic_day'), html)

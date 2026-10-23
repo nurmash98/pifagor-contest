@@ -36,6 +36,11 @@ class Student(models.Model):
     duel_games = models.PositiveIntegerField(default=0, verbose_name="Сыграно дуэлей")
     # Тестер дуэлей: пока режим «только тестеры», дуэли видят и могут играть только они.
     duel_tester = models.BooleanField(default=False, verbose_name="Тестер дуэлей")
+    # Выбранный аватар (ключ из contest/avatars.py). Пусто — аватар по умолчанию 🎓.
+    avatar = models.CharField(max_length=30, blank=True, default='', verbose_name="Аватар")
+    # Баннер под именем (ключ из contest/banners.py) и список полученных баннеров через запятую.
+    name_banner = models.CharField(max_length=30, blank=True, default='', verbose_name="Баннер под именем")
+    owned_banners = models.CharField(max_length=255, blank=True, default='', verbose_name="Полученные баннеры")
 
     def save(self, *args, **kwargs):
         self.school_class = normalize_school_class(self.school_class)

@@ -432,6 +432,11 @@ def task_detail(request, task_id):
         submission.save()
         messages.success(request, _submit_attempt(
             submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
+        from . import banners as banner_module
+        if banner_module.sync(student):
+            messages.success(request, 'Тәуелсіз Қазақстанның тарихын білесіз! Сізге «Қазақстан туы» баннері берілді 🇰🇿'
+                             if _get_content_lang(request) == 'kk' else
+                             'Вы знаете историю Казахстана! Вам вручён баннер «Флаг Казахстана» под вашим именем 🇰🇿')
         return redirect(task_url_with_back)
 
     first_failed = _first_failed(submission.autotest_results, task)
@@ -477,7 +482,28 @@ def profile_view(request):
     ]
     badge_module.mark_seen(student)
 
+    from . import avatars as avatar_module
+    from django.templatetags.static import static
+    lang = _get_content_lang(request)
+    avatar_options = [{'key': '', 'img': '', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
+                       'on': not student.avatar}]
+    for a in avatar_module.available_for(student):
+        avatar_options.append({'key': a['key'], 'img': static(a['file']), 'title': a['kk'] if lang == 'kk' else a['ru'],
+                               'on': student.avatar == a['key']})
+
+    from . import banners as banner_module
+    banner_module.sync(student)
+    owned_banners = banner_module.owned(student)
+    banner_options = [{'key': '', 'title': 'Жоқ' if lang == 'kk' else 'Без баннера', 'on': not student.name_banner, 'owned': True}]
+    for key, b in banner_module.CATALOG.items():
+        banner_options.append({'key': key, 'title': b['kk'] if lang == 'kk' else b['ru'], 'owned': key in owned_banners,
+                               'on': student.name_banner == key})
+
     context = {
+        'banner_options': banner_options,
+        'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
+        'republic_need': banner_module.REPUBLIC_NEED,
+        'avatar_options': avatar_options,
         'student': student,
         'solved_submissions': solved_submissions,
         'solved_count': solved_count,
@@ -486,6 +512,55 @@ def profile_view(request):
         'new_badges': new_badges,
     }
     return render(request, 'profile.html', context)
+
+
+@login_required
+def profile_avatar(request):
+    """Ученик выбирает аватар (пусто — аватар по умолчанию 🎓)."""
+    from . import avatars as avatar_module
+    student = get_object_or_404(Student, user=request.user)
+    if request.method == 'POST':
+        key = request.POST.get('avatar', '')
+        allowed = {a['key'] for a in avatar_module.available_for(student)}
+        if key == '' or key in allowed:
+            student.avatar = key
+            student.save(update_fields=['avatar'])
+    return redirect('profile')
+
+
+@login_required
+def profile_banner(request):
+    """Ученик ставит под имя один из полученных баннеров (или убирает баннер)."""
+    from . import banners as banner_module
+    student = get_object_or_404(Student, user=request.user)
+    if request.method == 'POST':
+        key = request.POST.get('banner', '')
+        if key == '' or key in banner_module.owned(student):
+            student.name_banner = key
+            student.save(update_fields=['name_banner'])
+    return redirect('profile')
+
+
+@login_required
+def republic_day(request):
+    """Страница подарка ко Дню Республики: 5 задач по истории Казахстана → баннер «Флаг»."""
+    from . import banners as banner_module
+    student = Student.objects.filter(user=request.user).first()
+    lang = _get_content_lang(request)
+    tasks = list(Task.objects.filter(tags__name=banner_module.REPUBLIC_TAG).order_by('level', 'id'))
+    _apply_task_language(tasks, lang)
+    new = banner_module.sync(student) if student else []
+    if student is not None:
+        best = {s.task_id: s for s in Submission.objects.filter(student=student, task__in=tasks)}
+        for t in tasks:
+            t.user_sub = best.get(t.id)
+    done = banner_module.holiday_progress(student) if student else 0
+    need = banner_module.REPUBLIC_NEED
+    return render(request, 'republic_day.html', {
+        'tasks': tasks, 'student': student, 'done': min(done, need), 'need': need,
+        'percent': int(100 * min(done, need) / need), 'has_banner': bool(student and 'kz_flag' in banner_module.owned(student)),
+        'just_got': bool(new),
+    })
 
 
 @login_required

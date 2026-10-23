@@ -1,5 +1,5 @@
 {% load badge_tags %}<span class="pf-avatar{% if tier %} pf-{{ tier.tier }}{% endif %}" style="width:{{ size }}px;height:{{ size }}px;"{% if tier %} title="{{ tier.title }}"{% endif %}>
     <span class="pf-ring"></span>
-    <span class="pf-face" style="font-size:{{ emoji_size }}px;">🎓</span>
+    <span class="pf-face" style="font-size:{{ emoji_size }}px;">{% if img %}<img src="{{ img }}" alt="" loading="lazy">{% else %}🎓{% endif %}</span>
     {% if mini %}<span class="pf-mini" style="width:{{ mini_w }}px;height:{{ mini_h }}px;">{% tier_badge tier uid %}</span>{% endif %}
 </span>

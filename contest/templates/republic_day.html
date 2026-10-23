@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load ui_i18n static %}
+{% block title %}{% if content_lang == 'kk' %}Республика күні{% else %}День Республики{% endif %} - Pifagor Contest{% endblock %}
+{% block content %}
+<div class="rep-hero rounded-4 p-4 p-md-5 mb-4 text-center position-relative overflow-hidden">
+    <div class="mb-2">{% include "holiday_flag.html" with uid="hero" h=70 %}</div>
+    <h2 class="fw-bold text-white mb-1">{% if content_lang == 'kk' %}Республика күні құтты болсын!{% else %}С Днём Республики!{% endif %}</h2>
+    <p class="mb-3" style="color:#e6fbff;max-width:720px;margin:0 auto;">
+        {% if content_lang == 'kk' %}Ата-бабаларымыз — Қазақ хандығының негізін қалаушылар, батырлар, билер, Алаш қайраткерлері — еліміздің бостандығы үшін күресті. Олар туралы есептерді шешіп, тарихымызды біліңіз. {{ need }} есепті 10/10 шешсеңіз — атыңыздың астына <b>Қазақстан туы</b> баннері беріледі!
+        {% else %}Наши предки — основатели Казахского ханства, батыры, бии, деятели Алаш — боролись за свободу нашей земли. Решайте задачи о них и узнавайте нашу историю. Решите {{ need }} задач на 10/10 — и получите баннер <b>«Флаг Казахстана»</b> под вашим именем!{% endif %}
+    </p>
+    <div class="d-inline-block bg-white bg-opacity-10 rounded-4 px-4 py-3">
+        <div class="mb-2"><span class="nb b-flag">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
+        {% if student %}
+            {% if has_banner %}
+            <div class="fw-bold" style="color:#ffe066;">✓ {% if content_lang == 'kk' %}Баннер сіздікі! Ол профильде, рейтингте және дуэльдерде көрінеді.{% else %}Баннер ваш! Он виден в профиле, лидерборде и дуэлях.{% endif %}</div>
+            {% else %}
+            <div class="rep-bar mx-auto"><i style="width:{{ percent }}%"></i></div>
+            <div class="small mt-1" style="color:#e6fbff;">{% if content_lang == 'kk' %}Шешілді{% else %}Решено{% endif %}: <b>{{ done }} / {{ need }}</b></div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3" style="color:#1a1a4b;">📜 {% if content_lang == 'kk' %}Тарих туралы есептер{% else %}Задачи об истории Казахстана{% endif %}</h5>
+<div class="row g-3">
+    {% for task in tasks %}
+    <div class="col-md-6">
+        <a href="{% url 'task_detail' task.id %}?back={{ request.path|urlencode }}" class="card border-0 shadow-sm rounded-4 p-3 h-100 text-decoration-none d-flex flex-row align-items-center gap-3">
+            <span class="badge badge-level-{{ task.level }}">{{ task.level }}</span>
+            <span class="fw-semibold flex-grow-1" style="color:#1a1a4b;">{{ task.display_title }}</span>
+            {% if task.user_sub and task.user_sub.score == 10 and task.user_sub.is_graded %}<span class="badge bg-success rounded-pill">✓ 10/10</span>
+            {% elif task.user_sub %}<span class="badge bg-warning text-dark rounded-pill">{% if content_lang == 'kk' %}үдерісте{% else %}в работе{% endif %}</span>{% endif %}
+        </a>
+    </div>
+    {% empty %}<p class="text-muted">—</p>{% endfor %}
+</div>
+<style>
+    .rep-hero { background: linear-gradient(160deg, #0a8fa6, #00afca 55%, #0a8fa6); border: 3px solid #f6c600; }
+    .rep-bar { width: 260px; height: 10px; border-radius: 9px; background: rgba(255,255,255,.3); overflow: hidden; }
+    .rep-bar i { display: block; height: 100%; background: #ffe066; }
+</style>
+{% endblock %}

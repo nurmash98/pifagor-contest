@@ -192,6 +192,7 @@
         <div class="container d-flex align-items-center justify-content-center gap-3 py-2">
             {% include "holiday_flag.html" with uid="banner" h=30 %}
             <span>{% if holiday == 'republic' %}{% if content_lang == 'kk' %}<b>25 қазан — Республика күні!</b> Мерекеңіз құтты болсын!{% else %}<b>25 октября — День Республики Казахстан!</b> С праздником!{% endif %}{% else %}{% if content_lang == 'kk' %}<b>16 желтоқсан — Қазақстан Республикасының Тәуелсіздік күні!</b> Мерекеңіз құтты болсын!{% else %}<b>16 декабря — День Независимости Республики Казахстан!</b> С праздником!{% endif %}{% endif %}</span>
+            {% if user.is_authenticated %}<a class="kz-gift-btn" href="{% url 'republic_day' %}">🎁 {% if content_lang == 'kk' %}Сыйлық алғың келе ме?{% else %}Хочешь подарок?{% endif %}</a>{% endif %}
         </div>
     </div>
     {% endif %}

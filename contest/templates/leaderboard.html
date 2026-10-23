@@ -59,7 +59,7 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 fw-bold" style="color: #1a1a4b;">
-                                <span class="d-inline-flex align-items-center gap-2">{% student_avatar student.calc_solved_count 38 False forloop.counter %}{{ student.full_name }}</span>
+                                <span class="d-inline-flex align-items-center gap-2">{% student_avatar student.calc_solved_count 38 False forloop.counter student.avatar %}{% student_name student %}</span>
                             </td>
                             <td class="text-center text-muted">
                                 {{ student.school_class }}

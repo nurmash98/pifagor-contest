@@ -32,6 +32,9 @@ urlpatterns = [
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     path('leaderboard/class-bonus/', views.add_class_bonus, name='add_class_bonus'),
     path('profile/', views.profile_view, name='profile'),
+    path('profile/avatar/', views.profile_avatar, name='profile_avatar'),
+    path('profile/banner/', views.profile_banner, name='profile_banner'),
+    path('republic-day/', views.republic_day, name='republic_day'),
 
     # Курсы
     path('courses/', views.courses_view, name='courses'),
