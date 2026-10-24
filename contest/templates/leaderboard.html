@@ -9,7 +9,7 @@
 
         <div class="text-center mb-4 mt-3">
             <h2 class="fw-bold" style="color: #1a1a4b;">
-                🏆 {% t "Рейтинг учеников" %}{% if scope_label %} — {{ scope_label }}{% endif %}{% if not is_full_list %} ({% t "Топ 10" %}){% endif %}
+                🏆 {% t "Рейтинг учеников" %}{% if scope_label %} — {{ scope_label }}{% endif %}{% if not is_full_list %} ({% t "Топ 20" %}){% endif %}
             </h2>
             <p class="text-muted mb-0">
                 {% if my_grade %}
@@ -64,6 +64,7 @@
             <span class="pz pz2">🥈 +{{ awards.2 }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
             <span class="pz pz3">🥉 +{{ awards.3 }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
             <span class="pz">4–10 {% if content_lang == 'kk' %}орын{% else %}места{% endif %} +{{ award_rest }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
+            <span class="pz">11–20 {% if content_lang == 'kk' %}орын{% else %}места{% endif %} +{{ award_tail }} <img src="{% static 'icons/coin-64.png' %}" alt=""></span>
         </div>
         {% endif %}
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white p-2 p-sm-3">

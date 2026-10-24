@@ -1838,7 +1838,7 @@ class QuarterExclusionTests(TestCase):
 class AwardForPlaceTests(TestCase):
     def test_award_table(self):
         from .quarters import award_for
-        self.assertEqual([award_for(p) for p in range(1, 12)], [200, 150, 100, 50, 50, 50, 50, 50, 50, 50, 0])
+        self.assertEqual([award_for(p) for p in range(1, 22)], [200, 150, 100] + [50] * 7 + [25] * 10 + [0])
 
 
 class RankChipTests(TestCase):

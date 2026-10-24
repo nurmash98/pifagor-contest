@@ -15,7 +15,7 @@
         <span>☀️ {% if kk == 'kk' %}Күннің алғашқы есебі: +{{ rules.DAILY_BONUS }}{% else %}Первая задача дня: +{{ rules.DAILY_BONUS }}{% endif %}</span>
         <span>🎯 {% if kk == 'kk' %}Әр {{ rules.MILESTONE_EVERY }} есеп: +{{ rules.MILESTONE_COINS }}{% else %}Каждые {{ rules.MILESTONE_EVERY }} задач: +{{ rules.MILESTONE_COINS }}{% endif %}</span>
         <span>⭐ {% if kk == 'kk' %}БЖБ/ТЖБ 10/10: +{{ rules.EXAM_TEN_COINS }}{% else %}СОР/СОЧ на 10/10: +{{ rules.EXAM_TEN_COINS }}{% endif %}</span>
-        <span>🏛 {% if kk == 'kk' %}Тоқсан қорытындысы (параллельде үздік 10): 1 орын +{{ awards.1 }}, 2 орын +{{ awards.2 }}, 3 орын +{{ awards.3 }}, 4–10 орын +{{ award_rest }}{% else %}Итоги четверти (топ-10 параллели): 1 место +{{ awards.1 }}, 2 место +{{ awards.2 }}, 3 место +{{ awards.3 }}, 4–10 места +{{ award_rest }}{% endif %}</span>
+        <span>🏛 {% if kk == 'kk' %}Тоқсан қорытындысы (параллельде үздік 20): 1 орын +{{ awards.1 }}, 2 орын +{{ awards.2 }}, 3 орын +{{ awards.3 }}, 4–10 орын +{{ award_rest }}, 11–20 орын +{{ award_tail }}{% else %}Итоги четверти (топ-20 параллели): 1 место +{{ awards.1 }}, 2 место +{{ awards.2 }}, 3 место +{{ awards.3 }}, 4–10 места +{{ award_rest }}, 11–20 места +{{ award_tail }}{% endif %}</span>
     </div>
 </div>
 

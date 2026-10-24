@@ -11,14 +11,19 @@ from django.utils import timezone
 
 YEAR = '2026-2027'
 COEF = {'A': 1, 'B': 2, 'C': 3}
-TOP = 10
+TOP = 20
 AWARD_COINS = {1: 200, 2: 150, 3: 100}
 AWARD_COINS_REST = 50        # 4–10 места
+AWARD_COINS_TAIL = 25        # 11–20 места
 
 
 def award_for(place):
-    """Монеты за место в топ-10 параллели по итогам четверти."""
-    return AWARD_COINS.get(place, AWARD_COINS_REST if place <= TOP else 0)
+    """Монеты за место в топ-20 параллели по итогам четверти."""
+    if place in AWARD_COINS:
+        return AWARD_COINS[place]
+    if place <= 10:
+        return AWARD_COINS_REST
+    return AWARD_COINS_TAIL if place <= TOP else 0
 
 
 def _dt(y, m, d, h=0, mi=0, s=0):
@@ -161,7 +166,7 @@ def class_rows(school_classes, start=None, end=None, fresh=False):
 
 
 def freeze_due(now=None):
-    """Фиксирует итоги всех закончившихся и ещё не зафиксированных четвертей: топ-10 учеников и
+    """Фиксирует итоги всех закончившихся и ещё не зафиксированных четвертей: топ-20 учеников и
     все классы каждой параллели; награды 1–3 местам (монеты, баннер «Чемпион четверти» за 1 место)."""
     from .models import QuarterFreeze
     now = now or timezone.now()

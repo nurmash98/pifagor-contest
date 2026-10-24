@@ -603,7 +603,7 @@ def shop(request):
     history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
     return render(request, 'shop.html', {
         'student': student, 'balance': bal, 'banners': banners, 'avatars': avatar_list, 'history': history,
-        'rules': coin_module, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
+        'rules': coin_module, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
         'republic_need': banner_module.REPUBLIC_NEED,
     })
 
@@ -705,7 +705,7 @@ def hall_of_fame(request):
         r['all_solved'] = counts.get(r['st'].id, 0) if r['st'] else 0
     return render(request, 'hall_of_fame.html', {
         'tabs': tabs, 'sel': sel, 'grades': grades, 'grade': grade, 'podium': rows[:3], 'rest': rows[3:],
-        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST,
+        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL,
     })
 
 
@@ -748,7 +748,7 @@ def leaderboard(request):
     teacher_grades = []
     teacher_grade = None  # учитель смотрит всю параллель (например, все 7-е)
     selected_class = ''
-    limit = 10
+    limit = 20
 
     if student is not None:
         my_grade = _grade_of(student.school_class)
@@ -852,7 +852,7 @@ def leaderboard(request):
         excluded = [e for e in ex if mc is None or e.student.school_class in mc]
 
     return render(request, 'leaderboard.html', {
-        'excluded': excluded, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST,
+        'excluded': excluded, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL,
         'quarter': quarter, 'quarter_days_left': quarters.days_left(quarter) if quarter else None,
         'last_frozen': last_frozen, 'winner': winner,
         'students': students,
