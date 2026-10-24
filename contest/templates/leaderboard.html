@@ -28,7 +28,28 @@
             <div class="d-inline-flex flex-wrap align-items-center justify-content-center gap-2 mt-2">
                 {% if quarter %}
                 <span class="badge rounded-pill px-3 py-2" style="background:#1a1a4b;">{{ quarter.n }} {% if content_lang == 'kk' %}тоқсан{% else %}четверть{% endif %} · {{ quarter.label }}</span>
-                <span class="text-muted small">{% if content_lang == 'kk' %}Қалды{% else %}Осталось{% endif %} {{ quarter_days_left }} {% if content_lang == 'kk' %}күн{% else %}дн.{% endif %}</span>
+                <span class="q-countdown" data-end="{{ quarter.end|date:'U' }}" data-kk="{% if content_lang == 'kk' %}1{% endif %}">
+                    <span class="text-muted small">{% if content_lang == 'kk' %}Қалды{% else %}Осталось{% endif %}</span>
+                    <span class="qc-box"><b class="qc-d">{{ quarter_days_left }}</b><i>{% if content_lang == 'kk' %}күн{% else %}дн{% endif %}</i></span>
+                    <span class="qc-box"><b class="qc-h">--</b><i>{% if content_lang == 'kk' %}сағ{% else %}ч{% endif %}</i></span>
+                    <span class="qc-box"><b class="qc-m">--</b><i>{% if content_lang == 'kk' %}мин{% else %}мин{% endif %}</i></span>
+                    <span class="qc-box"><b class="qc-s">--</b><i>{% if content_lang == 'kk' %}сек{% else %}сек{% endif %}</i></span>
+                </span>
+                <script>
+                (function () {
+                    var el = document.currentScript.previousElementSibling, end = +el.dataset.end * 1000;
+                    function pad(n) { return (n < 10 ? '0' : '') + n; }
+                    function tick() {
+                        var left = Math.max(0, Math.floor((end - Date.now()) / 1000));
+                        el.querySelector('.qc-d').textContent = Math.floor(left / 86400);
+                        el.querySelector('.qc-h').textContent = pad(Math.floor(left % 86400 / 3600));
+                        el.querySelector('.qc-m').textContent = pad(Math.floor(left % 3600 / 60));
+                        el.querySelector('.qc-s').textContent = pad(left % 60);
+                        if (left === 0) { clearInterval(t); setTimeout(function () { location.reload(); }, 3000); }
+                    }
+                    var t = setInterval(tick, 1000); tick();
+                })();
+                </script>
                 {% else %}
                 <span class="badge rounded-pill px-3 py-2" style="background:#1a1a4b;">{% if content_lang == 'kk' %}Оқу жылының қорытындысы{% else %}Итоги учебного года{% endif %}</span>
                 {% endif %}
