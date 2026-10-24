@@ -719,6 +719,8 @@ def leaderboard(request):
     my_grade = None
     scope_label = None
     teacher_classes = None
+    teacher_grades = []
+    teacher_grade = None  # учитель смотрит всю параллель (например, все 7-е)
     selected_class = ''
     limit = 10
 
@@ -729,10 +731,17 @@ def leaderboard(request):
         teacher = Teacher.objects.filter(user=request.user).first()
         if teacher is not None:
             teacher_classes = teacher.class_list()
+            teacher_grades = sorted({_grade_of(c) for c in teacher_classes if _grade_of(c)},
+                                    key=lambda g: (not g.isdigit(), int(g) if g.isdigit() else 0, g))
             requested_class = normalize_school_class(request.GET.get('class', ''))
             selected_class = requested_class if requested_class in teacher_classes else ''
-            scope_label = selected_class or ', '.join(teacher_classes)
-            limit = None  # Учитель видит полный список своих классов, без топ-10
+            limit = None  # Учитель видит полный список, без топ-10
+            if not selected_class and request.GET.get('scope') != 'mine' and teacher_grades:
+                # По умолчанию — вся параллель (все буквы), как её видят ученики
+                g = request.GET.get('grade', '').strip()
+                teacher_grade = g if g in teacher_grades else teacher_grades[0]
+            scope_label = (f'{teacher_grade} классы' if teacher_grade is not None
+                           else selected_class or ', '.join(teacher_classes))
 
     # Рейтинг по четвертям: считаются только баллы за задачи, лучший балл по которым получен в
     # текущей четверти (contest/quarters.py). Закончившиеся четверти фиксируются в «Зале славы».
@@ -746,6 +755,8 @@ def leaderboard(request):
         # Фильтруем в Python, т.к. класс — свободный текст ("7А", "10Б"),
         # а нужна именно числовая параллель без буквы.
         students_query = [s for s in students_query if _grade_of(s.school_class) == my_grade]
+    elif teacher_grade is not None:
+        students_query = [s for s in students_query if _grade_of(s.school_class) == teacher_grade]
     elif teacher_classes is not None:
         if selected_class:
             # Учитель выбрал конкретный класс из фильтра
@@ -758,8 +769,12 @@ def leaderboard(request):
     if limit is not None:
         students = students[:limit]
     # Награда за место по итогам четверти — видна всем в таблице
+    # (награды считаются по параллели, поэтому в списке «мои классы» / один класс их не показываем)
+    by_parallel = my_grade is not None or teacher_grade is not None or teacher_classes is None
+    managed = _managed_classes(request.user) if request.user.is_staff else set()
     for place, st in enumerate(students, 1):
-        st.prize = quarters.award_for(place) if quarter else 0
+        st.prize = quarters.award_for(place) if quarter and by_parallel else 0
+        st.can_manage = request.user.is_staff and (managed is None or st.school_class in managed)
 
     # ---- Рейтинг классов этой параллели (или параллелей, если у учителя классы из
     # разных параллелей / у админа нет выбранного фильтра) ----
@@ -769,6 +784,8 @@ def leaderboard(request):
 
     if my_grade is not None:
         relevant_grades = [my_grade]
+    elif teacher_grade is not None:
+        relevant_grades = [teacher_grade]
     elif teacher_classes is not None:
         if selected_class:
             relevant_grades = [_grade_of(selected_class)]
@@ -816,6 +833,8 @@ def leaderboard(request):
         'my_grade': my_grade,
         'scope_label': scope_label,
         'teacher_classes': teacher_classes,
+        'teacher_grades': teacher_grades,
+        'teacher_grade': teacher_grade,
         'selected_class': selected_class,
         'is_full_list': limit is None,
         'class_leaderboards': class_leaderboards,

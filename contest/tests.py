@@ -1850,3 +1850,27 @@ class RankChipTests(TestCase):
         self.assertIn('Junior', rank_chip(60))
         self.assertIn('Team Lead', rank_chip(700))
         self.assertIn('Architect', rank_chip(1000))
+
+
+class TeacherParallelLeaderboardTests(TestCase):
+    def test_teacher_sees_whole_parallel_and_own_classes(self):
+        t_user = User.objects.create_user('tpar', password='x', is_staff=True)
+        Teacher.objects.create(user=t_user, full_name='T', classes='7B, 8A')
+        task = Task.objects.create(title='P', description='d', level='A', test_cases=[])
+        from .models import Submission
+        for i, (n, c) in enumerate([('Мой Ученик', '7B'), ('Чужой Ученик', '7K'), ('Восьмой Ученик', '8C')]):
+            u = User.objects.create_user(f'p{i}', password='x')
+            st = Student.objects.create(user=u, full_name=n, school_class=c)
+            Submission.objects.create(student=st, task=task, status='DONE', score=10, is_graded=True)
+        self.client.force_login(t_user)
+        html = self.client.get(reverse('leaderboard')).content.decode()
+        board = html.split('lb-head')[1]
+        self.assertIn('Мой Ученик', board)
+        self.assertIn('Чужой Ученик', board)          # вся 7 параллель, не только свои классы
+        self.assertNotIn('Восьмой Ученик', board)
+        self.assertEqual(board.count('leaderboard/exclude') if 'leaderboard/exclude' in board else board.count('lb-ex'), 1)  # 🚫 только у своего
+        html8 = self.client.get(reverse('leaderboard') + '?grade=8').content.decode().split('lb-head')[1]
+        self.assertIn('Восьмой Ученик', html8)
+        mine = self.client.get(reverse('leaderboard') + '?scope=mine').content.decode().split('lb-head')[1]
+        self.assertIn('Мой Ученик', mine)
+        self.assertNotIn('Чужой Ученик', mine)

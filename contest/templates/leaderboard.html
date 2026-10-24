@@ -14,6 +14,8 @@
             <p class="text-muted mb-0">
                 {% if my_grade %}
                     {% t "Сравнение только среди вашей параллели" %} ({{ my_grade }}А, {{ my_grade }}Б {% t "и т.д." %})
+                {% elif teacher_grade %}
+                    {% t "Вся параллель" %} ({{ teacher_grade }}А, {{ teacher_grade }}Б {% t "и т.д." %}) — {% t "так рейтинг видят ученики" %}
                 {% elif is_full_list %}
                     {% t "Все ученики" %}{% if selected_class %} {% t "класса" %} {{ selected_class }}{% else %} {% t "ваших классов" %}{% endif %}, {% t "отсортированы по общему баллу" %}
                 {% else %}
@@ -44,7 +46,10 @@
         {% if teacher_classes %}
         <div class="text-center mb-4">
             <div class="btn-group shadow-sm" role="group">
-                <a href="{% url 'leaderboard' %}" class="btn btn-outline-dark btn-sm {% if not selected_class %}active{% endif %}">{% t "Все классы" %}</a>
+                {% for g in teacher_grades %}
+                <a href="{% url 'leaderboard' %}?grade={{ g }}" class="btn btn-outline-success btn-sm {% if teacher_grade == g %}active{% endif %}">{{ g }} {% t "классы (параллель)" %}</a>
+                {% endfor %}
+                <a href="{% url 'leaderboard' %}?scope=mine" class="btn btn-outline-dark btn-sm {% if not selected_class and not teacher_grade %}active{% endif %}">{% t "Мои классы" %}</a>
                 {% for cls in teacher_classes %}
                 <a href="{% url 'leaderboard' %}?class={{ cls|urlencode }}" class="btn btn-outline-primary btn-sm {% if selected_class == cls %}active{% endif %}">{{ cls }}</a>
                 {% endfor %}
@@ -83,7 +88,7 @@
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
                 <span class="lb-cell lb-hide-sm fw-semibold">{{ student.calc_solved_count }}</span>
                 <span class="lb-cell lb-score">{{ student.calc_total_score }}
-                    {% if user.is_staff and quarter %}<form method="post" action="{% url 'leaderboard_exclude' student.id %}" class="lb-ex" onsubmit="return confirm('Убрать {{ student.full_name|escapejs }} из рейтинга этой четверти (например, за списывание)? Задачи и монеты у ученика останутся.');">{% csrf_token %}
+                    {% if student.can_manage and quarter %}<form method="post" action="{% url 'leaderboard_exclude' student.id %}" class="lb-ex" onsubmit="return confirm('Убрать {{ student.full_name|escapejs }} из рейтинга этой четверти (например, за списывание)? Задачи и монеты у ученика останутся.');">{% csrf_token %}
                         <button type="submit" title="Убрать из рейтинга четверти">🚫</button></form>{% endif %}</span>
                 <span class="lb-cell lb-hide-sm">{% if student.prize %}<span class="lb-prize">+{{ student.prize }} <img src="{% static 'icons/coin-64.png' %}" alt="">{% if forloop.counter == 1 %} + 🏆{% endif %}</span>{% endif %}</span>
             </div>
