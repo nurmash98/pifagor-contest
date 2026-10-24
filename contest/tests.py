@@ -807,7 +807,7 @@ class TaskStatusFilterTests(TestCase):
         self.assertEqual(self.titles('?status=done'), {'Сделанная'})
         self.assertEqual(self.titles('?status=progress'), {'Рабочая', 'Девятка'})
         self.assertEqual(self.titles('?status=unsolved'), {'Рабочая', 'Новая', 'Девятка'})
-        self.assertEqual(self.titles(''), {'Сделанная', 'Рабочая', 'Новая', 'Девятка'})
+        self.assertEqual(self.titles('?all=1'), {'Сделанная', 'Рабочая', 'Новая', 'Девятка'})
 
     def test_combines_with_level_and_keeps_params_in_links(self):
         self.assertEqual(self.titles('?status=unsolved&level=B'), {'Новая'})
@@ -1874,3 +1874,27 @@ class TeacherParallelLeaderboardTests(TestCase):
         mine = self.client.get(reverse('leaderboard') + '?scope=mine').content.decode().split('lb-head')[1]
         self.assertIn('Мой Ученик', mine)
         self.assertNotIn('Чужой Ученик', mine)
+
+
+class RememberFiltersTests(TestCase):
+    def test_student_list_keeps_class_filter_after_edit(self):
+        t_user = User.objects.create_user('tflt', password='x', is_staff=True)
+        Teacher.objects.create(user=t_user, full_name='T', classes='7B, 7C')
+        self.client.force_login(t_user)
+        self.client.get(reverse('student_list') + '?q=&class=7C')
+        r = self.client.get(reverse('student_list'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('class=7C', r['Location'])
+        self.client.get(reverse('student_list') + '?q=&class=')
+        self.assertNotIn('class=7C', self.client.get(reverse('student_list'))['Location'])
+
+    def test_all_tasks_restores_and_all_link_resets(self):
+        u = User.objects.create_user('sflt', password='x')
+        Student.objects.create(user=u, full_name='S', school_class='7B')
+        self.client.force_login(u)
+        self.client.get(reverse('all_tasks') + '?level=B')
+        r = self.client.get(reverse('all_tasks'))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('level=B', r['Location'])
+        self.client.get(reverse('all_tasks') + '?all=1')
+        self.assertNotIn('level=B', self.client.get(reverse('all_tasks'))['Location'])

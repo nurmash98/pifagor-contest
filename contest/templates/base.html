@@ -256,5 +256,35 @@
     })();
     </script>
     {% endif %}
+<script>
+/* Возврат «туда, где был»: на списках (задачи, курсы, ученики, лидерборд) запоминаем
+   прокрутку и раскрытые блоки <details> в sessionStorage и восстанавливаем при возврате. */
+(function () {
+    var P = location.pathname;
+    var keep = P === '/' || /^\/(courses|leaderboard|teacher\/students|teacher\/tasks)\/?(\d+\/?)?$/.test(P);
+    if (!keep) return;
+    var KEY = 'place:' + P + location.search;
+    function save() {
+        try {
+            var open = [];
+            document.querySelectorAll('details').forEach(function (d, i) { if (d.open) open.push(i); });
+            sessionStorage.setItem(KEY, JSON.stringify({y: window.scrollY, open: open, t: Date.now()}));
+        } catch (e) {}
+    }
+    window.addEventListener('pagehide', save);
+    document.addEventListener('click', function (e) { if (e.target.closest('a,button')) save(); }, true);
+    function restore() {
+        var st = null;
+        try { st = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
+        if (!st || Date.now() - st.t > 3 * 3600 * 1000) return;
+        var all = document.querySelectorAll('details');
+        (st.open || []).forEach(function (i) { if (all[i] && !all[i].open) all[i].open = true; });
+        if (st.y) requestAnimationFrame(function () { window.scrollTo(0, st.y); });
+    }
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore); else restore();
+    window.addEventListener('pageshow', function (e) { if (e.persisted) restore(); });
+})();
+</script>
 </body>
 </html>

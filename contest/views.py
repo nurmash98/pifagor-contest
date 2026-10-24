@@ -224,6 +224,25 @@ def _safe_back_url(request):
     return None
 
 
+def _restore_filters(request, key):
+    """Запоминаем фильтры списка (класс, уровень, тег…) в сессии. Если страницу открыли без
+    параметров (после сохранения ученика, по кнопке «Назад», из меню) — возвращаем последние
+    выбранные фильтры. Ссылка «Все» передаёт ?all=1, чтобы явно сбросить фильтр."""
+    skey = f'filters:{key}'
+    if request.method != 'GET':
+        return None
+    if request.GET:
+        params = request.GET.copy()
+        for junk in ('back',):
+            params.pop(junk, None)
+        request.session[skey] = params.urlencode()
+        return None
+    saved = request.session.get(skey)
+    if saved:
+        return redirect(f'{request.path}?{saved}')
+    return None
+
+
 def _get_content_lang(request):
     """Текущий выбранный язык условий задач ('ru' или 'kk'), из сессии пользователя."""
     lang = request.session.get('content_lang', 'ru')
@@ -256,6 +275,9 @@ def all_tasks_view(request):
     """Главная страница: каталог всех задач в виде таблицы.
     Ученику показываем его статус по каждой задаче; преподавателю — тот же каталог
     в режиме просмотра (без статусов решения, которых у него просто нет)."""
+    restored = _restore_filters(request, 'all_tasks')
+    if restored:
+        return restored
     student = Student.objects.filter(user=request.user).first()
     lang = _get_content_lang(request)
 
@@ -315,7 +337,7 @@ def all_tasks_view(request):
         if status_value:
             params['status'] = status_value
         base = reverse('all_tasks')
-        return f'{base}?{urlencode(params)}' if params else base
+        return f'{base}?{urlencode(params)}' if params else f'{base}?all=1'
 
     all_tags = list(Tag.objects.all())
     context = {
@@ -715,6 +737,10 @@ def leaderboard(request):
     независимо от буквы). Учитель видит ВСЕХ учеников своих классов (без ограничения топ-10),
     с фильтром по конкретному классу (по списку классов в его профиле).
     Админ (суперпользователь) без своего класса видит топ-10 по всей школе."""
+    if request.user.is_staff:
+        restored = _restore_filters(request, 'leaderboard')
+        if restored:
+            return restored
     student = Student.objects.filter(user=request.user).first()
     my_grade = None
     scope_label = None
@@ -1342,6 +1368,9 @@ def topic_edit(request, topic_id):
 def task_tags_list(request):
     """Полный список всех задач для управления тегами — доступен любому учителю,
     вне привязки к его классам или курсам."""
+    restored = _restore_filters(request, 'task_tags_list')
+    if restored:
+        return restored
     tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
 
     level_filter = request.GET.get('level', '')
@@ -1600,6 +1629,9 @@ def student_list(request):
     from .moderation_views import release_expired_blocks
     release_expired_blocks()
     """Ученики для редактирования: учитель видит только свои классы, админ — всех."""
+    restored = _restore_filters(request, 'student_list')
+    if restored:
+        return restored
     classes = _managed_classes(request.user)
     students = Student.objects.select_related('user').order_by('school_class', 'full_name')
     if classes is not None:
