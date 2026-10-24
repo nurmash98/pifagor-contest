@@ -1898,3 +1898,19 @@ class RememberFiltersTests(TestCase):
         self.assertIn('level=B', r['Location'])
         self.client.get(reverse('all_tasks') + '?all=1')
         self.assertNotIn('level=B', self.client.get(reverse('all_tasks'))['Location'])
+
+
+class TeacherTop20CollapseTests(TestCase):
+    def test_rows_after_20_are_collapsible(self):
+        t_user = User.objects.create_user('t20', password='x', is_staff=True)
+        Teacher.objects.create(user=t_user, full_name='T', classes='7B')
+        task = Task.objects.create(title='P', description='d', level='A', test_cases=[])
+        from .models import Submission
+        for i in range(23):
+            st = Student.objects.create(user=User.objects.create_user(f'c{i}', password='x'), full_name=f'U{i}', school_class='7B')
+            Submission.objects.create(student=st, task=task, status='DONE', score=10, is_graded=True)
+        self.client.force_login(t_user)
+        html = self.client.get(reverse('leaderboard') + '?grade=7').content.decode()
+        self.assertEqual(html.count(' lb-more"'), 3)
+        self.assertIn('lb-more-btn', html)
+        self.assertIn('(3)', html)

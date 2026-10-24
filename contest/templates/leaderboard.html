@@ -98,7 +98,7 @@
                 <span class="text-center lb-hide-sm">{% if quarter %}{% if content_lang == 'kk' %}Марапат{% else %}Награда{% endif %}{% endif %}</span>
             </div>
             {% for student in students %}
-            <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% if student.name_banner == 'custom' %} fx-{{ student.custom_banner.fx|default:'shine' }}{% endif %}{% elif forloop.counter <= 3 %} lb-top{% endif %}"{% if student.name_banner == 'custom' %} style="{{ student.custom_banner_style }}"{% endif %}>
+            <div class="lb-row{% if student.name_banner %} has-b b-{{ student.name_banner }}{% if student.name_banner == 'custom' %} fx-{{ student.custom_banner.fx|default:'shine' }}{% endif %}{% elif forloop.counter <= 3 %} lb-top{% endif %}{% if forloop.counter > 20 %} lb-more{% endif %}"{% if student.name_banner == 'custom' %} style="{{ student.custom_banner_style }}"{% endif %}>
                 <span class="lb-place">
                     {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
                 </span>
@@ -118,6 +118,24 @@
             <div class="text-center py-5 text-muted">{% t "Рейтинг пока пуст. Будьте первым, кто решит задачу!" %}</div>
             {% endfor %}
         </div>
+        {% if students|length > 20 %}
+        <div class="text-center mt-2">
+            <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-4" id="lb-more-btn"
+                    data-show="{% if content_lang == 'kk' %}Қалғандарын көрсету{% else %}Показать остальных{% endif %} ({{ students|length|add:'-20' }}) ▾"
+                    data-hide="{% if content_lang == 'kk' %}Жию{% else %}Свернуть{% endif %} ▴"></button>
+        </div>
+        <script>
+        (function () {
+            var btn = document.getElementById('lb-more-btn'), card = btn.parentNode.previousElementSibling;
+            function set(open) { card.classList.toggle('lb-open', open); btn.textContent = open ? btn.dataset.hide : btn.dataset.show; }
+            btn.addEventListener('click', function () {
+                var open = !card.classList.contains('lb-open'); set(open);
+                if (!open) card.scrollIntoView({block: 'start', behavior: 'smooth'});
+            });
+            set(false);
+        })();
+        </script>
+        {% endif %}
         {% if excluded %}
         <div class="card border-0 shadow-sm rounded-4 p-3 mt-3 small">
             <div class="fw-bold mb-2">🚫 Убраны из рейтинга этой четверти (видно только учителю)</div>
@@ -139,6 +157,8 @@
             .lb-prize { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; font-size: .85rem; background: rgba(255,255,255,.55); color: #6b4e00; border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
             [data-bs-theme="dark"] .lb-prize { background: rgba(0,0,0,.35); color: #ffd75e; }
             .lb-head { padding: 10px 14px 12px; font-weight: 700; color: var(--bs-body-color); border-bottom: 1px solid var(--bs-border-color); margin-bottom: 6px; }
+            .lb-row.lb-more { display: none; }
+            .lb-open .lb-row.lb-more { display: grid; }
             .lb-row { position: relative; overflow: hidden; padding: 10px 14px; border-radius: 14px; margin: 4px 0; min-height: 62px; }
             .lb-row:not(.has-b) { border-bottom: 1px solid var(--bs-border-color); border-radius: 0; }
             .lb-row.lb-top { background: var(--bs-tertiary-bg); border-radius: 14px; border-bottom: 0; }
