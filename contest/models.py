@@ -653,7 +653,7 @@ class CoinTransaction(models.Model):
     key уникален для ученика — одно и то же начисление не может прийти дважды
     (например, 'task:15', 'day:2026-10-23', 'm:50', 'exam:7', 'buy:banner:gold')."""
     KIND_CHOICES = [('task', 'Задача 10/10'), ('day', 'Первая задача дня'), ('milestone', 'Каждые 50 задач'),
-                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('buy', 'Покупка')]
+                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('buy', 'Покупка')]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='coin_transactions')
     key = models.CharField(max_length=60)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)

@@ -1087,7 +1087,24 @@ def courses_view(request):
     courses = Course.objects.select_related('created_by').prefetch_related('topics__tasks')
     if not request.user.is_staff:
         courses = [c for c in courses.filter(is_visible=True) if _course_open_for(request.user, c)]
-    return render(request, 'courses.html', {'courses': courses})
+    from . import coins as coin_module
+    student = Student.objects.filter(user=request.user).first()
+    return render(request, 'courses.html', {'courses': courses, 'gift_student': student is not None,
+                                            'gift_ready': coin_module.gift_ready(student),
+                                            'gift_amount': coin_module.DAILY_GIFT})
+
+
+@login_required
+def daily_gift(request):
+    """🎁 на странице «Курсы»: +5 монет раз в день. Отвечает JSON для анимации монет."""
+    from django.http import JsonResponse
+    from . import coins as coin_module
+    student = Student.objects.filter(user=request.user).first()
+    if request.method != 'POST' or student is None:
+        return JsonResponse({'ok': False}, status=400)
+    got = coin_module.claim_gift(student)
+    return JsonResponse({'ok': got, 'amount': coin_module.DAILY_GIFT if got else 0,
+                         'balance': coin_module.balance(student)})
 
 
 @login_required

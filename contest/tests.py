@@ -1914,3 +1914,22 @@ class TeacherTop20CollapseTests(TestCase):
         self.assertEqual(html.count(' lb-more"'), 3)
         self.assertIn('lb-more-btn', html)
         self.assertIn('(3)', html)
+
+
+class DailyGiftTests(TestCase):
+    def test_gift_once_per_day(self):
+        from unittest import mock
+        from . import coins
+        u = User.objects.create_user('gft', password='x')
+        st = Student.objects.create(user=u, full_name='G', school_class='7B')
+        self.client.force_login(u)
+        self.assertIn('gift-btn', self.client.get(reverse('courses')).content.decode())
+        r = self.client.post(reverse('daily_gift')).json()
+        self.assertTrue(r['ok']); self.assertEqual(r['balance'], 5)
+        r2 = self.client.post(reverse('daily_gift')).json()
+        self.assertFalse(r2['ok']); self.assertEqual(coins.balance(st), 5)
+        self.assertIn('gift-done', self.client.get(reverse('courses')).content.decode())
+        with mock.patch('django.utils.timezone.now', return_value=timezone.now() + timedelta(days=1)):
+            self.client.force_login(u)
+            self.assertTrue(self.client.post(reverse('daily_gift')).json()['ok'])
+        self.assertEqual(coins.balance(st), 10)

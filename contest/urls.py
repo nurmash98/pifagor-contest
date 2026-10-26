@@ -43,6 +43,7 @@ urlpatterns = [
 
     # Курсы
     path('courses/', views.courses_view, name='courses'),
+    path('gift/', views.daily_gift, name='daily_gift'),
     path('courses/<int:course_id>/', views.course_detail, name='course_detail'),
     path('courses/topics/<int:topic_id>/video/', views.topic_video, name='topic_video'),
     path('courses/topics/<int:topic_id>/theory/', views.topic_theory, name='topic_theory'),

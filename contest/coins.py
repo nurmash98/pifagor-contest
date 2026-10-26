@@ -19,6 +19,7 @@ DAILY_BONUS = 5
 MILESTONE_EVERY = 50
 MILESTONE_COINS = 25
 EXAM_TEN_COINS = 50
+DAILY_GIFT = 5          # подарок 🎁 на странице «Курсы» — раз в день
 
 
 def balance(student):
@@ -70,6 +71,22 @@ def sync(student):
         return 0
     CoinTransaction.objects.bulk_create(new, ignore_conflicts=True)
     return sum(t.amount for t in new)
+
+
+def gift_key(now=None):
+    return f'gift:{timezone.localdate(now)}'
+
+
+def gift_ready(student):
+    return student is not None and not CoinTransaction.objects.filter(student=student, key=gift_key()).exists()
+
+
+def claim_gift(student):
+    """Ежедневный подарок: +5 монет один раз в день. True — начислено, False — уже получен сегодня."""
+    _, created = CoinTransaction.objects.get_or_create(
+        student=student, key=gift_key(),
+        defaults=dict(kind='gift', amount=DAILY_GIFT, note='Подарок дня', at=timezone.now()))
+    return created
 
 
 def spend(student, key, amount, note=''):

@@ -90,6 +90,7 @@
                 {% elif tx.kind == 'milestone' %}🎯 {% if kk == 'kk' %}Шешілген есептер:{% else %}Решено задач:{% endif %} {{ tx.note }}
                 {% elif tx.kind == 'exam' %}⭐ {{ tx.note }} — 10/10
                 {% elif tx.kind == 'award' %}🏛 {{ tx.note }}
+                {% elif tx.kind == 'gift' %}🎁 {% if kk == 'kk' %}Күн сыйлығы{% else %}Подарок дня{% endif %}
                 {% else %}🛒 {{ tx.note }}{% endif %}
                 <span class="text-muted ms-1">{{ tx.at|date:"d.m.Y" }}</span>
             </span>

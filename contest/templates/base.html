@@ -157,7 +157,7 @@
                             </li>
                             {% if coin_balance is not None %}
                             <li class="nav-item">
-                                <a class="coin-chip" href="{% url 'shop' %}" title="{% t "Магазин" %}"><img src="{% static 'icons/coin-64.png' %}" alt="">{{ coin_balance }}</a>
+                                <a class="coin-chip" href="{% url 'shop' %}" title="{% t "Магазин" %}"><img src="{% static 'icons/coin-64.png' %}" alt=""><span class="coin-num">{{ coin_balance }}</span></a>
                             </li>
                             {% endif %}
                         {% endif %}
