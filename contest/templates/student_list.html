@@ -16,8 +16,8 @@
         </p>
     </div>
     <div class="col-md-7">
-        <form method="get" class="d-flex gap-2">
-            <input type="text" name="q" class="form-control form-control-sm" placeholder="Поиск по имени или логину" value="{{ q }}">
+        <form method="get" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="q" class="form-control form-control-sm" style="min-width: 160px; flex: 1 1 160px;" placeholder="Поиск по имени или логину" value="{{ q }}">
             <select name="class" class="form-select form-select-sm" style="max-width: 160px;">
                 <option value="">{% if my_classes is None %}Все классы{% else %}Все мои классы{% endif %}</option>
                 {% for cls in all_classes %}

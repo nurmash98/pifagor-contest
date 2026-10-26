@@ -508,6 +508,8 @@ def profile_view(request):
         sub.score * LEADERBOARD_COEFFICIENT_BY_LEVEL.get(sub.task.level, 0)
         for sub in solved_submissions
     )
+    # Название задачи на выбранном языке (иначе в «Истории решений» строка без названия)
+    _apply_task_language([sub.task for sub in solved_submissions], _get_content_lang(request))
 
     from . import badges as badge_module
     groups, new_badges = badge_module.profile_badges(student, _get_content_lang(request))

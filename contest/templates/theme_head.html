@@ -42,7 +42,10 @@
     /* фирменные цвета: тёмно-синий на тёмном фоне не виден — берём светлый оттенок */
     [data-bs-theme="dark"] .text-pifagor-blue,
     [data-bs-theme="dark"] [style^="color: #1a1a4b"],
-    [data-bs-theme="dark"] [style*=" color: #1a1a4b"] { color: #c3c9ff !important; }
+    [data-bs-theme="dark"] [style*=" color: #1a1a4b"],
+    [data-bs-theme="dark"] [style^="color:#1a1a4b"],
+    [data-bs-theme="dark"] [style*=" color:#1a1a4b"],
+    [data-bs-theme="dark"] [style*=";color:#1a1a4b"] { color: #c3c9ff !important; }
     [data-bs-theme="dark"] .text-pifagor-green,
     [data-bs-theme="dark"] [style*="color: #008b42"] { color: #34c27a !important; }
     [data-bs-theme="dark"] [style*="color: #2c3e50"] { color: var(--bs-body-color) !important; }
@@ -53,7 +56,26 @@
     [data-bs-theme="dark"] .card { --bs-card-bg: var(--bs-secondary-bg); --bs-card-cap-bg: var(--bs-tertiary-bg); }
     [data-bs-theme="dark"] .list-group { --bs-list-group-bg: transparent; }
     [data-bs-theme="dark"] .navbar.bg-body { background-color: var(--bs-secondary-bg) !important; }
-    [data-bs-theme="dark"] .navbar-toggler-icon { filter: invert(1) grayscale(1) brightness(1.6); }
+    /* кнопка меню на телефоне: белые полоски в тёмной теме */
+    [data-bs-theme="dark"] .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28228,231,240,0.95%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e"); filter: none; }
+    [data-bs-theme="dark"] .navbar-toggler { border: 1px solid #3d4566 !important; }
+    /* красные кнопки/текст — светлее, иначе на тёмном фоне плохо читаются */
+    [data-bs-theme="dark"] .btn-outline-danger { --bs-btn-color: #ff7b86; --bs-btn-border-color: #ff7b86; --bs-btn-hover-bg: #dc3545; --bs-btn-hover-border-color: #dc3545; --bs-btn-hover-color: #fff; }
+    [data-bs-theme="dark"] .text-danger { color: #ff7b86 !important; }
+    [data-bs-theme="dark"] .btn-outline-primary { --bs-btn-color: #7fb3ff; --bs-btn-border-color: #5c8fe0; }
+    [data-bs-theme="dark"] .btn-outline-success { --bs-btn-color: #4fd18b; --bs-btn-border-color: #34a86a; }
+    [data-bs-theme="dark"] .text-muted { color: rgba(228, 231, 240, .62) !important; }
+    [data-bs-theme="dark"] input[type="date"], [data-bs-theme="dark"] input[type="datetime-local"], [data-bs-theme="dark"] input[type="time"] { color-scheme: dark; }
+    /* телефон: логотип и кнопка меню в одной строке, без лишней полоски у имени */
+    @media (max-width: 575.98px) {
+        .navbar-brand span { font-size: 1.12rem !important; }
+        .navbar-brand img, .navbar-brand svg { height: 30px !important; width: auto; }
+        .navbar > .container > .d-flex { gap: .5rem !important; }
+        .kz-holiday .container { gap: .5rem !important; flex-wrap: wrap; font-size: .85rem; text-align: center; }
+        .kz-holiday .container > svg, .kz-holiday .container > .kz-flag { display: none; }
+    }
+    @media (max-width: 991.98px) { .navbar-collapse .border-start { border: 0 !important; padding-left: 0 !important; margin-left: 0 !important; } }
     [data-bs-theme="dark"] .auth-card { box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
 
     /* тёмный текст на светлых плашках/бейджах: оставляем только там, где фон жёлтый/голубой */
