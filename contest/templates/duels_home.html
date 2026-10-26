@@ -123,7 +123,7 @@
                 <li class="dl-row{% if st.name_banner %} has-b b-{{ st.name_banner }}{% if st.name_banner == 'custom' %} fx-{{ st.custom_banner.fx|default:'shine' }}{% endif %}{% endif %}{% if student and st.id == student.id %} dl-me{% endif %}"{% if st.name_banner == 'custom' %} style="{{ st.custom_banner_style }}"{% endif %}>
                     <span class="dl-pl">{% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}</span>
                     {% student_avatar st.solved 34 False forloop.counter st.avatar %}
-                    <span class="dl-nm">{% if st.name_banner == 'custom' and st.custom_banner.icon %}{{ st.custom_banner.icon }} {% endif %}{{ st.full_name }} {% rank_chip st.solved forloop.counter 'sm' %} <span class="dl-cl">{{ st.school_class }}</span></span>
+                    <span class="dl-nm">{% if st.name_banner == 'custom' and st.custom_banner.icon %}{{ st.custom_banner.icon }} {% else %}{% banner_icon st.name_banner %}{% endif %}{{ st.full_name }} {% rank_chip st.solved forloop.counter 'sm' %} <span class="dl-cl">{{ st.school_class }}</span></span>
                     <span class="badge bg-warning text-dark fs-6 dl-rt">{{ st.duel_rating }}</span>
                 </li>
                 {% endfor %}

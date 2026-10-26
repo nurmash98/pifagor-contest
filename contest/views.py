@@ -798,7 +798,11 @@ def leaderboard(request):
     # (награды считаются по параллели, поэтому в списке «мои классы» / один класс их не показываем)
     by_parallel = my_grade is not None or teacher_grade is not None or teacher_classes is None
     managed = _managed_classes(request.user) if request.user.is_staff else set()
+    # Рамка аватара и ранг (Intern…Architect) — по всем решённым задачам, а не только за четверть
+    from .badge_art import solved_counts
+    totals = solved_counts([st.id for st in students])
     for place, st in enumerate(students, 1):
+        st.total_solved = totals.get(st.id, 0)
         st.prize = quarters.award_for(place) if quarter and by_parallel else 0
         st.can_manage = request.user.is_staff and (managed is None or st.school_class in managed)
 

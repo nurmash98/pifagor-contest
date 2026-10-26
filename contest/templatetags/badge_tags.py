@@ -48,3 +48,13 @@ def rank_chip(solved, uid='r', size='md'):
     return format_html('<span class="rank-chip rk-{} rk-{}" title="{} · {}+ ✓">{}<span class="rk-t">{}</span></span>',
                        TIERS[tier['key']]['tier'], size, tier['ru'], tier['need'],
                        rank_svg(tier, uid=uid, size=16 if size == 'sm' else 20), tier['ru'])
+
+
+BANNER_ICONS = {'code': '>_', 'fire': '🔥', 'gold': '👑', 'champion': '🏆'}
+
+
+@register.simple_tag
+def banner_icon(key):
+    """Значок баннера (🏆, 👑, 🔥, >_) перед именем в строках лидерборда и дуэлей."""
+    icon = BANNER_ICONS.get(key or '')
+    return format_html('<span class="nb-ico">{}</span> ', icon) if icon else ''

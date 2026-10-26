@@ -103,8 +103,8 @@
                     {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
                 </span>
                 <span class="lb-name">
-                    {% student_avatar student.calc_solved_count 40 False forloop.counter student.avatar %}
-                    <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% endif %}{{ student.full_name }}</span> {% rank_chip student.calc_solved_count forloop.counter 'sm' %}
+                    {% student_avatar student.total_solved 40 False forloop.counter student.avatar %}
+                    <span class="lb-name-text"><span class="lb-full">{% if student.name_banner == 'custom' and student.custom_banner.icon %}{{ student.custom_banner.icon }} {% else %}{% banner_icon student.name_banner %}{% endif %}{{ student.full_name }}</span> {% rank_chip student.total_solved forloop.counter 'sm' %}
                         <span class="lb-sub">{{ student.school_class }} · ✓ {{ student.calc_solved_count }}{% if student.prize %} · 🎁 +{{ student.prize }}{% if forloop.counter == 1 %} + 🏆{% endif %}{% endif %}</span></span>
                 </span>
                 <span class="lb-cell lb-hide-sm lb-muted">{{ student.school_class }}</span>
@@ -179,6 +179,8 @@
             .lb-row.has-b .lb-muted { opacity: .85; }
             .lb-row.has-b { padding: 10px 14px !important; white-space: normal; font-weight: 700; }
             .lb-row.b-code::before, .lb-row.b-fire::before, .lb-row.b-gold::before, .lb-row.b-champion::before { content: none; }
+            .nb-ico { flex: none; }
+            .b-code .nb-ico { opacity: .8; }
             .lb-row.b-kz_flag { background-position: left 8px center, 40% center; background-size: auto 115%, auto 140%; }
             @media (max-width: 575.98px) {
                 .lb-head, .lb-row { grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: 6px; }
