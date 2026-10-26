@@ -9,82 +9,44 @@
         <h3 class="fw-bold" style="color: #1a1a4b;">{% t "Курсы" %}</h3>
         <p class="text-muted small mb-0">{% t "Подборки задач по темам" %}</p>
     </div>
-    {% if gift_student %}
+    {% if gift_student and gift_ready %}
     <div class="col-auto">
-        <button type="button" id="gift-btn" class="gift-btn{% if not gift_ready %} gift-done{% endif %}" {% if not gift_ready %}disabled{% endif %}
-                data-url="{% url 'daily_gift' %}" data-coin="{% static 'icons/coin-64.png' %}"
-                data-done="{% if content_lang == 'kk' %}Ертең тағы кел!{% else %}Приходи завтра!{% endif %}">
-            <span class="gift-box">🎁</span>
-            <span class="gift-txt">{% if gift_ready %}{% if content_lang == 'kk' %}Сыйлық +{{ gift_amount }}{% else %}Подарок +{{ gift_amount }}{% endif %}{% else %}{% if content_lang == 'kk' %}Ертең тағы кел!{% else %}Приходи завтра!{% endif %}{% endif %}</span>
+        <button type="button" id="gift-btn" class="gift-code" data-url="{% url 'daily_gift' %}"
+                title="{% if content_lang == 'kk' %}Күнде +{{ gift_amount }} тиын{% else %}Каждый день +{{ gift_amount }} монет{% endif %}">
+            <span class="gc-var">s</span> <span class="gc-op">+=</span> <span class="gc-num">{{ gift_amount }}</span><span class="gc-cur">▌</span>
         </button>
     </div>
     {% endif %}
 </div>
-{% if gift_student %}
+{% if gift_student and gift_ready %}
 <style>
-.gift-btn { display: inline-flex; align-items: center; gap: 8px; border: 2px solid #f2c230; border-radius: 999px; padding: 6px 16px 6px 8px;
-    background: linear-gradient(135deg, #fff6d6, #ffe08a); color: #6b4e00; font-weight: 800; box-shadow: 0 4px 14px rgba(242,194,48,.45); cursor: pointer; }
-.gift-btn .gift-box { font-size: 2rem; line-height: 1; display: inline-block; animation: gift-wiggle 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
-.gift-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(242,194,48,.6); }
-.gift-btn.gift-done { opacity: .55; cursor: default; box-shadow: none; filter: grayscale(.4); }
-.gift-btn.gift-done .gift-box { animation: none; }
-.gift-btn.gift-open .gift-box { animation: gift-pop .5s ease-out forwards; }
-[data-bs-theme="dark"] .gift-btn { background: linear-gradient(135deg, #3a3220, #5a4818); color: #ffd75e; }
-@keyframes gift-wiggle { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-14deg) scale(1.08); } 80% { transform: rotate(12deg) scale(1.08); } 90% { transform: rotate(-6deg); } }
-@keyframes gift-pop { 40% { transform: scale(1.5) rotate(-10deg); } 100% { transform: scale(1); } }
-.fly-coin { position: fixed; width: 30px; height: 30px; z-index: 3000; pointer-events: none; will-change: transform, opacity;
-    transition: transform .9s cubic-bezier(.45,-0.3,.6,1), opacity .9s ease-in; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
-.fly-plus { position: fixed; z-index: 3001; pointer-events: none; font-weight: 900; font-size: 1.4rem; color: #d39b12; text-shadow: 0 1px 0 #fff;
-    animation: fly-plus 1.2s ease-out forwards; }
-@keyframes fly-plus { to { transform: translateY(-50px); opacity: 0; } }
-.coin-chip.coin-hit { animation: coin-hit .35s ease-out; }
-@keyframes coin-hit { 50% { transform: scale(1.25); box-shadow: 0 0 14px rgba(242,194,48,.9); } }
-@media (prefers-reduced-motion: reduce) { .gift-btn .gift-box { animation: none; } }
+.gift-code { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 1.15rem; font-weight: 700; background: #1e1e2e; color: #cdd6f4;
+    border: 2px solid #313244; border-radius: 12px; padding: 8px 16px; cursor: pointer; box-shadow: 0 4px 14px rgba(30,30,46,.35);
+    transition: transform .15s, box-shadow .15s, opacity .5s, filter .5s; animation: gc-glow 2s ease-in-out infinite; }
+.gift-code:hover { transform: translateY(-2px); }
+.gc-var { color: #89b4fa; } .gc-op { color: #f38ba8; } .gc-num { color: #fab387; }
+.gc-cur { color: #a6e3a1; margin-left: 2px; animation: gc-blink 1s steps(1) infinite; }
+.gift-code.gc-run { animation: none; box-shadow: 0 0 18px #a6e3a1; border-color: #a6e3a1; }
+.gift-code.gc-gone { opacity: 0; transform: scale(.8); filter: blur(2px); }
+@keyframes gc-blink { 50% { opacity: 0; } }
+@keyframes gc-glow { 50% { box-shadow: 0 0 14px rgba(250,179,135,.6); } }
+@media (prefers-reduced-motion: reduce) { .gift-code, .gc-cur { animation: none; } }
 </style>
 <script>
 (function () {
     var btn = document.getElementById('gift-btn');
     if (!btn) return;
     function csrf() { var m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ''; }
-    function countUp(el, from, to) {
-        var t0 = performance.now(), dur = 700;
-        (function step(t) { var k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(from + (to - from) * k); if (k < 1) requestAnimationFrame(step); })(t0);
-    }
     btn.addEventListener('click', function () {
         if (btn.disabled) return;
-        btn.disabled = true;
+        btn.disabled = true; btn.classList.add('gc-run');
         fetch(btn.dataset.url, {method: 'POST', headers: {'X-CSRFToken': csrf()}, credentials: 'same-origin'})
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                btn.classList.add('gift-open');
-                var chip = document.querySelector('.coin-chip'), num = chip && chip.querySelector('.coin-num');
-                var from = btn.querySelector('.gift-box').getBoundingClientRect();
-                var to = chip && chip.offsetParent ? chip.getBoundingClientRect() : {left: innerWidth - 60, top: 10, width: 30, height: 30};
-                if (d.ok) {
-                    var plus = document.createElement('div'); plus.className = 'fly-plus'; plus.textContent = '+' + d.amount;
-                    plus.style.left = (from.left + from.width / 2 - 14) + 'px'; plus.style.top = (from.top - 10) + 'px';
-                    document.body.appendChild(plus); setTimeout(function () { plus.remove(); }, 1300);
-                    for (var i = 0; i < d.amount; i++) (function (i) {
-                        var c = document.createElement('img'); c.src = btn.dataset.coin; c.className = 'fly-coin';
-                        c.style.left = (from.left + from.width / 2 - 15) + 'px'; c.style.top = (from.top + from.height / 2 - 15) + 'px';
-                        document.body.appendChild(c);
-                        setTimeout(function () {
-                            var dx = to.left + 4 - (from.left + from.width / 2 - 15), dy = to.top + to.height / 2 - 15 - (from.top + from.height / 2 - 15);
-                            c.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.7) rotate(' + (360 + i * 40) + 'deg)';
-                        }, 60 + i * 120);
-                        setTimeout(function () {
-                            c.remove();
-                            if (chip) { chip.classList.remove('coin-hit'); void chip.offsetWidth; chip.classList.add('coin-hit'); }
-                            if (num) num.textContent = (+num.textContent || 0) + 1;
-                            if (i === d.amount - 1 && num) countUp(num, +num.textContent, d.balance);
-                        }, 1000 + i * 120);
-                    })(i);
-                } else if (num) { num.textContent = d.balance; }
-                setTimeout(function () {
-                    btn.classList.add('gift-done'); btn.querySelector('.gift-txt').textContent = btn.dataset.done;
-                }, 1000 + d.amount * 120);
+                function hide() { btn.classList.add('gc-gone'); setTimeout(function () { btn.parentNode.remove(); }, 600); }
+                pfCoinBurst(d.amount, btn.getBoundingClientRect(), d.balance, hide);
             })
-            .catch(function () { btn.disabled = false; });
+            .catch(function () { btn.disabled = false; btn.classList.remove('gc-run'); });
     });
 })();
 </script>

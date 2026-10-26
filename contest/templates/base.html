@@ -286,5 +286,49 @@
     window.addEventListener('pageshow', function (e) { if (e.persisted) restore(); });
 })();
 </script>
+{% if coin_balance is not None %}
+<style>
+.fly-coin { position: fixed; width: 30px; height: 30px; z-index: 3000; pointer-events: none; will-change: transform, opacity;
+    transition: transform .9s cubic-bezier(.45,-0.3,.6,1), opacity .9s ease-in; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
+.fly-plus { position: fixed; z-index: 3001; pointer-events: none; font-weight: 900; font-size: 1.6rem; color: #d39b12;
+    text-shadow: 0 1px 0 #fff, 0 0 8px rgba(255,255,255,.8); animation: fly-plus 1.4s ease-out forwards; }
+@keyframes fly-plus { 0% { transform: scale(.6); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 100% { transform: translateY(-60px); opacity: 0; } }
+.coin-chip.coin-hit { animation: coin-hit .35s ease-out; }
+@keyframes coin-hit { 50% { transform: scale(1.25); box-shadow: 0 0 14px rgba(242,194,48,.9); } }
+</style>
+<script>
+/* Монеты летят в счётчик в шапке: pfCoinBurst(сколько, откуда {left,top,width,height}, итоговый баланс) */
+window.pfCoinBurst = function (amount, from, finalBalance, done) {
+    if (!amount) { if (done) done(); return; }
+    var chip = document.querySelector('.coin-chip'), num = chip && chip.querySelector('.coin-num');
+    var to = chip && chip.offsetParent ? chip.getBoundingClientRect()
+        : (document.querySelector('.navbar-toggler') || document.body).getBoundingClientRect();
+    if (!from) from = {left: innerWidth / 2 - 20, top: innerHeight / 2 - 20, width: 40, height: 40};
+    var fx = from.left + from.width / 2 - 15, fy = from.top + from.height / 2 - 15;
+    var start = finalBalance - amount, n = Math.min(amount, 10), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var plus = document.createElement('div'); plus.className = 'fly-plus'; plus.textContent = '+' + amount;
+    plus.style.left = (fx - 6) + 'px'; plus.style.top = (fy - 24) + 'px';
+    document.body.appendChild(plus); setTimeout(function () { plus.remove(); }, 1500);
+    if (num) num.textContent = start;
+    function hit(k) {
+        if (chip) { chip.classList.remove('coin-hit'); void chip.offsetWidth; chip.classList.add('coin-hit'); }
+        if (num) num.textContent = Math.round(start + amount * k);
+    }
+    if (reduce) { hit(1); if (done) done(); return; }
+    for (var i = 0; i < n; i++) (function (i) {
+        var c = document.createElement('img'); c.src = '{% static "icons/coin-64.png" %}'; c.className = 'fly-coin';
+        c.style.left = fx + 'px'; c.style.top = fy + 'px';
+        document.body.appendChild(c);
+        setTimeout(function () {
+            c.style.transform = 'translate(' + (to.left + 4 - fx) + 'px,' + (to.top + to.height / 2 - 15 - fy) + 'px) scale(.7) rotate(' + (360 + i * 40) + 'deg)';
+        }, 60 + i * 120);
+        setTimeout(function () { c.remove(); hit((i + 1) / n); if (i === n - 1 && done) done(); }, 1000 + i * 120);
+    })(i);
+};
+{% if coin_gain %}
+window.addEventListener('load', function () { setTimeout(function () { pfCoinBurst({{ coin_gain }}, null, {{ coin_balance }}); }, 400); });
+{% endif %}
+</script>
+{% endif %}
 </body>
 </html>

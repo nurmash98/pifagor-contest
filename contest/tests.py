@@ -1923,12 +1923,12 @@ class DailyGiftTests(TestCase):
         u = User.objects.create_user('gft', password='x')
         st = Student.objects.create(user=u, full_name='G', school_class='7B')
         self.client.force_login(u)
-        self.assertIn('gift-btn', self.client.get(reverse('courses')).content.decode())
+        self.assertIn('id="gift-btn"', self.client.get(reverse('courses')).content.decode())
         r = self.client.post(reverse('daily_gift')).json()
         self.assertTrue(r['ok']); self.assertEqual(r['balance'], 5)
         r2 = self.client.post(reverse('daily_gift')).json()
         self.assertFalse(r2['ok']); self.assertEqual(coins.balance(st), 5)
-        self.assertIn('gift-done', self.client.get(reverse('courses')).content.decode())
+        self.assertNotIn('id="gift-btn"', self.client.get(reverse('courses')).content.decode())
         with mock.patch('django.utils.timezone.now', return_value=timezone.now() + timedelta(days=1)):
             self.client.force_login(u)
             self.assertTrue(self.client.post(reverse('daily_gift')).json()['ok'])
@@ -1947,3 +1947,18 @@ class ClassBonusScaleTests(TestCase):
         self.assertEqual(sorted(ClassBonus.objects.values_list('points', flat=True)), [-10, 0, 3, 10])
         html = self.client.get(reverse('leaderboard') + '?scope=mine').content.decode()
         self.assertEqual(html.count('class="cb-pt'), 21)
+
+
+class CoinGainAnimationTests(TestCase):
+    def test_gain_shown_once_after_new_coins(self):
+        u = User.objects.create_user('cga', password='x')
+        st = Student.objects.create(user=u, full_name='C', school_class='7B')
+        self.client.force_login(u)
+        self.assertNotIn('pfCoinBurst(0', self.client.get(reverse('courses')).content.decode())
+        task = Task.objects.create(title='G', description='d', level='C', test_cases=[])
+        from .models import Submission
+        Submission.objects.create(student=st, task=task, status='DONE', score=10, is_graded=True)
+        s = self.client.session; s['coin_sync_at'] = 0; s.save()
+        html = self.client.get(reverse('courses')).content.decode()
+        self.assertIn('pfCoinBurst(8, null, 8)', html)        # 3 за задачу C + 5 первая задача дня
+        self.assertNotIn('pfCoinBurst(8, null', self.client.get(reverse('courses')).content.decode())

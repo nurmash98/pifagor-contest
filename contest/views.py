@@ -1110,8 +1110,9 @@ def daily_gift(request):
     if request.method != 'POST' or student is None:
         return JsonResponse({'ok': False}, status=400)
     got = coin_module.claim_gift(student)
-    return JsonResponse({'ok': got, 'amount': coin_module.DAILY_GIFT if got else 0,
-                         'balance': coin_module.balance(student)})
+    bal = coin_module.balance(student)
+    request.session['coin_seen'] = bal   # анимацию уже показали на этой странице
+    return JsonResponse({'ok': got, 'amount': coin_module.DAILY_GIFT if got else 0, 'balance': bal})
 
 
 @login_required

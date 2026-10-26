@@ -59,4 +59,20 @@ def coins(request):
     if not student:
         return {'coin_balance': None, 'my_solved': 0}
     solved = Submission.objects.filter(student=student, is_graded=True, score=10).count()
-    return {'coin_balance': balance(student), 'my_solved': solved}
+    # Новые начисления (учитель поставил 10/10, награда четверти…) подтягиваем не чаще раза в минуту
+    import time
+    session = getattr(request, 'session', None)
+    if session is not None and time.time() - session.get('coin_sync_at', 0) > 60:
+        from .coins import sync
+        sync(student)
+        session['coin_sync_at'] = time.time()
+    bal = balance(student)
+    # Анимация «монеты летят в счётчик» — когда баланс вырос с прошлой страницы
+    gain = 0
+    if session is not None:
+        seen = session.get('coin_seen')
+        if seen is not None and bal > seen:
+            gain = bal - seen
+        if seen != bal:
+            session['coin_seen'] = bal
+    return {'coin_balance': bal, 'my_solved': solved, 'coin_gain': gain}
