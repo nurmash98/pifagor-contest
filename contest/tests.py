@@ -1933,3 +1933,17 @@ class DailyGiftTests(TestCase):
             self.client.force_login(u)
             self.assertTrue(self.client.post(reverse('daily_gift')).json()['ok'])
         self.assertEqual(coins.balance(st), 10)
+
+
+class ClassBonusScaleTests(TestCase):
+    def test_scale_minus10_to_plus10(self):
+        from .models import ClassBonus
+        t_user = User.objects.create_user('tbs', password='x', is_staff=True)
+        Teacher.objects.create(user=t_user, full_name='T', classes='7B')
+        Student.objects.create(user=User.objects.create_user('sbs', password='x'), full_name='S', school_class='7B')
+        self.client.force_login(t_user)
+        for p in (-10, 0, 10, 3, 11, -11):
+            self.client.post(reverse('add_class_bonus'), {'school_class': '7B', 'points': p})
+        self.assertEqual(sorted(ClassBonus.objects.values_list('points', flat=True)), [-10, 0, 3, 10])
+        html = self.client.get(reverse('leaderboard') + '?scope=mine').content.decode()
+        self.assertEqual(html.count('class="cb-pt'), 21)
