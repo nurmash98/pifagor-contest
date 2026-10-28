@@ -36,7 +36,7 @@
                 <tr>
                     <th class="ps-3">Ученик</th>
                     {% for topic in topics %}
-                        <th class="text-center">{{ topic.name }}<div class="text-muted small fw-normal">задач: {{ topic.tasks.count }}</div></th>
+                        <th class="text-center">{{ topic.name }}<div class="text-muted small fw-normal">задач: {{ topic.task_total }}</div></th>
                     {% endfor %}
                     <th class="text-center">Всего на 10</th>
                 </tr>

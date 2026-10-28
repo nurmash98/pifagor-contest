@@ -55,6 +55,9 @@
                     </div>
                 </div>
 
+{% if subtopics|length %}
+                <div class="alert alert-info small mb-4">У темы есть подтемы, поэтому задачи добавляются в самих подтемах (ниже). Свои задачи у такой темы не показываются.</div>
+{% else %}
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Задачи темы</label>
 
@@ -85,6 +88,8 @@
                     <div class="form-text">Отметьте галочками задачи, которые войдут в тему.</div>
                 </div>
 
+{% endif %}
+
                 <button type="submit" class="btn btn-pifagor-green px-4">
                     {% if topic %}Сохранить{% else %}Добавить тему{% endif %}
                 </button>
@@ -107,6 +112,7 @@
                     <div>
                         <strong>{{ sub.name }}</strong>
                         {% if sub.theory_filename %}<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">📖 Теория</span>{% endif %}
+                        <span class="text-muted small ms-1">Задач: {{ sub.tasks.all|length }}</span>
                     </div>
                     <div class="d-flex gap-2">
                         <a href="{% url 'subtopic_edit' sub.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить</a>
@@ -120,7 +126,7 @@
                 <li class="list-group-item px-0 text-muted small">Подтем нет. Если их не добавить, ученик блок «Подтемы» не увидит.</li>
                 {% endfor %}
             </ul>
-            <div class="form-text mt-2">Сначала сохраните изменения в самой теме (кнопка «Сохранить» выше), потом переходите к подтемам.</div>
+            <div class="form-text mt-2">Сначала сохраните изменения в самой теме (кнопка «Сохранить» выше), потом переходите к подтемам. Как только появится подтема, свои задачи у темы скрываются: задачи добавляются в подтемах.</div>
         </div>
     </div>
 </div>

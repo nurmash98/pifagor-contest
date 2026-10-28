@@ -2048,14 +2048,13 @@ class SubtopicTests(TestCase):
     def test_hidden_when_no_subtopics(self):
         self.client.login(username='ssub', password='p')
         r = self.client.get(reverse('course_detail', args=[self.course.id]))
-        self.assertNotContains(r, 'data-part="subtopics"')
+        self.assertNotContains(r, 'subtopic_theory')
 
     def test_shown_with_theory_button(self):
         sub = self.Subtopic.objects.create(topic=self.topic, name='Цикл for', theory_html='<p>hi</p>', theory_filename='a.html')
         self.Subtopic.objects.create(topic=self.topic, name='Цикл while')
         self.client.login(username='ssub', password='p')
         r = self.client.get(reverse('course_detail', args=[self.course.id]))
-        self.assertContains(r, 'data-part="subtopics"')
         self.assertContains(r, 'Цикл for')
         self.assertContains(r, reverse('subtopic_theory', args=[sub.id]))
         t = self.client.get(reverse('subtopic_theory', args=[sub.id]))
@@ -2102,3 +2101,60 @@ class SubtopicTests(TestCase):
         r = self.client.post(reverse('subtopic_create', args=[self.topic.id]), {'name': 'X'})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.Subtopic.objects.count(), 0)
+
+
+class SubtopicTasksTests(TestCase):
+    def setUp(self):
+        from .models import Subtopic, Topic
+        self.tu = User.objects.create_user('tst', password='p', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.tu, full_name='У')
+        self.course = Course.objects.create(name='Py', is_visible=True)
+        self.teacher.courses.add(self.course)
+        self.topic = Topic.objects.create(course=self.course, name='Условный оператор')
+        self.own = Task.objects.create(title='Своя задача темы', description='d', level='A')
+        self.t1 = Task.objects.create(title='Задача подтемы 1', description='d', level='A')
+        self.t2 = Task.objects.create(title='Задача подтемы 2', description='d', level='B')
+        self.topic.tasks.add(self.own)
+        self.sub = Subtopic.objects.create(topic=self.topic, name='Вложенные условия')
+        self.sub.tasks.add(self.t1)
+        self.su = User.objects.create_user('sst', password='p')
+        Student.objects.create(user=self.su, full_name='С', school_class='7F')
+
+    def test_topic_with_subtopics_hides_own_tasks_shows_subtask(self):
+        self.client.login(username='sst', password='p')
+        r = self.client.get(reverse('course_detail', args=[self.course.id]))
+        self.assertNotContains(r, 'Своя задача темы')
+        self.assertContains(r, 'Вложенные условия')
+        self.assertContains(r, 'Задача подтемы 1')
+        self.assertNotContains(r, 'Задача подтемы 2')
+        self.assertNotContains(r, 'data-part="tasks"')   # без раскрывающегося блока задач темы
+
+    def test_topic_without_subtopics_shows_own_tasks(self):
+        self.sub.delete()
+        self.client.login(username='sst', password='p')
+        r = self.client.get(reverse('course_detail', args=[self.course.id]))
+        self.assertContains(r, 'Своя задача темы')
+
+    def test_teacher_sets_subtopic_tasks_and_topic_form_hides_checklist(self):
+        self.client.login(username='tst', password='p')
+        self.client.post(reverse('subtopic_edit', args=[self.sub.id]),
+                         {'name': 'Вложенные условия', 'tasks': [self.t1.id, self.t2.id]})
+        self.assertEqual(set(self.sub.tasks.values_list('id', flat=True)), {self.t1.id, self.t2.id})
+        page = self.client.get(reverse('topic_edit', args=[self.topic.id]))
+        self.assertNotContains(page, 'name="tasks"')
+        # сохранение темы не стирает и не меняет задачи
+        self.client.post(reverse('topic_edit', args=[self.topic.id]), {'name': 'Условный оператор', 'tasks': [self.t2.id]})
+        self.assertEqual(list(self.topic.tasks.values_list('id', flat=True)), [self.own.id])
+
+    def test_create_subtopic_with_tasks(self):
+        self.client.login(username='tst', password='p')
+        self.client.post(reverse('subtopic_create', args=[self.topic.id]), {'name': 'Новая', 'tasks': [self.t2.id]})
+        from .models import Subtopic
+        self.assertEqual(list(Subtopic.objects.get(name='Новая').tasks.values_list('id', flat=True)), [self.t2.id])
+
+    def test_effective_task_ids_and_analytics(self):
+        self.assertEqual(self.topic.effective_task_ids(), [self.t1.id])
+        r = self.client.login(username='tst', password='p')
+        page = self.client.get(reverse('course_analytics', args=[self.course.id]))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'задач: 1')

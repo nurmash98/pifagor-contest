@@ -1129,11 +1129,14 @@ def course_detail(request, course_id):
     topics = course.topics.prefetch_related(
         Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))
     ).prefetch_related(
-        Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html'))
+        Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html').prefetch_related(
+            Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))))
     ).defer('theory_html')
     lang = _get_content_lang(request)
     for topic in topics:
         _apply_task_language(topic.tasks.all(), lang)
+        for sub in topic.subtopics.all():
+            _apply_task_language(sub.tasks.all(), lang)
 
     if not request.user.is_staff:
         student = Student.objects.filter(user=request.user).first()
@@ -1144,6 +1147,9 @@ def course_detail(request, course_id):
             for topic in topics:
                 for task in topic.tasks.all():
                     task.user_sub = user_submissions.get(task.id)
+                for sub in topic.subtopics.all():
+                    for task in sub.tasks.all():
+                        task.user_sub = user_submissions.get(task.id)
 
     return render(request, 'course_detail.html', {'course': course, 'topics': topics})
 
@@ -1194,9 +1200,11 @@ def course_manage(request, course_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    topics = course.topics.prefetch_related(
-        'tasks', Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html'))
-    ).defer('theory_html')
+    topics = list(course.topics.prefetch_related(
+        'tasks', Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html').prefetch_related('tasks'))
+    ).defer('theory_html'))
+    for topic in topics:
+        topic.task_total = len(topic.effective_task_ids())
     context = {'course': course, 'topics': topics}
     context.update(_class_form_context(request.user, course))
     return render(request, 'course_manage.html', context)
@@ -1224,8 +1232,10 @@ def course_analytics(request, course_id):
     if selected_class not in classes:
         selected_class = classes[0] if classes else ''
 
-    topics = list(course.topics.prefetch_related('tasks').order_by('order', 'name'))
-    topic_task_ids = [(topic, list(topic.tasks.values_list('id', flat=True))) for topic in topics]
+    topics = list(course.topics.prefetch_related('tasks', 'subtopics__tasks').order_by('order', 'name'))
+    topic_task_ids = [(topic, topic.effective_task_ids()) for topic in topics]
+    for topic, ids in topic_task_ids:
+        topic.task_total = len(ids)
 
     students = []
     if selected_class:
@@ -1385,7 +1395,8 @@ def topic_edit(request, topic_id):
         topic.theory_video_url = request.POST.get('theory_video_url', '').strip()
         error = _apply_theory_upload(request, topic)
         topic.save()
-        topic.tasks.set(request.POST.getlist('tasks'))
+        if not topic.subtopics.exists():   # у темы с подтемами своих задач нет — задачи в подтемах
+            topic.tasks.set(request.POST.getlist('tasks'))
         if error:
             messages.error(request, f'Тема сохранена, но теория не загружена: {error}')
             return redirect('topic_edit', topic_id=topic.id)
@@ -1394,7 +1405,7 @@ def topic_edit(request, topic_id):
 
     return render(request, 'topic_form.html', {
         'course': course, 'topic': topic, 'all_tasks': all_tasks,
-        'subtopics': topic.subtopics.defer('theory_html'),
+        'subtopics': topic.subtopics.defer('theory_html').prefetch_related('tasks'),
         'selected_task_ids': set(topic.tasks.values_list('id', flat=True)),
         'all_tags': Tag.objects.all(),
     })
@@ -1434,12 +1445,16 @@ def subtopic_create(request, topic_id):
             sub = Subtopic(topic=topic, name=name[:200], order=max(order, 0))
             error = _apply_theory_upload(request, sub)
             sub.save()
+            sub.tasks.set(request.POST.getlist('tasks'))
             if error:
                 messages.error(request, f'Подтема «{sub.name}» добавлена, но теория не загружена: {error}')
                 return redirect('subtopic_edit', subtopic_id=sub.id)
             messages.success(request, f'Подтема «{sub.name}» добавлена.')
             return redirect('topic_edit', topic_id=topic.id)
-    return render(request, 'subtopic_form.html', {'topic': topic, 'course': topic.course, 'sub': None})
+    return render(request, 'subtopic_form.html', {
+        'topic': topic, 'course': topic.course, 'sub': None, 'selected_task_ids': set(),
+        'all_tasks': _tasks_by_level_and_solved(Task.objects.prefetch_related('tags')), 'all_tags': Tag.objects.all(),
+    })
 
 
 @staff_member_required
@@ -1458,12 +1473,17 @@ def subtopic_edit(request, subtopic_id):
             pass
         error = _apply_theory_upload(request, sub)
         sub.save()
+        sub.tasks.set(request.POST.getlist('tasks'))
         if error:
             messages.error(request, f'Подтема сохранена, но теория не загружена: {error}')
             return redirect('subtopic_edit', subtopic_id=sub.id)
         messages.success(request, f'Подтема «{sub.name}» сохранена.')
         return redirect('topic_edit', topic_id=sub.topic_id)
-    return render(request, 'subtopic_form.html', {'topic': sub.topic, 'course': sub.topic.course, 'sub': sub})
+    return render(request, 'subtopic_form.html', {
+        'topic': sub.topic, 'course': sub.topic.course, 'sub': sub,
+        'selected_task_ids': set(sub.tasks.values_list('id', flat=True)),
+        'all_tasks': _tasks_by_level_and_solved(Task.objects.prefetch_related('tags')), 'all_tags': Tag.objects.all(),
+    })
 
 
 @staff_member_required

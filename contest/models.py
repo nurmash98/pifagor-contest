@@ -174,6 +174,17 @@ class Topic(models.Model):
     def __str__(self):
         return f"{self.course.name} — {self.name}"
 
+    def effective_task_ids(self):
+        """Задачи темы для статистики: если у темы есть подтемы — задачи только подтем
+        (свои задачи темы тогда не показываются), иначе — задачи самой темы."""
+        subs = list(self.subtopics.all())
+        if subs:
+            ids = []
+            for sub in subs:
+                ids.extend(t.id for t in sub.tasks.all())
+            return list(dict.fromkeys(ids))
+        return [t.id for t in self.tasks.all()]
+
     def youtube_embed_url(self):
         """URL для встраивания ролика (<iframe>), если ссылка похожа на YouTube."""
         if not self.theory_video_url:
@@ -189,6 +200,7 @@ class Subtopic(models.Model):
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок отображения")
     theory_html = models.TextField(blank=True, verbose_name="Теория (HTML)")
     theory_filename = models.CharField(max_length=255, blank=True, verbose_name="Имя файла теории")
+    tasks = models.ManyToManyField(Task, blank=True, related_name='subtopics', verbose_name="Задачи")
 
     class Meta:
         verbose_name = "Подтема"
