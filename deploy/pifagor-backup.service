@@ -1,0 +1,6 @@
+[Unit]
+Description=Pifagor: копия базы данных
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pifagor-backup

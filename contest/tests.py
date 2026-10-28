@@ -1962,3 +1962,70 @@ class CoinGainAnimationTests(TestCase):
         html = self.client.get(reverse('courses')).content.decode()
         self.assertIn('pfCoinBurst(8, null, 8)', html)        # 3 за задачу C + 5 первая задача дня
         self.assertNotIn('pfCoinBurst(8, null', self.client.get(reverse('courses')).content.decode())
+
+
+class AutotestSandboxTests(TestCase):
+    def test_student_code_does_not_see_server_secrets(self):
+        import os
+        from unittest import mock
+        from . import autotest
+        code = "import os\nprint(sorted(k for k in os.environ if 'SECRET' in k or 'POSTGRES' in k))"
+        with mock.patch.dict(os.environ, {'DJANGO_SECRET_KEY': 'topsecret', 'POSTGRES_PASSWORD': 'pw'}):
+            out, err = autotest._run_one(code, '')
+        self.assertIsNone(err)
+        self.assertEqual(out.strip(), '[]')
+
+    def test_sandbox_command_and_exit_codes(self):
+        from unittest import mock
+        from . import autotest
+        argv, wall, pre = autotest.build_command('/tmp/x.py', 'pifagorbox')
+        self.assertEqual(argv[:5], ['sudo', '-n', '-u', 'pifagorbox', '--'])
+        self.assertIn('/usr/bin/prlimit', argv); self.assertIn('/usr/bin/timeout', argv)
+        self.assertEqual(argv[-2:], ['-I', '/tmp/x.py']); self.assertFalse(pre); self.assertGreater(wall, autotest.WALL_CLOCK_TIMEOUT)
+        self.assertEqual(autotest.build_command('/tmp/x.py')[0][1], '/tmp/x.py')
+        import subprocess
+        def fake(rc, err=''):
+            return mock.patch('contest.autotest.subprocess.run', return_value=subprocess.CompletedProcess([], rc, '', err))
+        with self.settings(AUTOTEST_SANDBOX_USER='pifagorbox'):
+            with fake(137):
+                self.assertEqual(autotest._run_one('print(1)', ''), ('', 'timeout'))
+            with fake(152):
+                self.assertEqual(autotest._run_one('print(1)', ''), ('', 'timeout'))
+            with fake(1, 'sudo: a password is required'):
+                self.assertIn('песочница', autotest._run_one('print(1)', '')[1])
+
+    def test_sandbox_check_requires_user(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        with self.settings(AUTOTEST_SANDBOX_USER=''):
+            with self.assertRaises(CommandError):
+                call_command('sandbox_check')
+
+
+class SharedCacheSettingTests(TestCase):
+    def test_cache_dir_env_switches_backend(self):
+        import importlib, os, sys
+        from unittest import mock
+        with mock.patch.dict(os.environ, {'DJANGO_CACHE_DIR': '/tmp/pf-cache-test'}):
+            mod = importlib.reload(importlib.import_module('pifagor_contest.settings'))
+            self.assertIn('filebased', mod.CACHES['default']['BACKEND'])
+        importlib.reload(importlib.import_module('pifagor_contest.settings'))
+
+
+class RealIPMiddlewareTests(TestCase):
+    def test_real_ip_only_when_trusted_and_from_loopback(self):
+        from .models import LoginEvent
+        u = User.objects.create_user('rip', password='pw12345')
+        Student.objects.create(user=u, full_name='R', school_class='7B')
+        kw = dict(REMOTE_ADDR='127.0.0.1', HTTP_X_REAL_IP='85.1.2.3')
+        with self.settings(TRUST_X_REAL_IP=True):
+            self.client.post(reverse('login'), {'username': 'rip', 'password': 'pw12345'}, **kw)
+        self.assertEqual(LoginEvent.objects.filter(user=u).latest('id').ip, '85.1.2.3')
+        self.client.logout()
+        with self.settings(TRUST_X_REAL_IP=True):       # запрос не с сервера — заголовку не верим
+            self.client.post(reverse('login'), {'username': 'rip', 'password': 'pw12345'}, REMOTE_ADDR='9.9.9.9', HTTP_X_REAL_IP='1.1.1.1')
+        self.assertEqual(LoginEvent.objects.filter(user=u).latest('id').ip, '9.9.9.9')
+        self.client.logout()
+        with self.settings(TRUST_X_REAL_IP=False):      # выключено (Render) — не меняем
+            self.client.post(reverse('login'), {'username': 'rip', 'password': 'pw12345'}, **kw)
+        self.assertEqual(LoginEvent.objects.filter(user=u).latest('id').ip, '127.0.0.1')

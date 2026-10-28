@@ -80,6 +80,35 @@ def _limit_resources():
         pass
 
 
+def _safe_env():
+    """Окружение для кода ученика: ничего из окружения сервера (пароль базы, SECRET_KEY…)."""
+    env = {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'PYTHONIOENCODING': 'utf-8', 'PYTHONUNBUFFERED': '1'}
+    if os.name == 'nt':   # Windows (локальная разработка): без SYSTEMROOT Python не стартует
+        env['SYSTEMROOT'] = os.environ.get('SYSTEMROOT', '')
+    return env
+
+
+def _sandbox_user():
+    from django.conf import settings
+    return getattr(settings, 'AUTOTEST_SANDBOX_USER', '') or ''
+
+
+def build_command(tmp_path, sandbox_user=None):
+    """Команда запуска кода ученика. Возвращает (argv, wall_timeout, использовать_ли_preexec).
+    Без песочницы — тот же Python, лимиты ставятся в дочернем процессе (preexec_fn).
+    С песочницей (на сервере) — под отдельным пользователем без доступа к файлам приложения:
+    sudo -> prlimit (лимиты CPU/память/процессы/файлы) -> timeout (убить по времени, даже если
+    программа «спит») -> python -I."""
+    if not sandbox_user:
+        return [sys.executable, tmp_path], WALL_CLOCK_TIMEOUT, True
+    from django.conf import settings
+    py = getattr(settings, 'AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3') or '/usr/bin/python3'
+    argv = ['sudo', '-n', '-u', sandbox_user, '--', '/usr/bin/prlimit',
+            f'--cpu={TIME_LIMIT_SECONDS}', f'--as={MEMORY_LIMIT_BYTES}', '--nproc=64', f'--fsize={10 * 1024 * 1024}', '--core=0',
+            '/usr/bin/timeout', '-s', 'KILL', str(WALL_CLOCK_TIMEOUT), py, '-I', tmp_path]
+    return argv, WALL_CLOCK_TIMEOUT + 2.5, False
+
+
 def _run_one(code, stdin_text):
     """Запускает code одним процессом Python, скармливает stdin_text на stdin.
     Возвращает (stdout, error), где error — None, 'timeout', 'memory' или
@@ -88,14 +117,20 @@ def _run_one(code, stdin_text):
         f.write(code)
         tmp_path = f.name
 
+    user = _sandbox_user()
+    argv, wall, use_preexec = build_command(tmp_path, user)
     try:
+        if user:
+            os.chmod(tmp_path, 0o644)      # пользователь песочницы должен прочитать файл
         proc = subprocess.run(
-            [sys.executable, tmp_path],
+            argv,
             input=stdin_text or '',
             capture_output=True,
             text=True,
-            timeout=WALL_CLOCK_TIMEOUT,
-            preexec_fn=_limit_resources if HAS_RESOURCE else None,
+            timeout=wall,
+            env=_safe_env(),
+            cwd=tempfile.gettempdir(),
+            preexec_fn=_limit_resources if (HAS_RESOURCE and use_preexec) else None,
         )
     except subprocess.TimeoutExpired:
         return '', 'timeout'
@@ -105,11 +140,13 @@ def _run_one(code, stdin_text):
         except OSError:
             pass
 
+    if user and proc.returncode != 0 and (proc.stderr or '').lstrip().startswith(('sudo:', 'prlimit:')):
+        return '', 'песочница недоступна (сообщите учителю)'
     if proc.returncode != 0:
         stderr_text = proc.stderr or ''
         # SIGKILL/SIGXCPU — процесс убит ядром за превышение лимита CPU-времени
         # (RLIMIT_CPU c одинаковым soft/hard лимитом убивает почти сразу).
-        if proc.returncode in (-9, -24):
+        if proc.returncode in (-9, -24, 137, 152):   # 137/152 — то же через sudo/timeout (128 + сигнал)
             return '', 'timeout'
         # RLIMIT_AS обычно приводит к обычному MemoryError внутри интерпретатора
         # (malloc не смог выделить память), а не к убийству процесса ядром.

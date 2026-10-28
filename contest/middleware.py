@@ -9,6 +9,23 @@ EXAM_LOCKED_VIEWS = {
 }
 
 
+class RealIPMiddleware:
+    """За nginx на своём сервере адрес клиента приходит в заголовке X-Real-IP (nginx его перезаписывает,
+    подделать нельзя). Берём его, только если запрос пришёл с самого сервера (127.0.0.1) и включено
+    TRUST_X_REAL_IP — иначе ничего не меняем (Render, локальная разработка)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.conf import settings
+        if getattr(settings, 'TRUST_X_REAL_IP', False) and request.META.get('REMOTE_ADDR') in ('127.0.0.1', '::1'):
+            real = (request.META.get('HTTP_X_REAL_IP') or '').strip()
+            if real:
+                request.META['REMOTE_ADDR'] = real
+        return self.get_response(request)
+
+
 class ExamLockMiddleware:
     """Пока у ученика идёт СОР/СОЧ (нажал «Начать», не завершил, время не вышло),
     Курсы и Все задачи недоступны — перекидываем обратно на экзамен.

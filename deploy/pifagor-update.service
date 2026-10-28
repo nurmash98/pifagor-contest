@@ -1,0 +1,6 @@
+[Unit]
+Description=Pifagor: подтянуть новый код из GitHub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pifagor-update

@@ -1,13 +1,16 @@
 [Unit]
-Description=Gunicorn daemon for Pifagor Contest
+Description=Pifagor Contest (gunicorn)
 After=network.target postgresql.service
 
 [Service]
-User=__APP_USER__
-Group=__APP_USER__
-WorkingDirectory=__APP_DIR__
-EnvironmentFile=__APP_DIR__/deploy/pifagor.env
-ExecStart=__APP_DIR__/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 pifagor_contest.wsgi:application
+User=pifagor
+Group=pifagor
+WorkingDirectory=/opt/pifagor-contest
+EnvironmentFile=/etc/pifagor/pifagor.env
+CacheDirectory=pifagor
+# 3 процесса × 4 потока. Код учеников запускается через sudo под пользователем pifagorbox,
+# поэтому НЕ включайте NoNewPrivileges — sudo перестанет работать.
+ExecStart=/opt/pifagor-contest/venv/bin/gunicorn --workers 3 --worker-class gthread --threads 4 --timeout 60 --bind 127.0.0.1:8000 pifagor_contest.wsgi:application
 Restart=on-failure
 RestartSec=3
 

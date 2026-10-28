@@ -1,0 +1,13 @@
+[Unit]
+Description=Pifagor: запрет сети для кода учеников (пользователь __BOX_USER__)
+After=network-pre.target ufw.service
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -C OUTPUT -m owner --uid-owner __BOX_USER__ -j REJECT 2>/dev/null || iptables -I OUTPUT 1 -m owner --uid-owner __BOX_USER__ -j REJECT; ip6tables -C OUTPUT -m owner --uid-owner __BOX_USER__ -j REJECT 2>/dev/null || ip6tables -I OUTPUT 1 -m owner --uid-owner __BOX_USER__ -j REJECT'
+ExecStop=/bin/sh -c 'iptables -D OUTPUT -m owner --uid-owner __BOX_USER__ -j REJECT 2>/dev/null; ip6tables -D OUTPUT -m owner --uid-owner __BOX_USER__ -j REJECT 2>/dev/null; true'
+
+[Install]
+WantedBy=multi-user.target

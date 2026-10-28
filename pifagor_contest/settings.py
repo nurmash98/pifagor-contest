@@ -61,10 +61,12 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Настоящий IP ученика за nginx (только при TRUST_X_REAL_IP=True — см. deploy/DEPLOY_HOME.md)
+    'contest.middleware.RealIPMiddleware',
     'django.middleware.security.SecurityMiddleware',
     # Отдаёт статику прямо из Gunicorn — нужно для хостингов вроде Render,
-    # где нет отдельного Nginx перед приложением. На Oracle-деплое с Nginx
-    # не мешает: запросы к /static/ там перехватывает сам Nginx раньше.
+    # где нет отдельного Nginx перед приложением. На своём сервере тоже оставляем:
+    # статику раздаёт сам Gunicorn (быстро и без лишних прав доступа для nginx).
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -129,6 +131,20 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+
+# Кэш. По умолчанию — в памяти процесса (разработка, Render с одним воркером). На своём сервере
+# gunicorn запускает несколько воркеров, и кэш в памяти у каждого свой: рейтинг четверти мог бы
+# отставать после проверки работы. Если задан DJANGO_CACHE_DIR — кэш лежит в общей папке на диске.
+_CACHE_DIR = os.environ.get('DJANGO_CACHE_DIR', '').strip()
+if _CACHE_DIR:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache', 'LOCATION': _CACHE_DIR}}
+
+# Запуск кода учеников (автотесты, дуэли, СОР/СОЧ) под отдельным пользователем без доступа к
+# файлам приложения и к сети — см. contest/autotest.py и deploy/DEPLOY_HOME.md.
+TRUST_X_REAL_IP = os.environ.get('TRUST_X_REAL_IP', 'False') == 'True'
+AUTOTEST_SANDBOX_USER = os.environ.get('AUTOTEST_SANDBOX_USER', '').strip()
+AUTOTEST_SANDBOX_PYTHON = os.environ.get('AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3').strip()
 
 
 # Password validation
