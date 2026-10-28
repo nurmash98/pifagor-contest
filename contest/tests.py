@@ -2158,3 +2158,52 @@ class SubtopicTasksTests(TestCase):
         page = self.client.get(reverse('course_analytics', args=[self.course.id]))
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, 'задач: 1')
+
+
+class DeleteCourseTopicTests(TestCase):
+    def setUp(self):
+        from .models import Subtopic, Topic
+        self.tu = User.objects.create_user('tdel', password='p', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.tu, full_name='Т')
+        self.ou = User.objects.create_user('tdel2', password='p', is_staff=True)
+        Teacher.objects.create(user=self.ou, full_name='Д')
+        self.course = Course.objects.create(name='К', is_visible=True)
+        self.teacher.courses.add(self.course)
+        self.task = Task.objects.create(title='Z', description='d', level='A')
+        self.topic = Topic.objects.create(course=self.course, name='Т1')
+        self.sub = Subtopic.objects.create(topic=self.topic, name='П1')
+        self.sub.tasks.add(self.task)
+        self.Topic, self.Subtopic = Topic, Subtopic
+
+    def test_delete_topic_removes_subtopics_keeps_task(self):
+        self.client.login(username='tdel', password='p')
+        self.client.post(reverse('topic_delete', args=[self.topic.id]))
+        self.assertFalse(self.Topic.objects.filter(id=self.topic.id).exists())
+        self.assertFalse(self.Subtopic.objects.filter(id=self.sub.id).exists())
+        self.assertTrue(Task.objects.filter(id=self.task.id).exists())
+
+    def test_delete_course_cascades(self):
+        self.client.login(username='tdel', password='p')
+        r = self.client.post(reverse('course_delete', args=[self.course.id]))
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(Course.objects.filter(id=self.course.id).exists())
+        self.assertEqual(self.Topic.objects.count(), 0)
+        self.assertTrue(Task.objects.filter(id=self.task.id).exists())
+
+    def test_get_does_not_delete_and_foreign_teacher_cannot(self):
+        self.client.login(username='tdel', password='p')
+        self.client.get(reverse('course_delete', args=[self.course.id]))
+        self.assertTrue(Course.objects.filter(id=self.course.id).exists())
+        self.client.logout()
+        self.client.login(username='tdel2', password='p')
+        self.client.post(reverse('course_delete', args=[self.course.id]))
+        self.client.post(reverse('topic_delete', args=[self.topic.id]))
+        self.assertTrue(Course.objects.filter(id=self.course.id).exists())
+        self.assertTrue(self.Topic.objects.filter(id=self.topic.id).exists())
+
+    def test_student_cannot_delete(self):
+        u = User.objects.create_user('stdel', password='p')
+        Student.objects.create(user=u, full_name='S', school_class='7F')
+        self.client.login(username='stdel', password='p')
+        self.client.post(reverse('course_delete', args=[self.course.id]))
+        self.assertTrue(Course.objects.filter(id=self.course.id).exists())

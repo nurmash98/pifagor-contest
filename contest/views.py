@@ -1428,6 +1428,36 @@ def subtopic_theory(request, subtopic_id):
 
 
 @staff_member_required
+def course_delete(request, course_id):
+    """Удаление курса вместе с его темами и подтемами. Задачи и решения учеников остаются."""
+    course = _get_owned_course_or_none(request, course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+    if request.method == 'POST':
+        name = course.name
+        course.delete()
+        messages.success(request, f'Курс «{name}» удалён.')
+        return redirect('teacher_dashboard')
+    return redirect('course_manage', course_id=course.id)
+
+
+@staff_member_required
+def topic_delete(request, topic_id):
+    """Удаление темы вместе с её подтемами. Сами задачи не удаляются."""
+    topic = get_object_or_404(Topic, id=topic_id)
+    course = _get_owned_course_or_none(request, topic.course_id)
+    if course is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+    if request.method == 'POST':
+        name = topic.name
+        topic.delete()
+        messages.success(request, f'Тема «{name}» удалена.')
+    return redirect('course_manage', course_id=course.id)
+
+
+@staff_member_required
 def subtopic_create(request, topic_id):
     topic = get_object_or_404(Topic.objects.select_related('course'), id=topic_id)
     if _get_owned_course_or_none(request, topic.course_id) is None:

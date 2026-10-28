@@ -32,6 +32,12 @@
                 </div>
                 <button type="submit" class="btn btn-pifagor-blue btn-sm px-3">Сохранить</button>
             </form>
+            <hr class="my-4">
+            <form method="post" action="{% url 'course_delete' course.id %}"
+                  onsubmit="return confirm('Удалить курс «{{ course.name|escapejs }}» вместе со всеми темами и подтемами? Задачи и решения учеников останутся. Отменить нельзя.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm px-3">🗑 Удалить курс</button>
+            </form>
         </div>
     </div>
 
@@ -55,7 +61,14 @@
                         {% endif %}
                         <div class="text-muted small">Задач: {{ topic.task_total }}{% if topic.subtopics.all %} · Подтем: {{ topic.subtopics.all|length }}{% endif %}</div>
                     </div>
-                    <a href="{% url 'topic_edit' topic.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Редактировать</a>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'topic_edit' topic.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Редактировать</a>
+                        <form method="post" action="{% url 'topic_delete' topic.id %}"
+                              onsubmit="return confirm('Удалить тему «{{ topic.name|escapejs }}»{% if topic.subtopics.all %} вместе с подтемами{% endif %}? Задачи останутся. Отменить нельзя.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">Удалить</button>
+                        </form>
+                    </div>
                 </li>
                 {% empty %}
                 <li class="list-group-item p-4 text-center text-muted">Тем пока нет — добавьте первую.</li>
