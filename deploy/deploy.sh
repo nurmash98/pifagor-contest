@@ -127,6 +127,8 @@ done
 sudo mkdir -p /var/backups/pifagor
 sudo cp "$APP_DIR"/deploy/pifagor-backup.{service,timer} "$APP_DIR"/deploy/pifagor-update.{service,timer} /etc/systemd/system/
 
+sudo install -d -o "$APP_USER" -g "$APP_USER" -m 700 /var/cache/pifagor
+
 say "Миграции и статика"
 sudo /usr/local/sbin/pifagor-manage migrate --noinput
 sudo /usr/local/sbin/pifagor-manage collectstatic --noinput
