@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, Task, Submission, Attempt, Tag, Course, Topic, Teacher, ClassBonus, Exam, ExamAttempt, ExamAnswer, ExamRetake
+from .models import Student, Task, Submission, Attempt, Tag, Course, Topic, Subtopic, Teacher, ClassBonus, Exam, ExamAttempt, ExamAnswer, ExamRetake
 
 
 def _teacher_of(request):
@@ -46,6 +46,13 @@ class TopicInline(admin.TabularInline):
     show_change_link = True
 
 
+class SubtopicInline(admin.TabularInline):
+    model = Subtopic
+    extra = 0
+    fields = ('name', 'order', 'theory_filename')
+    readonly_fields = ('theory_filename',)
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_visible', 'topics_count', 'created_by', 'created_at')
@@ -86,6 +93,7 @@ class TopicAdmin(admin.ModelAdmin):
     list_filter = ('course',)
     search_fields = ('name', 'course__name')
     filter_horizontal = ('tasks',)
+    inlines = [SubtopicInline]
 
     @admin.display(description="Задач в теме")
     def tasks_count(self, obj):

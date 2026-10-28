@@ -182,6 +182,23 @@ class Topic(models.Model):
         return f'https://www.youtube.com/embed/{match.group(1)}?rel=0' if match else None
 
 
+class Subtopic(models.Model):
+    """Подтема внутри темы курса: название и теория (HTML-файл). Без видео и задач."""
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='subtopics', verbose_name="Тема")
+    name = models.CharField(max_length=200, verbose_name="Название подтемы")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок отображения")
+    theory_html = models.TextField(blank=True, verbose_name="Теория (HTML)")
+    theory_filename = models.CharField(max_length=255, blank=True, verbose_name="Имя файла теории")
+
+    class Meta:
+        verbose_name = "Подтема"
+        verbose_name_plural = "Подтемы"
+        ordering = ['topic', 'order', 'name']
+
+    def __str__(self):
+        return f"{self.topic.name} — {self.name}"
+
+
 class Teacher(models.Model):
     """Профиль учителя. Создаётся только админом (суперпользователем) в Django admin —
     сами учителя не могут регистрироваться и назначать других учителей."""

@@ -47,6 +47,7 @@ urlpatterns = [
     path('courses/<int:course_id>/', views.course_detail, name='course_detail'),
     path('courses/topics/<int:topic_id>/video/', views.topic_video, name='topic_video'),
     path('courses/topics/<int:topic_id>/theory/', views.topic_theory, name='topic_theory'),
+    path('courses/subtopics/<int:subtopic_id>/theory/', views.subtopic_theory, name='subtopic_theory'),
 
     # Авторизация и регистрация
     path('register/', views.register, name='register'),
@@ -86,6 +87,9 @@ urlpatterns = [
     path('teacher/courses/<int:course_id>/analytics/', views.course_analytics, name='course_analytics'),
     path('teacher/courses/<int:course_id>/topics/add/', views.topic_create, name='topic_create'),
     path('teacher/topics/<int:topic_id>/edit/', views.topic_edit, name='topic_edit'),
+    path('teacher/topics/<int:topic_id>/subtopics/add/', views.subtopic_create, name='subtopic_create'),
+    path('teacher/subtopics/<int:subtopic_id>/edit/', views.subtopic_edit, name='subtopic_edit'),
+    path('teacher/subtopics/<int:subtopic_id>/delete/', views.subtopic_delete, name='subtopic_delete'),
 
     # Задачи: любой учитель может редактировать любую задачу (условие, пример, тесты, теги)
     path('teacher/tasks/', views.task_tags_list, name='task_tags_list'),

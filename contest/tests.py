@@ -2029,3 +2029,76 @@ class RealIPMiddlewareTests(TestCase):
         with self.settings(TRUST_X_REAL_IP=False):      # выключено (Render) — не меняем
             self.client.post(reverse('login'), {'username': 'rip', 'password': 'pw12345'}, **kw)
         self.assertEqual(LoginEvent.objects.filter(user=u).latest('id').ip, '127.0.0.1')
+
+
+class SubtopicTests(TestCase):
+    def setUp(self):
+        from .models import Subtopic, Topic
+        self.Subtopic = Subtopic
+        self.tu = User.objects.create_user('tsub', password='p', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.tu, full_name='Учитель')
+        self.other_u = User.objects.create_user('tother', password='p', is_staff=True)
+        self.other = Teacher.objects.create(user=self.other_u, full_name='Другой')
+        self.course = Course.objects.create(name='Python', is_visible=True)
+        self.teacher.courses.add(self.course)
+        self.topic = Topic.objects.create(course=self.course, name="Циклы")
+        self.su = User.objects.create_user('ssub', password='p')
+        Student.objects.create(user=self.su, full_name='Ученик', school_class='7F')
+
+    def test_hidden_when_no_subtopics(self):
+        self.client.login(username='ssub', password='p')
+        r = self.client.get(reverse('course_detail', args=[self.course.id]))
+        self.assertNotContains(r, 'data-part="subtopics"')
+
+    def test_shown_with_theory_button(self):
+        sub = self.Subtopic.objects.create(topic=self.topic, name='Цикл for', theory_html='<p>hi</p>', theory_filename='a.html')
+        self.Subtopic.objects.create(topic=self.topic, name='Цикл while')
+        self.client.login(username='ssub', password='p')
+        r = self.client.get(reverse('course_detail', args=[self.course.id]))
+        self.assertContains(r, 'data-part="subtopics"')
+        self.assertContains(r, 'Цикл for')
+        self.assertContains(r, reverse('subtopic_theory', args=[sub.id]))
+        t = self.client.get(reverse('subtopic_theory', args=[sub.id]))
+        self.assertContains(t, '<p>hi</p>')
+        self.assertIn('sandbox', t['Content-Security-Policy'])
+
+    def test_theory_404_without_file_and_for_hidden_course(self):
+        empty = self.Subtopic.objects.create(topic=self.topic, name='Пусто')
+        full = self.Subtopic.objects.create(topic=self.topic, name='Есть', theory_html='x', theory_filename='x.html')
+        self.client.login(username='ssub', password='p')
+        self.assertEqual(self.client.get(reverse('subtopic_theory', args=[empty.id])).status_code, 404)
+        self.course.is_visible = False
+        self.course.save()
+        self.assertEqual(self.client.get(reverse('subtopic_theory', args=[full.id])).status_code, 404)
+
+    def test_teacher_creates_edits_deletes(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.login(username='tsub', password='p')
+        f = SimpleUploadedFile('t.html', '<b>Теория</b>'.encode('utf-8'))
+        self.client.post(reverse('subtopic_create', args=[self.topic.id]), {'name': 'Новая', 'order': '2', 'theory_file': f})
+        sub = self.Subtopic.objects.get(name='Новая')
+        self.assertEqual(sub.theory_filename, 't.html')
+        self.assertIn('Теория', sub.theory_html)
+        page = self.client.get(reverse('topic_edit', args=[self.topic.id]))
+        self.assertContains(page, 'Новая')
+        self.client.post(reverse('subtopic_edit', args=[sub.id]), {'name': 'Переименована', 'order': '1', 'remove_theory': '1'})
+        sub.refresh_from_db()
+        self.assertEqual((sub.name, sub.theory_html), ('Переименована', ''))
+        self.client.post(reverse('subtopic_delete', args=[sub.id]))
+        self.assertFalse(self.Subtopic.objects.filter(id=sub.id).exists())
+
+    def test_foreign_teacher_cannot_change(self):
+        sub = self.Subtopic.objects.create(topic=self.topic, name='Чужая')
+        self.client.login(username='tother', password='p')
+        self.client.post(reverse('subtopic_delete', args=[sub.id]))
+        self.client.post(reverse('subtopic_edit', args=[sub.id]), {'name': 'Взлом'})
+        self.client.post(reverse('subtopic_create', args=[self.topic.id]), {'name': 'Левая'})
+        sub.refresh_from_db()
+        self.assertEqual(sub.name, 'Чужая')
+        self.assertEqual(self.Subtopic.objects.count(), 1)
+
+    def test_student_cannot_manage(self):
+        self.client.login(username='ssub', password='p')
+        r = self.client.post(reverse('subtopic_create', args=[self.topic.id]), {'name': 'X'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.Subtopic.objects.count(), 0)

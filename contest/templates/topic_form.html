@@ -93,6 +93,39 @@
     </div>
 </div>
 
+{% if topic %}
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0" style="color: #1a1a4b;">Подтемы ({{ subtopics|length }})</h5>
+                <a href="{% url 'subtopic_create' topic.id %}" class="btn btn-pifagor-green btn-sm rounded-pill px-3">+ Добавить подтему</a>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for sub in subtopics %}
+                <li class="list-group-item px-0 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <div>
+                        <strong>{{ sub.name }}</strong>
+                        {% if sub.theory_filename %}<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">📖 Теория</span>{% endif %}
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'subtopic_edit' sub.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить</a>
+                        <form method="post" action="{% url 'subtopic_delete' sub.id %}" onsubmit="return confirm('Удалить подтему «{{ sub.name|escapejs }}»?');">
+                            {% csrf_token %}
+                            <button class="btn btn-outline-danger btn-sm rounded-pill px-3">Удалить</button>
+                        </form>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="list-group-item px-0 text-muted small">Подтем нет. Если их не добавить, ученик блок «Подтемы» не увидит.</li>
+                {% endfor %}
+            </ul>
+            <div class="form-text mt-2">Сначала сохраните изменения в самой теме (кнопка «Сохранить» выше), потом переходите к подтемам.</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 (function () {
     var filterSelect = document.getElementById('tagFilterSelect');

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if sub %}Изменить подтему{% else %}Новая подтема{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'topic_edit' topic.id %}" class="text-decoration-none text-muted small">← Назад к теме «{{ topic.name }}»</a>
+</div>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">{% if sub %}Подтема: {{ sub.name }}{% else %}Новая подтема{% endif %}</h4>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Название подтемы</label>
+                        <input type="text" name="name" class="form-control" value="{{ sub.name|default:'' }}" required autofocus>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Порядок</label>
+                        <input type="number" name="order" class="form-control" value="{{ sub.order|default:0 }}" min="0">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Теория — HTML-файл (необязательно)</label>
+                    {% if sub.theory_filename %}
+                    <div class="d-flex align-items-center gap-3 mb-2 small flex-wrap">
+                        <span>📖 Сейчас загружено: <strong>{{ sub.theory_filename }}</strong></span>
+                        <a href="{% url 'subtopic_theory' sub.id %}" target="_blank" rel="noopener">Посмотреть ↗</a>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" name="remove_theory" value="1" id="remove_theory">
+                            <label class="form-check-label" for="remove_theory">Удалить теорию</label>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="theory_file" class="form-control" accept=".html,.htm,text/html">
+                    <div class="form-text">Файл .html (до 2 МБ). У ученика в подтеме появится кнопка «Открыть теорию».</div>
+                </div>
+                <button type="submit" class="btn btn-pifagor-green px-4">{% if sub %}Сохранить{% else %}Добавить подтему{% endif %}</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -17,7 +17,7 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import LoginEvent, Task, Submission, Attempt, Student, Course, Teacher, Topic, Tag, ClassBonus, normalize_school_class
+from .models import LoginEvent, Task, Submission, Attempt, Student, Course, Teacher, Topic, Subtopic, Tag, ClassBonus, normalize_school_class
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests, MAX_TEST_CASES
 from django.contrib.admin.views.decorators import staff_member_required
@@ -1128,6 +1128,8 @@ def course_detail(request, course_id):
     # theory_html (до 2 МБ на тему) на странице курса не нужен — только признак, что он есть.
     topics = course.topics.prefetch_related(
         Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))
+    ).prefetch_related(
+        Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html'))
     ).defer('theory_html')
     lang = _get_content_lang(request)
     for topic in topics:
@@ -1192,7 +1194,9 @@ def course_manage(request, course_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    topics = course.topics.prefetch_related('tasks').defer('theory_html')
+    topics = course.topics.prefetch_related(
+        'tasks', Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html'))
+    ).defer('theory_html')
     context = {'course': course, 'topics': topics}
     context.update(_class_form_context(request.user, course))
     return render(request, 'course_manage.html', context)
@@ -1390,9 +1394,89 @@ def topic_edit(request, topic_id):
 
     return render(request, 'topic_form.html', {
         'course': course, 'topic': topic, 'all_tasks': all_tasks,
+        'subtopics': topic.subtopics.defer('theory_html'),
         'selected_task_ids': set(topic.tasks.values_list('id', flat=True)),
         'all_tags': Tag.objects.all(),
     })
+
+
+def _subtopic_owned_or_none(request, subtopic):
+    return _get_owned_course_or_none(request, subtopic.topic.course_id)
+
+
+@login_required
+@xframe_options_sameorigin
+def subtopic_theory(request, subtopic_id):
+    """HTML-теория подтемы — так же в песочнице, как и теория темы."""
+    sub = get_object_or_404(Subtopic.objects.select_related('topic__course'), id=subtopic_id)
+    if not _course_open_for(request.user, sub.topic.course) or not sub.theory_html:
+        raise Http404
+    response = HttpResponse(sub.theory_html, content_type='text/html; charset=utf-8')
+    response['Content-Security-Policy'] = 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox'
+    return response
+
+
+@staff_member_required
+def subtopic_create(request, topic_id):
+    topic = get_object_or_404(Topic.objects.select_related('course'), id=topic_id)
+    if _get_owned_course_or_none(request, topic.course_id) is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if not name:
+            messages.error(request, 'Укажите название подтемы.')
+        else:
+            try:
+                order = int(request.POST.get('order') or 0)
+            except ValueError:
+                order = 0
+            sub = Subtopic(topic=topic, name=name[:200], order=max(order, 0))
+            error = _apply_theory_upload(request, sub)
+            sub.save()
+            if error:
+                messages.error(request, f'Подтема «{sub.name}» добавлена, но теория не загружена: {error}')
+                return redirect('subtopic_edit', subtopic_id=sub.id)
+            messages.success(request, f'Подтема «{sub.name}» добавлена.')
+            return redirect('topic_edit', topic_id=topic.id)
+    return render(request, 'subtopic_form.html', {'topic': topic, 'course': topic.course, 'sub': None})
+
+
+@staff_member_required
+def subtopic_edit(request, subtopic_id):
+    sub = get_object_or_404(Subtopic.objects.select_related('topic__course'), id=subtopic_id)
+    if _subtopic_owned_or_none(request, sub) is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if name:
+            sub.name = name[:200]
+        try:
+            sub.order = max(int(request.POST.get('order') or sub.order), 0)
+        except ValueError:
+            pass
+        error = _apply_theory_upload(request, sub)
+        sub.save()
+        if error:
+            messages.error(request, f'Подтема сохранена, но теория не загружена: {error}')
+            return redirect('subtopic_edit', subtopic_id=sub.id)
+        messages.success(request, f'Подтема «{sub.name}» сохранена.')
+        return redirect('topic_edit', topic_id=sub.topic_id)
+    return render(request, 'subtopic_form.html', {'topic': sub.topic, 'course': sub.topic.course, 'sub': sub})
+
+
+@staff_member_required
+def subtopic_delete(request, subtopic_id):
+    sub = get_object_or_404(Subtopic.objects.select_related('topic__course'), id=subtopic_id)
+    if _subtopic_owned_or_none(request, sub) is None:
+        messages.error(request, 'Это не ваш курс.')
+        return redirect('teacher_dashboard')
+    topic_id = sub.topic_id
+    if request.method == 'POST':
+        sub.delete()
+        messages.success(request, 'Подтема удалена.')
+    return redirect('topic_edit', topic_id=topic_id)
 
 
 @staff_member_required
