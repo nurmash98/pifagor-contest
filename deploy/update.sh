@@ -4,6 +4,7 @@
 set -euo pipefail
 APP_DIR=/opt/pifagor-contest
 BRANCH="${BRANCH:-feature/tags-and-courses}"
+git config --system --get-all safe.directory | grep -qx "$APP_DIR" || git config --system --add safe.directory "$APP_DIR"
 as_app() { runuser -u pifagor -- "$@"; }
 
 as_app git -C "$APP_DIR" fetch -q origin "$BRANCH"

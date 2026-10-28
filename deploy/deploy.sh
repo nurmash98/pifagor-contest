@@ -63,8 +63,9 @@ sudo systemctl restart pifagor-sandbox-fw.service
 
 say "Код проекта в $APP_DIR"
 sudo mkdir -p "$APP_DIR"
-sudo chown "$APP_USER:$APP_USER" "$APP_DIR"
-if [ -d "$APP_DIR/.git" ]; then
+sudo chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+sudo git config --system --get-all safe.directory | grep -qx "$APP_DIR" || sudo git config --system --add safe.directory "$APP_DIR"
+if sudo test -d "$APP_DIR/.git"; then
     sudo -u "$APP_USER" git -C "$APP_DIR" fetch origin "$BRANCH"
     sudo -u "$APP_USER" git -C "$APP_DIR" checkout "$BRANCH"
     sudo -u "$APP_USER" git -C "$APP_DIR" reset --hard "origin/$BRANCH"
