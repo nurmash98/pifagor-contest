@@ -11,22 +11,30 @@
     </div>
     {% if gift_student and gift_ready %}
     <div class="col-auto">
-        <button type="button" id="gift-btn" class="gift-code" data-url="{% url 'daily_gift' %}"
+        <button type="button" id="gift-btn" class="gift-code" data-url="{% url 'daily_gift' %}" data-amount="{{ gift_amount }}"
                 title="{% if content_lang == 'kk' %}Күнде +{{ gift_amount }} тиын{% else %}Каждый день +{{ gift_amount }} монет{% endif %}">
-            <span class="gc-var">s</span> <span class="gc-op">+=</span> <span class="gc-num">{{ gift_amount }}</span><span class="gc-cur">▌</span>
+            <span class="gc-bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="gc-title">daily_gift.py</span></span>
+            <span class="gc-line"><span class="gc-prompt">$</span> <span id="gc-typed" class="gc-text"></span><span class="gc-cur">▌</span></span>
+            <span class="gc-run-hint">▶ {% if content_lang == 'kk' %}орындау{% else %}выполнить{% endif %}</span>
         </button>
     </div>
     {% endif %}
 </div>
 {% if gift_student and gift_ready %}
 <style>
-.gift-code { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 1.15rem; font-weight: 700; background: #1e1e2e; color: #cdd6f4;
-    border: 2px solid #313244; border-radius: 12px; padding: 8px 16px; cursor: pointer; box-shadow: 0 4px 14px rgba(30,30,46,.35);
-    transition: transform .15s, box-shadow .15s, opacity .5s, filter .5s; animation: gc-glow 2s ease-in-out infinite; }
+.gift-code { display: block; text-align: left; font-family: "JetBrains Mono", "Courier New", monospace; background: #1e1e2e; color: #cdd6f4;
+    border: 2px solid #313244; border-radius: 12px; padding: 0 0 8px; min-width: 250px; max-width: 320px; cursor: pointer; overflow: hidden;
+    box-shadow: 0 4px 14px rgba(30,30,46,.35); transition: transform .15s, box-shadow .15s, opacity .5s, filter .5s; animation: gc-glow 2s ease-in-out infinite; }
 .gift-code:hover { transform: translateY(-2px); }
-.gc-var { color: #89b4fa; } .gc-op { color: #f38ba8; } .gc-num { color: #fab387; }
+.gc-bar { display: flex; align-items: center; gap: 5px; background: #181825; padding: 6px 10px; margin-bottom: 8px; }
+.gc-bar i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.gc-title { margin-left: 6px; font-size: .68rem; color: #7f849c; }
+.gc-line { display: block; padding: 0 12px; font-size: .95rem; font-weight: 700; min-height: 1.5em; word-break: break-word; }
+.gc-prompt { color: #a6e3a1; } .gc-text { color: #fab387; }
 .gc-cur { color: #a6e3a1; margin-left: 2px; animation: gc-blink 1s steps(1) infinite; }
+.gc-run-hint { display: block; padding: 4px 12px 0; font-size: .7rem; color: #89b4fa; }
 .gift-code.gc-run { animation: none; box-shadow: 0 0 18px #a6e3a1; border-color: #a6e3a1; }
+.gift-code.gc-run .gc-run-hint { color: #a6e3a1; }
 .gift-code.gc-gone { opacity: 0; transform: scale(.8); filter: blur(2px); }
 @keyframes gc-blink { 50% { opacity: 0; } }
 @keyframes gc-glow { 50% { box-shadow: 0 0 14px rgba(250,179,135,.6); } }
@@ -36,6 +44,22 @@
 (function () {
     var btn = document.getElementById('gift-btn');
     if (!btn) return;
+    var n = btn.dataset.amount || '5';
+    // Каждый день — другая «команда»; печатается как в терминале
+    var lines = [
+        'git commit -m "daily: +' + n + ' 🪙"',
+        'coins.push(' + n + ')  // 🪙',
+        'sudo make coins -j' + n,
+        'print("🪙" * ' + n + ')',
+        'for i in range(' + n + '): coins += 1',
+        'npm install ' + n + '-coins',
+        'if (молодец) return ' + n + ';',
+        'SELECT ' + n + ' FROM подарки;'
+    ];
+    var day = Math.floor(Date.now() / 86400000);
+    var text = lines[day % lines.length], typed = document.getElementById('gc-typed'), i = 0;
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { typed.textContent = text; }
+    else { (function tick() { typed.textContent = text.slice(0, ++i); if (i < text.length) setTimeout(tick, 55); })(); }
     function csrf() { var m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ''; }
     btn.addEventListener('click', function () {
         if (btn.disabled) return;
