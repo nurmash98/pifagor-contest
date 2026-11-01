@@ -1192,6 +1192,23 @@ def course_create(request):
     return render(request, 'course_form.html', _class_form_context(request.user))
 
 
+def _course_visibility_info(course):
+    """Кто сейчас увидит курс: включён ли он и сколько учеников в каждом из выбранных классов."""
+    counts = {}
+    for cls in Student.objects.filter(user__is_active=True).values_list('school_class', flat=True):
+        key = normalize_school_class(cls)
+        counts[key] = counts.get(key, 0) + 1
+    chosen = course.visible_class_list()
+    if chosen:
+        rows = [(c, counts.get(c, 0)) for c in chosen]
+        total = sum(n for _, n in rows)
+    else:
+        rows = []
+        total = sum(counts.values())
+    return {'enabled': course.is_visible, 'all_classes': not chosen, 'rows': rows, 'total': total,
+            'empty_classes': [c for c, n in rows if n == 0]}
+
+
 @staff_member_required
 def course_manage(request, course_id):
     """Страница курса для учителя: темы, теория, задачи — без захода в админку."""
@@ -1207,6 +1224,7 @@ def course_manage(request, course_id):
         topic.task_total = len(topic.effective_task_ids())
     context = {'course': course, 'topics': topics}
     context.update(_class_form_context(request.user, course))
+    context['visibility'] = _course_visibility_info(course)
     return render(request, 'course_manage.html', context)
 
 

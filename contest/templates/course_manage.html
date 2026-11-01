@@ -25,6 +25,16 @@
                     <textarea name="description" class="form-control" rows="3">{{ course.description }}</textarea>
                 </div>
                 {% include "course_classes_field.html" %}
+                <div class="rounded-3 p-2 mb-3 small {% if visibility.enabled and visibility.total %}bg-success-subtle{% else %}bg-warning-subtle{% endif %}">
+                    {% if not visibility.enabled %}
+                        ⚠️ Курс <strong>выключен</strong> — ученики его не видят. Включите «Показывать ученикам» и сохраните.
+                    {% elif visibility.all_classes %}
+                        👁 Сейчас курс видят <strong>все классы</strong> ({{ visibility.total }} учеников).
+                    {% else %}
+                        👁 Сейчас курс видят: {% for c, n in visibility.rows %}<strong>{{ c }}</strong> ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %} — всего {{ visibility.total }} учеников.
+                        {% if visibility.empty_classes %}<br>⚠️ В классах {{ visibility.empty_classes|join:", " }} пока нет учеников — проверьте, как записан класс у ученика.{% endif %}
+                    {% endif %}
+                </div>
                 <div class="form-check mb-3">
                     <input type="checkbox" name="is_visible" class="form-check-input" id="is_visible"
                            {% if course.is_visible %}checked{% endif %}>

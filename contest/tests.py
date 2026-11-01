@@ -2207,3 +2207,21 @@ class DeleteCourseTopicTests(TestCase):
         self.client.login(username='stdel', password='p')
         self.client.post(reverse('course_delete', args=[self.course.id]))
         self.assertTrue(Course.objects.filter(id=self.course.id).exists())
+
+
+class CourseVisibilityInfoTests(TestCase):
+    def test_manage_page_shows_who_sees_course(self):
+        tu = User.objects.create_user('tvi', password='p', is_staff=True)
+        teacher = Teacher.objects.create(user=tu, full_name='Т', classes='7F, 7K')
+        for i, cls in enumerate(['7F', '7F', '7K']):
+            Student.objects.create(user=User.objects.create_user(f'svi{i}', password='p'), full_name=f'С{i}', school_class=cls)
+        c = Course.objects.create(name='Курс', is_visible=True, visible_classes='7F, 7K, 7B')
+        teacher.courses.add(c)
+        self.client.login(username='tvi', password='p')
+        page = self.client.get(reverse('course_manage', args=[c.id])).content.decode()
+        self.assertIn('Сейчас курс видят', page)
+        self.assertIn('<strong>7F</strong> (2)', page)
+        self.assertIn('7B', page.split('пока нет учеников')[0][-60:])
+        c.is_visible = False
+        c.save()
+        self.assertIn('выключен', self.client.get(reverse('course_manage', args=[c.id])).content.decode())
