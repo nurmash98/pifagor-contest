@@ -102,6 +102,16 @@
     <form method="post" action="{% url 'duel_resign' duel.id %}" class="text-end mt-4" onsubmit="return confirm('{% t "Сдаться? Победа достанется сопернику." %}');">{% csrf_token %}
         <button class="btn btn-outline-danger btn-sm rounded-pill px-4">🏳 {% t "Сдаться" %}</button>
     </form>
+    <!-- Полноэкранный режим: дуэль идёт на весь экран; выход из него дольше FS_GRACE секунд — поражение -->
+    <div id="fs-gate" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(18,18,45,.97);color:#fff;align-items:center;justify-content:center;text-align:center;padding:24px;">
+        <div style="max-width:460px;">
+            <div style="font-size:3rem;">⛶</div>
+            <h4 class="fw-bold mb-2">{% t "Дуэль идёт в полноэкранном режиме" %}</h4>
+            <p id="fs-msg" class="mb-3 opacity-75">{% t "Нажми кнопку, чтобы начать. Выход из полного экрана во время дуэли — поражение." %}</p>
+            <div id="fs-left" class="display-4 fw-bold mb-3" style="display:none;"></div>
+            <button type="button" id="fs-btn" class="btn btn-warning btn-lg rounded-pill px-5 fw-bold">{% t "Войти в полный экран" %}</button>
+        </div>
+    </div>
     {% include 'code_editor.html' %}
     <script>
     (function () {
@@ -134,6 +144,44 @@
         }
         document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { leave(); } });
 
+
+        // ---- Полноэкранный режим (на iPhone Safari его нет — там просто не включается) ----
+        var FS_GRACE = 8;                       // секунд, чтобы вернуться в полный экран после обновления страницы
+        var fsKey = 'duelFs{{ duel.id }}';
+        var gate = document.getElementById('fs-gate'), fsBtn = document.getElementById('fs-btn');
+        var fsLeft = document.getElementById('fs-left'), fsMsg = document.getElementById('fs-msg');
+        var rootEl = document.documentElement;
+        var canFs = !!(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen);
+        function inFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+        function enterFs() {
+            try { var p = (rootEl.requestFullscreen || rootEl.webkitRequestFullscreen).call(rootEl); if (p && p.catch) { p.catch(function () {}); } } catch (e) {}
+        }
+        var armed = false, fsTimer = null;
+        try { armed = sessionStorage.getItem(fsKey) === '1'; } catch (e) {}
+        function showGate(countdown) {
+            gate.style.display = 'flex';
+            if (!countdown) { return; }
+            fsMsg.textContent = "{% t "Вернись в полный экран — иначе поражение." %}";
+            fsLeft.style.display = 'block';
+            var n = FS_GRACE; fsLeft.textContent = n;
+            clearInterval(fsTimer);
+            fsTimer = setInterval(function () {
+                n -= 1; fsLeft.textContent = Math.max(n, 0);
+                if (n <= 0) { clearInterval(fsTimer); leave(); setTimeout(function () { location.reload(); }, 400); }
+            }, 1000);
+        }
+        function hideGate() { clearInterval(fsTimer); gate.style.display = 'none'; fsLeft.style.display = 'none'; }
+        if (canFs) {
+            fsBtn.addEventListener('click', enterFs);
+            function onFsChange() {
+                if (inFs()) { armed = true; try { sessionStorage.setItem(fsKey, '1'); } catch (e) {} hideGate(); }
+                else if (armed && !safe) { showGate(true); }
+            }
+            document.addEventListener('fullscreenchange', onFsChange);
+            document.addEventListener('webkitfullscreenchange', onFsChange);
+            if (!inFs()) { showGate(armed); }      // после обновления страницы полный экран сбрасывается — даём FS_GRACE секунд
+        }
+
         // Таймер текущей задачи (5 минут). По нулю обновляем страницу — откроется следующая задача.
         var timer = document.querySelector('.duel-timer');
         if (timer) {
@@ -156,6 +204,15 @@
                 .then(function (d) { if (d.signature && d.signature !== sig) { safe = true; location.reload(); } })
                 .catch(function () {});
         }, 3000);
+    })();
+    </script>
+    {% else %}
+    <script>
+    // Дуэль окончена — выходим из полноэкранного режима
+    (function () {
+        try { sessionStorage.removeItem('duelFs{{ duel.id }}'); } catch (e) {}
+        try { if (document.fullscreenElement && document.exitFullscreen) { document.exitFullscreen(); }
+              else if (document.webkitFullscreenElement && document.webkitExitFullscreen) { document.webkitExitFullscreen(); } } catch (e) {}
     })();
     </script>
     {% endif %}

@@ -2306,3 +2306,22 @@ class DisqualifyTests(TestCase):
         self.assertEqual(balance(self.studs[0]), 0)
         self.assertEqual(balance(self.studs[1]), 0)
         self.assertEqual(balance(self.studs[2]), 100)
+
+
+class DuelFullscreenTests(DuelTests):
+    def test_active_duel_page_has_fullscreen_gate(self):
+        duel = self.start()
+        self.client.login(username='da', password='pw12345')
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertIn('id="fs-gate"', html)
+        self.assertIn('requestFullscreen', html)
+        self.assertIn('FS_GRACE', html)
+        self.assertIn('Дуэль идёт в полноэкранном режиме', html)
+
+    def test_finished_duel_page_exits_fullscreen_and_has_no_gate(self):
+        duel = self.start()
+        self.duels.resign(duel, self.st[0])
+        self.client.login(username='da', password='pw12345')
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertNotIn('id="fs-gate"', html)
+        self.assertIn('exitFullscreen', html)
