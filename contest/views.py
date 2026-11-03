@@ -713,6 +713,7 @@ def hall_of_fame(request):
     for r in rows:
         r['all_solved'] = counts.get(r['st'].id, 0) if r['st'] else 0
     return render(request, 'hall_of_fame.html', {
+        'can_disqualify': request.user.is_staff and frozen_q is not None,
         'tabs': tabs, 'sel': sel, 'grades': grades, 'grade': grade, 'podium': rows[:3], 'rest': rows[3:],
         'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL,
     })
@@ -902,6 +903,46 @@ def leaderboard_exclude(request, student_id):
     elif student is None:
         messages.error(request, 'Это ученик не вашего класса.')
     return redirect(_safe_back_url(request) or 'leaderboard')
+
+
+@staff_member_required
+def hall_disqualify(request):
+    """Учитель убирает ученика из итогов ЗАФИКСИРОВАННОЙ четверти (ИИ, списывание): место в Зале славы,
+    монеты-награда возвращаются, баннер чемпиона снимается, ученику приходит уведомление."""
+    from . import quarters
+    from .disqualify import disqualify
+    from .models import QuarterFreeze
+    if request.method != 'POST':
+        return redirect('hall_of_fame')
+    student = _managed_student_or_none(request, request.POST.get('student_id') or 0)
+    try:
+        quarter_n = int(request.POST.get('quarter', ''))
+    except ValueError:
+        quarter_n = 0
+    back = f"{reverse('hall_of_fame')}?q={quarter_n}&g={quarters.grade_of(student.school_class) if student else ''}"
+    if student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+    elif quarter_n not in quarters.BY_N or not QuarterFreeze.objects.filter(year=quarters.YEAR, quarter=quarter_n).exists():
+        messages.error(request, 'Эта четверть ещё не зафиксирована.')
+    else:
+        res = disqualify(student, quarter_n, request.POST.get('reason', ''), by=_teacher_or_none(request))
+        extra = []
+        if res['refunded']:
+            extra.append(f'монеты возвращены: −{res["refunded"]}')
+        if res['banner_removed']:
+            extra.append('баннер чемпиона снят')
+        messages.success(request, f'{student.full_name} убран(а) из итогов {quarter_n} четверти'
+                                  + (f' ({", ".join(extra)})' if extra else '') + '. Ученику показано уведомление.')
+    return redirect(back)
+
+
+@login_required
+def notice_seen(request):
+    """Ученик нажал «Понятно» — уведомление больше не показывается."""
+    from .models import StudentNotice
+    if request.method == 'POST':
+        StudentNotice.objects.filter(student__user=request.user, seen_at__isnull=True).update(seen_at=timezone.now())
+    return redirect(_safe_back_url(request) or 'courses')
 
 
 @staff_member_required

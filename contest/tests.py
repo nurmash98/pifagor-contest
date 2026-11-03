@@ -2225,3 +2225,84 @@ class CourseVisibilityInfoTests(TestCase):
         c.is_visible = False
         c.save()
         self.assertIn('выключен', self.client.get(reverse('course_manage', args=[c.id])).content.decode())
+
+
+class DisqualifyTests(TestCase):
+    """Убрать 1–2 места параллели из итогов зафиксированной четверти: монеты назад, баннер снят, уведомление."""
+
+    def setUp(self):
+        from django.utils import timezone as tz
+        from . import quarters
+        from .models import CoinTransaction, HallEntry, QuarterFreeze
+        self.q = quarters
+        self.tu = User.objects.create_user('tdq', password='p', is_staff=True)
+        self.teacher = Teacher.objects.create(user=self.tu, full_name='Учитель', classes='7A, 7B')
+        self.studs = []
+        for i, (cls, banner) in enumerate([('7A', 'champion'), ('7B', ''), ('7A', ''), ('7B', '')], 1):
+            u = User.objects.create_user(f'dq{i}', password='p')
+            st = Student.objects.create(user=u, full_name=f'Ученик {i}', school_class=cls,
+                                        owned_banners=banner, name_banner=banner)
+            self.studs.append(st)
+            HallEntry.objects.create(year=quarters.YEAR, quarter=1, kind='student', grade='7', place=i, student=st,
+                                     name=st.full_name, school_class=cls, score=100 - i, solved=5)
+            if i <= 3:
+                CoinTransaction.objects.create(student=st, key=f'q:{quarters.YEAR}:1', kind='award',
+                                               amount={1: 200, 2: 150, 3: 100}[i], at=tz.now(), note='награда')
+        QuarterFreeze.objects.create(year=quarters.YEAR, quarter=1, frozen_at=tz.now())
+
+    def test_disqualify_refunds_coins_removes_banner_notifies_and_rebuilds_hall(self):
+        from .coins import balance
+        from .disqualify import disqualify
+        from .models import HallEntry, StudentNotice
+        first, second, third = self.studs[:3]
+        r1 = disqualify(first, 1, 'ИИ')
+        r2 = disqualify(second, 1, 'ИИ')
+        self.assertEqual((r1['refunded'], r1['banner_removed']), (200, True))
+        self.assertEqual((r2['refunded'], r2['banner_removed']), (150, False))
+        first.refresh_from_db()
+        self.assertEqual((first.owned_banners, first.name_banner), ('', ''))
+        self.assertEqual(balance(first), 0)
+        self.assertEqual(balance(second), 0)
+        self.assertEqual(balance(third), 100)            # другим ничего не меняется
+        places = {e.student_id: e.place for e in HallEntry.objects.filter(quarter=1, kind='student')}
+        self.assertNotIn(first.id, places)
+        self.assertNotIn(second.id, places)
+        self.assertIn(StudentNotice.objects.get(student=first).text.count('возвращены'), (1,))
+        # повторный вызов ничего не возвращает второй раз
+        self.assertEqual(disqualify(first, 1, 'ИИ')['refunded'], 0)
+        self.assertEqual(balance(first), 0)
+
+    def test_student_sees_notice_until_understood(self):
+        from .disqualify import disqualify
+        disqualify(self.studs[0], 1, 'ИИ')
+        self.client.login(username='dq1', password='p')
+        page = self.client.get(reverse('courses')).content.decode()
+        self.assertIn('убрали из рейтинга 1 четверти', page)
+        self.client.post(reverse('notice_seen'))
+        self.assertNotIn('убрали из рейтинга 1 четверти', self.client.get(reverse('courses')).content.decode())
+
+    def test_teacher_button_and_permissions(self):
+        from .coins import balance
+        self.client.login(username='tdq', password='p')
+        page = self.client.get(reverse('hall_of_fame') + '?q=1&g=7').content.decode()
+        self.assertIn('/hall-of-fame/disqualify/', page)
+        r = self.client.post(reverse('hall_disqualify'), {'student_id': self.studs[0].id, 'quarter': 1, 'reason': 'ИИ'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(balance(self.studs[0]), 0)
+        # ученик чужого класса — нельзя
+        other = Student.objects.create(user=User.objects.create_user('oth', password='p'), full_name='Чужой', school_class='7Z')
+        self.client.post(reverse('hall_disqualify'), {'student_id': other.id, 'quarter': 1})
+        self.assertFalse(other.quarter_exclusions.exists())
+
+    def test_student_cannot_disqualify(self):
+        self.client.login(username='dq3', password='p')
+        self.client.post(reverse('hall_disqualify'), {'student_id': self.studs[0].id, 'quarter': 1})
+        self.assertFalse(self.studs[0].quarter_exclusions.exists())
+
+    def test_management_command(self):
+        from django.core.management import call_command
+        from .coins import balance
+        call_command('disqualify', quarter=1, grade='7', places='1,2', reason='ИИ', stdout=__import__('io').StringIO())
+        self.assertEqual(balance(self.studs[0]), 0)
+        self.assertEqual(balance(self.studs[1]), 0)
+        self.assertEqual(balance(self.studs[2]), 100)

@@ -207,3 +207,16 @@ def _freeze(q):
                                      name=row['school_class'], school_class=row['school_class'],
                                      score=row['total'], solved=row['student_count']))
     HallEntry.objects.bulk_create(entries)
+
+
+def rebuild_hall_students(q, grade):
+    """Пересобирает строки учеников в Зале славы за четверть q для параллели grade с учётом тех, кто
+    убран из рейтинга (места сдвигаются). Монеты и баннеры другим ученикам здесь не выдаются."""
+    from .models import HallEntry, Student
+    studs = [s for s in Student.objects.all() if grade_of(s.school_class) == grade]
+    HallEntry.objects.filter(year=YEAR, quarter=q['n'], kind='student', grade=grade).delete()
+    entries = [HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
+                         name=st.full_name, school_class=st.school_class,
+                         score=st.calc_total_score, solved=st.calc_solved_count)
+               for place, st in enumerate(student_ranking(studs, q['start'], q['end'], fresh=True, quarter_n=q['n'])[:TOP], 1)]
+    HallEntry.objects.bulk_create(entries)

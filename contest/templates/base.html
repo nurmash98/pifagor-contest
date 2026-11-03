@@ -203,6 +203,15 @@
     {% endif %}
     <main class="container my-5 flex-grow-1">
 
+        {% if student_notice %}
+        <div class="alert alert-warning shadow-sm rounded-4 d-flex justify-content-between align-items-start gap-3 mt-3" role="alert">
+            <div>⚠️ {% if content_lang == 'kk' and student_notice.text_kk %}{{ student_notice.text_kk }}{% else %}{{ student_notice.text }}{% endif %}</div>
+            <form method="post" action="{% url 'notice_seen' %}" class="flex-shrink-0">{% csrf_token %}
+                <input type="hidden" name="back" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-dark rounded-pill px-3">{% if content_lang == 'kk' %}Түсінікті{% else %}Понятно{% endif %}</button>
+            </form>
+        </div>
+        {% endif %}
         <!-- Глобальный вывод сообщений (messages) -->
         {% if messages %}
             <div class="row mb-3">

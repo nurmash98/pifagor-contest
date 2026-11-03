@@ -40,6 +40,7 @@
      <div class="pd-name">{% if p.st %}{% student_name p.st True p.name %}{% else %}{{ p.name }}{% endif %}</div>
      <div class="pd-cls">{{ p.school_class }} · ✓ {{ p.solved }}</div>
      <div class="pd-score">{{ p.score }}</div>
+{% if can_disqualify and p.st %}<form method="post" action="{% url 'hall_disqualify' %}" class="hf-dq" onsubmit="var r=prompt('Причина (её увидит ученик):','использование ИИ при решении задач'); if(r===null){return false;} this.reason.value=r; return confirm('Убрать {{ p.name|escapejs }} из итогов четверти? Награда-монеты вернётся, баннер чемпиона будет снят.');">{% csrf_token %}<input type="hidden" name="student_id" value="{{ p.st.id }}"><input type="hidden" name="quarter" value="{{ frozen_q.n }}"><input type="hidden" name="reason" value=""><button type="submit" title="Убрать из итогов (ИИ / списывание)">🚫</button></form>{% endif %}
      <div class="pd-step">{{ p.place }}</div>
    </div>
    {% endfor %}
@@ -50,7 +51,7 @@
    <div class="hf-row{% if r.st.name_banner %} has-b b-{{ r.st.name_banner }}{% if r.st.name_banner == 'custom' %} fx-{{ r.st.custom_banner.fx|default:'shine' }}{% endif %}{% endif %}"{% if r.st.name_banner == 'custom' %} style="{{ r.st.custom_banner_style }}"{% endif %}>
      <span class="hf-pl">{{ r.place }}</span>
      {% student_avatar r.all_solved 36 False r.place r.st.avatar %}
-     <span class="hf-nm">{{ r.name }}</span><span class="hf-cl">{{ r.school_class }}</span><span class="hf-sc">{{ r.score }}</span>
+     <span class="hf-nm">{{ r.name }}</span><span class="hf-cl">{{ r.school_class }}</span><span class="hf-sc">{{ r.score }}</span>{% if can_disqualify and r.st %}<form method="post" action="{% url 'hall_disqualify' %}" class="hf-dq" onsubmit="var r=prompt('Причина (её увидит ученик):','использование ИИ при решении задач'); if(r===null){return false;} this.reason.value=r; return confirm('Убрать {{ r.name|escapejs }} из итогов четверти? Награда-монеты вернётся, баннер чемпиона будет снят.');">{% csrf_token %}<input type="hidden" name="student_id" value="{{ r.st.id }}"><input type="hidden" name="quarter" value="{{ frozen_q.n }}"><input type="hidden" name="reason" value=""><button type="submit" title="Убрать из итогов (ИИ / списывание)">🚫</button></form>{% endif %}
    </div>
    {% empty %}{% if not podium %}<div class="text-muted p-3">{% if kk == 'kk' %}Әзірге бос.{% else %}Пока пусто.{% endif %}</div>{% endif %}{% endfor %}
   </div>
@@ -76,6 +77,7 @@
  .hf-chip{padding:5px 14px;border-radius:99px;font-weight:700;font-size:.85rem;text-decoration:none;border:1px solid var(--bs-border-color);color:var(--bs-body-color)}
  .hf-chip.on{background:#1a1a4b;color:#fff;border-color:#1a1a4b}
  .hf-fixed{background:rgba(242,194,48,.15);border:1px solid rgba(242,194,48,.5);border-radius:12px;padding:8px 14px;font-size:.9rem}
+ .hf-dq{display:inline;margin:0}.hf-dq button{border:0;background:transparent;font-size:1rem;cursor:pointer;opacity:.55;padding:0 4px}.hf-dq button:hover{opacity:1}
  .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:10px}
  .pd{text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
  .pd1{order:2}.pd2{order:1}.pd3{order:3}

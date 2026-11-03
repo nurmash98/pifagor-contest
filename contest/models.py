@@ -747,6 +747,21 @@ class QuarterExclusion(models.Model):
         verbose_name_plural = "Убраны из рейтинга четверти"
 
 
+class StudentNotice(models.Model):
+    """Сообщение ученику от учителя/системы (например, убран из рейтинга). Показывается сверху на
+    любой странице, пока ученик не нажмёт «Понятно»."""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='notices')
+    text = models.TextField(verbose_name="Текст (рус.)")
+    text_kk = models.TextField(blank=True, verbose_name="Текст (қаз.)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = "Уведомление ученику"
+        verbose_name_plural = "Уведомления ученикам"
+
+
 # Любое изменение отправок/попыток/баллов класса сбрасывает кэш рейтинга четверти (contest/quarters.py)
 from django.db.models.signals import post_delete, post_save  # noqa: E402
 

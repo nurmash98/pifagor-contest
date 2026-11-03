@@ -76,3 +76,13 @@ def coins(request):
         if seen != bal:
             session['coin_seen'] = bal
     return {'coin_balance': bal, 'my_solved': solved, 'coin_gain': gain}
+
+
+def notices(request):
+    """Непрочитанное уведомление ученику (убран из рейтинга и т. п.) — показывается сверху страницы."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'student_notice': None}
+    from .models import StudentNotice
+    note = StudentNotice.objects.filter(student__user=user, seen_at__isnull=True).first()
+    return {'student_notice': note}
