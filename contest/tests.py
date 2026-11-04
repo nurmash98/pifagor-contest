@@ -847,8 +847,9 @@ class DuelTests(TestCase):
         for name in ('a', 'b', 'c'):
             u = User.objects.create_user(f'd{name}', password='pw12345')
             self.users.append(u)
-            self.st.append(Student.objects.create(user=u, full_name=f'Игрок {name}', school_class='7F',
-                                                  duel_tester=(name != 'c')))
+            self.st.append(Student.objects.create(user=u, full_name=f'Игрок {name}', school_class='7F'))
+        from .models import SiteSettings
+        _s = SiteSettings.get(); _s.set_duel_classes(['7F']); _s.save()     # класс открыт преподавателем
         Task.objects.all().delete()     # задачи из миграций не нужны — берём только свои
         self.tasks = [Task.objects.create(title=f'T{i}', description='d', level='A',
                                           input_example='1', output_example='1',
@@ -967,30 +968,24 @@ class DuelTests(TestCase):
         self.client.post(reverse('duels_find'))
         self.assertEqual(DuelQueueEntry.objects.count(), 0)
 
-    def test_default_mode_is_testers_only(self):
+    def test_default_mode_shows_only_open_classes(self):
         from .models import SiteSettings
-        self.assertEqual(SiteSettings.get().duels_mode, 'testers')
-        self.client.login(username='dc', password='pw12345')           # не тестер
+        self.assertEqual(SiteSettings.get().duels_mode, 'testers')     # внутреннее имя режима «по классам»
+        self.client.login(username='da', password='pw12345')
+        self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
+        self.assertIn('Дуэли', self.client.get(reverse('all_tasks')).content.decode())
+        s = SiteSettings.get(); s.set_duel_classes([]); s.save()       # преподаватель закрыл класс
         r = self.client.get(reverse('duels'))
         self.assertRedirects(r, reverse('all_tasks'))
         self.client.post(reverse('duels_find'))
         self.assertEqual(DuelQueueEntry.objects.count(), 0)
         self.assertNotIn('Дуэли', self.client.get(reverse('all_tasks')).content.decode())
-        self.client.login(username='da', password='pw12345')           # тестер
-        self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
-        self.assertIn('Дуэли', self.client.get(reverse('all_tasks')).content.decode())
 
     def test_all_mode_opens_for_everyone(self):
         from .models import SiteSettings
         s = SiteSettings.get(); s.duels_mode = 'all'; s.save()
         self.client.login(username='dc', password='pw12345')
         self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
-
-    def test_teacher_can_mark_tester(self):
-        self.client.login(username='dt', password='x')
-        self.client.post(reverse('student_toggle_duel_tester', args=[self.st[2].id]))
-        self.st[2].refresh_from_db()
-        self.assertTrue(self.st[2].duel_tester)
 
     def test_suspicious_student_can_still_play(self):
         from unittest import mock
@@ -1045,7 +1040,7 @@ class DuelsTeacherViewTests(TestCase):
         self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         page = self.client.get(reverse('duels')).content.decode()
         self.assertIn('Для преподавателя', page)
-        self.assertIn('по классам и тестерам', page)
+        self.assertIn('по классам', page)
         self.client.login(username='sv', password='x')
         self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertRedirects(self.client.get(reverse('duels')), reverse('all_tasks'))
@@ -1173,15 +1168,6 @@ class DuelsAdminOnlyTests(TestCase):
         self.assertIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
         self.client.post(reverse('duels_toggle'))
         self.assertEqual(SiteSettings.get().duels_mode, 'all')
-
-    def test_other_teacher_cannot_mark_testers(self):
-        su = User.objects.create_user('stud', password='x')
-        st = Student.objects.create(user=su, full_name='Ученик', school_class='7F')
-        self.client.login(username='other', password='x')
-        self.client.post(reverse('student_toggle_duel_tester', args=[st.id]))
-        st.refresh_from_db()
-        self.assertFalse(st.duel_tester)
-
 
 class CourseClassVisibilityTests(TestCase):
     def setUp(self):

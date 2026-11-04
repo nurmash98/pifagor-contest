@@ -74,15 +74,13 @@ def open_classes():
 
 def visible_to(student):
     """Видны ли дуэли ученику. «Выключены» — никому. Иначе: режим «для всех», либо его класс
-    открыт преподавателем, либо режим «только тестеры» и он тестер."""
+    открыт преподавателем."""
     if student is None:
         return False
     obj = SiteSettings.get()
     if obj.duels_mode == 'off':
         return False
-    if obj.duels_mode == 'all' or normalize_school_class(student.school_class) in obj.duel_class_list():
-        return True
-    return obj.duels_mode == 'testers' and student.duel_tester
+    return obj.duels_mode == 'all' or normalize_school_class(student.school_class) in obj.duel_class_list()
 
 
 def can_play(student):

@@ -55,11 +55,10 @@ def duels_home(request):
     for s in ctx['top']:
         s.solved = counts.get(s.id, 0)
     if student is None and request.user.is_staff:
-        # Обзор для преподавателя: режим, тестеры, идущие и недавние дуэли (только просмотр)
+        # Обзор для преподавателя: режим, идущие и недавние дуэли (только просмотр)
         ctx.update({
             'mode': duels.duels_mode(),
             'class_rows': _class_rows(request.user),
-            'testers': list(Student.objects.filter(duel_tester=True).order_by('school_class', 'full_name')),
             'active_duels': list(Duel.objects.filter(status='ACTIVE').select_related('player1', 'player2')),
             'recent_duels': list(Duel.objects.filter(status='FINISHED').select_related('player1', 'player2', 'winner')
                                  .order_by('-finished_at')[:10]),
@@ -241,7 +240,7 @@ def duel_leave(request, duel_id):
 @staff_member_required
 @require_POST
 def duels_toggle(request):
-    """Переключает режим дуэлей по кругу: выключены → по классам и тестерам → для всех."""
+    """Переключает режим дуэлей по кругу: выключены → по классам → для всех."""
     if not duels.is_duels_admin(request.user):
         messages.error(request, 'Управлять дуэлями может только администратор дуэлей.')
         return redirect('teacher_dashboard')
@@ -249,7 +248,7 @@ def duels_toggle(request):
     settings_obj = SiteSettings.get()
     settings_obj.duels_mode = order[(order.index(settings_obj.duels_mode) + 1) % len(order)]
     settings_obj.save()
-    labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только открытые классы и тестеры.', 'all': 'Дуэли открыты для всех.'}
+    labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только открытые классы.', 'all': 'Дуэли открыты для всех.'}
     messages.success(request, labels[settings_obj.duels_mode])
     return redirect(request.POST.get('next') or 'teacher_dashboard')
 
