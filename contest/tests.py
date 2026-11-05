@@ -2387,3 +2387,14 @@ class StudentActivityTests(TestCase):
         self.assertNotEqual(self.client.get(reverse('student_activity')).status_code, 200)
         rows, r = self.rows(period='zzz')
         self.assertEqual(r.context['period'], '1d')
+
+    def test_tag_filter(self):
+        from .models import Tag
+        tg = Tag.objects.create(name='циклы')
+        self.t['A'].tags.add(tg)
+        self.mk(self.a, self.t['A'], 10, 0.5)
+        self.mk(self.a, self.t['B'], 10, 0.5)
+        rows, _ = self.rows(period='1h')
+        self.assertEqual(rows['Аня']['solved'], 2)
+        rows, _ = self.rows(period='1h', tag=tg.id)
+        self.assertEqual(rows['Аня']['solved'], 1)

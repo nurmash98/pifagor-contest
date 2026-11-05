@@ -29,11 +29,18 @@
             </select>
         </div>
         <div>
+            <div class="small fw-semibold mb-1">Тег</div>
+            <select name="tag" class="form-select form-select-sm">
+                <option value="">Все теги</option>
+                {% for t in tags %}<option value="{{ t.id }}" {% if t.id == tag_id %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
             <div class="small fw-semibold mb-1">Уровень</div>
             <div class="d-flex gap-2">
                 {% for key, label in levels %}
                 <input type="checkbox" class="btn-check" name="level" id="l-{{ key }}" value="{{ key }}" {% if key in picked_levels %}checked{% endif %}>
-                <label class="btn btn-outline-secondary btn-sm" for="l-{{ key }}">{{ key }}</label>
+                <label class="btn btn-outline-primary btn-sm px-3" for="l-{{ key }}">{% if key in picked_levels %}✓ {% endif %}{{ key }}</label>
                 {% endfor %}
             </div>
         </div>

@@ -12,7 +12,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from django.utils import timezone
 
-from .models import Student, Submission, Task, normalize_school_class
+from .models import Student, Submission, Tag, Task, normalize_school_class
 
 PERIODS = [('1h', '1 час', timedelta(hours=1)), ('2h', '2 часа', timedelta(hours=2)),
            ('1d', 'День', timedelta(days=1)), ('2d', '2 дня', timedelta(days=2)),
@@ -22,12 +22,15 @@ DEFAULT_PERIOD = '1d'
 LEVELS = [k for k, _ in Task.LEVEL_CHOICES]
 
 
-def activity_rows(students, start, levels):
+def activity_rows(students, start, levels, tag_id=None):
     """[{'student', 'solved', 'partial', 'pending', 'new', 'repeats', 'tasks'}] для списка учеников.
     new = solved + partial + pending (все впервые отправленные в периоде задачи)."""
     rows = {s.id: {'student': s, 'solved': 0, 'partial': 0, 'pending': 0, 'repeats': 0, 'tasks': []}
             for s in students}
-    subs = (Submission.objects.filter(student__in=list(rows), task__level__in=levels)
+    qs = Submission.objects.filter(student__in=list(rows), task__level__in=levels)
+    if tag_id:
+        qs = qs.filter(task_id__in=Task.objects.filter(tags__id=tag_id).values('id'))
+    subs = (qs
             .annotate(first=Coalesce(Min('attempts__submitted_at'), 'created_at'),
                       last=Coalesce(Max('attempts__submitted_at'), 'last_submitted_at', 'created_at'))
             .filter(last__gte=start).select_related('task'))
@@ -72,12 +75,14 @@ def student_activity(request):
         period, delta = DEFAULT_PERIOD, dict((k, d) for k, _, d in PERIODS)[DEFAULT_PERIOD]
     picked = [l for l in request.GET.getlist('level') if l in LEVELS]
     levels = picked or LEVELS
+    tag_raw = request.GET.get('tag', '')
+    tag_id = int(tag_raw) if tag_raw.isdigit() else None
     now = timezone.now()
     start = now - delta
-    rows = activity_rows(list(students), start, levels)
+    rows = activity_rows(list(students), start, levels, tag_id)
     totals = {k: sum(r[k] for r in rows) for k in ('solved', 'partial', 'pending', 'new', 'repeats')}
     return render(request, 'student_activity.html', {
         'rows': rows, 'totals': totals, 'periods': [(k, label) for k, label, _ in PERIODS], 'period': period,
         'all_classes': all_classes, 'class_filter': class_filter, 'levels': Task.LEVEL_CHOICES,
-        'picked_levels': levels, 'start': start, 'my_classes': classes,
+        'picked_levels': levels, 'tags': Tag.objects.all(), 'tag_id': tag_id, 'start': start, 'my_classes': classes,
     })
