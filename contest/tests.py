@@ -2311,3 +2311,79 @@ class DuelFullscreenTests(DuelTests):
         html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
         self.assertNotIn('id="fs-gate"', html)
         self.assertIn('exitFullscreen', html)
+
+
+class StudentActivityTests(TestCase):
+    """Активность за период: считаются только впервые отправленные в периоде задачи, пересдачи — нет."""
+
+    def setUp(self):
+        from .models import Attempt, Submission
+        self.now = timezone.now()
+        self.tu = User.objects.create_user('act_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
+        self.a = Student.objects.create(user=User.objects.create_user('act_a', password='p'), full_name='Аня', school_class='7A')
+        self.b = Student.objects.create(user=User.objects.create_user('act_b', password='p'), full_name='Боря', school_class='7A')
+        self.other = Student.objects.create(user=User.objects.create_user('act_o', password='p'), full_name='Чужой', school_class='9Z')
+        Task.objects.all().delete()
+        self.t = {lv: Task.objects.create(title=f'T{lv}{i}', description='d', level=lv, input_example='1',
+                                          output_example='1', test_cases=[]) for i, lv in enumerate('ABC')}
+        self.mk = lambda st, task, score, *hours_ago, graded=True: self._sub(st, task, score, hours_ago, graded)
+
+    def _sub(self, st, task, score, hours_ago, graded=True):
+        from .models import Attempt, Submission
+        sub = Submission.objects.create(student=st, task=task, score=score, is_graded=graded, status='DONE' if graded else 'TESTING')
+        for n, h in enumerate(sorted(hours_ago, reverse=True), 1):
+            Attempt.objects.create(submission=sub, number=n, submitted_at=self.now - timedelta(hours=h), score=score if graded else None)
+        Submission.objects.filter(pk=sub.pk).update(created_at=self.now - timedelta(hours=max(hours_ago)))
+        return sub
+
+    def rows(self, **params):
+        self.client.login(username='act_t', password='p')
+        r = self.client.get(reverse('student_activity'), params)
+        self.assertEqual(r.status_code, 200)
+        return {x['student'].full_name: x for x in r.context['rows']}, r
+
+    def test_counts_new_tasks_only(self):
+        self.mk(self.a, self.t['A'], 10, 0.5)              # первая отправка 30 мин назад — новая, решена
+        self.mk(self.a, self.t['B'], 6, 0.4)               # новая, частично
+        self.mk(self.a, self.t['C'], 0, 0.2, graded=False)  # новая, ждёт проверки
+        rows, _ = self.rows(period='1h')
+        self.assertEqual((rows['Аня']['solved'], rows['Аня']['partial'], rows['Аня']['pending'], rows['Аня']['new']), (1, 1, 1, 3))
+
+    def test_resubmission_for_higher_score_is_not_counted(self):
+        self.mk(self.a, self.t['A'], 10, 30, 0.5)          # первая отправка 30 ч назад, пересдача 30 мин назад
+        self.mk(self.b, self.t['A'], 10, 0.5)              # новая
+        rows, _ = self.rows(period='1d')
+        self.assertEqual(rows['Аня']['solved'], 0)
+        self.assertEqual(rows['Аня']['repeats'], 1)
+        self.assertEqual(rows['Боря']['solved'], 1)
+        rows, _ = self.rows(period='7d')                   # в окне 7 дней первая отправка уже внутри
+        self.assertEqual(rows['Аня']['solved'], 1)
+
+    def test_period_boundaries_and_levels(self):
+        self.mk(self.a, self.t['A'], 10, 3)                # 3 часа назад
+        self.mk(self.a, self.t['B'], 10, 50)               # 50 часов назад
+        rows, _ = self.rows(period='2h')
+        self.assertEqual(rows['Аня']['new'], 0)
+        rows, _ = self.rows(period='1d')
+        self.assertEqual(rows['Аня']['solved'], 1)
+        rows, _ = self.rows(period='3d')
+        self.assertEqual(rows['Аня']['solved'], 2)
+        rows, _ = self.rows(period='3d', level='B')
+        self.assertEqual(rows['Аня']['solved'], 1)
+        rows, _ = self.rows(period='3d', level=['A', 'C'])
+        self.assertEqual(rows['Аня']['solved'], 1)
+
+    def test_teacher_sees_only_own_classes_and_class_filter(self):
+        rows, _ = self.rows()
+        self.assertEqual(set(rows), {'Аня', 'Боря'})
+        rows, _ = self.rows(**{'class': '7A'})
+        self.assertEqual(set(rows), {'Аня', 'Боря'})
+        rows, _ = self.rows(**{'class': '9Z'})
+        self.assertEqual(set(rows), set())                 # чужой класс учителю недоступен
+
+    def test_student_cannot_open_and_bad_period_falls_back(self):
+        self.client.login(username='act_a', password='p')
+        self.assertNotEqual(self.client.get(reverse('student_activity')).status_code, 200)
+        rows, r = self.rows(period='zzz')
+        self.assertEqual(r.context['period'], '1d')

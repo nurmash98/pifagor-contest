@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Активность учеников - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a></div>
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">📈 Активность учеников</h3>
+<p class="text-muted small mb-3">Сколько <strong>новых</strong> задач сделал каждый ученик за выбранный период.
+    Считается только задача, <strong>первая отправка</strong> которой пришла в этот период. Если ученик уже отправлял задачу раньше и
+    переотправил её ради большего балла — это пересдача, в «новые» она не попадает (ниже показано, сколько таких).
+    «Решено» — итог 10 баллов.</p>
+
+<form method="get" class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+    <div class="d-flex flex-wrap gap-3 align-items-end">
+        <div>
+            <div class="small fw-semibold mb-1">Период</div>
+            <div class="btn-group btn-group-sm flex-wrap" role="group">
+                {% for key, label in periods %}
+                <input type="radio" class="btn-check" name="period" id="p-{{ key }}" value="{{ key }}" {% if key == period %}checked{% endif %}>
+                <label class="btn btn-outline-primary" for="p-{{ key }}">{{ label }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <div class="small fw-semibold mb-1">Класс</div>
+            <select name="class" class="form-select form-select-sm">
+                <option value="">{% if my_classes is None %}Все классы{% else %}Все мои классы{% endif %}</option>
+                {% for cls in all_classes %}<option value="{{ cls }}" {% if cls == class_filter %}selected{% endif %}>{{ cls }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <div class="small fw-semibold mb-1">Уровень</div>
+            <div class="d-flex gap-2">
+                {% for key, label in levels %}
+                <input type="checkbox" class="btn-check" name="level" id="l-{{ key }}" value="{{ key }}" {% if key in picked_levels %}checked{% endif %}>
+                <label class="btn btn-outline-secondary btn-sm" for="l-{{ key }}">{{ key }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <button type="submit" class="btn btn-pifagor-blue btn-sm px-4">Показать</button>
+    </div>
+</form>
+
+<div class="text-muted small mb-2">С {{ start|date:"d.m H:i" }} до сейчас · решено <strong>{{ totals.solved }}</strong>, частично {{ totals.partial }}, ждут проверки {{ totals.pending }} · пересдач (не считаются): {{ totals.repeats }}</div>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+    <ul class="list-group list-group-flush">
+        {% for r in rows %}
+        <li class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <strong style="color:#1a1a4b;">{{ r.student.full_name }}</strong>
+                    <span class="badge bg-secondary ms-1">{{ r.student.school_class }}</span>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <span class="badge {% if r.solved %}bg-success{% else %}bg-light text-muted border{% endif %} fs-6">решено: {{ r.solved }}</span>
+                    {% if r.partial %}<span class="badge bg-warning text-dark">частично: {{ r.partial }}</span>{% endif %}
+                    {% if r.pending %}<span class="badge bg-info text-dark">на проверке: {{ r.pending }}</span>{% endif %}
+                    {% if r.repeats %}<span class="badge bg-light text-muted border" title="Уже отправлял раньше — не считаются">пересдач: {{ r.repeats }}</span>{% endif %}
+                </div>
+            </div>
+            {% if r.tasks %}
+            <details class="mt-2"><summary class="small text-muted" style="cursor:pointer;">какие задачи</summary>
+                <ul class="small mb-0 mt-1 ps-3">
+                    {% for t in r.tasks %}<li>[{{ t.task.level }}] {{ t.task.title }} — {% if t.kind == 'pending' %}ждёт проверки{% else %}{{ t.score }}/10{% endif %}, первая отправка {{ t.at|date:"d.m H:i" }}</li>{% endfor %}
+                </ul>
+            </details>
+            {% endif %}
+        </li>
+        {% empty %}<li class="list-group-item text-muted">Нет учеников.</li>{% endfor %}
+    </ul>
+</div>
+{% endblock %}
