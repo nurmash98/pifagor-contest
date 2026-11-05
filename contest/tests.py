@@ -2350,15 +2350,29 @@ class StudentActivityTests(TestCase):
         rows, _ = self.rows(period='1h')
         self.assertEqual((rows['Аня']['solved'], rows['Аня']['partial'], rows['Аня']['pending'], rows['Аня']['new']), (1, 1, 1, 3))
 
-    def test_resubmission_for_higher_score_is_not_counted(self):
-        self.mk(self.a, self.t['A'], 10, 30, 0.5)          # первая отправка 30 ч назад, пересдача 30 мин назад
+    def test_resubmission_counts_only_if_score_grew(self):
+        from .models import Attempt
+        sub = self.mk(self.a, self.t['A'], 10, 30)         # раньше: 30 ч назад получил 10
+        Attempt.objects.create(submission=sub, number=2, submitted_at=self.now - timedelta(hours=0.5), score=10)
+        sub2 = self.mk(self.a, self.t['B'], 4, 30)         # раньше 4, теперь 4 — такой же
+        Attempt.objects.create(submission=sub2, number=2, submitted_at=self.now - timedelta(hours=0.5), score=4)
+        sub3 = self.mk(self.a, self.t['C'], 8, 30)         # раньше 8, теперь меньше (3)
+        Attempt.objects.create(submission=sub3, number=2, submitted_at=self.now - timedelta(hours=0.5), score=3)
         self.mk(self.b, self.t['A'], 10, 0.5)              # новая
         rows, _ = self.rows(period='1d')
-        self.assertEqual(rows['Аня']['solved'], 0)
-        self.assertEqual(rows['Аня']['repeats'], 1)
+        self.assertEqual((rows['Аня']['solved'], rows['Аня']['new'], rows['Аня']['repeats']), (0, 0, 3))
         self.assertEqual(rows['Боря']['solved'], 1)
         rows, _ = self.rows(period='7d')                   # в окне 7 дней первая отправка уже внутри
         self.assertEqual(rows['Аня']['solved'], 1)
+
+    def test_resubmission_with_higher_score_is_counted(self):
+        from .models import Attempt
+        sub = self.mk(self.a, self.t['A'], 4, 30)          # раньше 4
+        Attempt.objects.create(submission=sub, number=2, submitted_at=self.now - timedelta(hours=0.5), score=10)
+        sub2 = self.mk(self.a, self.t['B'], 2, 30)         # раньше 2, теперь 6 — выросло, но не 10
+        Attempt.objects.create(submission=sub2, number=2, submitted_at=self.now - timedelta(hours=0.5), score=6)
+        rows, _ = self.rows(period='1d')
+        self.assertEqual((rows['Аня']['solved'], rows['Аня']['partial'], rows['Аня']['repeats']), (1, 1, 0))
 
     def test_period_boundaries_and_levels(self):
         self.mk(self.a, self.t['A'], 10, 3)                # 3 часа назад

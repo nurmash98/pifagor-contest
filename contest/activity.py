@@ -1,8 +1,8 @@
 """Активность учеников за период: сколько НОВЫХ задач каждый сделал.
 
-Задача считается, только если ПЕРВАЯ отправка по ней пришла внутри периода. Если ученик уже
-отправлял её раньше, а теперь отправил ещё раз ради большего балла — это пересдача: она не
-идёт в «новые» (показывается отдельно, чтобы учитель видел, что ничего не потеряно).
+Задача считается, если первая отправка по ней пришла внутри периода. Если ученик отправлял её
+раньше, а в периоде отправил снова: балл стал БОЛЬШЕ — задача считается, балл такой же или меньше —
+это пересдача, в «новые» не идёт (показывается отдельно).
 «Решено» — итоговый балл 10, как и в рейтинге; «частично» — проверено, но меньше 10."""
 from datetime import timedelta
 
@@ -24,29 +24,47 @@ LEVELS = [k for k, _ in Task.LEVEL_CHOICES]
 
 def activity_rows(students, start, levels, tag_id=None):
     """[{'student', 'solved', 'partial', 'pending', 'new', 'repeats', 'tasks'}] для списка учеников.
-    new = solved + partial + pending (все впервые отправленные в периоде задачи)."""
+    new = solved + partial + pending (задачи, засчитанные в периоде)."""
+    from .models import Attempt
     rows = {s.id: {'student': s, 'solved': 0, 'partial': 0, 'pending': 0, 'repeats': 0, 'tasks': []}
             for s in students}
     qs = Submission.objects.filter(student__in=list(rows), task__level__in=levels)
     if tag_id:
         qs = qs.filter(task_id__in=Task.objects.filter(tags__id=tag_id).values('id'))
-    subs = (qs
-            .annotate(first=Coalesce(Min('attempts__submitted_at'), 'created_at'),
-                      last=Coalesce(Max('attempts__submitted_at'), 'last_submitted_at', 'created_at'))
-            .filter(last__gte=start).select_related('task'))
-    for sub in subs:
-        row = rows[sub.student_id]
-        if sub.first < start:
-            row['repeats'] += 1          # уже отправлял раньше — пересдача, не считаем
-            continue
-        if not sub.is_graded:
-            kind = 'pending'
-        elif sub.score == 10:
-            kind = 'solved'
+    subs = {s.id: s for s in qs.select_related('task')}
+    info = {}      # submission_id -> {'first', 'before_best', 'win_best', 'win_any'}
+    for a in (Attempt.objects.filter(submission_id__in=list(subs)).values('submission_id', 'submitted_at', 'score')):
+        i = info.setdefault(a['submission_id'], {'first': a['submitted_at'], 'before_best': 0, 'win_best': None, 'win_any': False})
+        if a['submitted_at'] < i['first']:
+            i['first'] = a['submitted_at']
+        if a['submitted_at'] < start:
+            i['before_best'] = max(i['before_best'], a['score'] or 0)
         else:
-            kind = 'partial'
+            i['win_any'] = True
+            if a['score'] is not None:
+                i['win_best'] = a['score'] if i['win_best'] is None else max(i['win_best'], a['score'])
+    for sid, sub in subs.items():
+        i = info.get(sid)
+        if i is None:        # старая запись без попыток: берём даты самой отправки
+            first = sub.created_at
+            i = {'first': first, 'before_best': 0, 'win_best': sub.score if sub.is_graded else None,
+                 'win_any': (sub.last_submitted_at or first) >= start}
+            if first < start:
+                i['before_best'] = sub.score if sub.is_graded else 0
+        if not i['win_any']:
+            continue
+        row = rows[sub.student_id]
+        if i['first'] >= start:                       # первая отправка в периоде — новая задача
+            score = i['win_best']
+        elif i['win_best'] is not None and i['win_best'] > i['before_best']:
+            score = i['win_best']                     # раньше отправлял, но балл стал БОЛЬШЕ — считаем
+        else:
+            row['repeats'] += 1                       # балл такой же или меньше (или ещё не проверено)
+            continue
+        kind = 'pending' if score is None else ('solved' if score == 10 else 'partial')
         row[kind] += 1
-        row['tasks'].append({'task': sub.task, 'kind': kind, 'score': sub.score, 'at': sub.first})
+        row['tasks'].append({'task': sub.task, 'kind': kind, 'score': score, 'at': i['first'],
+                             'improved': i['first'] < start, 'was': i['before_best']})
     out = list(rows.values())
     for r in out:
         r['new'] = r['solved'] + r['partial'] + r['pending']

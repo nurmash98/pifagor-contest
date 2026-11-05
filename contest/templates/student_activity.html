@@ -6,8 +6,8 @@
 <div class="mb-3"><a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a></div>
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">📈 Активность учеников</h3>
 <p class="text-muted small mb-3">Сколько <strong>новых</strong> задач сделал каждый ученик за выбранный период.
-    Считается только задача, <strong>первая отправка</strong> которой пришла в этот период. Если ученик уже отправлял задачу раньше и
-    переотправил её ради большего балла — это пересдача, в «новые» она не попадает (ниже показано, сколько таких).
+    Считается задача, <strong>первая отправка</strong> которой пришла в этот период, а также старая задача, по которой в этот период балл
+    стал <strong>больше</strong> прежнего. Если ученик отправил её снова, а балл такой же или меньше — это пересдача, в «новые» она не попадает (ниже показано, сколько таких).
     «Решено» — итог 10 баллов.</p>
 
 <form method="get" class="card border-0 shadow-sm rounded-4 p-3 mb-4">
@@ -69,7 +69,7 @@
             {% if r.tasks %}
             <details class="mt-2"><summary class="small text-muted" style="cursor:pointer;">какие задачи</summary>
                 <ul class="small mb-0 mt-1 ps-3">
-                    {% for t in r.tasks %}<li>[{{ t.task.level }}] {{ t.task.title }} — {% if t.kind == 'pending' %}ждёт проверки{% else %}{{ t.score }}/10{% endif %}, первая отправка {{ t.at|date:"d.m H:i" }}</li>{% endfor %}
+                    {% for t in r.tasks %}<li>[{{ t.task.level }}] {{ t.task.title }} — {% if t.kind == 'pending' %}ждёт проверки{% else %}{{ t.score }}/10{% endif %}, {% if t.improved %}балл вырос с {{ t.was }} (первая отправка {{ t.at|date:"d.m H:i" }}){% else %}первая отправка {{ t.at|date:"d.m H:i" }}{% endif %}</li>{% endfor %}
                 </ul>
             </details>
             {% endif %}
