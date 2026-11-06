@@ -17,6 +17,7 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from .names import sort_students
 from .models import LoginEvent, Task, Submission, Attempt, Student, Course, Teacher, Topic, Subtopic, Tag, ClassBonus, normalize_school_class
 from .forms import StudentRegistrationForm
 from .autotest import run_autotests, MAX_TEST_CASES
@@ -1329,7 +1330,7 @@ def course_analytics(request, course_id):
 
     students = []
     if selected_class:
-        class_students = Student.objects.filter(school_class=selected_class).order_by('full_name')
+        class_students = sort_students(Student.objects.filter(school_class=selected_class))
 
         # Задачи этого класса, решённые на 10/10 (итоговая оценка): {(student_id, task_id)}
         perfect = set(
@@ -1888,7 +1889,7 @@ def student_list(request):
     if restored:
         return restored
     classes = _managed_classes(request.user)
-    students = Student.objects.select_related('user').order_by('school_class', 'full_name')
+    students = Student.objects.select_related('user')
     if classes is not None:
         students = students.filter(school_class__in=classes)
 
@@ -1905,8 +1906,9 @@ def student_list(request):
     else:
         all_classes = Student.objects.order_by('school_class').values_list('school_class', flat=True).distinct()
 
+    from .names import sort_students
     return render(request, 'student_list.html', {
-        'students': students, 'all_classes': all_classes, 'class_filter': class_filter, 'q': q,
+        'students': sort_students(students, by_class=True), 'all_classes': all_classes, 'class_filter': class_filter, 'q': q,
         'my_classes': classes,
     })
 

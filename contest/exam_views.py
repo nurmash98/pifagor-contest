@@ -28,6 +28,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from .names import sort_students
 from .autotest import run_autotests
 from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
                      normalize_school_class)
@@ -611,12 +612,12 @@ def exam_results(request, exam_id, retake_id=None):
         return redirect('exam_list')
     now = timezone.now()
     tasks = list(exam.tasks.all())
-    class_students = Student.objects.filter(school_class=exam.school_class).select_related('user').order_by('full_name')
+    class_students = sort_students(Student.objects.filter(school_class=exam.school_class).select_related('user'))
     retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam) if retake_id is not None else None
 
     exam_attempts = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
     if retake is not None:
-        students = retake.students.select_related('user').order_by('full_name')
+        students = sort_students(retake.students.select_related('user'))
         attempts = {a.student_id: a for a in retake.attempts.prefetch_related('answers')}
         rows = _result_rows(exam, students, attempts, now, per_student=True)
         for row in rows:    # рядом — оценка того же ученика за сам экзамен
@@ -680,7 +681,7 @@ def retake_create(request, exam_id):
     for rt in exam.retakes.prefetch_related('students'):
         for st in rt.students.all():
             in_retake.setdefault(st.id, []).append(rt)
-    students = list(Student.objects.filter(school_class=exam.school_class).order_by('full_name'))
+    students = sort_students(Student.objects.filter(school_class=exam.school_class))
     for st in students:
         attempt = exam_attempts.get(st.id)
         st.exam_grade = attempt.grade() if attempt else 0

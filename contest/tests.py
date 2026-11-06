@@ -2489,3 +2489,69 @@ class ReconcileQuartersTests(TestCase):
         r = self.client.post(reverse('hall_reconcile'), {'quarter': 1, 'grade': '7'}, follow=True)
         self.assertContains(r, 'Награды 1 четверти пересчитаны')
         self.st[0].refresh_from_db(); self.assertNotIn('champion', self.st[0].owned_banners)
+
+
+class NamesAndEdupageTests(TestCase):
+    """Сортировка по фамилии (А→Я, казахские буквы на своих местах) и страница «Имена из Edupage»."""
+
+    def setUp(self):
+        self.tu = User.objects.create_user('ed_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='7C')
+        self.mk = lambda login, name, cls='7C': Student.objects.create(
+            user=User.objects.create_user(login, password='p'), full_name=name, school_class=cls)
+
+    def test_name_key_alphabet_and_surname_first(self):
+        from .names import name_key
+        names = ['Тайыр Айша', 'Әбілда Райымбек', 'Бейдальдин Аман', 'Ғабдығали Искандер', 'Гинаятова Айя', 'Абдыхан Жания']
+        self.assertEqual(sorted(names, key=name_key),
+                         ['Абдыхан Жания', 'Әбілда Райымбек', 'Бейдальдин Аман', 'Гинаятова Айя', 'Ғабдығали Искандер', 'Тайыр Айша'])
+
+    def test_similarity_matches_latin_to_cyrillic(self):
+        from .names import best_matches
+        db = ['Adlet Aisha', 'Alexey Gorinov', 'Asanali', 'Eldar Alimhoja']
+        edu = ['Алимқожа Эльдар', 'Горинов Алексей', 'Абултдинов Асанали', 'Адлет Аиша', 'Жеңіс Алиби']
+        m = best_matches(db, edu)
+        self.assertEqual([edu[m[i][0]] for i in range(4)],
+                         ['Адлет Аиша', 'Горинов Алексей', 'Абултдинов Асанали', 'Алимқожа Эльдар'])
+
+    def test_page_suggests_and_saves_only_roster_names(self):
+        a = self.mk('e1', 'Adlet Aisha')
+        b = self.mk('e2', 'Alexey Gorinov')
+        self.client.login(username='ed_t', password='p')
+        page = self.client.get(reverse('edupage_names') + '?class=7C')
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'value="Адлет Аиша" selected')
+        r = self.client.post(reverse('edupage_names'), {'class': '7C', f'name_{a.id}': 'Адлет Аиша', f'name_{b.id}': 'Кто-то левый'})
+        self.assertEqual(r.status_code, 302)
+        a.refresh_from_db(); b.refresh_from_db()
+        self.assertEqual(a.full_name, 'Адлет Аиша')
+        self.assertEqual(b.full_name, 'Alexey Gorinov')       # имени нет в списке Edupage — не принято
+
+    def test_duplicate_choice_and_foreign_class_and_student_access(self):
+        a = self.mk('e1', 'Adlet Aisha')
+        b = self.mk('e2', 'Adlet Aisha2')
+        other = self.mk('e3', 'Test Other', cls='7A')
+        self.client.login(username='ed_t', password='p')
+        self.client.post(reverse('edupage_names'), {'class': '7C', f'name_{a.id}': 'Адлет Аиша', f'name_{b.id}': 'Адлет Аиша'})
+        a.refresh_from_db(); b.refresh_from_db()
+        self.assertEqual(sorted([a.full_name, b.full_name]), sorted(['Адлет Аиша', 'Adlet Aisha2']))
+        # чужой класс учителю недоступен: страница пустая, имена не меняются
+        self.client.post(reverse('edupage_names'), {'class': '7A', f'name_{other.id}': 'Әбіл Ахмет'})
+        other.refresh_from_db(); self.assertEqual(other.full_name, 'Test Other')
+        self.client.login(username='e1', password='p')
+        self.assertNotEqual(self.client.get(reverse('edupage_names')).status_code, 200)
+
+    def test_student_list_sorted_by_surname(self):
+        for i, n in enumerate(['Тайыр Айша', 'Әбілда Райымбек', 'Абдыхан Жания', 'Ғабдығали Искандер', 'Бейдальдин Аман']):
+            self.mk(f's{i}', n)
+        self.client.login(username='ed_t', password='p')
+        r = self.client.get(reverse('student_list'), {'class': '7C'})
+        self.assertEqual([s.full_name for s in r.context['students']],
+                         ['Абдыхан Жания', 'Әбілда Райымбек', 'Бейдальдин Аман', 'Ғабдығали Искандер', 'Тайыр Айша'])
+
+    def test_activity_sorted_by_surname(self):
+        for i, n in enumerate(['Тайыр Айша', 'Абдыхан Жания', 'Бейдальдин Аман']):
+            self.mk(f'a{i}', n)
+        self.client.login(username='ed_t', password='p')
+        r = self.client.get(reverse('student_activity'), {'class': '7C'})
+        self.assertEqual([x['student'].full_name for x in r.context['rows']], ['Абдыхан Жания', 'Бейдальдин Аман', 'Тайыр Айша'])

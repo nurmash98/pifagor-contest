@@ -13,6 +13,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from .models import Student, Submission, Tag, Task, normalize_school_class
+from .names import name_key
 
 PERIODS = [('1h', '1 час', timedelta(hours=1)), ('2h', '2 часа', timedelta(hours=2)),
            ('1d', 'День', timedelta(days=1)), ('2d', '2 дня', timedelta(days=2)),
@@ -69,7 +70,7 @@ def activity_rows(students, start, levels, tag_id=None):
     for r in out:
         r['new'] = r['solved'] + r['partial'] + r['pending']
         r['tasks'].sort(key=lambda t: t['at'])
-    out.sort(key=lambda r: (-r['solved'], -r['new'], r['student'].school_class, r['student'].full_name))
+    out.sort(key=lambda r: (r['student'].school_class or '', name_key(r['student'].full_name)))
     return out
 
 
@@ -77,7 +78,7 @@ def activity_rows(students, start, levels, tag_id=None):
 def student_activity(request):
     from .views import _managed_classes
     classes = _managed_classes(request.user)
-    students = Student.objects.select_related('user').order_by('school_class', 'full_name')
+    students = Student.objects.select_related('user')
     if classes is not None:
         students = students.filter(school_class__in=classes)
         all_classes = sorted(set(classes))
@@ -103,4 +104,53 @@ def student_activity(request):
         'rows': rows, 'totals': totals, 'periods': [(k, label) for k, label, _ in PERIODS], 'period': period,
         'all_classes': all_classes, 'class_filter': class_filter, 'levels': Task.LEVEL_CHOICES,
         'picked_levels': levels, 'tags': Tag.objects.all(), 'tag_id': tag_id, 'start': start, 'my_classes': classes,
+    })
+
+
+@staff_member_required
+def edupage_names(request):
+    """Приводит имена учеников к виду из Edupage («Фамилия Имя»): для каждого ученика класса предлагаем
+    самое похожее имя из списка Edupage, учитель проверяет и сохраняет."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+    from .edupage_roster import ROSTER
+    from .names import best_matches, name_key, sort_students
+    from .views import _managed_classes
+    classes = _managed_classes(request.user)
+    available = [c for c in ROSTER if classes is None or c in classes]
+    cls = request.GET.get('class') or request.POST.get('class') or (available[0] if available else '')
+    if cls not in available:
+        return render(request, 'edupage_names.html', {'available': available, 'cls': '', 'rows': []})
+    roster = ROSTER[cls]
+    students = sort_students(Student.objects.filter(school_class=cls))
+
+    if request.method == 'POST':
+        changed = 0
+        taken = set()
+        for st in students:
+            new = request.POST.get(f'name_{st.id}', '')
+            if not new or new not in roster or new == st.full_name:
+                continue
+            if new in taken:
+                messages.error(request, f'Имя «{new}» выбрано для двух учеников — второе пропущено.')
+                continue
+            taken.add(new)
+            st.full_name = new
+            st.save(update_fields=['full_name'])
+            changed += 1
+        messages.success(request, f'Класс {cls}: имён обновлено — {changed}.')
+        return redirect(f"{request.path}?class={cls}")
+
+    matches = best_matches([s.full_name for s in students], roster)
+    rows, used = [], set()
+    for i, st in enumerate(students):
+        j, score = matches.get(i, (None, 0))
+        guess = roster[j] if j is not None else ''
+        if guess:
+            used.add(guess)
+        rows.append({'student': st, 'guess': guess, 'same': guess == st.full_name, 'score': round(score * 100)})
+    rows.sort(key=lambda r: name_key(r['guess'] or r['student'].full_name))
+    return render(request, 'edupage_names.html', {
+        'available': available, 'cls': cls, 'rows': rows, 'roster': sorted(roster, key=name_key),
+        'missing': [n for n in sorted(roster, key=name_key) if n not in used],
     })

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Имена из Edupage - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'student_list' %}" class="text-decoration-none text-muted small">← Ученики</a></div>
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">📋 Имена как в Edupage</h3>
+<p class="text-muted small mb-3">Имя ученика в базе приводится к виду Edupage: <strong>Фамилия Имя</strong> без запятой. Для каждого ученика уже
+    подобрано самое похожее имя из списка Edupage вашего класса. <strong>Проверьте каждую строку</strong> (особенно с маленьким процентом) и нажмите «Сохранить».
+    Строка «— не менять —» оставит имя как есть.</p>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    {% for c in available %}<a href="?class={{ c }}" class="btn btn-sm {% if c == cls %}btn-pifagor-blue{% else %}btn-outline-primary{% endif %}">{{ c }}</a>{% endfor %}
+</div>
+
+{% if cls %}
+<form method="post">{% csrf_token %}
+    <input type="hidden" name="class" value="{{ cls }}">
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+        <ul class="list-group list-group-flush">
+            {% for r in rows %}
+            <li class="list-group-item p-3">
+                <div class="row align-items-center g-2">
+                    <div class="col-md-4">
+                        <div class="fw-semibold">{{ r.student.full_name }}</div>
+                        <div class="small text-muted">Логин: {{ r.student.user.username }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <select name="name_{{ r.student.id }}" class="form-select form-select-sm">
+                            <option value="">— не менять —</option>
+                            {% for n in roster %}<option value="{{ n }}" {% if n == r.guess %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 small">
+                        {% if r.same %}<span class="badge bg-success">уже так</span>
+                        {% elif r.guess %}<span class="badge {% if r.score >= 90 %}bg-success{% else %}bg-warning text-dark{% endif %}">совпадение {{ r.score }}%</span>
+                        {% else %}<span class="badge bg-secondary">не нашёл пару</span>{% endif %}
+                    </div>
+                </div>
+            </li>
+            {% empty %}<li class="list-group-item text-muted">В классе нет учеников.</li>{% endfor %}
+        </ul>
+    </div>
+    <div class="mt-3 d-flex gap-3 align-items-center">
+        <button type="submit" class="btn btn-pifagor-blue px-4">Сохранить имена класса {{ cls }}</button>
+        {% if missing %}<span class="small text-muted">В Edupage есть, но ни к кому не подобрано: {{ missing|join:", " }}</span>{% endif %}
+    </div>
+</form>
+{% else %}
+<div class="alert alert-secondary">Нет классов для сопоставления.</div>
+{% endif %}
+{% endblock %}

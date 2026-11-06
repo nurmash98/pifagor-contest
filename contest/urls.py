@@ -106,6 +106,7 @@ urlpatterns = [
 
     # Управление учениками — доступно любому учителю для всех учеников
     path('teacher/students/', views.student_list, name='student_list'),
+    path('teacher/edupage-names/', activity.edupage_names, name='edupage_names'),
     path('teacher/activity/', activity.student_activity, name='student_activity'),
     path('teacher/suspicious/', moderation_views.suspicious_students, name='suspicious_students'),
     path('teacher/students/<int:student_id>/block/', moderation_views.student_toggle_block, name='student_toggle_block'),
