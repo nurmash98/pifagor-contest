@@ -2412,3 +2412,80 @@ class StudentActivityTests(TestCase):
         self.assertEqual(rows['Аня']['solved'], 2)
         rows, _ = self.rows(period='1h', tag=tg.id)
         self.assertEqual(rows['Аня']['solved'], 1)
+
+
+class ReconcileQuartersTests(TestCase):
+    """После убирания 1–2 мест: убранным монеты назад, поднявшимся — награда за новое место, 1 место — баннер."""
+
+    def setUp(self):
+        from django.utils import timezone as tz
+        from . import quarters
+        from .models import CoinTransaction, HallEntry, QuarterFreeze, Submission
+        self.q = quarters
+        self.tu = User.objects.create_user('trc', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
+        self.st = []
+        for i in range(1, 5):
+            u = User.objects.create_user(f'rc{i}', password='p')
+            st = Student.objects.create(user=u, full_name=f'У{i}', school_class='7A',
+                                        owned_banners='champion' if i == 1 else '', name_banner='champion' if i == 1 else '')
+            self.st.append(st)
+            HallEntry.objects.create(year=quarters.YEAR, quarter=1, kind='student', grade='7', place=i, student=st,
+                                     name=st.full_name, school_class='7A', score=100 - i, solved=5)
+            for n in range(5 - i):          # У1 решил 4 задачи, У2 — 3, … — реальные баллы в окне четверти
+                task = Task.objects.create(title=f'rc{i}-{n}', description='d', level='A', input_example='1',
+                                           output_example='1', test_cases=[])
+                sub = Submission.objects.create(student=st, task=task, score=10, is_graded=True, status='DONE')
+                Submission.objects.filter(pk=sub.pk).update(updated_at=quarters.BY_N[1]['end'] - timedelta(days=3))
+            CoinTransaction.objects.create(student=st, key=f'q:{quarters.YEAR}:1', kind='award',
+                                           amount=quarters.award_for(i), at=tz.now(), note='награда')
+        QuarterFreeze.objects.create(year=quarters.YEAR, quarter=1, frozen_at=tz.now())
+
+    def _exclude_without_refund(self, *idx):
+        from .models import QuarterExclusion
+        for i in idx:                      # как будто убрали старым способом: исключение есть, остального нет
+            QuarterExclusion.objects.create(student=self.st[i], year=self.q.YEAR, quarter=1, reason='ИИ')
+
+    def test_reconcile_repairs_everything_and_is_idempotent(self):
+        from .coins import balance
+        from .disqualify import reconcile
+        from .models import HallEntry
+        self._exclude_without_refund(0, 1)
+        r = reconcile(1)
+        self.assertEqual({n for n, _ in r['refunded']}, {'У1', 'У2'})
+        self.assertEqual(balance(self.st[0]), 0)                 # было 200, вернули
+        self.assertEqual(balance(self.st[1]), 0)                 # было 150
+        for s in self.st:
+            s.refresh_from_db()
+        # У3 поднялся на 1 место: 100 -> 200, У4 на 2: 50 -> 150
+        self.assertEqual(balance(self.st[2]), 200)
+        self.assertEqual(balance(self.st[3]), 150)
+        self.assertIn('champion', self.st[2].owned_banners)      # новый чемпион
+        self.assertNotIn('champion', self.st[0].owned_banners)   # у убранного снят
+        self.assertEqual(self.st[0].name_banner, '')
+        self.assertEqual(HallEntry.objects.get(kind='student', place=1).student_id, self.st[2].id)
+        again = reconcile(1)
+        self.assertEqual((again['refunded'], again['awarded'], again['champions']), ([], [], []))
+        self.assertEqual(balance(self.st[2]), 200)
+
+    def test_disqualify_promotes_next_students(self):
+        from .coins import balance
+        from .disqualify import disqualify
+        disqualify(self.st[0], 1)
+        disqualify(self.st[1], 1)
+        for s in self.st:
+            s.refresh_from_db()
+        self.assertEqual((balance(self.st[0]), balance(self.st[1])), (0, 0))
+        self.assertEqual((balance(self.st[2]), balance(self.st[3])), (200, 150))
+        self.assertIn('champion', self.st[2].owned_banners)
+        self.assertNotIn('champion', self.st[0].owned_banners)
+
+    def test_button_view_and_permissions(self):
+        self._exclude_without_refund(0)
+        self.client.login(username='rc2', password='p')
+        self.client.post(reverse('hall_reconcile'), {'quarter': 1})
+        self.st[0].refresh_from_db(); self.assertIn('champion', self.st[0].owned_banners)   # ученику нельзя
+        self.client.login(username='trc', password='p')
+        r = self.client.post(reverse('hall_reconcile'), {'quarter': 1, 'grade': '7'}, follow=True)
+        self.assertContains(r, 'Награды 1 четверти пересчитаны')
+        self.st[0].refresh_from_db(); self.assertNotIn('champion', self.st[0].owned_banners)

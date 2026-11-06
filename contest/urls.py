@@ -32,6 +32,7 @@ urlpatterns = [
     # Рейтинг и профиль
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     path('hall-of-fame/', views.hall_of_fame, name='hall_of_fame'),
+    path('hall-of-fame/reconcile/', views.hall_reconcile, name='hall_reconcile'),
     path('hall-of-fame/disqualify/', views.hall_disqualify, name='hall_disqualify'),
     path('notice/seen/', views.notice_seen, name='notice_seen'),
     path('leaderboard/class-bonus/', views.add_class_bonus, name='add_class_bonus'),

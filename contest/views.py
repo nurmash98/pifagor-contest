@@ -936,6 +936,37 @@ def hall_disqualify(request):
     return redirect(back)
 
 
+@staff_member_required
+def hall_reconcile(request):
+    """Пересчёт наград зафиксированной четверти: убранным монеты возвращаются, поднявшимся доначисляются,
+    новый 1 место получает баннер чемпиона. Повторный запуск ничего не ломает."""
+    from . import quarters
+    from .disqualify import reconcile
+    from .models import QuarterFreeze
+    if request.method != 'POST':
+        return redirect('hall_of_fame')
+    try:
+        n = int(request.POST.get('quarter', ''))
+    except ValueError:
+        n = 0
+    if n not in quarters.BY_N or not QuarterFreeze.objects.filter(year=quarters.YEAR, quarter=n).exists():
+        messages.error(request, 'Эта четверть ещё не зафиксирована.')
+        return redirect('hall_of_fame')
+    r = reconcile(n)
+    quarters.invalidate()
+    bits = []
+    if r['refunded']:
+        bits.append('монеты возвращены: ' + ', '.join(f'{nm} −{c}' for nm, c in r['refunded']))
+    if r['awarded']:
+        bits.append('начислено: ' + ', '.join(f'{nm} (место {pl}) +{c}' for nm, pl, c in r['awarded']))
+    if r['champions']:
+        bits.append('баннер чемпиона: ' + ', '.join(r['champions']))
+    if r['banners_removed']:
+        bits.append('баннер снят: ' + ', '.join(r['banners_removed']))
+    messages.success(request, f'Награды {n} четверти пересчитаны. ' + ('; '.join(bits) if bits else 'Всё уже было верно, менять нечего.'))
+    return redirect(f"{reverse('hall_of_fame')}?q={n}&g={request.POST.get('grade', '')}")
+
+
 @login_required
 def notice_seen(request):
     """Ученик нажал «Понятно» — уведомление больше не показывается."""
