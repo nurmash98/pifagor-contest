@@ -9,6 +9,11 @@
     подобрано самое похожее имя из списка Edupage вашего класса. <strong>Проверьте каждую строку</strong> (особенно с маленьким процентом) и нажмите «Сохранить».
     Строка «— не менять —» оставит имя как есть.</p>
 
+<form method="post" class="mb-3" onsubmit="return confirm('Переименовать всех учеников с уверенным совпадением (90% и выше) во всех ваших классах?');">{% csrf_token %}
+    <input type="hidden" name="action" value="auto_all">
+    <button type="submit" class="btn btn-success btn-sm">⚡ Применить уверенные совпадения во всех классах</button>
+    <span class="small text-muted ms-2">Остальных (меньше 90%) можно проверить вручную ниже.</span>
+</form>
 <div class="d-flex flex-wrap gap-2 mb-3">
     {% for c in available %}<a href="?class={{ c }}" class="btn btn-sm {% if c == cls %}btn-pifagor-blue{% else %}btn-outline-primary{% endif %}">{{ c }}</a>{% endfor %}
 </div>

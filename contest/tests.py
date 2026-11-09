@@ -2402,6 +2402,14 @@ class StudentActivityTests(TestCase):
         rows, r = self.rows(period='zzz')
         self.assertEqual(r.context['period'], '1d')
 
+    def test_task_list_shows_only_solved_and_partial(self):
+        self.mk(self.a, self.t['A'], 10, 0.5)
+        self.mk(self.a, self.t['B'], 6, 0.4)
+        self.mk(self.a, self.t['C'], 0, 0.2, graded=False)
+        rows, _ = self.rows(period='1h')
+        self.assertEqual({t['kind'] for t in rows['Аня']['done_tasks']}, {'solved', 'partial'})
+        self.assertEqual(rows['Аня']['pending'], 1)             # счётчик «на проверке» остаётся
+
     def test_tag_filter(self):
         from .models import Tag
         tg = Tag.objects.create(name='циклы')
@@ -2555,3 +2563,17 @@ class NamesAndEdupageTests(TestCase):
         self.client.login(username='ed_t', password='p')
         r = self.client.get(reverse('student_activity'), {'class': '7C'})
         self.assertEqual([x['student'].full_name for x in r.context['rows']], ['Абдыхан Жания', 'Бейдальдин Аман', 'Тайыр Айша'])
+
+    def test_auto_all_renames_only_confident_matches(self):
+        a = self.mk('au1', 'Рамазан Исламов', cls='7C')        # имя-фамилия по-русски
+        b = self.mk('au2', 'Alexey Gorinov')
+        c = self.mk('au3', 'Совсем Другой')                      # похожего в Edupage нет
+        self.client.login(username='ed_t', password='p')
+        r = self.client.post(reverse('edupage_names'), {'action': 'auto_all'}, follow=True)
+        self.assertEqual(r.status_code, 200)
+        for s in (a, b, c):
+            s.refresh_from_db()
+        self.assertEqual(b.full_name, 'Горинов Алексей')
+        self.assertEqual(c.full_name, 'Совсем Другой')
+        self.assertContains(r, 'Совсем Другой')                  # в списке «проверить вручную»
+

@@ -66,10 +66,10 @@
                     {% if r.repeats %}<span class="badge bg-light text-muted border" title="Уже отправлял раньше — не считаются">пересдач: {{ r.repeats }}</span>{% endif %}
                 </div>
             </div>
-            {% if r.tasks %}
+            {% if r.done_tasks %}
             <details class="mt-2"><summary class="small text-muted" style="cursor:pointer;">какие задачи</summary>
                 <ul class="small mb-0 mt-1 ps-3">
-                    {% for t in r.tasks %}<li>[{{ t.task.level }}] {{ t.task.title }} — {% if t.kind == 'pending' %}ждёт проверки{% else %}{{ t.score }}/10{% endif %}, {% if t.improved %}балл вырос с {{ t.was }} (первая отправка {{ t.at|date:"d.m H:i" }}){% else %}первая отправка {{ t.at|date:"d.m H:i" }}{% endif %}</li>{% endfor %}
+                    {% for t in r.done_tasks %}<li>[{{ t.task.level }}] {{ t.task.title }} — {% if t.kind == 'solved' %}решена, 10/10{% else %}частично, {{ t.score }}/10{% endif %}, {% if t.improved %}балл вырос с {{ t.was }} (первая отправка {{ t.at|date:"d.m H:i" }}){% else %}первая отправка {{ t.at|date:"d.m H:i" }}{% endif %}</li>{% endfor %}
                 </ul>
             </details>
             {% endif %}

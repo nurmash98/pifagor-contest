@@ -70,6 +70,7 @@ def activity_rows(students, start, levels, tag_id=None):
     for r in out:
         r['new'] = r['solved'] + r['partial'] + r['pending']
         r['tasks'].sort(key=lambda t: t['at'])
+        r['done_tasks'] = [t for t in r['tasks'] if t['kind'] != 'pending']     # в списке — только решённые и частичные
     out.sort(key=lambda r: (r['student'].school_class or '', name_key(r['student'].full_name)))
     return out
 
@@ -118,6 +119,20 @@ def edupage_names(request):
     from .views import _managed_classes
     classes = _managed_classes(request.user)
     available = [c for c in ROSTER if classes is None or c in classes]
+    if request.method == 'POST' and request.POST.get('action') == 'auto_all':
+        done, left = 0, []
+        for c in available:
+            sts = sort_students(Student.objects.filter(school_class=c))
+            for i, (j, score) in best_matches([s.full_name for s in sts], ROSTER[c], threshold=0.9).items():
+                st, new = sts[i], ROSTER[c][j]
+                if st.full_name != new and not Student.objects.filter(school_class=c, full_name=new).exclude(pk=st.pk).exists():
+                    st.full_name = new
+                    st.save(update_fields=['full_name'])
+                    done += 1
+            left += [f'{s.full_name} ({c})' for s in Student.objects.filter(school_class=c) if s.full_name not in ROSTER[c]]
+        messages.success(request, f'Переименовано уверенных совпадений: {done}.' + (
+            f' Осталось проверить вручную ({len(left)}): ' + ', '.join(left[:40]) + ('…' if len(left) > 40 else '') if left else ' Все имена теперь как в Edupage.'))
+        return redirect(request.path)
     cls = request.GET.get('class') or request.POST.get('class') or (available[0] if available else '')
     if cls not in available:
         return render(request, 'edupage_names.html', {'available': available, 'cls': '', 'rows': []})
