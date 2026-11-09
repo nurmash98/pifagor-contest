@@ -6,7 +6,7 @@
 {% block content %}
 <style>
   .cg-wrap { max-width: 980px; margin: 0 auto; }
-  .cg-code { background:#0d1117; color:#e6edf3; border-radius:10px; padding:14px 16px; font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:pre; overflow-x:auto; margin:0; }
+  .cg-code { user-select:none; -webkit-user-select:none; background:#0d1117; color:#e6edf3; border-radius:10px; padding:14px 16px; font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:pre; overflow-x:auto; margin:0; }
   .cg-timer { font: 700 2.2rem/1 ui-monospace,Menlo,Consolas,monospace; letter-spacing:2px; }
   .cg-shake { animation: cgshake .45s; }
   @keyframes cgshake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
@@ -94,13 +94,12 @@
 </div>
 
 {% if run.status == 'playing' %}
-<!-- Игра идёт на весь экран: вышел и не вернулся за FS_GRACE секунд — проигрыш -->
+<!-- Игра идёт на весь экран: любой выход — проигрыш -->
 <div id="fs-gate" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(18,18,24,.97);color:#fff;align-items:center;justify-content:center;text-align:center;padding:24px;">
   <div style="max-width:460px;">
     <div style="font-size:3rem;">💣</div>
     <h4 class="fw-bold mb-2">{% t "Бомба обезвреживается в полноэкранном режиме" %}</h4>
-    <p id="fs-msg" class="mb-3 opacity-75">{% t "Нажми кнопку. Выход из полного экрана во время игры — проигрыш." %}</p>
-    <div id="fs-left" class="display-4 fw-bold mb-3" style="display:none;"></div>
+    <p id="fs-msg" class="mb-3 opacity-75">{% t "Нажми кнопку. Во время игры нельзя выходить из полного экрана, переключаться на другое окно, вкладку или программу — сразу проигрыш." %}</p>
     <button type="button" id="fs-btn" class="btn btn-danger btn-lg rounded-pill px-5 fw-bold">⛶ {% t "Начать" %}</button>
   </div>
 </div>
@@ -111,42 +110,57 @@
   var timerEl = document.getElementById('timer'), busy = false, over = false;
   function fmt(s) { s = Math.max(0, s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
-  // ---- Полноэкранный режим (на iPhone Safari его нет — там игра идёт без него) ----
-  var FS_GRACE = 5, fsKey = 'gameFs{{ run.id }}';
-  var gate = document.getElementById('fs-gate'), fsBtn = document.getElementById('fs-btn');
-  var fsLeft = document.getElementById('fs-left'), fsMsg = document.getElementById('fs-msg');
+  // ---- Защита: игра идёт только в полноэкранном режиме этого окна ----
+  // Любой выход — Esc, другое окно или программа (Alt+Tab / Cmd+Tab), другая вкладка, обновление страницы —
+  // сразу проигрыш. Сервер принимает ответы только из того браузера, где игра началась в полном экране.
+  var fsKey = 'gameFs{{ run.id }}', armUrl = '{% url "codegame_arm" run.id %}';
+  var gate = document.getElementById('fs-gate'), fsBtn = document.getElementById('fs-btn'), fsMsg = document.getElementById('fs-msg');
   var rootEl = document.documentElement, canFs = !!(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen);
   function inFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
   function enterFs() { try { var p = (rootEl.requestFullscreen || rootEl.webkitRequestFullscreen).call(rootEl); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
   function exitFs() { try { if (inFs()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
-  var armed = false, fsTimer = null;
+  var armed = false;
   try { armed = sessionStorage.getItem(fsKey) === '1'; } catch (e) {}
+  function post(u) { var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+    return fetch(u, { method: 'POST', body: fd, credentials: 'same-origin', keepalive: true }); }
   function forfeit() {
-    if (over) return; over = true;
-    var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
-    fetch(forfeitUrl, { method: 'POST', body: fd, credentials: 'same-origin', keepalive: true })
-      .finally(function () { location.reload(); });
+    if (over || !armed) return; over = true;
+    if (navigator.sendBeacon) { var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf); navigator.sendBeacon(forfeitUrl, fd); setTimeout(function () { location.reload(); }, 300); }
+    else post(forfeitUrl).finally(function () { location.reload(); });
   }
-  function showGate(countdown) {
-    gate.style.display = 'flex';
-    if (!countdown) return;
-    fsMsg.textContent = "{% t "Вернись в полный экран — иначе бомба взорвётся." %}";
-    fsLeft.style.display = 'block';
-    var n = FS_GRACE; fsLeft.textContent = n; clearInterval(fsTimer);
-    fsTimer = setInterval(function () { n -= 1; fsLeft.textContent = Math.max(n, 0); if (n <= 0) { clearInterval(fsTimer); forfeit(); } }, 1000);
-  }
-  function hideGate() { clearInterval(fsTimer); gate.style.display = 'none'; fsLeft.style.display = 'none'; }
-  if (canFs) {
+  function lockKeys() { try { if (navigator.keyboard && navigator.keyboard.lock) navigator.keyboard.lock().catch(function () {}); } catch (e) {} }
+  if (!canFs) {
+    gate.style.display = 'flex'; fsBtn.style.display = 'none';
+    fsMsg.textContent = "{% t "На этом устройстве нет полноэкранного режима. Открой игру на компьютере в Chrome или Edge." %}";
+  } else if (armed && !inFs()) {
+    forfeit();                              // страницу обновили или открыли заново во время игры — это выход
+  } else {
+    gate.style.display = inFs() ? 'none' : 'flex';
     fsBtn.addEventListener('click', enterFs);
     var onFsChange = function () {
-      if (inFs()) { armed = true; try { sessionStorage.setItem(fsKey, '1'); } catch (e) {} hideGate(); }
-      else if (armed && !over) { showGate(true); }
+      if (inFs()) {
+        lockKeys();
+        if (!armed) { post(armUrl).then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok) { armed = true; try { sessionStorage.setItem(fsKey, '1'); } catch (e) {} gate.style.display = 'none'; }
+          else { location.reload(); } }); }
+        else gate.style.display = 'none';
+      } else if (armed) { forfeit(); }
     };
     document.addEventListener('fullscreenchange', onFsChange);
     document.addEventListener('webkitfullscreenchange', onFsChange);
-    if (!inFs()) showGate(armed);         // после обновления страницы полный экран сбрасывается — даём FS_GRACE секунд
+    window.addEventListener('blur', function () { if (armed) forfeit(); });                 // другое окно / программа
+    document.addEventListener('visibilitychange', function () { if (document.hidden && armed) forfeit(); });
   }
-  function finish() { over = true; clearInterval(timer); hideGate(); try { sessionStorage.removeItem(fsKey); } catch (e) {} exitFs(); }
+  // Лишние клавиши и меню: копирование кода, правая кнопка, инструменты разработчика, печать, поиск
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  ['copy', 'cut', 'dragstart'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }); });
+  document.addEventListener('keydown', function (e) {
+    var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+    if (k === 'f12' || (mod && e.shiftKey && 'ijc'.indexOf(k) >= 0) || (mod && 'uspfcxtnwrl'.indexOf(k) >= 0 && k.length === 1)) {
+      e.preventDefault(); e.stopPropagation();
+    }
+  }, true);
+  function finish() { over = true; clearInterval(timer); gate.style.display = 'none'; try { sessionStorage.removeItem(fsKey); } catch (e) {} exitFs(); }
 
   function tick() { timerEl.textContent = fmt(left); if (left <= 0) { finish(); location.reload(); return; } left -= 1; }
   tick(); var timer = setInterval(tick, 1000);

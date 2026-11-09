@@ -170,6 +170,9 @@ def game_play(request, run_id):
     st = _student(request)
     run = get_object_or_404(CodeGameRun.objects.select_related('game'), id=run_id, student=st)
     cg.expire_if_needed(run)
+    if run.status == 'playing' and run.client and run.client != _client(request):
+        run = cg.forfeit(run)            # игру открыли в другом браузере — это выход из игры
+        messages.error(request, 'Игру открыли в другом браузере — засчитан проигрыш.')
     qs = [cg.public_question(q, i) for i, q in enumerate(run.questions)]
     return render(request, 'codegame_play.html', {
         'run': run, 'game': run.game, 'questions': qs, 'left': cg.seconds_left(run) if run.status == 'playing' else 0,
@@ -182,11 +185,37 @@ def game_play(request, run_id):
 def game_answer(request, run_id):
     st = _student(request)
     run = get_object_or_404(CodeGameRun, id=run_id, student=st)
+    if run.status == 'playing' and run.client != _client(request):
+        if run.client:                    # ответ из другого браузера — проигрыш
+            run = cg.forfeit(run)
+        return JsonResponse({'ok': False, 'state': run.status, 'left': cg.seconds_left(run) if run.status == 'playing' else 0,
+                             'strikes': run.mistakes, 'need_fullscreen': True})
     try:
         index = int(request.POST.get('index', '-1'))
     except ValueError:
         index = -1
     return JsonResponse(cg.answer(run, index, request.POST.get('answer', '')))
+
+
+def _client(request):
+    if not request.session.session_key:
+        request.session.save()
+    return request.session.session_key or ''
+
+
+@login_required
+@require_POST
+def game_arm(request, run_id):
+    """Браузер вошёл в полноэкранный режим: игра привязывается к нему. Второй браузер привязаться не может."""
+    st = _student(request)
+    run = get_object_or_404(CodeGameRun, id=run_id, student=st)
+    me = _client(request)
+    updated = CodeGameRun.objects.filter(pk=run.pk, status='playing', client='').update(client=me)
+    run.refresh_from_db()
+    ok = run.status == 'playing' and run.client == me
+    if not ok and run.status == 'playing':
+        run = cg.forfeit(run)
+    return JsonResponse({'ok': ok, 'state': run.status, 'bound': bool(updated)})
 
 
 @login_required

@@ -2599,7 +2599,9 @@ class CodeGameTests(TestCase):
         self.client.login(username='cg_s', password='p')
         r = self.client.post(reverse('codegame_start', args=[self.game.id]))
         self.assertEqual(r.status_code, 302)
-        return CodeGameRun.objects.filter(student=self.st).latest('id')
+        run = CodeGameRun.objects.filter(student=self.st).latest('id')
+        self.assertTrue(self.client.post(reverse('codegame_arm', args=[run.id])).json()['ok'])   # вошёл в полный экран
+        return run
 
     def _ans(self, run, i, value):
         return self.client.post(reverse('codegame_answer', args=[run.id]), {'index': i, 'answer': value}).json()
@@ -2662,6 +2664,36 @@ class CodeGameTests(TestCase):
         self.assertEqual(self._ans(run, 0, 'x')['state'], 'lost')
         self.client.login(username='cg_o', password='p')       # чужое прохождение не трогается
         self.assertEqual(self.client.post(reverse('codegame_forfeit', args=[run.id])).status_code, 404)
+
+    def test_answers_only_after_fullscreen_and_only_from_same_browser(self):
+        from django.test import Client
+        from .models import CodeGameRun
+        self.client.login(username='cg_s', password='p')
+        self.client.post(reverse('codegame_start', args=[self.game.id]))
+        run = CodeGameRun.objects.filter(student=self.st).latest('id')
+        d = self._ans(run, 0, run.questions[0]['answer'])          # без полного экрана ответ не принимается
+        self.assertTrue(d.get('need_fullscreen'))
+        self.assertFalse(d['ok'])
+        self.client.post(reverse('codegame_arm', args=[run.id]))
+        other = Client()                                            # тот же ученик в другом браузере
+        other.login(username='cg_s', password='p')
+        d = other.post(reverse('codegame_answer', args=[run.id]), {'index': 0, 'answer': run.questions[0]['answer']}).json()
+        self.assertEqual(d['state'], 'lost')
+        run.refresh_from_db()
+        self.assertEqual(run.status, 'lost')
+
+    def test_second_browser_cannot_arm_or_open(self):
+        from django.test import Client
+        run = self._start()
+        other = Client()
+        other.login(username='cg_s', password='p')
+        self.assertFalse(other.post(reverse('codegame_arm', args=[run.id])).json()['ok'])
+        run.refresh_from_db()
+        self.assertEqual(run.status, 'lost')
+        run2 = self._start()
+        other.get(reverse('codegame_play', args=[run2.id]))         # просто открыл в другом браузере
+        run2.refresh_from_db()
+        self.assertEqual(run2.status, 'lost')
 
     def test_page_does_not_leak_answers_and_timeout_loses(self):
         from datetime import timedelta

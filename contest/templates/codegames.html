@@ -1,7 +1,17 @@
 {% extends 'base.html' %}
 {% load ui_i18n %}
 
-{% block title %}{% t "Игры" %} - Pifagor Contest{% endblock %}
+{% block title %}{% t "Игры" %} - Pifagor Contest<div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>
+<script>
+(function () {
+  var el = document.documentElement;
+  if (!(el.requestFullscreen || el.webkitRequestFullscreen)) {
+    document.getElementById('no-fs').style.display = 'block';
+    document.querySelectorAll('form[action*="/start/"] button').forEach(function (b) { b.disabled = true; });
+  }
+})();
+</script>
+{% endblock %}
 
 {% block content %}
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 {% t "Игры" %}</h3>
@@ -27,4 +37,14 @@
     <div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>
     {% endfor %}
 </div>
+<div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>
+<script>
+(function () {
+  var el = document.documentElement;
+  if (!(el.requestFullscreen || el.webkitRequestFullscreen)) {
+    document.getElementById('no-fs').style.display = 'block';
+    document.querySelectorAll('form[action*="/start/"] button').forEach(function (b) { b.disabled = true; });
+  }
+})();
+</script>
 {% endblock %}

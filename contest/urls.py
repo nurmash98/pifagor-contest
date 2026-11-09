@@ -115,6 +115,7 @@ urlpatterns = [
     path('games/<int:game_id>/start/', codegame_views.game_start, name='codegame_start'),
     path('games/run/<int:run_id>/', codegame_views.game_play, name='codegame_play'),
     path('games/run/<int:run_id>/answer/', codegame_views.game_answer, name='codegame_answer'),
+    path('games/run/<int:run_id>/arm/', codegame_views.game_arm, name='codegame_arm'),
     path('games/run/<int:run_id>/forfeit/', codegame_views.game_forfeit, name='codegame_forfeit'),
     path('teacher/activity/', activity.student_activity, name='student_activity'),
     path('teacher/suspicious/', moderation_views.suspicious_students, name='suspicious_students'),

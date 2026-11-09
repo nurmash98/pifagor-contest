@@ -813,6 +813,8 @@ class CodeGameRun(models.Model):
     mistakes = models.PositiveSmallIntegerField(default=0)
     penalty = models.PositiveIntegerField(default=0)
     coins = models.PositiveSmallIntegerField(default=0)
+    # Браузер (ключ сессии), где игра началась в полноэкранном режиме: ответы принимаются только из него
+    client = models.CharField(max_length=64, blank=True, default='')
     started_at = models.DateTimeField()
     finished_at = models.DateTimeField(null=True, blank=True)
 
