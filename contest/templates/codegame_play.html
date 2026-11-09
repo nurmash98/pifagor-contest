@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load ui_i18n %}
 
-{% block title %}{{ game.title }} - Pifagor Contest{% endblock %}
+{% block title %}{% t "Бомба" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
 <style>
@@ -54,7 +54,7 @@
   {% else %}
     <div class="cg-bomb">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-        <h4 class="fw-bold mb-0">💣 {{ game.title }}</h4>
+        <h4 class="fw-bold mb-0">💣 {% t "Бомба" %}</h4>
         <div class="d-flex align-items-center gap-3">
           <div id="strikes">{% for n in "123" %}<span class="cg-strike {% if forloop.counter <= run.mistakes %}on{% endif %}">✕</span> {% endfor %}</div>
           <div class="cg-lcd cg-timer" id="timer">--:--</div>

@@ -118,6 +118,12 @@ def game_delete(request, game_id):
     return redirect('codegames_manage')
 
 
+def _kk(request, text):
+    """Сообщение ученику на его языке (RU/KZ из шапки сайта)."""
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    return UI_TRANSLATIONS.get(text, text) if request.session.get('content_lang') == 'kk' else text
+
+
 def _student(request):
     st = Student.objects.filter(user=request.user).first()
     if st is None:
@@ -136,7 +142,7 @@ def games(request):
     for g in my:
         won = [r.duration() for r in g.runs.filter(student=st, status='won')]
         items.append({'game': g, 'best': min(won) if won else None, 'wins': len(won),
-                      'topics': ', '.join(cg.TOPIC_LABELS.get(t, t) for t in g.topic_list())})
+                      'topics': [cg.TOPIC_LABELS.get(t, t) for t in g.topic_list()]})
     return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'balance': balance(st)})
 
 
@@ -151,16 +157,16 @@ def game_start(request, game_id):
         return redirect('codegame_play', run_id=current.id)
     from .coins import balance, spend
     if balance(st) < cg.ENTRY_FEE:
-        messages.error(request, f'Вход в игру стоит {cg.ENTRY_FEE} монету — у тебя не хватает. Реши задачу, чтобы заработать.')
+        messages.error(request, _kk(request, 'Вход в игру стоит 1 монету — у тебя не хватает. Реши задачу, чтобы заработать.'))
         return redirect('codegames')
     questions = cg.generate(game, random.Random())
     if not questions:
-        messages.error(request, 'Не получилось собрать вопросы. Сообщите учителю.')
+        messages.error(request, _kk(request, 'Не получилось собрать вопросы. Сообщите учителю.'))
         return redirect('codegames')
     run = CodeGameRun.objects.create(game=game, student=st, questions=questions, started_at=timezone.now())
     if not spend(st, f'gamefee:{run.id}', cg.ENTRY_FEE, 'Вход в игру «Бомба»'):
         run.delete()
-        messages.error(request, 'Не хватает монет для входа в игру.')
+        messages.error(request, _kk(request, 'Не хватает монет для входа в игру.'))
         return redirect('codegames')
     return redirect('codegame_play', run_id=run.id)
 
@@ -172,7 +178,7 @@ def game_play(request, run_id):
     cg.expire_if_needed(run)
     if run.status == 'playing' and run.client and run.client != _client(request):
         run = cg.forfeit(run)            # игру открыли в другом браузере — это выход из игры
-        messages.error(request, 'Игру открыли в другом браузере — засчитан проигрыш.')
+        messages.error(request, _kk(request, 'Игру открыли в другом браузере — засчитан проигрыш.'))
     qs = [cg.public_question(q, i) for i, q in enumerate(run.questions)]
     return render(request, 'codegame_play.html', {
         'run': run, 'game': run.game, 'questions': qs, 'left': cg.seconds_left(run) if run.status == 'playing' else 0,

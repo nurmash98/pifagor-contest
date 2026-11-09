@@ -2732,3 +2732,16 @@ class CodeGameTests(TestCase):
         self.assertNotContains(page, 'Escape')
         self.client.login(username='cg_s', password='p')
         self.assertNotEqual(self.client.get(reverse('codegames_manage')).status_code, 200)
+
+    def test_kazakh_ui(self):
+        run = self._start()
+        s = self.client.session; s['content_lang'] = 'kk'; s.save()
+        page = self.client.get(reverse('codegame_play', args=[run.id])).content.decode()
+        for kk in ('Бастау', 'Сапёр нұсқаулығы', 'Пернетақта', 'Сымдар', 'Бағдарлама шығаратыны'):
+            self.assertIn(kk, page)
+        self.assertNotIn('Инструкция сапёра', page)
+        lst = self.client.get(reverse('codegames')).content.decode()
+        self.assertIn('Ойнау', lst)
+        self.assertIn('Енгізу-шығару және айнымалылар', lst)
+        self.client.post(reverse('codegame_forfeit', args=[run.id]))
+        self.assertIn('Бомба жарылды', self.client.get(reverse('codegame_play', args=[run.id])).content.decode())
