@@ -16,7 +16,11 @@ from .autotest import _run_one, outputs_match
 
 TOPICS = [('@io', 'Ввод-вывод и переменные'), ('@cond', 'Условия if / else')]
 TOPIC_SHORT = {'@io': 'ввод-вывод', '@cond': 'if/else'}
-ENTRY_FEE = 1               # монет за вход в игру
+ENTRY_FEE = 1               # минимальная ставка
+MAX_STAKE = 3               # ставка 1..3 монеты
+PAYOUT = 2                  # обезвредил — ставка ×2 (1 → 2, 2 → 4, 3 → 6)
+KINDS = ['keypad', 'wires', 'pairs']   # модули идут по кругу
+PAIR_COUNT = 3              # в модуле «Пары» — 3 программы и 3 вывода
 TOPIC_LABELS = dict(TOPICS)
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Za-z_]\w*)\s*:\s*([^}]+?)\s*\}\}")
 RANGE_RE = re.compile(r"^(-?\d+)\s*\.\.\s*(-?\d+)$")
@@ -104,25 +108,65 @@ def generate(game, rng=None):
     pool = [t for t in bank() if set(t['tags']) & topics]
     rng.shuffle(pool)
     questions = []
-    for tpl in pool:
-        if len(questions) >= game.questions:
-            break
-        q = make_question(tpl, rng)
-        if q is None:
-            continue
-        q['kind'] = 'wires' if len(questions) % 2 else 'keypad'
-        if q['kind'] == 'wires':
-            options = [q['answer']] + _distractors(q, rng)
-            rng.shuffle(options)
-            q['options'] = options
-            q['colors'] = rng.sample(WIRE_COLORS, len(options))
+    it = iter(pool)
+    while len(questions) < game.questions:
+        kind = KINDS[len(questions) % len(KINDS)]
+        if kind == 'pairs':
+            q = _make_pairs(it, rng)
+            if q is None:
+                kind = 'keypad'             # шаблонов не хватило — обычная клавиатура
+        if kind != 'pairs':
+            q = None
+            for tpl in it:
+                q = make_question(tpl, rng)
+                if q is not None:
+                    break
+            if q is None:
+                break
+            q['kind'] = kind
+            if kind == 'wires':
+                options = [q['answer']] + _distractors(q, rng)
+                rng.shuffle(options)
+                q['options'] = options
+                q['colors'] = rng.sample(WIRE_COLORS, len(options))
         q['done'] = False
         questions.append(q)
     return questions
 
 
+def _make_pairs(templates, rng):
+    """Модуль «Пары»: 3 программы и 3 вывода вперемешку — соедини каждую программу с её выводом.
+    Выводы должны быть разными, иначе пара была бы неоднозначной."""
+    items = []
+    for tpl in templates:
+        q = make_question(tpl, rng)
+        if q is None or any(x['answer'].strip() == q['answer'].strip() for x in items):
+            continue
+        items.append(q)
+        if len(items) == PAIR_COUNT:
+            break
+    if len(items) < PAIR_COUNT:
+        return None
+    order = list(range(PAIR_COUNT))
+    rng.shuffle(order)
+    return {'kind': 'pairs', 'title': 'Пары', 'code': '', 'answer': '',
+            'codes': [x['code'] for x in items], 'answers': [x['answer'] for x in items],
+            'outputs': [items[k]['answer'] for k in order], 'colors': rng.sample(WIRE_COLORS, PAIR_COUNT)}
+
+
 def is_correct(q, answer):
     return outputs_match(answer or '', q['answer'])
+
+
+def _pairs_ok(q, value):
+    """value = «2,0,1»: для каждой программы — номер выбранного вывода."""
+    try:
+        picks = [int(x) for x in str(value).split(',')]
+    except ValueError:
+        return False
+    if len(picks) != len(q['codes']) or sorted(picks) != list(range(len(q['codes']))):
+        return False
+    return all(q['outputs'][p].strip() == a.strip() for p, a in zip(picks, q['answers']))
 
 
 def public_question(q, i):
@@ -130,6 +174,9 @@ def public_question(q, i):
     d = {'i': i, 'title': q['title'], 'code': q['code'], 'kind': q['kind'], 'done': q.get('done', False)}
     if q['kind'] == 'wires':
         d['wires'] = [{'label': o, 'color': c} for o, c in zip(q['options'], q['colors'])]
+    if q['kind'] == 'pairs':
+        d['codes'] = [{'code': c, 'color': col, 'n': k} for k, (c, col) in enumerate(zip(q['codes'], q['colors']))]
+        d['outputs'] = [{'label': o, 'letter': 'ABCDEF'[k]} for k, o in enumerate(q['outputs'])]
     return d
 
 
@@ -146,12 +193,13 @@ def _finish(run, won, now):
     from .models import CoinTransaction
     run.status = 'won' if won else 'lost'
     run.finished_at = now
-    if won and run.game.coins > 0:
+    prize = run.stake * PAYOUT
+    if won and prize > 0:
         tx, created = CoinTransaction.objects.get_or_create(
             student=run.student, key=f'game:{run.id}',
-            defaults=dict(kind='game', amount=run.game.coins, at=now, note='Бомба обезврежена'))
+            defaults=dict(kind='game', amount=prize, at=now, note=f'Бомба обезврежена: ставка {run.stake} × {PAYOUT}'))
         if created:
-            run.coins = run.game.coins
+            run.coins = prize
     run.save()
 
 
@@ -188,7 +236,7 @@ def answer(run, index, value):
         if q['kind'] == 'wires':
             ok = str(value) in [str(k) for k, o in enumerate(q['options']) if o.strip() == q['answer'].strip()]
         else:
-            ok = is_correct(q, value)
+            ok = _pairs_ok(q, value) if q['kind'] == 'pairs' else is_correct(q, value)
         if ok:
             q['done'] = True
             run.progress = sum(1 for x in qs if x.get('done'))

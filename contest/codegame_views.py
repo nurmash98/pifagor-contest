@@ -43,7 +43,6 @@ def _save_form(request, game):
     game.topics = ','.join(topics or list(cg.TOPIC_LABELS))
     game.questions = _int(request.POST.get('questions'), 4, 1, 12)
     game.time_limit = _int(request.POST.get('minutes'), 5, 1, 60) * 60
-    game.coins = _int(request.POST.get('coins'), 2, 0, 50)
     game.is_active = bool(request.POST.get('is_active'))
     game.title = game.title or 'Бомба'
     game.save()
@@ -143,7 +142,8 @@ def games(request):
         won = [r.duration() for r in g.runs.filter(student=st, status='won')]
         items.append({'game': g, 'best': min(won) if won else None, 'wins': len(won),
                       'topics': [cg.TOPIC_LABELS.get(t, t) for t in g.topic_list()]})
-    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'balance': balance(st)})
+    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'balance': balance(st),
+                                              'stakes': list(range(1, cg.MAX_STAKE + 1)), 'payout': cg.PAYOUT})
 
 
 @login_required
@@ -156,15 +156,16 @@ def game_start(request, game_id):
     if current and not cg.expire_if_needed(current, now):
         return redirect('codegame_play', run_id=current.id)
     from .coins import balance, spend
-    if balance(st) < cg.ENTRY_FEE:
-        messages.error(request, _kk(request, 'Вход в игру стоит 1 монету — у тебя не хватает. Реши задачу, чтобы заработать.'))
+    stake = _int(request.POST.get('stake'), 1, 1, cg.MAX_STAKE)
+    if balance(st) < stake:
+        messages.error(request, _kk(request, 'Не хватает монет на такую ставку. Поставь меньше или реши задачу, чтобы заработать.'))
         return redirect('codegames')
     questions = cg.generate(game, random.Random())
     if not questions:
         messages.error(request, _kk(request, 'Не получилось собрать вопросы. Сообщите учителю.'))
         return redirect('codegames')
-    run = CodeGameRun.objects.create(game=game, student=st, questions=questions, started_at=timezone.now())
-    if not spend(st, f'gamefee:{run.id}', cg.ENTRY_FEE, 'Вход в игру «Бомба»'):
+    run = CodeGameRun.objects.create(game=game, student=st, questions=questions, stake=stake, started_at=timezone.now())
+    if not spend(st, f'gamefee:{run.id}', stake, f'Ставка в игре «Бомба»: {stake}'):
         run.delete()
         messages.error(request, _kk(request, 'Не хватает монет для входа в игру.'))
         return redirect('codegames')

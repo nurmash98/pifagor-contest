@@ -2594,10 +2594,10 @@ class CodeGameTests(TestCase):
         self.game.students.add(self.st)
         CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=5, at=timezone.now())
 
-    def _start(self):
+    def _start(self, stake=1):
         from .models import CodeGameRun
         self.client.login(username='cg_s', password='p')
-        r = self.client.post(reverse('codegame_start', args=[self.game.id]))
+        r = self.client.post(reverse('codegame_start', args=[self.game.id]), {'stake': stake})
         self.assertEqual(r.status_code, 302)
         run = CodeGameRun.objects.filter(student=self.st).latest('id')
         self.assertTrue(self.client.post(reverse('codegame_arm', args=[run.id])).json()['ok'])   # вошёл в полный экран
@@ -2608,7 +2608,12 @@ class CodeGameTests(TestCase):
 
     def _win(self, run):
         for i, q in enumerate(run.questions):
-            v = [k for k, o in enumerate(q['options']) if o.strip() == q['answer'].strip()][0] if q['kind'] == 'wires' else q['answer']
+            if q['kind'] == 'wires':
+                v = [k for k, o in enumerate(q['options']) if o.strip() == q['answer'].strip()][0]
+            elif q['kind'] == 'pairs':
+                v = ','.join(str([o.strip() for o in q['outputs']].index(a.strip())) for a in q['answers'])
+            else:
+                v = q['answer']
             d = self._ans(run, i, str(v))
             self.assertTrue(d['ok'])
         run.refresh_from_db()
@@ -2619,9 +2624,15 @@ class CodeGameTests(TestCase):
         from . import codegame as cg
         self.game.topics = '@cond'
         qs = cg.generate(self.game, random.Random(1))
-        self.assertEqual([q['kind'] for q in qs], ['keypad', 'wires', 'keypad', 'wires'])
+        self.assertEqual([q['kind'] for q in qs], ['keypad', 'wires', 'pairs', 'keypad'])
         bank = {t['code']: t['tags'] for t in cg.bank()}
-        for q in qs:
+        pairs = qs[2]
+        self.assertEqual(len(pairs['codes']), 3)
+        self.assertEqual(sorted(pairs['outputs']), sorted(pairs['answers']))
+        self.assertEqual(len(set(a.strip() for a in pairs['answers'])), 3)       # выводы разные — пара однозначна
+        for code, ans in zip(pairs['codes'], pairs['answers']):
+            self.assertEqual(cg.run_output(code), ans)
+        for q in [q for q in qs if q['kind'] != 'pairs']:
             self.assertEqual(cg.run_output(q['code']), q['answer'])
             self.assertNotIn('{{', q['code'])
             self.assertIn('@cond', bank[q['template']])
@@ -2630,23 +2641,38 @@ class CodeGameTests(TestCase):
         other = cg.generate(self.game, random.Random(2))
         self.assertNotEqual([q['code'] for q in qs], [q['code'] for q in other])
 
-    def test_fee_and_prize_every_game(self):
+    def test_stake_and_double_payout(self):
         from .coins import balance
-        run = self._start()
-        self.assertEqual(balance(self.st), 4)                   # 5 − 1 за вход
+        run = self._start(stake=3)
+        self.assertEqual(balance(self.st), 2)                   # 5 − 3
         run = self._win(run)
-        self.assertEqual((run.status, run.coins), ('won', 2))
-        self.assertEqual(balance(self.st), 6)
-        run2 = self._win(self._start())                         # вторая игра: снова −1 и +2
-        self.assertEqual(run2.status, 'won')
-        self.assertEqual(balance(self.st), 7)
+        self.assertEqual((run.status, run.coins), ('won', 6))  # 3 × 2
+        self.assertEqual(balance(self.st), 8)
+        run2 = self._win(self._start(stake=1))                  # 8 − 1 + 2
+        self.assertEqual(run2.coins, 2)
+        self.assertEqual(balance(self.st), 9)
+        self.client.post(reverse('codegame_start', args=[self.game.id]), {'stake': 99})   # больше 3 нельзя
+        from .models import CodeGameRun
+        self.assertEqual(CodeGameRun.objects.latest('id').stake, 3)
+
+    def test_pairs_wrong_match_is_a_strike(self):
+        from .models import CodeGameRun
+        run = self._start()
+        i = [k for k, q in enumerate(run.questions) if q['kind'] == 'pairs'][0]
+        q = run.questions[i]
+        right = [[o.strip() for o in q['outputs']].index(a.strip()) for a in q['answers']]
+        wrong = right[1:] + right[:1]
+        d = self._ans(run, i, ','.join(map(str, wrong)))
+        self.assertFalse(d['ok'])
+        self.assertEqual(d['strikes'], 1)
+        self.assertTrue(self._ans(run, i, ','.join(map(str, right)))['ok'])
 
     def test_no_coins_no_game(self):
         from .models import CodeGameRun, CoinTransaction
         CoinTransaction.objects.filter(student=self.st).delete()
         self.client.login(username='cg_s', password='p')
         r = self.client.post(reverse('codegame_start', args=[self.game.id]), follow=True)
-        self.assertContains(r, 'не хватает')
+        self.assertContains(r, 'Не хватает монет')
         self.assertFalse(CodeGameRun.objects.exists())
 
     def test_three_strikes_explode(self):
@@ -2724,7 +2750,7 @@ class CodeGameTests(TestCase):
             'is_active': 'on', 'students': [self.st.id, self.foreign.id]})
         g = CodeGame.objects.latest('id')
         self.assertRedirects(r, reverse('codegame_edit', args=[g.id]))
-        self.assertEqual((g.mode, g.topics, g.time_limit, g.coins), ('bomb', '@cond', 240, 3))
+        self.assertEqual((g.mode, g.topics, g.time_limit), ('bomb', '@cond', 240))
         self.assertEqual(g.title, 'Бомба · 7A · if/else')
         self.assertEqual(list(g.students.all()), [self.st])
         page = self.client.get(reverse('codegame_edit', args=[g.id]))
