@@ -66,8 +66,13 @@
             {% if a.title %}<div class="fw-semibold small mb-2">{{ a.title }}</div>{% endif %}
             <div class="mt-auto">
             {% if a.kind == 'soon' %}<span class="badge bg-secondary rounded-pill px-3 py-2">🔒 {% if kk == 'kk' %}Жақында{% else %}Скоро{% endif %}</span>
-            {% elif not student %}
+            {% elif not student %}{% if a.kind == 'paid' %}<span class="text-warning-emphasis small fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }}</span>{% endif %}
             {% elif a.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓</span>
+            {% elif not a.owned and a.short %}
+                <span class="btn btn-sm btn-light rounded-pill px-2 disabled"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }} · {% if kk == 'kk' %}жетпейді{% else %}не хватает{% endif %} {{ a.short }}</span>
+            {% elif not a.owned %}
+                <form method="post" action="{% url 'shop_buy' %}">{% csrf_token %}<input type="hidden" name="avatar" value="{{ a.key }}">
+                    <button class="btn btn-sm btn-warning fw-bold rounded-pill px-3">{% if kk == 'kk' %}Сатып алу{% else %}Купить{% endif %} · {{ a.price }} <img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""></button></form>
             {% else %}
                 <form method="post" action="{% url 'profile_avatar' %}">{% csrf_token %}<input type="hidden" name="avatar" value="{{ a.key }}"><input type="hidden" name="next" value="shop">
                     <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">{% if kk == 'kk' %}Таңдау{% else %}Выбрать{% endif %}</button></form>

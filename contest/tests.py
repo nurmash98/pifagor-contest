@@ -1633,7 +1633,7 @@ class CoinsAndShopTests(TestCase):
         self.st.refresh_from_db(); self.assertEqual(self.st.name_banner, 'mint')
         html = self.client.get(reverse('shop')).content.decode()
         self.assertIn('b-gold', html)
-        self.assertIn('Скоро', html)
+        self.assertIn('av-01.webp', html)               # аватары в магазине (раньше были заглушки «Скоро»)
         self.assertIn('coin-chip', html)
 
     def test_exam_ten_gives_50(self):
@@ -2792,3 +2792,53 @@ class CodeGameTests(TestCase):
             page = self.client.get(url).content.decode()
             self.assertIn('icons/coin-64.png', page)
             self.assertNotIn('🪙', page)
+
+
+class AvatarShopTests(TestCase):
+    """29 новых аватаров продаются в магазине за монеты; выбрать можно только бесплатные и купленные."""
+
+    def setUp(self):
+        from .models import CoinTransaction
+        self.st = Student.objects.create(user=User.objects.create_user('av_s', password='p'), full_name='Аня', school_class='7A')
+        CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=120, at=timezone.now())
+        self.client.login(username='av_s', password='p')
+
+    def test_catalog_files_exist(self):
+        import os
+        from django.conf import settings
+        from . import avatars
+        paid = [a for a in avatars.CATALOG if a['kind'] == 'paid']
+        self.assertEqual(len(paid), 29)
+        base = os.path.join(settings.BASE_DIR, 'contest', 'static')
+        for a in avatars.CATALOG:
+            self.assertTrue(os.path.exists(os.path.join(base, a['file'])), a['file'])
+            self.assertTrue(a['ru'] and a['kk'])
+
+    def test_cannot_pick_unbought_avatar(self):
+        self.client.post(reverse('profile_avatar'), {'avatar': 'av01'})
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.avatar, '')
+
+    def test_buy_avatar_spends_coins_and_puts_it_on(self):
+        from .coins import balance
+        self.client.post(reverse('shop_buy'), {'avatar': 'av01'})     # 50 монет
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.avatar, 'av01')
+        self.assertIn('av01', self.st.owned_avatars)
+        self.assertEqual(balance(self.st), 70)
+        self.client.post(reverse('shop_buy'), {'avatar': 'av01'})     # второй раз не списывает
+        self.assertEqual(balance(self.st), 70)
+        self.client.post(reverse('profile_avatar'), {'avatar': ''})
+        self.client.post(reverse('profile_avatar'), {'avatar': 'av01'})  # купленный выбирается снова бесплатно
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.avatar, 'av01')
+
+    def test_not_enough_coins(self):
+        from .coins import balance
+        self.client.post(reverse('shop_buy'), {'avatar': 'av21'})     # дракон 200 > 120
+        self.st.refresh_from_db()
+        self.assertEqual((self.st.avatar, self.st.owned_avatars), ('', ''))
+        self.assertEqual(balance(self.st), 120)
+        page = self.client.get(reverse('shop')).content.decode()
+        self.assertIn('av-21.webp', page)
+        self.assertIn('не хватает 80', page)

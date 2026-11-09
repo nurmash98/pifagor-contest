@@ -607,8 +607,11 @@ def shop(request):
                         'short': max(b.get('price', 0) - bal, 0)})
     avatar_list = [{'key': '', 'img': '', 'kind': 'free', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
                     'on': bool(student and not student.avatar)}]
+    my_avatars = avatar_module.owned(student) if student else set()
     for a in avatar_module.CATALOG:
         avatar_list.append({'key': a['key'], 'img': static(a['file']) if a['file'] else '', 'kind': a['kind'],
+                            'price': a.get('price', 0), 'owned': a['kind'] == 'free' or a['key'] in my_avatars,
+                            'short': max(a.get('price', 0) - bal, 0),
                             'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key'])})
     history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
     return render(request, 'shop.html', {
@@ -625,6 +628,22 @@ def shop_buy(request):
     from . import coins as coin_module
     student = get_object_or_404(Student, user=request.user)
     kk = _get_content_lang(request) == 'kk'
+    if request.method == 'POST' and request.POST.get('avatar'):
+        from . import avatars as avatar_module
+        key = request.POST.get('avatar', '')
+        item = avatar_module.BY_KEY.get(key)
+        if item is None or item['kind'] != 'paid':
+            messages.error(request, 'Бұл аватарды сатып алуға болмайды.' if kk else 'Этот аватар нельзя купить.')
+        elif key in avatar_module.owned(student):
+            messages.info(request, 'Бұл аватар сізде бар.' if kk else 'Этот аватар у вас уже есть.')
+        elif coin_module.spend(student, f'buy:avatar:{key}', item['price'], f'Аватар «{item["ru"]}»'):
+            avatar_module.give(student, key)
+            student.avatar = key
+            student.save(update_fields=['avatar'])
+            messages.success(request, f'«{item["kk"]}» аватары сатып алынды!' if kk else f'Аватар «{item["ru"]}» куплен и уже стоит в профиле!')
+        else:
+            messages.warning(request, 'Тиын жетпейді.' if kk else 'Не хватает монет.')
+        return redirect('shop')
     if request.method == 'POST':
         key = request.POST.get('banner', '')
         item = banner_module.CATALOG.get(key)
