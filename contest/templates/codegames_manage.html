@@ -4,10 +4,11 @@
 
 {% block content %}
 <div class="mb-3"><a href="{% if game %}{% url 'codegames_manage' %}{% else %}{% url 'teacher_dashboard' %}{% endif %}" class="text-decoration-none text-muted small">← {% if game %}Все игры{% else %}Назад в кабинет{% endif %}</a></div>
-<h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 {% if game %}{{ game.title }}{% else %}Игры «Что выведет код?»{% endif %}</h3>
-<p class="text-muted small mb-4">Вопросы — задачи 1 тура Инфо Тартыс: ученик видит код и пишет, что он выведет. Числа в коде у каждого ученика и в каждой игре свои,
-    правильный ответ вычисляется запуском кода. <strong>Escape Room</strong> — замки открываются по порядку, неверный ответ отнимает {{ 30 }} секунд.
-    <strong>Бомба</strong> — модули можно обезвреживать в любом порядке, 3 ошибки или конец таймера — взрыв. Монеты за победу — один раз в день за каждую игру.</p>
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">💣 {% if game %}{{ game.title }}{% else %}Игра «Бомба»{% endif %}</h3>
+<p class="text-muted small mb-4">Модули бомбы — задачи 1 тура Инфо Тартыс: ученик видит код и вводит, что он выведет («клавиатура»),
+    или перерезает провод с правильным выводом («провода»). Числа в коде у каждого ученика и в каждой игре свои, правильный ответ вычисляется запуском кода.
+    Игра идёт в полноэкранном режиме: вышел и не вернулся за 5 секунд — проигрыш. 3 ошибки или конец таймера — взрыв.
+    <strong>Вход стоит 1 монету</strong>, за победу — приз (по умолчанию 2 монеты). Название ставится само по классам и темам.</p>
 
 {% if not game and games %}
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-4">
@@ -15,9 +16,9 @@
         {% for g in games %}
         <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <a href="{% url 'codegame_edit' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">{% if g.mode == 'bomb' %}💣{% else %}🚪{% endif %} {{ g.title }}</a>
+                <a href="{% url 'codegame_edit' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">💣 {{ g.title }}</a>
                 {% if not g.is_active %}<span class="badge bg-secondary ms-1">закрыта</span>{% endif %}
-                <div class="small text-muted">{{ g.get_mode_display }} · {{ g.questions }} вопр. · {{ g.time_limit|floatformat:0 }} сек · учеников: {{ g.students.all|length }} · +{{ g.coins }} монет</div>
+                <div class="small text-muted">{{ g.questions }} модулей · {% widthratio g.time_limit 60 1 %} мин · учеников: {{ g.students.all|length }} · приз {{ g.coins }} 🪙</div>
             </div>
             <form method="post" action="{% url 'codegame_delete' g.id %}" onsubmit="return confirm('Удалить игру «{{ g.title|escapejs }}» и все результаты?');">{% csrf_token %}
                 <button class="btn btn-outline-danger btn-sm">Удалить</button></form>
@@ -30,26 +31,17 @@
 <form method="post" class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">{% csrf_token %}
     <h5 class="fw-bold mb-3">{% if game %}Настройки{% else %}Новая игра{% endif %}</h5>
     <div class="row g-3">
-        <div class="col-md-6"><label class="form-label small fw-semibold">Название</label>
-            <input name="title" class="form-control" required maxlength="120" value="{{ game.title|default:'' }}" placeholder="Например: Побег из лаборатории"></div>
-        <div class="col-md-6"><label class="form-label small fw-semibold d-block">Режим</label>
-            <div class="btn-group" role="group">
-                <input type="radio" class="btn-check" name="mode" id="m-escape" value="escape" {% if not game or game.mode == 'escape' %}checked{% endif %}>
-                <label class="btn btn-outline-primary" for="m-escape">🚪 Escape Room</label>
-                <input type="radio" class="btn-check" name="mode" id="m-bomb" value="bomb" {% if game.mode == 'bomb' %}checked{% endif %}>
-                <label class="btn btn-outline-primary" for="m-bomb">💣 Бомба</label>
-            </div></div>
         <div class="col-md-6"><label class="form-label small fw-semibold d-block">Темы</label>
             {% for key, label in topics %}
             <input type="checkbox" class="btn-check" name="topics" id="t-{{ forloop.counter }}" value="{{ key }}" {% if not game or key in game.topic_list %}checked{% endif %}>
             <label class="btn btn-outline-primary btn-sm mb-1" for="t-{{ forloop.counter }}">{{ label }}</label>
             {% endfor %}</div>
-        <div class="col-4 col-md-2"><label class="form-label small fw-semibold">Вопросов</label>
-            <input name="questions" type="number" min="1" max="15" class="form-control" value="{{ game.questions|default:5 }}"></div>
+        <div class="col-4 col-md-2"><label class="form-label small fw-semibold">Модулей</label>
+            <input name="questions" type="number" min="1" max="12" class="form-control" value="{{ game.questions|default:4 }}"></div>
         <div class="col-4 col-md-2"><label class="form-label small fw-semibold">Минут</label>
-            <input name="minutes" type="number" min="1" max="60" class="form-control" value="{% if game %}{% widthratio game.time_limit 60 1 %}{% else %}10{% endif %}"></div>
-        <div class="col-4 col-md-2"><label class="form-label small fw-semibold">Монет</label>
-            <input name="coins" type="number" min="0" max="200" class="form-control" value="{{ game.coins|default:20 }}"></div>
+            <input name="minutes" type="number" min="1" max="60" class="form-control" value="{% if game %}{% widthratio game.time_limit 60 1 %}{% else %}5{% endif %}"></div>
+        <div class="col-4 col-md-2"><label class="form-label small fw-semibold">Приз, монет</label>
+            <input name="coins" type="number" min="0" max="50" class="form-control" value="{% if game %}{{ game.coins }}{% else %}2{% endif %}"></div>
         <div class="col-12"><div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="is_active" id="active" {% if not game or game.is_active %}checked{% endif %}>
             <label class="form-check-label" for="active">Игра открыта выбранным ученикам</label></div></div>
@@ -92,12 +84,6 @@ document.querySelectorAll('.cls-all').forEach(function (box) {
     var items = document.querySelectorAll('input[name="students"][data-cls="' + box.dataset.cls + '"]');
     box.checked = items.length && Array.prototype.every.call(items, function (i) { return i.checked; });
     box.addEventListener('change', function () { items.forEach(function (i) { i.checked = box.checked; }); });
-});
-document.querySelectorAll('input[name="mode"]').forEach(function (r) {
-    r.addEventListener('change', function () {
-        var m = document.querySelector('input[name="minutes"]');
-        {% if not game %}if (m) m.value = r.value === 'bomb' ? 5 : 10;{% endif %}
-    });
 });
 </script>
 {% endblock %}

@@ -2579,87 +2579,98 @@ class NamesAndEdupageTests(TestCase):
 
 
 
+
 class CodeGameTests(TestCase):
-    """Игры «Что выведет код?»: генерация с разными числами, доступ только выбранным, Escape Room, Бомба, монеты."""
+    """Игра «Бомба»: генерация с разными числами, вход 1 монета, приз, доступ только выбранным, выход из полного экрана."""
 
     def setUp(self):
-        from .models import CodeGame
+        from .models import CodeGame, CoinTransaction
         self.tu = User.objects.create_user('cg_t', password='p', is_staff=True)
         Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
         self.st = Student.objects.create(user=User.objects.create_user('cg_s', password='p'), full_name='Аня', school_class='7A')
         self.other = Student.objects.create(user=User.objects.create_user('cg_o', password='p'), full_name='Боря', school_class='7A')
         self.foreign = Student.objects.create(user=User.objects.create_user('cg_f', password='p'), full_name='Чужой', school_class='9Z')
-        self.game = CodeGame.objects.create(owner=self.tu, title='Побег', mode='escape', questions=3, time_limit=600, coins=15)
+        self.game = CodeGame.objects.create(owner=self.tu, title='Бомба', mode='bomb', questions=4, time_limit=300, coins=2)
         self.game.students.add(self.st)
+        CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=5, at=timezone.now())
 
-    def _start(self, game=None):
+    def _start(self):
         from .models import CodeGameRun
         self.client.login(username='cg_s', password='p')
-        r = self.client.post(reverse('codegame_start', args=[(game or self.game).id]))
+        r = self.client.post(reverse('codegame_start', args=[self.game.id]))
         self.assertEqual(r.status_code, 302)
         return CodeGameRun.objects.filter(student=self.st).latest('id')
 
     def _ans(self, run, i, value):
         return self.client.post(reverse('codegame_answer', args=[run.id]), {'index': i, 'answer': value}).json()
 
+    def _win(self, run):
+        for i, q in enumerate(run.questions):
+            v = [k for k, o in enumerate(q['options']) if o.strip() == q['answer'].strip()][0] if q['kind'] == 'wires' else q['answer']
+            d = self._ans(run, i, str(v))
+            self.assertTrue(d['ok'])
+        run.refresh_from_db()
+        return run
+
     def test_generated_answers_are_real_outputs_and_topics(self):
         import random
         from . import codegame as cg
         self.game.topics = '@cond'
         qs = cg.generate(self.game, random.Random(1))
-        self.assertEqual(len(qs), 3)
+        self.assertEqual([q['kind'] for q in qs], ['keypad', 'wires', 'keypad', 'wires'])
         bank = {t['code']: t['tags'] for t in cg.bank()}
         for q in qs:
             self.assertEqual(cg.run_output(q['code']), q['answer'])
             self.assertNotIn('{{', q['code'])
             self.assertIn('@cond', bank[q['template']])
+            if q['kind'] == 'wires':
+                self.assertEqual([o.strip() for o in q['options']].count(q['answer'].strip()), 1)
         other = cg.generate(self.game, random.Random(2))
         self.assertNotEqual([q['code'] for q in qs], [q['code'] for q in other])
 
-    def test_escape_flow_penalty_win_and_coins_once_a_day(self):
+    def test_fee_and_prize_every_game(self):
         from .coins import balance
         run = self._start()
-        d = self._ans(run, 0, 'точно неправильно')
-        self.assertFalse(d['ok'])
-        run.refresh_from_db()
-        self.assertEqual((run.mistakes, run.penalty), (1, 30))
-        for i, q in enumerate(run.questions):
-            d = self._ans(run, i, q['answer'])
-            self.assertTrue(d['ok'])
-        run.refresh_from_db()
-        self.assertEqual(run.status, 'won')
-        self.assertEqual(balance(self.st), 15)
-        run2 = self._start()
-        for i, q in enumerate(run2.questions):
-            self._ans(run2, i, q['answer'])
-        run2.refresh_from_db()
-        self.assertEqual((run2.status, run2.coins), ('won', 0))
-        self.assertEqual(balance(self.st), 15)          # второй раз за день монет нет
+        self.assertEqual(balance(self.st), 4)                   # 5 − 1 за вход
+        run = self._win(run)
+        self.assertEqual((run.status, run.coins), ('won', 2))
+        self.assertEqual(balance(self.st), 6)
+        run2 = self._win(self._start())                         # вторая игра: снова −1 и +2
+        self.assertEqual(run2.status, 'won')
+        self.assertEqual(balance(self.st), 7)
 
-    def test_bomb_wires_and_three_strikes(self):
-        from .models import CodeGame
-        bomb = CodeGame.objects.create(owner=self.tu, title='Бомба', mode='bomb', questions=4, time_limit=300)
-        bomb.students.add(self.st)
-        run = self._start(bomb)
-        wires = [i for i, q in enumerate(run.questions) if q['kind'] == 'wires']
-        self.assertTrue(wires)
-        q = run.questions[wires[0]]
-        self.assertEqual([o.strip() for o in q['options']].count(q['answer'].strip()), 1)
-        good = [k for k, o in enumerate(q['options']) if o.strip() == q['answer'].strip()][0]
-        self.assertTrue(self._ans(run, wires[0], str(good))['ok'])
+    def test_no_coins_no_game(self):
+        from .models import CodeGameRun, CoinTransaction
+        CoinTransaction.objects.filter(student=self.st).delete()
+        self.client.login(username='cg_s', password='p')
+        r = self.client.post(reverse('codegame_start', args=[self.game.id]), follow=True)
+        self.assertContains(r, 'не хватает')
+        self.assertFalse(CodeGameRun.objects.exists())
+
+    def test_three_strikes_explode(self):
+        from .coins import balance
+        run = self._start()
         for _ in range(3):
             d = self._ans(run, 0, 'неправильно')
         self.assertEqual(d['state'], 'lost')
-        run.refresh_from_db()
-        self.assertEqual(run.status, 'lost')
+        self.assertEqual(balance(self.st), 4)                   # вход не возвращается
+
+    def test_leaving_fullscreen_forfeits(self):
+        run = self._start()
+        r = self.client.post(reverse('codegame_forfeit', args=[run.id]))
+        self.assertEqual(r.json()['state'], 'lost')
+        self.assertEqual(self._ans(run, 0, 'x')['state'], 'lost')
+        self.client.login(username='cg_o', password='p')       # чужое прохождение не трогается
+        self.assertEqual(self.client.post(reverse('codegame_forfeit', args=[run.id])).status_code, 404)
 
     def test_page_does_not_leak_answers_and_timeout_loses(self):
         from datetime import timedelta
         run = self._start()
         page = self.client.get(reverse('codegame_play', args=[run.id]))
         self.assertEqual(page.status_code, 200)
-        self.assertTrue(all('answer' not in q for q in page.context['questions']))
-        run.started_at = timezone.now() - timedelta(seconds=700)
+        self.assertContains(page, 'fs-gate')
+        self.assertTrue(all('answer' not in q and 'options' not in q for q in page.context['questions']))
+        run.started_at = timezone.now() - timedelta(seconds=400)
         run.save()
         self.client.get(reverse('codegame_play', args=[run.id]))
         run.refresh_from_db()
@@ -2668,21 +2679,24 @@ class CodeGameTests(TestCase):
     def test_only_chosen_students_can_play_and_see_menu(self):
         self.client.login(username='cg_o', password='p')
         self.assertEqual(self.client.post(reverse('codegame_start', args=[self.game.id])).status_code, 404)
-        self.assertNotContains(self.client.get(reverse('codegames')), 'Побег')
+        self.assertNotContains(self.client.get(reverse('codegames')), '💣')
         self.client.login(username='cg_s', password='p')
-        self.assertContains(self.client.get(reverse('codegames')), 'Побег')
+        self.assertContains(self.client.get(reverse('codegames')), '💣')
         self.assertContains(self.client.get(reverse('profile')), '🎮')
 
-    def test_teacher_creates_game_only_with_own_class_students(self):
+    def test_teacher_creates_game_auto_title_bomb_only(self):
         from .models import CodeGame
         self.client.login(username='cg_t', password='p')
         r = self.client.post(reverse('codegames_manage'), {
-            'title': 'Новая', 'mode': 'bomb', 'topics': ['@io'], 'questions': 4, 'minutes': 5, 'coins': 10,
+            'mode': 'escape', 'topics': ['@cond'], 'questions': 6, 'minutes': 4, 'coins': 3,
             'is_active': 'on', 'students': [self.st.id, self.foreign.id]})
-        g = CodeGame.objects.get(title='Новая')
+        g = CodeGame.objects.latest('id')
         self.assertRedirects(r, reverse('codegame_edit', args=[g.id]))
-        self.assertEqual((g.mode, g.topics, g.time_limit), ('bomb', '@io', 300))
+        self.assertEqual((g.mode, g.topics, g.time_limit, g.coins), ('bomb', '@cond', 240, 3))
+        self.assertEqual(g.title, 'Бомба · 7A · if/else')
         self.assertEqual(list(g.students.all()), [self.st])
-        self.assertEqual(self.client.get(reverse('codegame_edit', args=[g.id])).status_code, 200)
+        page = self.client.get(reverse('codegame_edit', args=[g.id]))
+        self.assertNotContains(page, 'name="title"')
+        self.assertNotContains(page, 'Escape')
         self.client.login(username='cg_s', password='p')
         self.assertNotEqual(self.client.get(reverse('codegames_manage')).status_code, 200)

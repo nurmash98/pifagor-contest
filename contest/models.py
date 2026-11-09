@@ -777,15 +777,15 @@ for _model in (Submission, Attempt, ClassBonus, QuarterExclusion):
 
 
 class CodeGame(models.Model):
-    """Игра «Что выведет код?» — Escape Room или Бомба. Учитель выбирает темы и учеников, которым она открыта."""
+    """Игра «Бомба» на задачах «Что выведет код?». Учитель выбирает темы и учеников; mode всегда bomb (Escape Room убран)."""
     MODE_CHOICES = [('escape', 'Escape Room'), ('bomb', 'Бомба')]
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='code_games', verbose_name='Учитель')
     title = models.CharField(max_length=120, verbose_name='Название')
-    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='escape', verbose_name='Режим')
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='bomb', verbose_name='Режим')
     topics = models.CharField(max_length=100, default='@io,@cond', verbose_name='Темы')
-    questions = models.PositiveSmallIntegerField(default=5, verbose_name='Вопросов')
-    time_limit = models.PositiveIntegerField(default=600, verbose_name='Время, секунд')
-    coins = models.PositiveSmallIntegerField(default=20, verbose_name='Монет за победу (раз в день)')
+    questions = models.PositiveSmallIntegerField(default=4, verbose_name='Модулей')
+    time_limit = models.PositiveIntegerField(default=300, verbose_name='Время, секунд')
+    coins = models.PositiveSmallIntegerField(default=2, verbose_name='Монет за победу (вход стоит 1)')
     is_active = models.BooleanField(default=True, verbose_name='Открыта')
     students = models.ManyToManyField(Student, blank=True, related_name='code_games', verbose_name='Ученики')
     created_at = models.DateTimeField(auto_now_add=True)

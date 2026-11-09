@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Игры «Что выведет код?» (Escape Room и Бомба). Вопросы — шаблоны 1 тура из infotartys
+"""Игра «Бомба» на задачах «Что выведет код?». Вопросы — шаблоны 1 тура из infotartys
 (contest/codegame_bank.json): {{a:2..9}} — случайное целое, {{op:+|-|*}} — один из вариантов,
 одинаковое имя — одно значение. Ответ (вывод программы) вычисляется запуском кода в той же
 песочнице, что и автотесты, поэтому он всегда верный, а у каждого ученика свои числа."""
@@ -15,11 +15,12 @@ from django.utils import timezone
 from .autotest import _run_one, outputs_match
 
 TOPICS = [('@io', 'Ввод-вывод и переменные'), ('@cond', 'Условия if / else')]
+TOPIC_SHORT = {'@io': 'ввод-вывод', '@cond': 'if/else'}
+ENTRY_FEE = 1               # монет за вход в игру
 TOPIC_LABELS = dict(TOPICS)
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Za-z_]\w*)\s*:\s*([^}]+?)\s*\}\}")
 RANGE_RE = re.compile(r"^(-?\d+)\s*\.\.\s*(-?\d+)$")
 MAX_OUTPUT = 200
-ESCAPE_PENALTY = 30          # секунд штрафа за неверный ответ в Escape Room
 BOMB_STRIKES = 3             # ошибок до взрыва
 WIRE_COLORS = ['red', 'blue', 'yellow', 'green', 'white']
 
@@ -109,16 +110,13 @@ def generate(game, rng=None):
         q = make_question(tpl, rng)
         if q is None:
             continue
-        if game.mode == 'bomb':
-            q['kind'] = 'wires' if len(questions) % 2 else 'keypad'
-            if q['kind'] == 'wires':
-                options = [q['answer']] + _distractors(q, rng)
-                rng.shuffle(options)
-                q['options'] = options
-                q['colors'] = rng.sample(WIRE_COLORS, len(options))
-            q['done'] = False
-        else:
-            q['kind'] = 'lock'
+        q['kind'] = 'wires' if len(questions) % 2 else 'keypad'
+        if q['kind'] == 'wires':
+            options = [q['answer']] + _distractors(q, rng)
+            rng.shuffle(options)
+            q['options'] = options
+            q['colors'] = rng.sample(WIRE_COLORS, len(options))
+        q['done'] = False
         questions.append(q)
     return questions
 
@@ -149,14 +147,22 @@ def _finish(run, won, now):
     run.status = 'won' if won else 'lost'
     run.finished_at = now
     if won and run.game.coins > 0:
-        day = timezone.localdate(now).isoformat()
         tx, created = CoinTransaction.objects.get_or_create(
-            student=run.student, key=f'game:{run.game_id}:{day}',
-            defaults=dict(kind='game', amount=run.game.coins, at=now,
-                          note=f'Игра «{run.game.title}» пройдена'))
+            student=run.student, key=f'game:{run.id}',
+            defaults=dict(kind='game', amount=run.game.coins, at=now, note='Бомба обезврежена'))
         if created:
             run.coins = run.game.coins
     run.save()
+
+
+def forfeit(run):
+    """Ученик вышел из полноэкранного режима — проигрыш."""
+    from .models import CodeGameRun
+    with transaction.atomic():
+        run = CodeGameRun.objects.select_for_update().select_related('game', 'student').get(pk=run.pk)
+        if run.status == 'playing':
+            _finish(run, False, timezone.now())
+    return run
 
 
 def expire_if_needed(run, now=None):
@@ -176,8 +182,6 @@ def answer(run, index, value):
         if expire_if_needed(run, now) or run.status != 'playing':
             return {'ok': False, 'state': run.status, 'left': 0, 'strikes': run.mistakes}
         qs = run.questions
-        if run.game.mode == 'escape':
-            index = run.progress            # замки открываются строго по порядку
         if not (0 <= index < len(qs)) or qs[index].get('done'):
             return {'ok': False, 'state': run.status, 'left': seconds_left(run, now), 'strikes': run.mistakes, 'bad': True}
         q = qs[index]
@@ -191,12 +195,10 @@ def answer(run, index, value):
             run.questions = qs
         else:
             run.mistakes += 1
-            if run.game.mode == 'escape':
-                run.penalty += ESCAPE_PENALTY
         run.save()
         if run.progress >= len(qs):
             _finish(run, True, now)
-        elif run.game.mode == 'bomb' and run.mistakes >= BOMB_STRIKES:
+        elif run.mistakes >= BOMB_STRIKES:
             _finish(run, False, now)
         elif expire_if_needed(run, now):
             pass
