@@ -2665,6 +2665,8 @@ class CodeGameTests(TestCase):
         d = self._ans(run, i, ','.join(map(str, wrong)))
         self.assertFalse(d['ok'])
         self.assertEqual(d['strikes'], 1)
+        run.refresh_from_db()
+        self.assertEqual(run.penalty, 60)
         self.assertTrue(self._ans(run, i, ','.join(map(str, right)))['ok'])
 
     def test_no_coins_no_game(self):
@@ -2675,13 +2677,25 @@ class CodeGameTests(TestCase):
         self.assertContains(r, 'не хватает')
         self.assertFalse(CodeGameRun.objects.exists())
 
-    def test_three_strikes_explode(self):
+    def test_each_mistake_costs_a_minute_no_strike_limit(self):
         from .coins import balance
-        run = self._start()
-        for _ in range(3):
+        run = self._start()                                     # 5 минут
+        for n in range(4):                                      # 4 ошибки = −4 минуты, игра продолжается
             d = self._ans(run, 0, 'неправильно')
+            self.assertEqual(d['state'], 'playing')
+        run.refresh_from_db()
+        self.assertEqual((run.mistakes, run.penalty), (4, 240))
+        self.assertLessEqual(d['left'], 60)
+        d = self._ans(run, 0, 'неправильно')                    # пятая ошибка съела последнюю минуту — взрыв
         self.assertEqual(d['state'], 'lost')
         self.assertEqual(balance(self.st), 4)                   # вход не возвращается
+
+    def test_mistakes_then_win_still_pays(self):
+        run = self._start()
+        self._ans(run, 0, 'неправильно')
+        self._ans(run, 0, 'неправильно')
+        run = self._win(run)
+        self.assertEqual((run.status, run.coins, run.penalty), ('won', 2, 120))
 
     def test_leaving_fullscreen_forfeits(self):
         run = self._start()

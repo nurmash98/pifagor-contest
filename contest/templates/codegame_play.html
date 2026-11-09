@@ -15,8 +15,6 @@
   /* Бомба */
   .cg-bomb { background: linear-gradient(160deg,#3f3f46,#27272a); border:4px solid #52525b; border-radius:22px; padding:18px; color:#f4f4f5; }
   .cg-lcd { background:#1a0000; color:#ff3b3b; border-radius:8px; padding:8px 16px; text-shadow:0 0 8px #ff0000aa; display:inline-block; }
-  .cg-strike { display:inline-block; width:30px; height:30px; border-radius:50%; background:#3f0d0d; border:2px solid #7f1d1d; color:#7f1d1d; text-align:center; line-height:26px; font-weight:800; }
-  .cg-strike.on { background:#dc2626; color:#fff; border-color:#fecaca; box-shadow:0 0 10px #dc2626; }
   .cg-module { background:#18181b; border:2px solid #3f3f46; border-radius:14px; padding:14px; position:relative; height:100%; }
   .cg-module .led { position:absolute; top:12px; right:12px; width:14px; height:14px; border-radius:50%; background:#52525b; }
   .cg-module.done .led { background:#22c55e; box-shadow:0 0 10px #22c55e; }
@@ -61,7 +59,7 @@
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
         <h4 class="fw-bold mb-0">💣 {% t "Бомба" %}</h4>
         <div class="d-flex align-items-center gap-3">
-          <div id="strikes">{% for n in "123" %}<span class="cg-strike {% if forloop.counter <= run.mistakes %}on{% endif %}">✕</span> {% endfor %}</div>
+          <div id="penalty-flash" class="fw-bold" style="color:#ff3b3b;font-size:1.4rem;opacity:0;transition:opacity .3s;">−1:00</div>
           <div class="cg-lcd cg-timer" id="timer">--:--</div>
         </div>
       </div>
@@ -110,7 +108,7 @@
           <li>🔢 {% t "Клавиатура: введи ровно то, что выведет программа, и нажми ⏎." %}</li>
           <li>✂️ {% t "Провода: перережь провод, подписанный выводом программы. Остальные трогать нельзя." %}</li>
           <li>🔗 {% t "Пары: для каждой программы выбери букву её вывода и нажми «Соединить». Одна ошибка в паре — ошибка всего модуля." %}</li>
-          <li>{% t "Модули можно обезвреживать в любом порядке. 3 ошибки или конец таймера — взрыв." %}</li>
+          <li>{% t "Модули можно обезвреживать в любом порядке. Каждая ошибка отнимает 1 минуту. Время кончилось — взрыв." %}</li>
         </ul></details>
     </div>
   {% endif %}
@@ -199,7 +197,11 @@
         if (typeof d.left === 'number') left = d.left;
         flash(el, d.ok);
         if (d.ok && onOk) onOk(d);
-        document.querySelectorAll('#strikes .cg-strike').forEach(function (s, k) { s.classList.toggle('on', k < d.strikes); });
+        if (!d.ok && d.state === 'playing') {                 // ошибка: минус минута — показываем на таймере
+          var pf = document.getElementById('penalty-flash'); pf.style.opacity = 1; timerEl.classList.add('cg-shake');
+          timerEl.textContent = fmt(left);
+          setTimeout(function () { pf.style.opacity = 0; timerEl.classList.remove('cg-shake'); }, 1200);
+        }
         if (d.state !== 'playing') { finish(); setTimeout(function () { location.reload(); }, d.ok ? 700 : 900); }
       })
       .catch(function () { busy = false; });

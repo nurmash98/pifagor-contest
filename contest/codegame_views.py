@@ -182,7 +182,7 @@ def game_play(request, run_id):
     qs = [cg.public_question(q, i) for i, q in enumerate(run.questions)]
     return render(request, 'codegame_play.html', {
         'run': run, 'game': run.game, 'questions': qs, 'left': cg.seconds_left(run) if run.status == 'playing' else 0,
-        'strikes_max': cg.BOMB_STRIKES, 'duration': run.duration(), 'fee': cg.ENTRY_FEE,
+        'penalty': cg.ERROR_PENALTY, 'duration': run.duration(), 'fee': cg.ENTRY_FEE,
     })
 
 

@@ -21,7 +21,7 @@
             <h5 class="fw-bold mb-1">{% t "Бомба" %}</h5>
             <div class="small text-muted mb-2">{% for tp in it.topics %}{% t tp %}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
             <div class="small mb-3">
-                {{ it.game.questions }} {% t "модулей" %} · {% widthratio it.game.time_limit 60 1 %} {% t "мин" %} · 3 {% t "ошибки — взрыв" %}<br>
+                {{ it.game.questions }} {% t "модулей" %} · {% widthratio it.game.time_limit 60 1 %} {% t "мин" %} · {% t "ошибка — минус 1 минута" %}<br>
                 {% if it.best is not None %}🏆 {% t "Лучшее время" %}: <strong>{{ it.best }} {% t "сек" %}</strong> · {% t "побед" %}: {{ it.wins }}<br>{% endif %}
             </div>
             <form method="post" action="{% url 'codegame_start' it.game.id %}" class="mt-auto">{% csrf_token %}

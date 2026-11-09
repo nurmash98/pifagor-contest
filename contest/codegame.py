@@ -25,7 +25,7 @@ TOPIC_LABELS = dict(TOPICS)
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([A-Za-z_]\w*)\s*:\s*([^}]+?)\s*\}\}")
 RANGE_RE = re.compile(r"^(-?\d+)\s*\.\.\s*(-?\d+)$")
 MAX_OUTPUT = 200
-BOMB_STRIKES = 3             # ошибок до взрыва
+ERROR_PENALTY = 60           # каждая ошибка отнимает минуту от таймера; ограничения на число ошибок нет
 WIRE_COLORS = ['red', 'blue', 'yellow', 'green', 'white']
 
 _BANK = None
@@ -243,13 +243,12 @@ def answer(run, index, value):
             run.questions = qs
         else:
             run.mistakes += 1
+            run.penalty += ERROR_PENALTY
         run.save()
         if run.progress >= len(qs):
             _finish(run, True, now)
-        elif run.mistakes >= BOMB_STRIKES:
-            _finish(run, False, now)
-        elif expire_if_needed(run, now):
-            pass
+        else:
+            expire_if_needed(run, now)        # штраф мог съесть всё оставшееся время — взрыв
         return {'ok': ok, 'state': run.status, 'left': seconds_left(run, now) if run.status == 'playing' else 0,
-                'strikes': run.mistakes, 'progress': run.progress, 'coins': run.coins,
+                'strikes': run.mistakes, 'penalty': ERROR_PENALTY, 'progress': run.progress, 'coins': run.coins,
                 'answer': q['answer'] if (run.status == 'lost') else None}
