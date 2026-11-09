@@ -1,0 +1,65 @@
+{% load ui_i18n %}{# Бомба со шнуром и таймером. Огонёк бежит по шнуру к бомбе по мере того, как уходит время. #}
+<div class="bomb-wrap{% if exploded %} exploding{% endif %}" id="bomb-wrap">
+  <svg class="bomb-svg" viewBox="0 0 440 250" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="bs-white" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f4f4f5"/><stop offset=".45" stop-color="#d4d4d8"/><stop offset="1" stop-color="#9ca3af"/>
+      </linearGradient>
+      <linearGradient id="bs-gold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fde68a"/><stop offset=".5" stop-color="#eab308"/><stop offset="1" stop-color="#a16207"/>
+      </linearGradient>
+      <linearGradient id="bs-tape" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#52525b"/><stop offset=".5" stop-color="#27272a"/><stop offset="1" stop-color="#18181b"/>
+      </linearGradient>
+      <pattern id="bs-rope" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#b91c1c"/><rect width="2.5" height="6" fill="#7f1d1d"/>
+      </pattern>
+      <radialGradient id="bs-spark">
+        <stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#fde047"/><stop offset=".7" stop-color="#f97316" stop-opacity=".7"/><stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <!-- шнур: сгоревшая часть тёмная, несгоревшая — красная витая -->
+    <path id="fuse-path" d="M 46 46 C 70 6, 150 2, 170 44 S 210 120, 150 140 S 110 175, 128 178"
+          fill="none" stroke="#3f3f46" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 5"/>
+    <path id="fuse-live" d="M 46 46 C 70 6, 150 2, 170 44 S 210 120, 150 140 S 110 175, 128 178"
+          fill="none" stroke="url(#bs-rope)" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- шашки -->
+    <g>
+      <rect x="110" y="150" width="290" height="30" rx="14" fill="url(#bs-white)"/>
+      <rect x="110" y="178" width="290" height="30" rx="14" fill="url(#bs-white)"/>
+      <rect x="110" y="206" width="290" height="30" rx="14" fill="url(#bs-white)"/>
+      <rect x="290" y="150" width="110" height="86" rx="14" fill="url(#bs-gold)"/>
+      <path d="M 300 152 v 82 M 320 152 v 82 M 340 152 v 82 M 360 152 v 82 M 380 152 v 82" stroke="#a16207" stroke-opacity=".35" stroke-width="3"/>
+      <!-- изолента -->
+      <rect x="128" y="142" width="40" height="102" rx="8" fill="url(#bs-tape)"/>
+      <rect x="342" y="142" width="40" height="102" rx="8" fill="url(#bs-tape)"/>
+      <rect x="134" y="134" width="14" height="14" rx="3" fill="#18181b"/>
+      <rect x="350" y="134" width="14" height="14" rx="3" fill="#18181b"/>
+    </g>
+
+    <!-- провода -->
+    <path d="M 168 168 C 200 120, 240 120, 262 168" fill="none" stroke="#dc2626" stroke-width="4" stroke-linecap="round"/>
+    <path d="M 340 220 C 300 250, 230 250, 190 222" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round"/>
+    <path d="M 380 180 C 420 150, 430 210, 404 228" fill="none" stroke="#dc2626" stroke-width="4" stroke-linecap="round"/>
+    <path d="M 120 214 C 92 222, 92 186, 116 176" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- табло таймера -->
+    <rect x="182" y="160" width="146" height="66" rx="8" fill="#18181b" stroke="#3f3f46" stroke-width="3"/>
+    <rect x="190" y="166" width="130" height="46" rx="4" fill="#1a0000"/>
+    <text id="timer" x="255" y="200" text-anchor="middle" class="bomb-lcd">--:--</text>
+    <circle cx="198" cy="219" r="3" fill="#ef4444" class="bomb-led"/>
+    <circle cx="306" cy="219" r="2" fill="#71717a"/><circle cx="314" cy="219" r="2" fill="#71717a"/>
+
+    <!-- огонёк на конце шнура -->
+    <g id="fuse-spark" transform="translate(46 46)">
+      <circle r="18" fill="url(#bs-spark)" class="spark-glow"/>
+      <g class="spark-rays" stroke="#fde047" stroke-width="2" stroke-linecap="round">
+        <path d="M 0 -15 V -7 M 0 7 V 15 M -15 0 H -7 M 7 0 H 15 M -11 -11 L -5 -5 M 5 5 L 11 11 M -11 11 L -5 5 M 5 -5 L 11 -11"/>
+      </g>
+      <circle r="4" fill="#fff"/>
+    </g>
+  </svg>
+  <div class="boom"><span></span><span></span><span></span><b>{% t "БУМ!" %}</b></div>
+</div>

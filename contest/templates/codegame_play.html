@@ -14,7 +14,6 @@
   .cg-flash-ok { box-shadow: 0 0 0 4px #22c55e !important; }
   /* Бомба */
   .cg-bomb { background: linear-gradient(160deg,#3f3f46,#27272a); border:4px solid #52525b; border-radius:22px; padding:18px; color:#f4f4f5; }
-  .cg-lcd { background:#1a0000; color:#ff3b3b; border-radius:8px; padding:8px 16px; text-shadow:0 0 8px #ff0000aa; display:inline-block; }
   .cg-module { background:#18181b; border:2px solid #3f3f46; border-radius:14px; padding:14px; position:relative; height:100%; }
   .cg-module .led { position:absolute; top:12px; right:12px; width:14px; height:14px; border-radius:50%; background:#52525b; }
   .cg-module.done .led { background:#22c55e; box-shadow:0 0 10px #22c55e; }
@@ -28,6 +27,36 @@
   .pair-out { background:#0d1117; color:#e6edf3; border:1px solid #3f3f46; border-radius:8px; padding:4px 10px; font:14px ui-monospace,Menlo,monospace; white-space:pre; }
   .pair-out b { color:#facc15; margin-right:4px; }
   .cg-boom { font-size:5rem; animation: cgshake .6s 2; }
+  /* Бомба со шнуром */
+  .cg-head { position:sticky; top:6px; z-index:20; background:linear-gradient(160deg,#3f3f46,#2f2f35); border-radius:16px; padding:6px 10px; margin-bottom:14px; }
+  .bomb-wrap { position:relative; width:100%; max-width:400px; margin:0 auto; }
+  .bomb-svg { width:100%; height:auto; display:block; overflow:visible; }
+  .bomb-lcd { font: 700 34px ui-monospace,Menlo,Consolas,monospace; fill:#ff3b3b; letter-spacing:2px; filter: drop-shadow(0 0 4px #ff0000); }
+  .bomb-led { animation: led 1s steps(2) infinite; }
+  @keyframes led { 50% { opacity:.15; } }
+  .spark-glow { animation: spark .18s ease-in-out infinite alternate; transform-box:fill-box; transform-origin:center; }
+  .spark-rays { animation: rays .35s linear infinite; transform-box:fill-box; transform-origin:center; }
+  @keyframes spark { from { transform: scale(.75); } to { transform: scale(1.25); } }
+  @keyframes rays { to { transform: rotate(45deg); } }
+  .bomb-wrap.hurry .bomb-svg { animation: cgshake .5s infinite; }
+  .bomb-wrap.hurry .bomb-lcd { animation: led .5s steps(2) infinite; }
+  #penalty-flash { position:absolute; right:8%; top:38%; color:#ff3b3b; font:800 1.6rem ui-monospace,Menlo,monospace; opacity:0; transition:opacity .25s, transform .6s; pointer-events:none; text-shadow:0 0 8px #000; }
+  #penalty-flash.on { opacity:1; transform:translateY(-14px); }
+  /* взрыв */
+  .boom { position:absolute; left:58%; top:70%; width:0; height:0; pointer-events:none; }
+  .boom span { position:absolute; left:0; top:0; width:20px; height:20px; margin:-10px; border-radius:50%; opacity:0;
+               background: radial-gradient(circle, #fff 0%, #fde047 25%, #f97316 55%, #b91c1c 72%, transparent 76%); filter: blur(1.5px); }
+  .boom b { position:absolute; left:-100px; top:-30px; width:200px; text-align:center; font:900 2.6rem Montserrat,sans-serif; color:#fde047; text-shadow:0 0 12px #f97316, 0 3px 0 #b91c1c; opacity:0; }
+  .exploding .boom span { animation: blast 1.1s ease-out forwards; }
+  .exploding .boom span:nth-child(2) { animation-delay:.12s; }
+  .exploding .boom span:nth-child(3) { animation-delay:.25s; }
+  .exploding .boom b { animation: boomtext 1.3s ease-out forwards; }
+  .exploding .bomb-svg { animation: blowup .7s ease-in forwards; }
+  @keyframes blast { 0% { opacity:1; transform:scale(0); } 70% { opacity:1; } 100% { opacity:0; transform:scale(28); } }
+  @keyframes boomtext { 0% { opacity:0; transform:scale(.2); } 30% { opacity:1; transform:scale(1.3); } 100% { opacity:1; transform:scale(1); } }
+  @keyframes blowup { 0% { transform:none; } 30% { transform:translate(-6px,3px) rotate(-2deg) scale(1.05); } 100% { transform:scale(1.4) rotate(6deg); opacity:0; filter:brightness(3); } }
+  .cg-flashwhite { position:fixed; inset:0; background:#fff; z-index:4000; pointer-events:none; animation: whiteflash .9s ease-out forwards; }
+  @keyframes whiteflash { 0% { opacity:.95; } 100% { opacity:0; } }
 </style>
 
 <div class="cg-wrap">
@@ -43,7 +72,7 @@
         <p class="fs-4 fw-bold text-success mb-1">+{{ run.coins|default:payout }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></p>
         <p class="small text-muted">{% t "Вход" %} −{{ fee }}, {% t "победа" %} +{{ payout }}</p>
       {% else %}
-        <div class="cg-boom">💥</div>
+        <div style="max-width:320px;margin:0 auto;">{% include '_bomb_svg.html' with exploded=True %}</div>
         <h2 class="fw-bold">{% t "Бум! Бомба взорвалась." %}</h2>
         <p class="text-muted">{% t "Решено" %}: {{ run.progress }} / {{ questions|length }}</p>
         <p class="fs-5 fw-bold text-danger">−{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> <span class="small fw-normal text-muted">({% t "монета за вход не возвращается" %})</span></p>
@@ -56,12 +85,8 @@
 
   {% else %}
     <div class="cg-bomb">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-        <h4 class="fw-bold mb-0">💣 {% t "Бомба" %}</h4>
-        <div class="d-flex align-items-center gap-3">
-          <div id="penalty-flash" class="fw-bold" style="color:#ff3b3b;font-size:1.4rem;opacity:0;transition:opacity .3s;">−1:00</div>
-          <div class="cg-lcd cg-timer" id="timer">--:--</div>
-        </div>
+      <div class="cg-head">
+        <div style="position:relative;">{% include '_bomb_svg.html' %}<div id="penalty-flash">−1:00</div></div>
       </div>
       <div class="row g-3">
         {% for q in questions %}
@@ -183,7 +208,24 @@
   }, true);
   function finish() { over = true; clearInterval(timer); gate.style.display = 'none'; try { sessionStorage.removeItem(fsKey); } catch (e) {} exitFs(); }
 
-  function tick() { timerEl.textContent = fmt(left); if (left <= 0) { finish(); location.reload(); return; } left -= 1; }
+  // ---- Шнур: огонёк бежит к бомбе. Доля сгоревшего шнура = прошедшее время (со штрафами) / всё время ----
+  var TOTAL = {{ game.time_limit }}, fuse = document.getElementById('fuse-live');
+  var spark = document.getElementById('fuse-spark'), wrap = document.getElementById('bomb-wrap'), FL = fuse.getTotalLength();
+  fuse.style.transition = 'stroke-dashoffset .9s linear';
+  function drawFuse(sec) {
+    var burned = FL * Math.min(1, Math.max(0, 1 - sec / TOTAL));
+    fuse.style.strokeDasharray = FL + ' ' + FL; fuse.style.strokeDashoffset = -burned;
+    var pt = fuse.getPointAtLength(burned);
+    spark.setAttribute('transform', 'translate(' + pt.x.toFixed(1) + ' ' + pt.y.toFixed(1) + ')');
+    wrap.classList.toggle('hurry', sec <= 30);
+  }
+  function explode() {
+    wrap.classList.remove('hurry'); wrap.classList.add('exploding');
+    var f = document.createElement('div'); f.className = 'cg-flashwhite'; document.body.appendChild(f);
+    document.body.classList.add('cg-shake');
+  }
+  function tick() { timerEl.textContent = fmt(left); drawFuse(left);
+    if (left <= 0) { finish(); explode(); setTimeout(function () { location.reload(); }, 1500); return; } left -= 1; }
   tick(); var timer = setInterval(tick, 1000);
   function flash(el, ok) { var c = ok ? 'cg-flash-ok' : 'cg-flash-bad'; el.classList.add(c); if (!ok) el.classList.add('cg-shake');
     setTimeout(function () { el.classList.remove(c, 'cg-shake'); }, 600); }
@@ -198,11 +240,11 @@
         flash(el, d.ok);
         if (d.ok && onOk) onOk(d);
         if (!d.ok && d.state === 'playing') {                 // ошибка: минус минута — показываем на таймере
-          var pf = document.getElementById('penalty-flash'); pf.style.opacity = 1; timerEl.classList.add('cg-shake');
-          timerEl.textContent = fmt(left);
-          setTimeout(function () { pf.style.opacity = 0; timerEl.classList.remove('cg-shake'); }, 1200);
+          var pf = document.getElementById('penalty-flash'); pf.classList.add('on'); wrap.classList.add('cg-shake');
+          timerEl.textContent = fmt(left); drawFuse(left);
+          setTimeout(function () { pf.classList.remove('on'); wrap.classList.remove('cg-shake'); }, 1200);
         }
-        if (d.state !== 'playing') { finish(); setTimeout(function () { location.reload(); }, d.ok ? 700 : 900); }
+        if (d.state !== 'playing') { finish(); if (d.state === 'lost') explode(); setTimeout(function () { location.reload(); }, d.state === 'lost' ? 1500 : 700); }
       })
       .catch(function () { busy = false; });
   }
