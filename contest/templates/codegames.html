@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load ui_i18n %}
+{% load ui_i18n static %}
 
 {% block title %}{% t "Игры" %} - Pifagor Contest<div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>
 <script>
@@ -16,7 +16,7 @@
 {% block content %}
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 {% t "Игры" %}</h3>
 <p class="text-muted small mb-4">{% t "Обезвредь бомбу: смотри на код и пиши, что он выведет. Числа каждый раз новые." %}
-    {% t "Вход" %} — {{ fee }} 🪙, {% t "у тебя" %}: <strong>{{ balance }} 🪙</strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
+    {% t "Вход" %} — {{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt="">, {% t "у тебя" %}: <strong>{{ balance }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
 <div class="row g-3">
     {% for it in items %}
     <div class="col-md-6 col-lg-4">
@@ -27,10 +27,10 @@
             <div class="small mb-3">
                 {{ it.game.questions }} {% t "модулей" %} · {% widthratio it.game.time_limit 60 1 %} {% t "мин" %} · 3 {% t "ошибки — взрыв" %}<br>
                 {% if it.best is not None %}🏆 {% t "Лучшее время" %}: <strong>{{ it.best }} {% t "сек" %}</strong> · {% t "побед" %}: {{ it.wins }}<br>{% endif %}
-                🪙 {% t "Вход" %} −{{ fee }}, {% t "победа" %} +{{ it.game.coins }}
+                <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> {% t "Вход" %} −{{ fee }}, {% t "победа" %} +{{ it.game.coins }}
             </div>
             <form method="post" action="{% url 'codegame_start' it.game.id %}" class="mt-auto">{% csrf_token %}
-                <button class="btn btn-pifagor-green rounded-pill px-4" {% if balance < fee %}disabled{% endif %}>{% t "Играть" %} (−{{ fee }} 🪙)</button></form>
+                <button class="btn btn-pifagor-green rounded-pill px-4" {% if balance < fee %}disabled{% endif %}>{% t "Играть" %} (−{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt="">)</button></form>
         </div>
     </div>
     {% empty %}

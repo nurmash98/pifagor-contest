@@ -2745,3 +2745,10 @@ class CodeGameTests(TestCase):
         self.assertIn('Енгізу-шығару және айнымалылар', lst)
         self.client.post(reverse('codegame_forfeit', args=[run.id]))
         self.assertIn('Бомба жарылды', self.client.get(reverse('codegame_play', args=[run.id])).content.decode())
+
+    def test_coin_is_the_site_picture_not_emoji(self):
+        run = self._start()
+        for url in (reverse('codegames'), reverse('codegame_play', args=[run.id])):
+            page = self.client.get(url).content.decode()
+            self.assertIn('icons/coin-64.png', page)
+            self.assertNotIn('🪙', page)

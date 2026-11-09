@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Игры - Pifagor Contest{% endblock %}
 
@@ -18,7 +19,7 @@
             <div>
                 <a href="{% url 'codegame_edit' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">💣 {{ g.title }}</a>
                 {% if not g.is_active %}<span class="badge bg-secondary ms-1">закрыта</span>{% endif %}
-                <div class="small text-muted">{{ g.questions }} модулей · {% widthratio g.time_limit 60 1 %} мин · учеников: {{ g.students.all|length }} · приз {{ g.coins }} 🪙</div>
+                <div class="small text-muted">{{ g.questions }} модулей · {% widthratio g.time_limit 60 1 %} мин · учеников: {{ g.students.all|length }} · приз {{ g.coins }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></div>
             </div>
             <form method="post" action="{% url 'codegame_delete' g.id %}" onsubmit="return confirm('Удалить игру «{{ g.title|escapejs }}» и все результаты?');">{% csrf_token %}
                 <button class="btn btn-outline-danger btn-sm">Удалить</button></form>

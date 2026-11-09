@@ -47,10 +47,10 @@
     var n = btn.dataset.amount || '5';
     // Каждый день — другая «команда»; печатается как в терминале
     var lines = [
-        'git commit -m "daily: +' + n + ' 🪙"',
-        'coins.push(' + n + ')  // 🪙',
+        'git commit -m "daily: +' + n + ' coins"',
+        'coins.push(' + n + ')',
         'sudo make coins -j' + n,
-        'print("🪙" * ' + n + ')',
+        'print("coin " * ' + n + ')',
         'for i in range(' + n + '): coins += 1',
         'npm install ' + n + '-coins',
         'if (молодец) return ' + n + ';',

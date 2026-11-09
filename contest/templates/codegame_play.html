@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load ui_i18n %}
+{% load ui_i18n static %}
 
 {% block title %}{% t "Бомба" %} - Pifagor Contest{% endblock %}
 
@@ -39,14 +39,14 @@
         <div style="font-size:4.5rem;">✂️</div>
         <h2 class="fw-bold">{% t "Бомба обезврежена!" %}</h2>
         <p class="mb-1">{% t "Время" %}: <strong>{{ duration }} {% t "сек" %}</strong>{% if run.mistakes %} · {% t "ошибок" %}: {{ run.mistakes }}{% endif %}</p>
-        {% if run.coins %}<p class="fs-5">🪙 +{{ run.coins }}</p>{% endif %}
+        {% if run.coins %}<p class="fs-5"><img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> +{{ run.coins }}</p>{% endif %}
       {% else %}
         <div class="cg-boom">💥</div>
         <h2 class="fw-bold">{% t "Бум! Бомба взорвалась." %}</h2>
         <p class="text-muted">{% t "Решено" %}: {{ run.progress }} / {{ questions|length }}</p>
       {% endif %}
       <div class="d-flex justify-content-center gap-2 mt-3">
-        <form method="post" action="{% url 'codegame_start' game.id %}">{% csrf_token %}<button class="btn btn-pifagor-green rounded-pill px-4">{% t "Ещё раз" %} (−{{ fee }} 🪙)</button></form>
+        <form method="post" action="{% url 'codegame_start' game.id %}">{% csrf_token %}<button class="btn btn-pifagor-green rounded-pill px-4">{% t "Ещё раз" %} (−{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt="">)</button></form>
         <a href="{% url 'codegames' %}" class="btn btn-outline-secondary rounded-pill px-4">{% t "К играм" %}</a>
       </div>
     </div>

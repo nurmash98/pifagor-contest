@@ -468,7 +468,7 @@ def task_detail(request, task_id):
         from . import coins as coin_module
         got = coin_module.sync(student)
         if got:
-            messages.success(request, f'🪙 +{got} {"тиын" if _get_content_lang(request) == "kk" else "монет"}')
+            messages.success(request, f'+{got} {"тиын" if _get_content_lang(request) == "kk" else "монет"}', extra_tags='coin')
         if banner_module.sync(student):
             messages.success(request, 'Тәуелсіз Қазақстанның тарихын білесіз! Сізге «Қазақстан туы» баннері берілді 🇰🇿'
                              if _get_content_lang(request) == 'kk' else
