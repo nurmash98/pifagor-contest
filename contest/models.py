@@ -682,7 +682,7 @@ class CoinTransaction(models.Model):
     key уникален для ученика — одно и то же начисление не может прийти дважды
     (например, 'task:15', 'day:2026-10-23', 'm:50', 'exam:7', 'buy:banner:gold')."""
     KIND_CHOICES = [('task', 'Задача 10/10'), ('day', 'Первая задача дня'), ('milestone', 'Каждые 50 задач'),
-                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('buy', 'Покупка')]
+                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('game', 'Игра'), ('buy', 'Покупка')]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='coin_transactions')
     key = models.CharField(max_length=60)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)
@@ -774,3 +774,52 @@ def _invalidate_quarter_cache(sender, **kwargs):
 for _model in (Submission, Attempt, ClassBonus, QuarterExclusion):
     post_save.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-save-{_model.__name__}')
     post_delete.connect(_invalidate_quarter_cache, sender=_model, dispatch_uid=f'qcache-del-{_model.__name__}')
+
+
+class CodeGame(models.Model):
+    """Игра «Что выведет код?» — Escape Room или Бомба. Учитель выбирает темы и учеников, которым она открыта."""
+    MODE_CHOICES = [('escape', 'Escape Room'), ('bomb', 'Бомба')]
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='code_games', verbose_name='Учитель')
+    title = models.CharField(max_length=120, verbose_name='Название')
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='escape', verbose_name='Режим')
+    topics = models.CharField(max_length=100, default='@io,@cond', verbose_name='Темы')
+    questions = models.PositiveSmallIntegerField(default=5, verbose_name='Вопросов')
+    time_limit = models.PositiveIntegerField(default=600, verbose_name='Время, секунд')
+    coins = models.PositiveSmallIntegerField(default=20, verbose_name='Монет за победу (раз в день)')
+    is_active = models.BooleanField(default=True, verbose_name='Открыта')
+    students = models.ManyToManyField(Student, blank=True, related_name='code_games', verbose_name='Ученики')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Игра «Что выведет код?»'
+        verbose_name_plural = 'Игры «Что выведет код?»'
+
+    def __str__(self):
+        return self.title
+
+    def topic_list(self):
+        return [t for t in (self.topics or '').split(',') if t]
+
+
+class CodeGameRun(models.Model):
+    """Одно прохождение игры учеником. questions — сгенерированные вопросы с ответами (в браузер ответы не уходят)."""
+    STATUS_CHOICES = [('playing', 'Играет'), ('won', 'Победа'), ('lost', 'Проигрыш')]
+    game = models.ForeignKey(CodeGame, on_delete=models.CASCADE, related_name='runs')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='code_game_runs')
+    questions = models.JSONField(default=list)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='playing')
+    progress = models.PositiveSmallIntegerField(default=0)
+    mistakes = models.PositiveSmallIntegerField(default=0)
+    penalty = models.PositiveIntegerField(default=0)
+    coins = models.PositiveSmallIntegerField(default=0)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def duration(self):
+        if not self.finished_at:
+            return None
+        return int((self.finished_at - self.started_at).total_seconds()) + self.penalty

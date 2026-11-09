@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{% t "Игры" %} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 {% t "Игры" %}</h3>
+<p class="text-muted small mb-4">{% t "Смотри на код и пиши, что он выведет. Числа каждый раз новые." %}</p>
+<div class="row g-3">
+    {% for it in items %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4 bg-white">
+            <div class="fs-1">{% if it.game.mode == 'bomb' %}💣{% else %}🚪{% endif %}</div>
+            <h5 class="fw-bold mb-1">{{ it.game.title }}</h5>
+            <div class="small text-muted mb-2">{{ it.game.get_mode_display }} · {{ it.topics }}</div>
+            <div class="small mb-3">
+                {{ it.game.questions }} {% t "вопросов" %} · {% widthratio it.game.time_limit 60 1 %} {% t "мин" %}
+                {% if it.game.mode == 'bomb' %}· 3 {% t "ошибки — взрыв" %}{% else %}· {% t "ошибка — минус 30 сек" %}{% endif %}<br>
+                {% if it.best is not None %}🏆 {% t "Лучшее время" %}: <strong>{{ it.best }} {% t "сек" %}</strong>{% endif %}
+                {% if it.game.coins %}<br>🪙 +{{ it.game.coins }} {% if it.paid_today %}<span class="text-muted">({% t "сегодня уже получено" %})</span>{% else %}{% t "за победу сегодня" %}{% endif %}{% endif %}
+            </div>
+            <form method="post" action="{% url 'codegame_start' it.game.id %}" class="mt-auto">{% csrf_token %}
+                <button class="btn btn-pifagor-green rounded-pill px-4">{% t "Играть" %}</button></form>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>
+    {% endfor %}
+</div>
+{% endblock %}

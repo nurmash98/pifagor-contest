@@ -32,6 +32,15 @@ def duels_visible(request):
     return {'duels_visible': student is not None and visible_to(student), 'duels_admin': False}
 
 
+def code_games(request):
+    """Пункт «Игры» в меню: ученику — если учитель открыл ему хотя бы одну игру."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'games_visible': False}
+    from .models import CodeGame
+    return {'games_visible': CodeGame.objects.filter(is_active=True, students__user=user).exists()}
+
+
 def holiday(request):
     """Праздничное оформление с флагом Казахстана: День Республики — 25 октября (показываем 23–27 октября),
     День Независимости — 16 декабря (14–18 декабря). Для проверки заранее: HOLIDAY_FORCE=republic / independence."""

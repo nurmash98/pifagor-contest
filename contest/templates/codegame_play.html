@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{{ game.title }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<style>
+  .cg-wrap { max-width: 980px; margin: 0 auto; }
+  .cg-code { background:#0d1117; color:#e6edf3; border-radius:10px; padding:14px 16px; font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:pre; overflow-x:auto; margin:0; }
+  .cg-timer { font: 700 2.2rem/1 ui-monospace,Menlo,Consolas,monospace; letter-spacing:2px; }
+  .cg-shake { animation: cgshake .45s; }
+  @keyframes cgshake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+  .cg-flash-bad { box-shadow: 0 0 0 4px #dc3545 !important; }
+  .cg-flash-ok { box-shadow: 0 0 0 4px #22c55e !important; }
+  /* Escape Room */
+  .cg-doors { display:flex; gap:8px; flex-wrap:wrap; }
+  .cg-door { width:44px; height:58px; border-radius:8px 8px 3px 3px; background:#3b2f2a; border:2px solid #6b5545; display:flex; align-items:center; justify-content:center; font-size:20px; transition: all .3s; }
+  .cg-door.open { background:#14532d; border-color:#22c55e; }
+  .cg-door.cur { border-color:#facc15; box-shadow:0 0 12px #facc1588; }
+  .cg-room { background: linear-gradient(160deg,#2b2f3a,#1b1e26); border:3px solid #4b5563; border-radius:18px; padding:22px; color:#e5e7eb; }
+  .cg-room .lock { font-size:2.4rem; }
+  /* Бомба */
+  .cg-bomb { background: linear-gradient(160deg,#3f3f46,#27272a); border:4px solid #52525b; border-radius:22px; padding:18px; color:#f4f4f5; }
+  .cg-lcd { background:#1a0000; color:#ff3b3b; border-radius:8px; padding:8px 16px; text-shadow:0 0 8px #ff0000aa; display:inline-block; }
+  .cg-strike { display:inline-block; width:30px; height:30px; border-radius:50%; background:#3f0d0d; border:2px solid #7f1d1d; color:#7f1d1d; text-align:center; line-height:26px; font-weight:800; }
+  .cg-strike.on { background:#dc2626; color:#fff; border-color:#fecaca; box-shadow:0 0 10px #dc2626; }
+  .cg-module { background:#18181b; border:2px solid #3f3f46; border-radius:14px; padding:14px; position:relative; height:100%; }
+  .cg-module .led { position:absolute; top:12px; right:12px; width:14px; height:14px; border-radius:50%; background:#52525b; }
+  .cg-module.done .led { background:#22c55e; box-shadow:0 0 10px #22c55e; }
+  .cg-module.done { border-color:#166534; opacity:.75; }
+  .cg-wire { display:flex; align-items:center; gap:10px; width:100%; border:0; background:transparent; padding:6px 0; color:#f4f4f5; cursor:pointer; }
+  .cg-wire .bar { flex:1; height:12px; border-radius:6px; position:relative; }
+  .cg-wire .lbl { min-width:80px; text-align:right; font:600 14px ui-monospace,Menlo,monospace; white-space:pre; }
+  .cg-wire.cut .bar { background-image: linear-gradient(90deg, transparent 47%, #18181b 47%, #18181b 53%, transparent 53%) !important; }
+  .w-red{background:#ef4444}.w-blue{background:#3b82f6}.w-yellow{background:#eab308}.w-green{background:#22c55e}.w-white{background:#e5e7eb}
+  .cg-boom { font-size:5rem; animation: cgshake .6s 2; }
+</style>
+
+<div class="cg-wrap">
+  <div class="mb-2"><a href="{% url 'codegames' %}" class="text-decoration-none text-muted small">← {% t "К играм" %}</a></div>
+  <form id="cg-csrf">{% csrf_token %}</form>
+
+  {% if run.status != 'playing' %}
+    <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+      {% if run.status == 'won' %}
+        <div style="font-size:4.5rem;">{% if game.mode == 'bomb' %}✂️{% else %}🔓{% endif %}</div>
+        <h2 class="fw-bold">{% if game.mode == 'bomb' %}{% t "Бомба обезврежена!" %}{% else %}{% t "Ты выбрался!" %}{% endif %}</h2>
+        <p class="mb-1">{% t "Время" %}: <strong>{{ duration }} {% t "сек" %}</strong>{% if run.mistakes %} · {% t "ошибок" %}: {{ run.mistakes }}{% endif %}</p>
+        {% if run.coins %}<p class="fs-5">🪙 +{{ run.coins }}</p>{% elif game.coins %}<p class="text-muted small">{% t "Монеты за эту игру сегодня уже получены." %}</p>{% endif %}
+      {% else %}
+        <div class="cg-boom">{% if game.mode == 'bomb' %}💥{% else %}⌛{% endif %}</div>
+        <h2 class="fw-bold">{% if game.mode == 'bomb' %}{% t "Бум! Бомба взорвалась." %}{% else %}{% t "Время вышло — дверь не открылась." %}{% endif %}</h2>
+        <p class="text-muted">{% t "Решено" %}: {{ run.progress }} / {{ questions|length }}</p>
+      {% endif %}
+      <div class="d-flex justify-content-center gap-2 mt-3">
+        <form method="post" action="{% url 'codegame_start' game.id %}">{% csrf_token %}<button class="btn btn-pifagor-green rounded-pill px-4">{% t "Ещё раз" %}</button></form>
+        <a href="{% url 'codegames' %}" class="btn btn-outline-secondary rounded-pill px-4">{% t "К играм" %}</a>
+      </div>
+    </div>
+
+  {% elif game.mode == 'escape' %}
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+      <div>
+        <h4 class="fw-bold mb-2">🚪 {{ game.title }}</h4>
+        <div class="cg-doors" id="doors">{% for q in questions %}<div class="cg-door {% if q.done %}open{% endif %}" data-i="{{ q.i }}">{% if q.done %}🔓{% else %}🔒{% endif %}</div>{% endfor %}</div>
+      </div>
+      <div class="text-end"><div class="small text-muted">{% t "До закрытия" %}</div><div class="cg-timer" id="timer">--:--</div><div class="small text-danger" id="penalty"></div></div>
+    </div>
+    {% for q in questions %}
+    <div class="cg-room mb-3" data-room="{{ q.i }}" {% if q.i != run.progress %}hidden{% endif %}>
+      <div class="d-flex align-items-center gap-3 mb-3"><span class="lock">🔐</span>
+        <div><div class="fw-bold fs-5">{% t "Комната" %} {{ q.i|add:1 }} / {{ questions|length }}</div>
+        <div class="small" style="color:#cbd5e1;">{% t "Код замка — это то, что выведет программа." %}</div></div></div>
+      <pre class="cg-code">{{ q.code }}</pre>
+      <form class="cg-answer mt-3" data-i="{{ q.i }}">
+        <textarea name="answer" class="form-control font-monospace" rows="2" placeholder="{% t 'Вывод программы' %}" autocomplete="off" spellcheck="false"></textarea>
+        <button class="btn btn-warning fw-bold mt-2 px-4">🔑 {% t "Открыть" %}</button>
+      </form>
+    </div>
+    {% endfor %}
+
+  {% else %}
+    <div class="cg-bomb">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <h4 class="fw-bold mb-0">💣 {{ game.title }}</h4>
+        <div class="d-flex align-items-center gap-3">
+          <div id="strikes">{% for n in "123" %}<span class="cg-strike {% if forloop.counter <= run.mistakes %}on{% endif %}">✕</span> {% endfor %}</div>
+          <div class="cg-lcd cg-timer" id="timer">--:--</div>
+        </div>
+      </div>
+      <div class="row g-3">
+        {% for q in questions %}
+        <div class="col-md-6">
+          <div class="cg-module {% if q.done %}done{% endif %}" data-mod="{{ q.i }}">
+            <span class="led"></span>
+            <div class="small text-uppercase fw-bold mb-2" style="color:#a1a1aa;">{% if q.kind == 'wires' %}✂️ {% t "Провода" %}{% else %}🔢 {% t "Клавиатура" %}{% endif %} · {% t "модуль" %} {{ q.i|add:1 }}</div>
+            <pre class="cg-code">{{ q.code }}</pre>
+            {% if q.kind == 'wires' %}
+              <div class="mt-2">{% for w in q.wires %}
+                <button type="button" class="cg-wire" data-i="{{ q.i }}" data-w="{{ forloop.counter0 }}" {% if q.done %}disabled{% endif %}>
+                  <span class="bar w-{{ w.color }}"></span><span class="lbl">{{ w.label }}</span></button>
+              {% endfor %}</div>
+            {% else %}
+              <form class="cg-answer mt-2 d-flex gap-2" data-i="{{ q.i }}">
+                <textarea name="answer" class="form-control font-monospace" rows="1" placeholder="{% t 'Вывод программы' %}" autocomplete="off" spellcheck="false" {% if q.done %}disabled{% endif %}></textarea>
+                <button class="btn btn-danger fw-bold" {% if q.done %}disabled{% endif %}>⏎</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <details class="mt-3" style="color:#d4d4d8;"><summary class="fw-semibold" style="cursor:pointer;">📖 {% t "Инструкция сапёра" %}</summary>
+        <ul class="small mt-2 mb-0">
+          <li>{% t "Каждый модуль — программа. Сначала мысленно выполни её." %}</li>
+          <li>🔢 {% t "Клавиатура: введи ровно то, что выведет программа, и нажми ⏎." %}</li>
+          <li>✂️ {% t "Провода: перережь провод, подписанный выводом программы. Остальные трогать нельзя." %}</li>
+          <li>{% t "Модули можно обезвреживать в любом порядке. 3 ошибки или конец таймера — взрыв." %}</li>
+        </ul></details>
+    </div>
+  {% endif %}
+</div>
+
+{% if run.status == 'playing' %}
+<script>
+(function () {
+  var mode = '{{ game.mode }}', left = {{ left }}, url = '{% url "codegame_answer" run.id %}';
+  var csrf = document.querySelector('#cg-csrf input[name=csrfmiddlewaretoken]').value;
+  var timerEl = document.getElementById('timer'), busy = false;
+  function fmt(s) { s = Math.max(0, s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+  function tick() { timerEl.textContent = fmt(left); if (left <= 0) { location.reload(); return; } left -= 1; }
+  tick(); var timer = setInterval(tick, 1000);
+  function flash(el, ok) { var c = ok ? 'cg-flash-ok' : 'cg-flash-bad'; el.classList.add(c); if (!ok) el.classList.add('cg-shake');
+    setTimeout(function () { el.classList.remove(c, 'cg-shake'); }, 600); }
+  function send(i, value, el, onOk) {
+    if (busy) return; busy = true;
+    var fd = new FormData(); fd.append('index', i); fd.append('answer', value);
+    fetch(url, { method: 'POST', body: fd, headers: { 'X-CSRFToken': csrf }, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        busy = false;
+        if (typeof d.left === 'number') left = d.left;
+        flash(el, d.ok);
+        if (d.ok && onOk) onOk(d);
+        if (mode === 'bomb') document.querySelectorAll('#strikes .cg-strike').forEach(function (s, k) { s.classList.toggle('on', k < d.strikes); });
+        if (mode === 'escape' && !d.ok && d.state === 'playing') { var p = document.getElementById('penalty'); p.textContent = '−{{ penalty }} сек'; setTimeout(function () { p.textContent = ''; }, 1500); }
+        if (d.state !== 'playing') { clearInterval(timer); setTimeout(function () { location.reload(); }, d.ok ? 700 : 900); }
+      })
+      .catch(function () { busy = false; });
+  }
+  document.querySelectorAll('form.cg-answer').forEach(function (f) {
+    var ta = f.querySelector('textarea');
+    ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } });
+    f.addEventListener('submit', function (e) {
+      e.preventDefault(); var i = +f.dataset.i, box = mode === 'escape' ? f.closest('.cg-room') : f.closest('.cg-module');
+      if (!ta.value.trim()) return;
+      send(i, ta.value, box, function () {
+        if (mode === 'escape') {
+          var door = document.querySelector('.cg-door[data-i="' + i + '"]'); door.classList.add('open'); door.textContent = '🔓';
+          setTimeout(function () { box.hidden = true; var next = document.querySelector('.cg-room[data-room="' + (i + 1) + '"]');
+            if (next) { next.hidden = false; var t = next.querySelector('textarea'); if (t) t.focus(); markCur(); } }, 500);
+        } else { box.classList.add('done'); f.querySelectorAll('textarea,button').forEach(function (x) { x.disabled = true; }); }
+      });
+      if (mode === 'escape') ta.select();
+    });
+  });
+  document.querySelectorAll('.cg-wire').forEach(function (w) {
+    w.addEventListener('click', function () {
+      var box = w.closest('.cg-module'); if (box.classList.contains('done') || w.classList.contains('cut')) return;
+      w.classList.add('cut');
+      send(+w.dataset.i, w.dataset.w, box, function () { box.classList.add('done'); box.querySelectorAll('.cg-wire').forEach(function (x) { x.disabled = true; }); });
+    });
+  });
+  function markCur() { var cur = document.querySelector('.cg-room:not([hidden])'); document.querySelectorAll('.cg-door').forEach(function (d) {
+    d.classList.toggle('cur', cur && d.dataset.i === cur.dataset.room); }); }
+  if (mode === 'escape') { markCur(); var t = document.querySelector('.cg-room:not([hidden]) textarea'); if (t) t.focus(); }
+})();
+</script>
+{% endif %}
+{% endblock %}

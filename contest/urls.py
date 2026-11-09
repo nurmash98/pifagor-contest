@@ -3,6 +3,7 @@ from . import views
 from . import exam_views
 from . import moderation_views
 from . import activity
+from . import codegame_views
 from . import duel_views
 
 urlpatterns = [
@@ -107,6 +108,13 @@ urlpatterns = [
     # Управление учениками — доступно любому учителю для всех учеников
     path('teacher/students/', views.student_list, name='student_list'),
     path('teacher/edupage-names/', activity.edupage_names, name='edupage_names'),
+    path('teacher/games/', codegame_views.games_manage, name='codegames_manage'),
+    path('teacher/games/<int:game_id>/', codegame_views.game_edit, name='codegame_edit'),
+    path('teacher/games/<int:game_id>/delete/', codegame_views.game_delete, name='codegame_delete'),
+    path('games/', codegame_views.games, name='codegames'),
+    path('games/<int:game_id>/start/', codegame_views.game_start, name='codegame_start'),
+    path('games/run/<int:run_id>/', codegame_views.game_play, name='codegame_play'),
+    path('games/run/<int:run_id>/answer/', codegame_views.game_answer, name='codegame_answer'),
     path('teacher/activity/', activity.student_activity, name='student_activity'),
     path('teacher/suspicious/', moderation_views.suspicious_students, name='suspicious_students'),
     path('teacher/students/<int:student_id>/block/', moderation_views.student_toggle_block, name='student_toggle_block'),

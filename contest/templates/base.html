@@ -152,6 +152,11 @@
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'duels' %}">⚔️ {% t "Дуэли" %}</a>
                             </li>
                             {% endif %}
+                            {% if games_visible %}
+                            <li class="nav-item">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'codegames' %}">🎮 {% t "Игры" %}</a>
+                            </li>
+                            {% endif %}
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'profile' %}">{% t "Профиль" %}</a>
                             </li>

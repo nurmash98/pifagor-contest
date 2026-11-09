@@ -1,0 +1,2452 @@
+[
+{
+"title": "Склейка строк",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint(a + b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сложение чисел из строк",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint(int(a) + int(b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Строка, умноженная на число",
+"code": "s = \"{{a:2..9}}\"\nprint(s * {{k:2..4}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Квадрат введённого числа",
+"code": "s = \"{{a:12..99}}\"\nprint(int(s) ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Склейка и число",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint(int(a + b) + 1)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Число и строка",
+"code": "s = \"{{a:2..9}}\"\nn = int(s) * 2\nprint(str(n) + s)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Три строки",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nc = \"{{c:2..9}}\"\nprint(a + b + c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Строка на число",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint(a * int(b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Дробное из строки",
+"code": "x = float(\"{{a:1..9}}.5\")\nprint(x * 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Среднее двух строк-чисел",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint((int(a) + int(b)) / 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Слово повторено",
+"code": "w = \"ab\"\nn = int(\"{{n:2..5}}\")\nprint(w * n)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма и склейка",
+"code": "a = \"{{a:2..9}}\"\nb = \"{{b:2..9}}\"\nprint(f\"{int(a) + int(b)}-{a + b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма двух",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(a + b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Разность",
+"code": "a, b = map(int, \"{{a:10..19}} {{b:1..9}}\".split())\nprint(a - b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Произведение",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(a * b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Целая часть от деления",
+"code": "a, b = map(int, \"{{a:20..99}} {{b:3..9}}\".split())\nprint(a // b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Остаток от деления",
+"code": "a, b = map(int, \"{{a:20..99}} {{b:3..9}}\".split())\nprint(a % b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Степень",
+"code": "a, b = map(int, \"{{a:2..5}} {{b:2..4}}\".split())\nprint(a ** b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Периметр прямоугольника",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(2 * (a + b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Площадь и периметр",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(f\"{a * b}/{2 * (a + b)}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма квадратов",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(a ** 2 + b ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Квадрат суммы",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint((a + b) ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Целое среднее",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint((a + b) // 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Деление нацело и остаток",
+"code": "a, b = map(int, \"{{a:20..99}} {{b:3..9}}\".split())\nprint(f\"{a // b}r{a % b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Обмен значений",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\na, b = b, a\nprint(f\"{a}-{b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сложение в f-строке",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(f\"{a}+{b}={a + b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Произведение в f-строке",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(f\"{a}*{b}={a * b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Разность с выражением",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:2..9}}\".split())\nprint(a * b - a - b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Остаток суммы",
+"code": "a, b = map(int, \"{{a:20..99}} {{b:3..9}}\".split())\nprint((a + b) % b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма и остаток",
+"code": "a, b = map(int, \"{{a:20..99}} {{b:3..9}}\".split())\nprint(a // b + a % b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Три числа в строке",
+"code": "a, b, c = map(int, \"{{a:2..9}} {{b:2..9}} {{c:2..9}}\".split())\nprint(a + b * c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Скобки меняют результат",
+"code": "a, b, c = map(int, \"{{a:2..9}} {{b:2..9}} {{c:2..9}}\".split())\nprint((a + b) * c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма трёх",
+"code": "a, b, c = map(int, \"{{a:2..9}} {{b:2..9}} {{c:2..9}}\".split())\nprint(a + b + c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма трёх, среднее",
+"code": "a, b, c = map(int, \"{{a:10..30}} {{b:10..30}} {{c:10..30}}\".split())\nprint((a + b + c) // 3)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Разность квадратов",
+"code": "a, b = map(int, \"{{a:10..19}} {{b:2..9}}\".split())\nprint(a ** 2 - b ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Вычитание в обратном порядке",
+"code": "a, b = map(int, \"{{a:2..9}} {{b:10..19}}\".split())\nprint(a - b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Число и его квадрат",
+"code": "n = int(\"{{n:2..9}}\")\nprint(f\"{n}^2={n ** 2}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два числа с разных строк",
+"code": "a = int(\"{{a:2..9}}\")\nb = int(\"{{b:2..9}}\")\nprint(a * b + 1)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Прямоугольный параллелепипед",
+"code": "a = int(\"{{a:2..6}}\")\nb = int(\"{{b:2..6}}\")\nc = int(\"{{c:2..6}}\")\nprint(a * b * c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Стоимость покупки",
+"code": "price = int(\"{{p:10..50}}\")\ncount = int(\"{{c:2..9}}\")\nprint(price * count)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сдача с покупки",
+"code": "price = int(\"{{p:10..50}}\")\ncount = int(\"{{c:2..9}}\")\nprint(1000 - price * count)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма трёх строк",
+"code": "a = int(\"{{a:1..9}}\")\nb = int(\"{{b:1..9}}\")\nc = int(\"{{c:1..9}}\")\nprint(a + b + c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Приветствие",
+"code": "name = \"Aru\"\nage = int(\"{{a:10..17}}\")\nprint(f\"{name}:{age + 1}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Возраст через год",
+"code": "age = int(\"{{a:10..17}}\")\nprint(f\"Age:{age + 5}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Скидка",
+"code": "p = int(\"{{p:100..900}}\")\nd = int(\"{{d:5..30}}\")\nprint(p * (100 - d) // 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма с процентом",
+"code": "p = int(\"{{p:100..900}}\")\nr = int(\"{{r:5..30}}\")\nprint(p + p * r // 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Путь по скорости и времени",
+"code": "v = int(\"{{v:40..90}}\")\nt = int(\"{{t:2..9}}\")\nprint(v * t)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сотни",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Десятки",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 10 % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Единицы",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма цифр трёхзначного",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100 + n // 10 % 10 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Произведение цифр",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100 * (n // 10 % 10) * (n % 10))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Число наоборот",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n % 10 * 100 + n // 10 % 10 * 10 + n // 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Без последней цифры",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Две последние цифры",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n % 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление вниз до десятков",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 10 * 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление вниз до сотен",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100 * 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Тысячи",
+"code": "n = int(\"{{n:1000..9999}}\")\nprint(n // 1000)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Средние цифры",
+"code": "n = int(\"{{n:1000..9999}}\")\nprint(n // 10 % 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма первой и последней цифры",
+"code": "n = int(\"{{n:1000..9999}}\")\nprint(n // 1000 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма цифр четырёхзначного",
+"code": "n = int(\"{{n:1000..9999}}\")\nprint(n // 1000 + n // 100 % 10 + n // 10 % 10 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Двузначное наоборот",
+"code": "n = int(\"{{n:10..99}}\")\nprint(n % 10 * 10 + n // 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма цифр двузначного",
+"code": "n = int(\"{{n:10..99}}\")\nprint(n // 10 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Разность цифр",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100 - n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Заменить среднюю цифру нулём",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 100 * 100 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Заменить последнюю цифру нулём",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n - n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цифра десятков четырёхзначного",
+"code": "n = int(\"{{n:1000..9999}}\")\nprint(n % 100 // 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сумма двух последних цифр",
+"code": "n = int(\"{{n:100..999}}\")\nprint(n // 10 % 10 + n % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Последняя цифра квадрата",
+"code": "n = int(\"{{n:10..99}}\")\nprint(n ** 2 % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Секунды в формат",
+"code": "t = int(\"{{t:3700..90000}}\")\nprint(f\"{t // 3600}:{t % 3600 // 60}:{t % 60}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Минуты в часы",
+"code": "m = int(\"{{m:130..900}}\")\nprint(f\"{m // 60}h{m % 60}m\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Дни в недели",
+"code": "d = int(\"{{d:15..200}}\")\nprint(f\"{d // 7}w{d % 7}d\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Часы и минуты в минуты",
+"code": "h, m = map(int, \"{{h:1..9}} {{m:1..59}}\".split())\nprint(h * 60 + m)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Сантиметры в метры",
+"code": "c = int(\"{{c:105..999}}\")\nprint(f\"{c // 100}m{c % 100}cm\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Купюры и мелочь",
+"code": "n = int(\"{{n:101..999}}\")\nprint(f\"{n // 100}-{n // 10 % 10}-{n % 10}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Монеты по 50",
+"code": "n = int(\"{{n:101..999}}\")\nprint(f\"{n // 50}x{n % 50}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Часы после полуночи",
+"code": "h, m, k = map(int, \"{{h:1..9}} {{m:1..59}} {{k:10..200}}\".split())\nt = h * 60 + m + k\nprint(f\"{t // 60}:{t % 60}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Конфеты поровну",
+"code": "n, k = map(int, \"{{n:40..99}} {{k:3..9}}\".split())\nprint(f\"{n // k}/{n % k}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Автобусы для группы",
+"code": "n, k = map(int, \"{{n:40..99}} {{k:10..30}}\".split())\nprint((n + k - 1) // k)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Деление с двумя знаками",
+"code": "a, b = map(int, \"{{a:10..99}} {{b:3..9}}\".split())\nprint(f\"{a / b:.2f}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "round до целого",
+"code": "a, b = map(int, \"{{a:10..99}} {{b:3..9}}\".split())\nprint(round(a / b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "round до десятых",
+"code": "a, b = map(int, \"{{a:10..99}} {{b:3..9}}\".split())\nprint(round(a / b, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "int от дроби",
+"code": "a, b = map(int, \"{{a:10..99}} {{b:3..9}}\".split())\nprint(int(a / b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Деление без остатка в float",
+"code": "print({{a:2..9}} * 2 / 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Банковское округление",
+"code": "print(round({{a:0..9}}.5))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Отрицательная дробь и int",
+"code": "print(int(-{{a:2..9}}.9))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Отрицательное // ",
+"code": "print(-{{a:10..40}} // {{b:3..7}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Отрицательное %",
+"code": "print(-{{a:10..40}} % {{b:3..7}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Степень степени",
+"code": "print({{a:2..5}} ** 2 ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Площадь круга",
+"code": "r = {{r:2..9}}\nprint(round(3.14 * r ** 2, 2))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Средний балл",
+"code": "a, b, c = map(int, \"{{a:3..5}} {{b:3..5}} {{c:3..5}}\".split())\nprint(f\"{(a + b + c) / 3:.2f}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Градусы в Фаренгейты",
+"code": "c = int(\"{{c:1..8}}\") * 5\nprint(c * 9 / 5 + 32)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка присваиваний",
+"code": "x = {{x:2..9}}\nx += {{y:2..9}}\nx *= 2\nx -= {{z:1..5}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Деление в присваивании",
+"code": "x = {{x:40..99}}\nx //= {{k:3..7}}\nx %= {{m:3..5}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Умножение и степень",
+"code": "x = {{x:2..4}}\nx **= 2\nx += {{y:1..9}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Порядок действий",
+"code": "print({{a:2..9}} + {{b:2..9}} * {{c:2..9}} - {{d:1..9}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Минус перед степенью",
+"code": "print(-{{a:2..9}} ** 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Степень и остаток",
+"code": "print({{a:2..9}} ** {{b:2..4}} % {{c:3..9}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Вычитание подряд",
+"code": "print({{a:30..60}} - {{b:2..9}} - {{c:2..9}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Деление подряд",
+"code": "print({{a:100..400}} // {{b:2..5}} // {{c:2..5}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Чётное или нечётное",
+"code": "n = {{n:10..99}}\nif n % 2 == 0:\n    print(\"even\")\nelse:\n    print(\"odd\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Больше порога",
+"code": "x = {{x:1..30}}\nif x > {{t:10..20}}:\n    print(\"big\")\nelse:\n    print(\"small\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Делится на три",
+"code": "n = {{n:10..99}}\nif n % 3 == 0:\n    print(n // 3)\nelse:\n    print(n % 3)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Положительное число",
+"code": "x = {{x:-9..9}}\nif x > 0:\n    print(x * 2)\nelse:\n    print(x - 10)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Совершеннолетие",
+"code": "age = {{a:8..30}}\nif age >= 18:\n    print(\"adult\")\nelse:\n    print(\"child\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Скидка за объём",
+"code": "s = {{s:50..300}}\nif s >= 200:\n    print(s - 20)\nelse:\n    print(s)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Проходной балл",
+"code": "p = {{p:20..100}}\nif p >= 60:\n    print(\"pass\")\nelse:\n    print(\"fail\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Кратно пяти",
+"code": "n = {{n:10..99}}\nif n % 5 == 0:\n    print(\"yes\")\nelse:\n    print(\"no\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Билет на сеанс",
+"code": "age = {{a:3..40}}\nif age < 12:\n    print(500)\nelse:\n    print(900)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Равны ли числа",
+"code": "a, b = {{a:1..5}}, {{b:1..5}}\nif a == b:\n    print(\"same\")\nelse:\n    print(a + b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Остаток нуль",
+"code": "n, k = {{n:10..60}}, {{k:2..7}}\nif n % k == 0:\n    print(\"div\")\nelse:\n    print(n % k)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Температура воды",
+"code": "t = {{t:-10..120}}\nif t >= 100:\n    print(\"steam\")\nelse:\n    print(\"liquid\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Чётное — деление",
+"code": "n = {{n:10..99}}\nif n % 2 == 0:\n    print(n // 2)\nelse:\n    print(3 * n + 1)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Модуль числа",
+"code": "x = {{x:-20..20}}\nif x < 0:\n    print(-x)\nelse:\n    print(x)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Оценка по баллам",
+"code": "s = {{s:30..100}}\nif s >= 90:\n    print(5)\nelif s >= 70:\n    print(4)\nelif s >= 50:\n    print(3)\nelse:\n    print(2)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Знак числа",
+"code": "x = {{x:-9..9}}\nif x > 0:\n    print(\"plus\")\nelif x < 0:\n    print(\"minus\")\nelse:\n    print(\"zero\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цена билета по возрасту",
+"code": "age = {{a:1..70}}\nif age < 6:\n    print(0)\nelif age < 18:\n    print(300)\nelif age < 60:\n    print(700)\nelse:\n    print(400)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Время суток",
+"code": "h = {{h:0..23}}\nif h < 6:\n    print(\"night\")\nelif h < 12:\n    print(\"morning\")\nelif h < 18:\n    print(\"day\")\nelse:\n    print(\"evening\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Времена года",
+"code": "m = {{m:1..12}}\nif m == 12 or m <= 2:\n    print(\"winter\")\nelif m <= 5:\n    print(\"spring\")\nelif m <= 8:\n    print(\"summer\")\nelse:\n    print(\"autumn\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Дней в месяце",
+"code": "m = {{m:1..12}}\nif m == 2:\n    print(28)\nelif m == 4 or m == 6 or m == 9 or m == 11:\n    print(30)\nelse:\n    print(31)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Штраф за скорость",
+"code": "v = {{v:50..140}}\nif v <= 60:\n    print(0)\nelif v <= 80:\n    print(500)\nelif v <= 100:\n    print(1500)\nelse:\n    print(5000)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Стоимость доставки",
+"code": "w = {{w:1..30}}\nif w <= 2:\n    print(200)\nelif w <= 10:\n    print(450)\nelse:\n    print(900)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Класс ИМТ",
+"code": "b = {{b:14..38}}\nif b < 19:\n    print(\"low\")\nelif b < 25:\n    print(\"norm\")\nelif b < 30:\n    print(\"high\")\nelse:\n    print(\"obese\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тариф такси",
+"code": "km = {{k:1..25}}\nif km <= 3:\n    print(400)\nelif km <= 10:\n    print(400 + (km - 3) * 80)\nelse:\n    print(400 + 7 * 80 + (km - 10) * 60)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сколько цифр",
+"code": "n = {{n:0..99999}}\nif n < 10:\n    print(1)\nelif n < 100:\n    print(2)\nelif n < 1000:\n    print(3)\nelif n < 10000:\n    print(4)\nelse:\n    print(5)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Размер одежды",
+"code": "h = {{h:140..200}}\nif h < 155:\n    print(\"S\")\nelif h < 170:\n    print(\"M\")\nelif h < 185:\n    print(\"L\")\nelse:\n    print(\"XL\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Скидка по сумме",
+"code": "s = {{s:100..2000}}\nif s >= 1500:\n    print(s * 80 // 100)\nelif s >= 1000:\n    print(s * 90 // 100)\nelif s >= 500:\n    print(s * 95 // 100)\nelse:\n    print(s)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Налоговая ставка",
+"code": "d = {{d:50..500}}\nif d <= 100:\n    print(0)\nelif d <= 300:\n    print((d - 100) * 10 // 100)\nelse:\n    print(20 + (d - 300) * 20 // 100)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тип угла",
+"code": "a = {{a:1..179}}\nif a < 90:\n    print(\"acute\")\nelif a == 90:\n    print(\"right\")\nelse:\n    print(\"obtuse\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Категория возраста",
+"code": "age = {{a:1..90}}\nif age < 3:\n    print(\"baby\")\nelif age < 12:\n    print(\"kid\")\nelif age < 20:\n    print(\"teen\")\nelif age < 65:\n    print(\"adult\")\nelse:\n    print(\"senior\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Кратность",
+"code": "n = {{n:10..200}}\nif n % 15 == 0:\n    print(\"FizzBuzz\")\nelif n % 5 == 0:\n    print(\"Buzz\")\nelif n % 3 == 0:\n    print(\"Fizz\")\nelse:\n    print(n)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Четверть координат",
+"code": "x, y = {{x:-5..5}}, {{y:-5..5}}\nif x > 0 and y > 0:\n    print(1)\nelif x < 0 and y > 0:\n    print(2)\nelif x < 0 and y < 0:\n    print(3)\nelif x > 0 and y < 0:\n    print(4)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Порядок условий",
+"code": "s = {{s:40..100}}\nif s >= 90:\n    print(5)\nelif s >= 80:\n    print(4)\nelif s >= 60:\n    print(3)\nelse:\n    print(2)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Баллы за тест",
+"code": "k = {{k:0..20}}\nif k == 20:\n    print(\"A\")\nelif k >= 16:\n    print(\"B\")\nelif k >= 10:\n    print(\"C\")\nelse:\n    print(\"D\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тип треугольника",
+"code": "a, b, c = {{a:3..6}}, {{b:3..6}}, {{c:3..6}}\nif a == b and b == c:\n    print(\"equal\")\nelif a == b or b == c or a == c:\n    print(\"isosceles\")\nelse:\n    print(\"scalene\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Размер штрафа за опоздание",
+"code": "m = {{m:0..60}}\nif m == 0:\n    print(0)\nelif m <= 15:\n    print(100)\nelif m <= 30:\n    print(250)\nelse:\n    print(500)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сколько корней",
+"code": "d = {{d:-9..9}}\nif d > 0:\n    print(2)\nelif d == 0:\n    print(1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Когда ложится спать",
+"code": "age = {{a:3..16}}\nif age <= 6:\n    print(20)\nelif age <= 11:\n    print(21)\nelse:\n    print(22)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Размер порции",
+"code": "k = {{k:1..12}}\nif k <= 2:\n    print(\"S\")\nelif k <= 5:\n    print(\"M\")\nelif k <= 8:\n    print(\"L\")\nelse:\n    print(\"XL\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Школьник",
+"code": "age = {{a:3..25}}\nif age >= 7 and age <= 17:\n    print(\"school\")\nelse:\n    print(\"other\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Выходной день",
+"code": "d = {{d:1..7}}\nif d == 6 or d == 7:\n    print(\"weekend\")\nelse:\n    print(\"work\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Не кратно двум",
+"code": "n = {{n:10..99}}\nif not n % 2 == 0:\n    print(\"odd\")\nelse:\n    print(\"even\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Оба больше",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nif a > 4 and b > 4:\n    print(a + b)\nelse:\n    print(a * b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Хотя бы один",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nif a > 7 or b > 7:\n    print(a + b)\nelse:\n    print(a * b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Число в диапазоне",
+"code": "x = {{x:1..40}}\nif 10 < x < 20:\n    print(\"in\")\nelse:\n    print(\"out\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Кратно двум и трём",
+"code": "n = {{n:10..99}}\nif n % 2 == 0 and n % 3 == 0:\n    print(n // 6)\nelse:\n    print(n % 6)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Или три, или пять",
+"code": "n = {{n:10..99}}\nif n % 3 == 0 or n % 5 == 0:\n    print(1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Нечётное и больше",
+"code": "n = {{n:1..40}}\nif n % 2 == 1 and n > 20:\n    print(\"A\")\nelif n % 2 == 1:\n    print(\"B\")\nelse:\n    print(\"C\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Скидка студенту или пенсионеру",
+"code": "age = {{a:10..80}}\nif age < 25 or age >= 60:\n    print(500)\nelse:\n    print(800)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Високосный год",
+"code": "y = {{y:1890..2030}}\nif y % 4 == 0 and y % 100 != 0 or y % 400 == 0:\n    print(\"leap\")\nelse:\n    print(\"common\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цифры двузначного",
+"code": "n = {{n:10..99}}\nif n // 10 == n % 10:\n    print(\"same\")\nelif n // 10 > n % 10:\n    print(\"down\")\nelse:\n    print(\"up\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Не больше и не меньше",
+"code": "x = {{x:0..30}}\nif not x < 10 and not x > 20:\n    print(\"mid\")\nelse:\n    print(\"edge\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сравнение цепочкой",
+"code": "x = {{x:1..30}}\nif 5 < x <= 15:\n    print(x - 5)\nelse:\n    print(x + 5)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Чётность положительного",
+"code": "x = {{x:-9..9}}\nif x > 0:\n    if x % 2 == 0:\n        print('A')\n    else:\n        print('B')\nelse:\n    print('C')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Вход в систему",
+"code": "login = '{{l:admin|user|guest}}'\npw = '{{p:1234|0000}}'\nif login == 'admin':\n    if pw == '1234':\n        print('ok')\n    else:\n        print('badpw')\nelse:\n    print('nouser')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Три числа: наибольшее",
+"code": "a, b, c = {{a:1..30}}, {{b:1..30}}, {{c:1..30}}\nif a >= b:\n    if a >= c:\n        print(a)\n    else:\n        print(c)\nelse:\n    if b >= c:\n        print(b)\n    else:\n        print(c)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Три числа: наименьшее",
+"code": "a, b, c = {{a:1..30}}, {{b:1..30}}, {{c:1..30}}\nm = a\nif b < m:\n    m = b\nif c < m:\n    m = c\nprint(m)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Четверти вложенными",
+"code": "x, y = {{x:-5..5}}, {{y:-5..5}}\nif x > 0:\n    if y > 0:\n        print(1)\n    else:\n        print(4)\nelse:\n    if y > 0:\n        print(2)\n    else:\n        print(3)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Размер скидки",
+"code": "age = {{a:10..80}}\nsum_ = {{s:100..1000}}\nif age >= 60:\n    if sum_ >= 500:\n        print(sum_ * 70 // 100)\n    else:\n        print(sum_ * 90 // 100)\nelse:\n    print(sum_)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Средний из трёх",
+"code": "a, b, c = {{a:1..9}}, {{b:10..19}}, {{c:20..29}}\nx = {{p:1..3}}\nif x == 1:\n    if a < b:\n        print(b)\n    else:\n        print(a)\nelif x == 2:\n    print(c - b)\nelse:\n    print(a + c)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Выбор по режиму",
+"code": "mode = {{m:1..3}}\nx = {{x:2..9}}\nif mode == 1:\n    print(x + 1)\nelif mode == 2:\n    print(x * 2)\nelse:\n    print(x ** 2)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Точка в круге",
+"code": "x, y = {{x:-4..4}}, {{y:-4..4}}\nif x * x + y * y <= 16:\n    if x * x + y * y <= 4:\n        print('inner')\n    else:\n        print('ring')\nelse:\n    print('out')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Камень, ножницы, бумага",
+"code": "a = '{{a:rock|paper|scissors}}'\nb = '{{b:rock|paper|scissors}}'\nif a == b:\n    print('draw')\nelif a == 'rock' and b == 'scissors' or a == 'scissors' and b == 'paper' or a == 'paper' and b == 'rock':\n    print('first')\nelse:\n    print('second')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сравнить два времени",
+"code": "h1, m1 = {{a:8..10}}, {{b:0..59}}\nh2, m2 = {{c:8..10}}, {{d:0..59}}\nif h1 > h2:\n    print(1)\nelif h1 < h2:\n    print(2)\nelif m1 > m2:\n    print(1)\nelif m1 < m2:\n    print(2)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Дата: корректна ли",
+"code": "d, m = {{d:25..32}}, {{m:1..12}}\nif m == 2:\n    ok = d <= 28\nelif m == 4 or m == 6 or m == 9 or m == 11:\n    ok = d <= 30\nelse:\n    ok = d <= 31\nprint(ok)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тарифы по весу и расстоянию",
+"code": "w, d = {{w:1..12}}, {{d:10..600}}\nif w <= 5:\n    price = 300\nelse:\n    price = 500\nif d > 500:\n    price += 600\nelif d > 100:\n    price += 200\nprint(price)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Что за число",
+"code": "n = {{n:-20..20}}\nif n == 0:\n    print('zero')\nelif n > 0:\n    if n % 2 == 0:\n        print('pos_even')\n    else:\n        print('pos_odd')\nelse:\n    print('neg')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Счётчик условий",
+"code": "x = {{x:1..30}}\nc = 0\nif x > 5:\n    c += 1\nif x > 10:\n    c += 1\nif x > 20:\n    c += 1\nprint(c)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сколько условий верно",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nc = 0\nif a > b:\n    c += 1\nif a % 2 == 0:\n    c += 1\nif b % 2 == 0:\n    c += 1\nprint(c)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Накопление баллов",
+"code": "x = {{x:1..40}}\nscore = 0\nif x % 2 == 0:\n    score += 2\nif x % 3 == 0:\n    score += 3\nif x > 20:\n    score += 5\nprint(score)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "if вместо elif",
+"code": "x = {{x:1..30}}\nif x > 10:\n    r = 1\nif x > 20:\n    r = 2\nelse:\n    r = 0\nprint(r)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Лестница с ловушкой",
+"code": "x = {{x:1..30}}\nif x > 5:\n    print('A')\nelif x > 15:\n    print('B')\nelse:\n    print('C')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Обмен по условию",
+"code": "a, b = {{a:1..30}}, {{b:1..30}}\nif a > b:\n    a, b = b, a\nprint(a * 100 + b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Условие и изменение",
+"code": "x = {{x:1..30}}\nif x % 2 == 0:\n    x //= 2\nelse:\n    x = 3 * x + 1\nif x > 20:\n    x -= 20\nprint(x)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Два шага Коллатца",
+"code": "n = {{n:5..30}}\nif n % 2 == 0:\n    n //= 2\nelse:\n    n = 3 * n + 1\nif n % 2 == 0:\n    n //= 2\nelse:\n    n = 3 * n + 1\nprint(n)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Монеты: хватит ли",
+"code": "price, money = {{p:50..150}}, {{m:50..150}}\nif money >= price:\n    print(money - price)\nelse:\n    print(-(price - money))",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Ограничение значения",
+"code": "x = {{x:-20..40}}\nif x < 0:\n    x = 0\nif x > 25:\n    x = 25\nprint(x)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Результат сравнения",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nprint(a > b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сравнение с остатком",
+"code": "n = {{n:1..40}}\nprint(n % 3 == 0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Равенство сумм",
+"code": "a, b, c = {{a:1..9}}, {{b:1..9}}, {{c:1..9}}\nprint(a + b == c + {{d:0..5}})",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "not от сравнения",
+"code": "x = {{x:1..20}}\nprint(not x > 10)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "and как значение",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nprint(a > 3 and b > 3)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "or как значение",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nprint(a > 6 or b > 6)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цепочка как значение",
+"code": "x = {{x:1..30}}\nprint(10 <= x <= 20)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Строка равна слову",
+"code": "s = '{{s:yes|no|maybe}}'\nif s == 'yes':\n    print(1)\nelif s == 'no':\n    print(0)\nelse:\n    print(-1)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Одинаковые слова",
+"code": "a = '{{a:apple|banana|cherry}}'\nb = '{{b:apple|banana|cherry}}'\nif a == b:\n    print('same')\nelif a == 'apple' or b == 'apple':\n    print('has_apple')\nelse:\n    print('other')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Пароль верный",
+"code": "p = '{{p:1234|4321|0000}}'\nif p == '1234':\n    print('open')\nelse:\n    print('closed')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Оценка за диктант",
+"code": "e = {{e:0..12}}\nif e == 0:\n    print(5)\nelif e <= 2:\n    print(4)\nelif e <= 4:\n    print(3)\nelse:\n    print(2)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Светофор",
+"code": "t = {{t:0..59}}\nif t < 25:\n    print(\"green\")\nelif t < 30:\n    print(\"yellow\")\nelse:\n    print(\"red\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Положение точки",
+"code": "x, y = {{x:-2..2}}, {{y:-2..2}}\nif x == 0 and y == 0:\n    print(\"O\")\nelif x == 0:\n    print(\"Y\")\nelif y == 0:\n    print(\"X\")\nelse:\n    print(\"XY\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сумма или произведение",
+"code": "a, b = {{a:1..4}}, {{b:1..4}}\nif a + b > a * b:\n    print(\"sum\")\nelif a + b == a * b:\n    print(\"eq\")\nelse:\n    print(\"prod\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Остаток от деления на 4",
+"code": "n = {{n:10..99}}\nif n % 4 == 0:\n    print(\"A\")\nelif n % 4 == 1:\n    print(\"B\")\nelif n % 4 == 2:\n    print(\"C\")\nelse:\n    print(\"D\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Знак произведения",
+"code": "a, b = {{a:-4..4}}, {{b:-4..4}}\nif a == 0 or b == 0:\n    print(\"zero\")\nelif a > 0 and b > 0 or a < 0 and b < 0:\n    print(\"pos\")\nelse:\n    print(\"neg\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Рейтинг по двум оценкам",
+"code": "a, b = {{a:2..5}}, {{b:2..5}}\nif a == 5 and b == 5:\n    print(\"top\")\nelif a >= 4 and b >= 4:\n    print(\"good\")\nelif a <= 2 or b <= 2:\n    print(\"bad\")\nelse:\n    print(\"mid\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Лифт",
+"code": "cur, f = {{c:1..9}}, {{f:1..9}}\nif f > cur:\n    print(f - cur)\nelif f < cur:\n    print(cur - f)\nelse:\n    print(\"stay\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Чётность суммы цифр",
+"code": "n = {{n:100..999}}\ns = n // 100 + n // 10 % 10 + n % 10\nif s % 2 == 0:\n    print(\"even\")\nelse:\n    print(\"odd\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Кэшбэк",
+"code": "p = {{p:100..1000}}\nif p >= 800:\n    print(p - p // 5)\nelif p >= 500:\n    print(p - p // 10)\nelse:\n    print(p)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Надбавка за стаж",
+"code": "y = {{y:0..30}}\nif y < 1:\n    print(0)\nelif y < 5:\n    print(5)\nelif y < 10:\n    print(10)\nelse:\n    print(15)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "До выходных",
+"code": "d = {{d:1..7}}\nif d == 6 or d == 7:\n    print(\"weekend\")\nelif d == 5:\n    print(1)\nelse:\n    print(6 - d)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Наименьшая цифра ли ноль",
+"code": "n = {{n:10..99}}\nif n % 10 == 0:\n    print(\"zero\")\nelif n // 10 == 1:\n    print(\"teen\")\nelse:\n    print(\"other\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цепочка 1",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nx = x + y\ny = x % 5\nprint(x + y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 2",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\na = a * b\nb = a - b\nprint(a - b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 3",
+"code": "x = {{a:3..9}}\nx = x * 2\nx = x - {{b:1..5}}\ny = x // 3\nprint(x + y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 4",
+"code": "s = 0\ns = s + {{a:2..9}}\ns = s * {{b:2..5}}\ns = s - {{c:1..4}}\nprint(s)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 5",
+"code": "x = {{a:10..30}}\ny = {{b:3..7}}\nx = x // y\ny = x + y\nprint(y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 6",
+"code": "a = {{a:2..6}}\nb = a ** 2\nc = b % {{m:3..7}}\nprint(b + c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 7",
+"code": "x = {{a:2..9}}\nx += {{b:2..9}}\nx *= 2\nx -= {{c:1..5}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 8",
+"code": "x = {{a:20..60}}\nx //= {{b:2..5}}\nx %= {{c:3..7}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 9",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nc = a + b\nc = c * c\nprint(c - a * b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 10",
+"code": "x = {{a:2..9}}\ny = x * {{b:2..5}}\nz = y - x\nprint(z + x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 11",
+"code": "p = {{a:3..9}}\nq = p + {{b:1..9}}\np = q - p\nq = q * p\nprint(q)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 12",
+"code": "x = {{a:5..15}}\ny = x % {{b:3..6}}\nx = x // {{b:3..6}}\nprint(x * 10 + y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 13",
+"code": "a = {{a:2..5}}\na = a ** 2\na = a + {{b:1..9}}\na = a % {{c:4..8}}\nprint(a)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 14",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nz = x\nx = y\ny = z + x\nprint(y - x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 15",
+"code": "k = {{a:2..9}}\nk = k * k\nk = k // {{b:2..4}}\nprint(k + {{c:1..9}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 16",
+"code": "a = {{a:10..40}}\nb = a // {{b:3..6}}\nc = a % {{b:3..6}}\nprint(b + c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 17",
+"code": "x = {{a:1..9}}\nx = x + x\nx = x * x\nx = x - {{b:1..9}}\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 18",
+"code": "t = {{a:2..9}}\nu = {{b:2..9}}\nt = t - u\nu = u + t\nt = t * u\nprint(t)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 19",
+"code": "x = {{a:20..50}}\ny = {{b:2..6}}\nprint(x // y + x % y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 20",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nc = {{c:2..9}}\nc = c + a\nb = b * c\nprint(b - a)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 21",
+"code": "x = {{a:2..4}}\nx = x ** 3\nx = x - {{b:1..9}}\nx = x // 2\nprint(x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 22",
+"code": "s = {{a:1..9}}\nn = {{b:2..6}}\ns = s * n\nn = s % 5\nprint(s + n)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 23",
+"code": "x = {{a:2..9}}\ny = x\ny += {{b:1..9}}\nx *= y\nprint(x % {{c:5..9}})",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 24",
+"code": "a = {{a:3..9}}\nb = {{b:3..9}}\nb = a * b\na = b - a\nprint(a + b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 25",
+"code": "m = {{a:30..99}}\nm = m % {{b:7..11}}\nm = m * {{c:2..5}}\nprint(m)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Цепочка 26",
+"code": "x = {{a:2..9}}\ny = 2 * x + {{b:1..5}}\nz = y % x\nprint(y - z)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 27",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nx = x + y\ny = x % 5\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 28",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\na, b = b, a\nb = b * 2\nprint(a, b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 29",
+"code": "x = {{a:20..60}}\ny = {{b:3..7}}\nprint(x // y, x % y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 30",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nx = x * y\ny = x // y\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 31",
+"code": "a = {{a:5..15}}\nb = a * {{b:2..4}}\na = b - a\nprint(a, b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 32",
+"code": "x = {{a:2..9}}\nx += {{b:1..9}}\ny = x * x\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 33",
+"code": "a = {{a:30..90}}\nb = a // 10\na = a % 10\nprint(a, b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 34",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nx = x - y\ny = y + x\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 35",
+"code": "s = {{a:2..9}}\np = s\ns = s + {{b:2..9}}\np = p * {{b:2..9}}\nprint(s, p)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 36",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nc = a ** 2 + b ** 2\nprint(a + b, c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 37",
+"code": "x = {{a:10..40}}\ny = x % {{b:3..8}}\nx = x // {{b:3..8}}\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 38",
+"code": "t = {{a:70..400}}\nh = t // 60\nm = t % 60\nprint(h, m)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 39",
+"code": "x = {{a:2..9}}\ny = x * 2\nz = y * 2\nprint(y, z)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 40",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nc = a * b\nd = a + b\nprint(c, d)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 41",
+"code": "x = {{a:3..9}}\nx = x ** 2\ny = x % {{b:4..9}}\nprint(x, y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 42",
+"code": "a = {{a:2..9}}\nb = a + {{b:2..9}}\na = a + b\nb = a - b\nprint(a, b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 43",
+"code": "n = {{a:100..999}}\nprint(n // 100, n % 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 44",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nz = x\nx = y\ny = z\nprint(x - y, x + y)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 45",
+"code": "k = {{a:50..99}}\nk = k - {{b:1..9}}\nprint(k // 7, k % 7)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 46",
+"code": "a = {{a:2..5}}\nb = a ** 3\nc = b // a\nprint(b, c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 47",
+"code": "x = {{a:1..9}}\ny = x + 1\nz = y + 1\nprint(x * y, z)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 48",
+"code": "p = {{a:2..9}}\nq = {{b:2..9}}\np *= 2\nq += p\nprint(p, q)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 49",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nc = {{c:2..9}}\nprint(a + b + c, a * b * c)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Два ответа 50",
+"code": "x = {{a:40..99}}\nprint(x // 10 + x % 10, x // 10 * x % 10)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 51",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(round(x))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 52",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(round(x, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 53",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(round(x, 2))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 54",
+"code": "a = {{a:5..20}}\nb = {{b:3..7}}\nprint(round(a / b), a // b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 55",
+"code": "a = {{a:5..20}}\nb = {{b:3..7}}\nprint(round(a / b, 1), a % b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 56",
+"code": "x = {{a:2..9}}\ny = {{b:3..7}}\nz = x / y\nprint(round(z, 2))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 57",
+"code": "x = {{a:10..50}}\nx = x / 4\nprint(round(x), x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 58",
+"code": "a = {{a:1..9}}\nb = {{b:3..8}}\nc = a / b\nc = c * 100\nprint(round(c))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 59",
+"code": "p = {{a:100..900}}\nr = {{b:5..30}}\nprint(round(p * r / 100))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 60",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nprint(round((x + y) / 2, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 61",
+"code": "s = {{a:70..100}} + {{b:70..100}} + {{c:70..100}}\nprint(round(s / 3, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 62",
+"code": "x = {{a:2..9}} / 3\nprint(round(x, 3), round(x))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 63",
+"code": "r = {{a:2..9}}\nprint(round(3.14 * r * r, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 64",
+"code": "x = {{a:10..99}}\ny = round(x / 7)\nprint(y * 7 - x)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 65",
+"code": "a = {{a:20..99}}\nb = a / {{b:3..9}}\nprint(round(b, 2) * 2)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 66",
+"code": "x = {{a:1..9}} / {{b:6..9}}\nprint(round(x, 1), round(x, 2))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 67",
+"code": "t = {{a:1000..5000}}\nprint(round(t / 1000, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 68",
+"code": "a = {{a:10..40}}\nb = {{b:3..9}}\nprint(round(a / b, 2), round(a / b))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 69",
+"code": "x = {{a:3..9}}\nx = x * 0.7\nprint(round(x, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 70",
+"code": "c = {{a:5..35}}\nf = c * 9 / 5 + 32\nprint(round(f))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 71",
+"code": "m = {{a:100..500}}\nprint(round(m / 60, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 72",
+"code": "x = {{a:1..9}}\ny = {{b:1..9}}\nz = x / y\nprint(int(z), round(z))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 73",
+"code": "v = {{a:30..110}}\nprint(round(v * 1000 / 3600, 1))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 74",
+"code": "a = {{a:5..15}}\nb = {{b:2..6}}\nc = a / b\nprint(round(c, 1), int(c))",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Округление 75",
+"code": "x = {{a:100..999}}\nprint(round(x / 100), x // 100)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 76",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nprint(f\"{x}+{y}={x + y}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 77",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nprint(f\"{x} {y} {x * y}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 78",
+"code": "x = {{a:10..60}}\ny = {{b:3..7}}\nprint(f\"{x // y}r{x % y}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 79",
+"code": "x = {{a:10..60}}\ny = {{b:3..7}}\nprint(f\"{x // y} {x % y}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 80",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\na = a * 2\nprint(f\"a={a},b={b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 81",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nprint(f\"{a}x{b}={a * b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 82",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(f\"{x:.2f}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 83",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(f\"{round(x, 1)}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 84",
+"code": "x = {{a:10..99}} / {{b:3..7}}\nprint(f\"{x:.1f} {round(x)}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 85",
+"code": "x = {{a:2..9}}\nx += {{b:1..9}}\nprint(f\"x={x}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 86",
+"code": "t = {{a:70..400}}\nprint(f\"{t // 60}:{t % 60}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 87",
+"code": "t = {{a:3700..40000}}\nprint(f\"{t // 3600}h {t % 3600 // 60}m\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 88",
+"code": "a = {{a:2..9}}\nb = a ** 2\nc = b ** 2\nprint(f\"{a}-{b}-{c}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 89",
+"code": "p = {{a:100..900}}\nd = {{b:5..30}}\nprint(f\"{p * (100 - d) // 100} {p * d // 100}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 90",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nx, y = y, x\nprint(f\"{x} {y}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 91",
+"code": "x = {{a:2..9}}\ny = {{b:2..9}}\nprint(f\"{x + y}!\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 92",
+"code": "n = {{a:100..999}}\nprint(f\"{n // 100}+{n // 10 % 10}+{n % 10}={n // 100 + n // 10 % 10 + n % 10}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 93",
+"code": "a = {{a:3..9}}\nb = {{b:3..9}}\nprint(f\"{a / b:.2f}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 94",
+"code": "a = {{a:3..9}}\nb = {{b:3..9}}\nprint(f\"{round(a / b, 2)} {a // b}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 95",
+"code": "name = \"Ali\"\nage = {{a:10..17}}\nage += {{b:1..5}}\nprint(f\"{name} {age}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 96",
+"code": "x = {{a:2..9}}\ny = x * {{b:2..5}}\nz = y % {{c:3..7}}\nprint(f\"{x}:{y}:{z}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 97",
+"code": "h = {{a:1..9}}\nm = {{b:1..59}}\nprint(f\"{h * 60 + m} min\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 98",
+"code": "w = {{a:2..9}}\nh = {{b:2..9}}\nprint(f\"P={2 * (w + h)} S={w * h}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 99",
+"code": "x = {{a:1000..9999}}\nprint(f\"{x // 1000} {x % 1000}\")",
+"tags": [
+"@io"
+]
+},
+{
+"title": "f-строка 100",
+"code": "a = {{a:2..9}}\nb = {{b:2..9}}\nprint(f\"{a}{b}\", a + b)",
+"tags": [
+"@io"
+]
+},
+{
+"title": "Парковка",
+"code": "h = {{h:1..12}}\nif h <= 1:\n    print(100)\nelif h <= 4:\n    print(100 + (h - 1) * 60)\nelse:\n    print(280 + (h - 4) * 40)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Очки в баскетболе",
+"code": "p = {{p:0..40}}\nif p >= 30:\n    print(\"star\")\nelif p >= 15:\n    print(\"good\")\nelif p >= 5:\n    print(\"ok\")\nelse:\n    print(\"weak\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Мишень",
+"code": "r = {{r:0..12}}\nif r <= 2:\n    print(10)\nelif r <= 5:\n    print(5)\nelif r <= 9:\n    print(1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Надёжность пароля",
+"code": "n = {{n:1..16}}\nif n < 6:\n    print(\"weak\")\nelif n < 10:\n    print(\"medium\")\nelse:\n    print(\"strong\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тип треугольника по теореме",
+"code": "a, b, c = {{a:3..8}}, {{b:3..8}}, {{c:3..8}}\nif a * a + b * b == c * c:\n    print(\"right\")\nelif a * a + b * b > c * c:\n    print(\"acute\")\nelse:\n    print(\"obtuse\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Число корней",
+"code": "a, b, c = {{a:1..3}}, {{b:-6..6}}, {{c:0..5}}\nd = b * b - 4 * a * c\nif d > 0:\n    print(2)\nelif d == 0:\n    print(1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Ход ладьи",
+"code": "x1, y1, x2, y2 = {{a:1..8}}, {{b:1..8}}, {{c:1..8}}, {{d:1..8}}\nif x1 == x2 and y1 == y2:\n    print(\"same\")\nelif x1 == x2 or y1 == y2:\n    print(\"yes\")\nelse:\n    print(\"no\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цвет клетки",
+"code": "x, y = {{x:1..8}}, {{y:1..8}}\nif (x + y) % 2 == 0:\n    print(\"black\")\nelse:\n    print(\"white\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Ход короля",
+"code": "x1, y1, x2, y2 = {{a:3..5}}, {{b:3..5}}, {{c:2..6}}, {{d:2..6}}\ndx = (x1 - x2) ** 2\ndy = (y1 - y2) ** 2\nif dx == 0 and dy == 0:\n    print(\"same\")\nelif dx <= 1 and dy <= 1:\n    print(\"yes\")\nelse:\n    print(\"no\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Дней в феврале",
+"code": "y = {{y:1890..2030}}\nif y % 400 == 0:\n    print(29)\nelif y % 100 == 0:\n    print(28)\nelif y % 4 == 0:\n    print(29)\nelse:\n    print(28)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Следующий день",
+"code": "d = {{d:1..30}}\nm = {{m:1..11}}\nif m == 4 or m == 6 or m == 9 or m == 11:\n    last = 30\nelse:\n    last = 31\nif d < last:\n    print(f\"{d + 1}.{m}\")\nelse:\n    print(f\"1.{m % 12 + 1}\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Время через k минут",
+"code": "h = {{h:0..22}}\nm = {{m:0..59}}\nk = {{k:1..59}}\nt = m + k\nif t >= 60:\n    h = h + 1\n    t = t - 60\nprint(f\"{h}:{t}\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Точка в прямоугольнике",
+"code": "x, y = {{x:-2..12}}, {{y:-2..8}}\nif x >= 0 and x <= 10 and y >= 0 and y <= 6:\n    print('in')\nelse:\n    print('out')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Точка в кольце",
+"code": "x, y = {{x:-6..6}}, {{y:-6..6}}\nr = x * x + y * y\nif r < 4:\n    print(\"hole\")\nelif r <= 25:\n    print(\"ring\")\nelse:\n    print(\"out\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Калькулятор",
+"code": "a, b = {{a:2..9}}, {{b:2..9}}\nop = '{{op:+|-|*}}'\nif op == '+':\n    print(a + b)\nelif op == '-':\n    print(a - b)\nelse:\n    print(a * b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Оценка по проценту",
+"code": "p = {{p:20..100}}\nif p >= 85:\n    print(\"A\")\nelif p >= 70:\n    print(\"B\")\nelif p >= 50:\n    print(\"C\")\nelse:\n    print(\"F\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Средний по величине",
+"code": "a, b, c = {{a:1..30}}, {{b:1..30}}, {{c:1..30}}\nif (a >= b and a <= c) or (a <= b and a >= c):\n    print(a)\nelif (b >= a and b <= c) or (b <= a and b >= c):\n    print(b)\nelse:\n    print(c)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цифры трёхзначного различны",
+"code": "n = {{n:100..999}}\na, b, c = n // 100, n // 10 % 10, n % 10\nif a != b and b != c and a != c:\n    print(\"diff\")\nelse:\n    print(\"same\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Палиндром трёхзначного",
+"code": "n = {{n:100..999}}\nif n // 100 == n % 10:\n    print(\"pal\")\nelse:\n    print(\"not\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Цифры по возрастанию",
+"code": "n = {{n:100..999}}\na, b, c = n // 100, n // 10 % 10, n % 10\nif a < b < c:\n    print(\"up\")\nelif a > b > c:\n    print(\"down\")\nelse:\n    print(\"mix\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Счастливый билет",
+"code": "n = {{n:1000..9999}}\nif n // 1000 + n // 100 % 10 == n // 10 % 10 + n % 10:\n    print(\"lucky\")\nelse:\n    print(\"usual\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Кратность четырём и шести",
+"code": "n = {{n:10..99}}\nif n % 4 == 0 and n % 6 == 0:\n    print(3)\nelif n % 4 == 0:\n    print(2)\nelif n % 6 == 0:\n    print(1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Три по цене двух",
+"code": "k = {{k:1..9}}\nprice = {{p:10..50}}\nif k % 3 == 0:\n    print(k // 3 * 2 * price)\nelse:\n    print((k // 3 * 2 + k % 3) * price)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тариф связи",
+"code": "m = {{m:50..800}}\ng = {{g:1..20}}\nif m <= 300 and g <= 5:\n    print(1500)\nelif m <= 500 and g <= 10:\n    print(2500)\nelse:\n    print(4000)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Электричество",
+"code": "k = {{k:20..500}}\nif k <= 100:\n    print(k * 10)\nelif k <= 300:\n    print(1000 + (k - 100) * 15)\nelse:\n    print(4000 + (k - 300) * 20)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Доставка по зоне",
+"code": "z = '{{z:A|B|C}}'\nw = {{w:1..9}}\nif z == 'A':\n    print(200 + w * 10)\nelif z == 'B':\n    print(300 + w * 20)\nelse:\n    print(500 + w * 30)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Какая дата раньше",
+"code": "d1, m1 = {{a:1..28}}, {{b:1..12}}\nd2, m2 = {{c:1..28}}, {{d:1..12}}\nif m1 < m2 or (m1 == m2 and d1 < d2):\n    print(1)\nelif m1 == m2 and d1 == d2:\n    print(0)\nelse:\n    print(2)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Знак суммы",
+"code": "a, b = {{a:-9..9}}, {{b:-9..9}}\nif a + b > 0:\n    print(\"plus\")\nelif a + b < 0:\n    print(\"minus\")\nelse:\n    print(\"zero\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Магазин открыт?",
+"code": "d = {{d:1..7}}\nh = {{h:7..20}}\nif d <= 5 and h >= 9 and h < 18:\n    print('open')\nelif d == 6 and h >= 10 and h < 16:\n    print('open')\nelse:\n    print('closed')",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Лифт: можно ли ехать",
+"code": "p, w = {{p:1..10}}, {{w:40..90}}\nif p > 8:\n    print(\"no\")\nelif p * w > 600:\n    print(\"no\")\nelse:\n    print(\"yes\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Век года",
+"code": "y = {{y:1..2025}}\nif y % 100 == 0:\n    print(y // 100)\nelse:\n    print(y // 100 + 1)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Дней в месяце с учётом года",
+"code": "m = {{m:1..12}}\nleap = {{l:0..1}}\nif m == 2 and leap == 1:\n    print(29)\nelif m == 2:\n    print(28)\nelif m == 4 or m == 6 or m == 9 or m == 11:\n    print(30)\nelse:\n    print(31)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Билеты с группой",
+"code": "a, c = {{a:1..6}}, {{c:0..6}}\ncost = a * 1000 + c * 500\nif a + c >= 8:\n    print(cost * 80 // 100)\nelif a + c >= 5:\n    print(cost * 90 // 100)\nelse:\n    print(cost)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Результат матча",
+"code": "g1, g2 = {{a:0..5}}, {{b:0..5}}\nif g1 > g2:\n    print(\"win\")\nelif g1 < g2:\n    print(\"lose\")\nelse:\n    print(\"draw\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Точка относительно прямой",
+"code": "x, y = {{x:-3..3}}, {{y:-6..6}}\nline = 2 * x + 1\nif y > line:\n    print(1)\nelif y < line:\n    print(-1)\nelse:\n    print(0)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Четверть часа",
+"code": "m = {{m:0..59}}\nif m < 15:\n    print(1)\nelif m < 30:\n    print(2)\nelif m < 45:\n    print(3)\nelse:\n    print(4)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Деление или ошибка",
+"code": "a, b = {{a:10..50}}, {{b:0..5}}\nif b == 0:\n    print(\"error\")\nelif a % b == 0:\n    print(a // b)\nelse:\n    print(a % b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Средняя оценка",
+"code": "a, b, c = {{a:2..5}}, {{b:2..5}}, {{c:2..5}}\nr = round((a + b + c) / 3)\nif r >= 5:\n    print(\"excellent\")\nelif r == 4:\n    print(\"good\")\nelse:\n    print(\"satisfactory\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Спортивный разряд",
+"code": "t = {{t:10..20}}\nif t < 11:\n    print(\"I\")\nelif t < 13:\n    print(\"II\")\nelif t < 16:\n    print(\"III\")\nelse:\n    print(\"none\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Углы треугольника",
+"code": "a, b = {{a:20..100}}, {{b:20..100}}\nc = 180 - a - b\nif c <= 0:\n    print(\"none\")\nelif a == 90 or b == 90 or c == 90:\n    print(\"right\")\nelif a < 90 and b < 90 and c < 90:\n    print(\"acute\")\nelse:\n    print(\"obtuse\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Выбор транспорта",
+"code": "d = {{d:1..40}}\nt = {{t:5..40}}\nif d <= 1:\n    print(\"walk\")\nelif d <= 5 and t <= 15:\n    print(\"bike\")\nelif d <= 15:\n    print(\"bus\")\nelse:\n    print(\"train\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Скидка за возраст и сумму",
+"code": "age, s = {{a:10..80}}, {{s:100..1000}}\nif age < 14 and s > 500:\n    print(s // 2)\nelif age < 14 or age >= 60:\n    print(s * 80 // 100)\nelse:\n    print(s)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Тип числа",
+"code": "n = {{n:-9..9}}\nif n == 0:\n    print(\"zero\")\nelif n > 0 and n % 2 == 0:\n    print(\"pos_even\")\nelif n > 0:\n    print(\"pos_odd\")\nelif n % 2 == 0:\n    print(\"neg_even\")\nelse:\n    print(\"neg_odd\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Чётная сумма",
+"code": "a, b = {{a:1..9}}, {{b:1..9}}\nif (a + b) % 2 == 0:\n    print((a + b) // 2)\nelse:\n    print(a * b)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Три стороны: тип",
+"code": "a, b, c = {{a:2..5}}, {{b:2..5}}, {{c:2..9}}\nif a + b <= c or a + c <= b or b + c <= a:\n    print(\"none\")\nelif a == b and b == c:\n    print(\"equilateral\")\nelif a == b or b == c or a == c:\n    print(\"isosceles\")\nelse:\n    print(\"scalene\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Сутки: какая смена",
+"code": "h = {{h:0..23}}\nif h >= 8 and h < 16:\n    print(\"A\")\nelif h >= 16:\n    print(\"B\")\nelse:\n    print(\"C\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Порог и остаток",
+"code": "n = {{n:1..100}}\nif n > 90:\n    print(n - 90)\nelif n > 50 and n % 2 == 0:\n    print(n // 2)\nelse:\n    print(n % 7)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Монета: хватит ли",
+"code": "have, cost = {{h:20..100}}, {{c:20..100}}\nif have == cost:\n    print(\"exact\")\nelif have > cost:\n    print(have - cost)\nelse:\n    print(\"short\")",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Размер штрафа",
+"code": "v, limit = {{v:40..130}}, {{l:50..90}}\nover = v - limit\nif over <= 0:\n    print(0)\nelif over <= 20:\n    print(5000)\nelif over <= 40:\n    print(15000)\nelse:\n    print(50000)",
+"tags": [
+"@cond"
+]
+},
+{
+"title": "Номер недели в месяце",
+"code": "d = {{d:1..31}}\nif d <= 7:\n    print(1)\nelif d <= 14:\n    print(2)\nelif d <= 21:\n    print(3)\nelif d <= 28:\n    print(4)\nelse:\n    print(5)",
+"tags": [
+"@cond"
+]
+}
+]
