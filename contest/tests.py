@@ -2641,19 +2641,19 @@ class CodeGameTests(TestCase):
         other = cg.generate(self.game, random.Random(2))
         self.assertNotEqual([q['code'] for q in qs], [q['code'] for q in other])
 
-    def test_stake_and_double_payout(self):
+    def test_entry_one_coin_win_two(self):
         from .coins import balance
-        run = self._start(stake=3)
-        self.assertEqual(balance(self.st), 2)                   # 5 − 3
+        run = self._start(stake=3)                              # выбора ставки нет — всегда 1
+        self.assertEqual(run.stake, 1)
+        self.assertEqual(balance(self.st), 4)                   # 5 − 1
         run = self._win(run)
-        self.assertEqual((run.status, run.coins), ('won', 6))  # 3 × 2
-        self.assertEqual(balance(self.st), 8)
-        run2 = self._win(self._start(stake=1))                  # 8 − 1 + 2
-        self.assertEqual(run2.coins, 2)
-        self.assertEqual(balance(self.st), 9)
-        self.client.post(reverse('codegame_start', args=[self.game.id]), {'stake': 99})   # больше 3 нельзя
-        from .models import CodeGameRun
-        self.assertEqual(CodeGameRun.objects.latest('id').stake, 3)
+        self.assertEqual((run.status, run.coins), ('won', 2))
+        self.assertEqual(balance(self.st), 6)                   # +2
+        page = self.client.get(reverse('codegames')).content.decode()
+        self.assertIn('−1', page)
+        self.assertIn('+2', page)
+        self.assertNotIn('name="stake"', page)
+        self.assertNotIn('no-fs', page.split('</title>')[0])    # блок «нет полного экрана» не в заголовке страницы
 
     def test_pairs_wrong_match_is_a_strike(self):
         from .models import CodeGameRun
@@ -2672,7 +2672,7 @@ class CodeGameTests(TestCase):
         CoinTransaction.objects.filter(student=self.st).delete()
         self.client.login(username='cg_s', password='p')
         r = self.client.post(reverse('codegame_start', args=[self.game.id]), follow=True)
-        self.assertContains(r, 'Не хватает монет')
+        self.assertContains(r, 'не хватает')
         self.assertFalse(CodeGameRun.objects.exists())
 
     def test_three_strikes_explode(self):

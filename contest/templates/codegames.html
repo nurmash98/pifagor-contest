@@ -1,22 +1,18 @@
 {% extends 'base.html' %}
 {% load ui_i18n static %}
 
-{% block title %}{% t "Игры" %} - Pifagor Contest<div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>
-<script>
-(function () {
-  var el = document.documentElement;
-  if (!(el.requestFullscreen || el.webkitRequestFullscreen)) {
-    document.getElementById('no-fs').style.display = 'block';
-    document.querySelectorAll('form[action*="/start/"] button').forEach(function (b) { b.disabled = true; });
-  }
-})();
-</script>
-{% endblock %}
+{% block title %}{% t "Игры" %} - Pifagor Contest{% endblock %}
 
 {% block content %}
+<style>
+  .game-price { display:inline-flex; align-items:center; gap:6px; font-weight:800; border-radius:999px; padding:6px 14px; font-size:1.05rem; }
+  .game-price .coin-ico { width:1.4em; height:1.4em; }
+  .game-price.lose { background:#fee2e2; color:#b91c1c; }
+  .game-price.win { background:#dcfce7; color:#15803d; }
+</style>
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 {% t "Игры" %}</h3>
 <p class="text-muted small mb-4">{% t "Обезвредь бомбу: смотри на код и пиши, что он выведет. Числа каждый раз новые." %}
-    {% t "Ставка — от 1 до 3 монет, обезвредил бомбу — получаешь ставку ×2." %} {% t "у тебя" %}: <strong>{{ balance }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
+    {% t "у тебя" %}: <strong>{{ balance }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
 <div class="row g-3">
     {% for it in items %}
     <div class="col-md-6 col-lg-4">
@@ -29,14 +25,12 @@
                 {% if it.best is not None %}🏆 {% t "Лучшее время" %}: <strong>{{ it.best }} {% t "сек" %}</strong> · {% t "побед" %}: {{ it.wins }}<br>{% endif %}
             </div>
             <form method="post" action="{% url 'codegame_start' it.game.id %}" class="mt-auto">{% csrf_token %}
-                <div class="small fw-semibold mb-1">{% t "Ставка" %}</div>
-                <div class="btn-group mb-2" role="group">
-                    {% for s in stakes %}
-                    <input type="radio" class="btn-check" name="stake" id="st-{{ it.game.id }}-{{ s }}" value="{{ s }}" {% if forloop.first %}checked{% endif %} {% if balance < s %}disabled{% endif %}>
-                    <label class="btn btn-outline-warning btn-sm" for="st-{{ it.game.id }}-{{ s }}">{{ s }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> → +{% widthratio s 1 payout %}</label>
-                    {% endfor %}
-                </div><br>
-                <button class="btn btn-pifagor-green rounded-pill px-4" {% if balance < fee %}disabled{% endif %}>{% t "Играть" %}</button></form>
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <span class="game-price lose">{% t "Вход" %} −{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></span>
+                    <span class="fs-5">→</span>
+                    <span class="game-price win">{% t "Победа" %} +{{ payout }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></span>
+                </div>
+                <button class="btn btn-pifagor-green rounded-pill px-4" {% if balance < fee %}disabled{% endif %}>{% t "Играть за" %} {{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></button></form>
         </div>
     </div>
     {% empty %}

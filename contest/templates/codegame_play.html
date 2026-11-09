@@ -42,14 +42,16 @@
         <div style="font-size:4.5rem;">✂️</div>
         <h2 class="fw-bold">{% t "Бомба обезврежена!" %}</h2>
         <p class="mb-1">{% t "Время" %}: <strong>{{ duration }} {% t "сек" %}</strong>{% if run.mistakes %} · {% t "ошибок" %}: {{ run.mistakes }}{% endif %}</p>
-        {% if run.coins %}<p class="fs-5"><img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> +{{ run.coins }}</p>{% endif %}
+        <p class="fs-4 fw-bold text-success mb-1">+{{ run.coins|default:payout }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></p>
+        <p class="small text-muted">{% t "Вход" %} −{{ fee }}, {% t "победа" %} +{{ payout }}</p>
       {% else %}
         <div class="cg-boom">💥</div>
         <h2 class="fw-bold">{% t "Бум! Бомба взорвалась." %}</h2>
         <p class="text-muted">{% t "Решено" %}: {{ run.progress }} / {{ questions|length }}</p>
+        <p class="fs-5 fw-bold text-danger">−{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""> <span class="small fw-normal text-muted">({% t "монета за вход не возвращается" %})</span></p>
       {% endif %}
       <div class="d-flex justify-content-center gap-2 mt-3">
-        <form method="post" action="{% url 'codegame_start' game.id %}">{% csrf_token %}<input type="hidden" name="stake" value="{{ run.stake }}"><button class="btn btn-pifagor-green rounded-pill px-4">{% t "Ещё раз" %} ({% t "ставка" %} {{ run.stake }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt="">)</button></form>
+        <form method="post" action="{% url 'codegame_start' game.id %}">{% csrf_token %}<button class="btn btn-pifagor-green rounded-pill px-4">{% t "Ещё раз" %} — {% t "вход" %} {{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></button></form>
         <a href="{% url 'codegames' %}" class="btn btn-outline-secondary rounded-pill px-4">{% t "К играм" %}</a>
       </div>
     </div>
