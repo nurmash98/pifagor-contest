@@ -2166,3 +2166,42 @@ def web_manifest(request):
 def favicon(request):
     from django.templatetags.static import static
     return redirect(static('icons/favicon.ico'))
+
+
+GRANT_MAX = 50   # сколько монет учитель может выдать ученику за один раз
+
+
+@staff_member_required
+def student_coins(request, student_id):
+    """Учитель сам выдаёт монеты конкретному ученику (1–50 за раз), с причиной. Ученик видит уведомление."""
+    import uuid
+    from . import coins as coin_module
+    from .models import CoinTransaction, StudentNotice
+    student = _managed_student_or_none(request, student_id)
+    if student is None:
+        messages.error(request, 'Это ученик не из ваших классов.')
+        return redirect('student_list')
+    if request.method == 'POST':
+        try:
+            amount = int(request.POST.get('amount', ''))
+        except ValueError:
+            amount = 0
+        reason = (request.POST.get('reason') or '').strip()[:120]
+        if not 1 <= amount <= GRANT_MAX:
+            messages.error(request, f'Можно выдать от 1 до {GRANT_MAX} монет за раз.')
+        else:
+            teacher = getattr(request.user, 'teacher', None)
+            who = teacher.full_name if teacher else request.user.get_full_name() or request.user.username
+            CoinTransaction.objects.create(
+                student=student, key=f'grant:{uuid.uuid4().hex[:16]}', kind='grant', amount=amount,
+                at=timezone.now(), note=(reason or 'Награда от учителя') + f' — {who}')
+            StudentNotice.objects.create(
+                student=student,
+                text=f'Учитель {who} подарил тебе {amount} монет' + (f': {reason}' if reason else '!'),
+                text_kk=f'Мұғалім {who} саған {amount} тиын сыйлады' + (f': {reason}' if reason else '!'))
+            messages.success(request, f'{student.full_name}: +{amount} монет.')
+            return redirect('student_coins', student_id=student.id)
+    grants = student.coin_transactions.filter(kind='grant').order_by('-at')[:20]
+    return render(request, 'student_coins.html', {
+        'student': student, 'balance': coin_module.balance(student), 'grants': grants, 'max': GRANT_MAX,
+    })

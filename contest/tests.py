@@ -2842,3 +2842,42 @@ class AvatarShopTests(TestCase):
         page = self.client.get(reverse('shop')).content.decode()
         self.assertIn('av-21.webp', page)
         self.assertIn('не хватает 380', page)
+
+
+class TeacherGrantCoinsTests(TestCase):
+    """Учитель сам даёт монеты ученику своего класса: от 1 до 50 за раз, ученик получает уведомление."""
+
+    def setUp(self):
+        self.tu = User.objects.create_user('gr_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Нұр-Мұхаммед', classes='7A')
+        self.st = Student.objects.create(user=User.objects.create_user('gr_s', password='p'), full_name='Аня', school_class='7A')
+        self.foreign = Student.objects.create(user=User.objects.create_user('gr_f', password='p'), full_name='Чужой', school_class='9Z')
+        self.client.login(username='gr_t', password='p')
+
+    def test_grant_with_reason_and_notice(self):
+        from .coins import balance
+        from .models import StudentNotice
+        r = self.client.post(reverse('student_coins', args=[self.st.id]), {'amount': 30, 'reason': 'помог однокласснику'})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(balance(self.st), 30)
+        n = StudentNotice.objects.get(student=self.st)
+        self.assertIn('30', n.text)
+        self.assertIn('помог однокласснику', n.text)
+        self.client.post(reverse('student_coins', args=[self.st.id]), {'amount': 10})   # несколько раз — можно
+        self.assertEqual(balance(self.st), 40)
+        page = self.client.get(reverse('student_coins', args=[self.st.id]))
+        self.assertContains(page, 'помог однокласснику — Нұр-Мұхаммед')
+
+    def test_limits_and_permissions(self):
+        from .coins import balance
+        for bad in (0, 51, -5, 'abc'):
+            self.client.post(reverse('student_coins', args=[self.st.id]), {'amount': bad})
+        self.assertEqual(balance(self.st), 0)
+        self.client.post(reverse('student_coins', args=[self.foreign.id]), {'amount': 10})
+        self.assertEqual(balance(self.foreign), 0)                 # чужой класс
+        self.client.login(username='gr_s', password='p')
+        self.client.post(reverse('student_coins', args=[self.st.id]), {'amount': 50})
+        self.assertEqual(balance(self.st), 0)                      # ученик сам себе не может
+
+    def test_button_in_student_list(self):
+        self.assertContains(self.client.get(reverse('student_list')), reverse('student_coins', args=[self.st.id]))

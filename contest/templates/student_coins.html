@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Монеты: {{ student.full_name }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'student_list' %}?class={{ student.school_class }}" class="text-decoration-none text-muted small">← Ученики {{ student.school_class }}</a></div>
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
+            <h4 class="fw-bold mb-1" style="color:#1a1a4b;">{{ student.full_name }} <span class="badge bg-secondary fs-6 align-middle">{{ student.school_class }}</span></h4>
+            <div class="mb-3">Сейчас: <span class="fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ balance }}</span></div>
+            <form method="post">{% csrf_token %}
+                <label class="form-label small fw-semibold">Сколько монет дать (1–{{ max }})</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-warning btn-sm quick" data-n="5">+5</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm quick" data-n="10">+10</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm quick" data-n="20">+20</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm quick" data-n="30">+30</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm quick" data-n="50">+50</button>
+                </div>
+                <input type="number" name="amount" id="amount" min="1" max="{{ max }}" required class="form-control mb-3" placeholder="Например, 10">
+                <label class="form-label small fw-semibold">За что (ученик увидит)</label>
+                <input type="text" name="reason" maxlength="120" class="form-control mb-3" placeholder="Например: помог однокласснику, активность на уроке">
+                <button class="btn btn-warning fw-bold px-4"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> Дать монеты</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+            <div class="p-3 fw-bold">Выдано учителями</div>
+            <ul class="list-group list-group-flush">
+                {% for g in grants %}
+                <li class="list-group-item d-flex justify-content-between small">
+                    <span>{{ g.note }} <span class="text-muted ms-1">{{ g.at|date:"d.m.Y H:i" }}</span></span>
+                    <span class="fw-bold text-success">+{{ g.amount }}</span>
+                </li>
+                {% empty %}<li class="list-group-item text-muted small">Пока ничего не выдавали.</li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.quick').forEach(function (b) {
+    b.addEventListener('click', function () { document.getElementById('amount').value = b.dataset.n; });
+});
+</script>
+{% endblock %}
