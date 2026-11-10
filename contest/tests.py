@@ -2821,13 +2821,13 @@ class AvatarShopTests(TestCase):
 
     def test_buy_avatar_spends_coins_and_puts_it_on(self):
         from .coins import balance
-        self.client.post(reverse('shop_buy'), {'avatar': 'av01'})     # 50 монет
+        self.client.post(reverse('shop_buy'), {'avatar': 'av01'})     # 100 монет
         self.st.refresh_from_db()
         self.assertEqual(self.st.avatar, 'av01')
         self.assertIn('av01', self.st.owned_avatars)
-        self.assertEqual(balance(self.st), 70)
+        self.assertEqual(balance(self.st), 20)
         self.client.post(reverse('shop_buy'), {'avatar': 'av01'})     # второй раз не списывает
-        self.assertEqual(balance(self.st), 70)
+        self.assertEqual(balance(self.st), 20)
         self.client.post(reverse('profile_avatar'), {'avatar': ''})
         self.client.post(reverse('profile_avatar'), {'avatar': 'av01'})  # купленный выбирается снова бесплатно
         self.st.refresh_from_db()
@@ -2835,10 +2835,10 @@ class AvatarShopTests(TestCase):
 
     def test_not_enough_coins(self):
         from .coins import balance
-        self.client.post(reverse('shop_buy'), {'avatar': 'av21'})     # дракон 200 > 120
+        self.client.post(reverse('shop_buy'), {'avatar': 'av21'})     # дракон 500 > 120
         self.st.refresh_from_db()
         self.assertEqual((self.st.avatar, self.st.owned_avatars), ('', ''))
         self.assertEqual(balance(self.st), 120)
         page = self.client.get(reverse('shop')).content.decode()
         self.assertIn('av-21.webp', page)
-        self.assertIn('не хватает 80', page)
+        self.assertIn('не хватает 380', page)
