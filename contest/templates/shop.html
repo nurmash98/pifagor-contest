@@ -46,7 +46,7 @@
             {% elif b.kind == 'gift' %}
                 <a href="{% url 'republic_day' %}" class="btn btn-sm btn-info rounded-pill px-3">{% if kk == 'kk' %}Есептер{% else %}Задачи{% endif %} {{ republic_progress }}/{{ republic_need }}</a>
             {% elif b.short %}
-                <span class="btn btn-sm btn-light rounded-pill px-3 disabled">{% if kk == 'kk' %}Жетпейді{% else %}Не хватает{% endif %} {{ b.short }}</span>
+                <div class="shop-short">{% if kk == 'kk' %}жетпейді{% else %}не хватает{% endif %} {{ b.short }}</div>
             {% else %}
                 <form method="post" action="{% url 'shop_buy' %}">{% csrf_token %}<input type="hidden" name="banner" value="{{ b.key }}">
                     <button class="btn btn-sm btn-warning fw-bold rounded-pill px-3">{% if kk == 'kk' %}Сатып алу{% else %}Купить{% endif %} · {{ b.price }}</button></form>
@@ -69,7 +69,8 @@
             {% elif not student %}{% if a.kind == 'paid' %}<span class="text-warning-emphasis small fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }}</span>{% endif %}
             {% elif a.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓</span>
             {% elif not a.owned and a.short %}
-                <span class="btn btn-sm btn-light rounded-pill px-2 disabled"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }} · {% if kk == 'kk' %}жетпейді{% else %}не хватает{% endif %} {{ a.short }}</span>
+                <div class="fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }}</div>
+                <div class="shop-short">{% if kk == 'kk' %}жетпейді{% else %}не хватает{% endif %} {{ a.short }}</div>
             {% elif not a.owned %}
                 <form method="post" action="{% url 'shop_buy' %}">{% csrf_token %}<input type="hidden" name="avatar" value="{{ a.key }}">
                     <button class="btn btn-sm btn-warning fw-bold rounded-pill px-3">{% if kk == 'kk' %}Сатып алу{% else %}Купить{% endif %} · {{ a.price }} <img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""></button></form>
@@ -107,6 +108,7 @@
 {% endif %}
 <style>
     .shop-card.on { outline: 2px solid #34c27a; }
+    .shop-short { font-size: .72rem; color: #9ca3af; margin-top: 2px; }
     .shop-card.soon { opacity: .7; }
     .shop-ava { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; background: var(--bs-tertiary-bg); display: flex; align-items: center; justify-content: center; font-size: 40px; }
     .shop-ava img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; background: #fff; }
