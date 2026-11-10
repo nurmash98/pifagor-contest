@@ -2906,3 +2906,12 @@ class NewBannersTests(TestCase):
         st.refresh_from_db()
         self.assertIn('python', st.owned_banners)
         self.assertEqual(balance(st), 100)
+
+    def test_row_banners_have_icon_and_no_grid_breaking_pseudo(self):
+        from django.template.loader import render_to_string
+        css = render_to_string('theme_head.html')
+        self.assertIn('.has-b:is(', css)                          # значки ::before в строках выключены
+        for k in ('chess', 'python', 'diamond', 'pixel', 'sakura', 'ice', 'storm'):
+            self.assertIn(f'.b-{k}', css.split('.has-b:is(')[1].split(')::before')[0])
+        from .templatetags.badge_tags import banner_icon
+        self.assertIn('♞', banner_icon('chess'))

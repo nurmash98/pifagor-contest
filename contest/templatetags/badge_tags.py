@@ -50,7 +50,8 @@ def rank_chip(solved, uid='r', size='md'):
                        rank_svg(tier, uid=uid, size=16 if size == 'sm' else 20), tier['ru'])
 
 
-BANNER_ICONS = {'code': '>_', 'fire': '🔥', 'gold': '👑', 'champion': '🏆'}
+BANNER_ICONS = {'code': '>_', 'fire': '🔥', 'gold': '👑', 'champion': '🏆', 'python': '🐍', 'pixel': '♥', 'sakura': '🌸',
+                'ice': '❄', 'storm': '⚡', 'chess': '♞', 'diamond': '💎', 'shanyrak': '☀'}
 
 
 @register.simple_tag

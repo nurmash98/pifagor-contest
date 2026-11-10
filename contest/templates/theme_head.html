@@ -262,6 +262,12 @@
     .b-diamond::after { content: "✦"; position: absolute; right: 6px; top: 2px; color: #fff; font-size: 12px; text-shadow: 0 0 6px #fff; animation: dm-twinkle 1.6s ease-in-out infinite; }
     @keyframes dm-shift { to { background-position: 100% 100%; } }
     @keyframes dm-twinkle { 50% { opacity: 0; transform: scale(.4) rotate(45deg); } }
+    /* В строках лидерборда, Зала славы и дуэлей (.has-b) баннер красит всю строку: значок-«::before» там стал бы
+       лишней ячейкой сетки и ломал строку — значок вместо этого ставится перед именем (тег banner_icon) */
+    .has-b:is(.b-code, .b-fire, .b-gold, .b-champion, .b-python, .b-pixel, .b-sakura, .b-ice, .b-storm, .b-chess, .b-diamond, .b-shanyrak)::before { content: none; }
+    .has-b.b-pixel { font-family: inherit; font-size: inherit; letter-spacing: normal; margin: 3px 0; }
+    .has-b.b-cyber { text-transform: none; }
+    .has-b.b-steppe::after { background-size: 45% 100%; }
     @media (prefers-reduced-motion: reduce) { .nb, .nb::after, .nb::before { animation: none !important; } }
     /* Монеты в шапке */
     .coin-chip { display: inline-flex; align-items: center; gap: 6px; background: #fff6d6; color: #6b4e00 !important; font-weight: 800; border: 1px solid #f2d27a;
