@@ -1824,7 +1824,10 @@ class QuarterExclusionTests(TestCase):
 class AwardForPlaceTests(TestCase):
     def test_award_table(self):
         from .quarters import award_for
-        self.assertEqual([award_for(p) for p in range(1, 22)], [200, 150, 100] + [50] * 7 + [25] * 10 + [0])
+        self.assertEqual([award_for(p) for p in range(1, 22)], [500, 400, 300] + [200] * 7 + [100] * 10 + [0])
+        self.assertEqual([award_for(p, 2) for p in (1, 2, 3, 4, 11)], [500, 400, 300, 200, 100])
+        # 1 четверть уже выдана по старой таблице — она не меняется (иначе пересчёт доначислил бы всем)
+        self.assertEqual([award_for(p, 1) for p in range(1, 22)], [200, 150, 100] + [50] * 7 + [25] * 10 + [0])
 
 
 class RankChipTests(TestCase):
@@ -2446,7 +2449,7 @@ class ReconcileQuartersTests(TestCase):
                 sub = Submission.objects.create(student=st, task=task, score=10, is_graded=True, status='DONE')
                 Submission.objects.filter(pk=sub.pk).update(updated_at=quarters.BY_N[1]['end'] - timedelta(days=3))
             CoinTransaction.objects.create(student=st, key=f'q:{quarters.YEAR}:1', kind='award',
-                                           amount=quarters.award_for(i), at=tz.now(), note='награда')
+                                           amount=quarters.award_for(i, 1), at=tz.now(), note='награда')
         QuarterFreeze.objects.create(year=quarters.YEAR, quarter=1, frozen_at=tz.now())
 
     def _exclude_without_refund(self, *idx):

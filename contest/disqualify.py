@@ -39,7 +39,7 @@ def reconcile(quarter_n, notify=True):
             e = entries.get(sid)
             have = paid.get(sid, 0)
             if e is not None:
-                want = quarters.award_for(e.place)
+                want = quarters.award_for(e.place, quarter_n)
                 if want <= have:          # лишнее у не убранных не отбираем (ранг мог поменяться из-за поздних оценок)
                     continue
             else:

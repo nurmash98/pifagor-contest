@@ -12,18 +12,26 @@ from django.utils import timezone
 YEAR = '2026-2027'
 COEF = {'A': 1, 'B': 2, 'C': 3}
 TOP = 20
-AWARD_COINS = {1: 200, 2: 150, 3: 100}
-AWARD_COINS_REST = 50        # 4–10 места
-AWARD_COINS_TAIL = 25        # 11–20 места
+AWARD_COINS = {1: 500, 2: 400, 3: 300}
+AWARD_COINS_REST = 200       # 4–10 места
+AWARD_COINS_TAIL = 100       # 11–20 места
+# 1 четверть уже выдана по старой таблице — пересчёт наград её не трогает
+OLD_AWARDS = {1: ({1: 200, 2: 150, 3: 100}, 50, 25)}
 
 
-def award_for(place):
+def award_table(quarter_n=None):
+    """(монеты за 1–3 места, за 4–10, за 11–20) для этой четверти."""
+    return OLD_AWARDS.get(quarter_n, (AWARD_COINS, AWARD_COINS_REST, AWARD_COINS_TAIL))
+
+
+def award_for(place, quarter_n=None):
     """Монеты за место в топ-20 параллели по итогам четверти."""
-    if place in AWARD_COINS:
-        return AWARD_COINS[place]
+    top3, rest, tail = award_table(quarter_n)
+    if place in top3:
+        return top3[place]
     if place <= 10:
-        return AWARD_COINS_REST
-    return AWARD_COINS_TAIL if place <= TOP else 0
+        return rest
+    return tail if place <= TOP else 0
 
 
 def _dt(y, m, d, h=0, mi=0, s=0):
@@ -194,10 +202,10 @@ def _freeze(q):
             entries.append(HallEntry(year=YEAR, quarter=q['n'], kind='student', grade=grade, place=place, student=st,
                                      name=st.full_name, school_class=st.school_class,
                                      score=st.calc_total_score, solved=st.calc_solved_count))
-            if award_for(place):
+            if award_for(place, q['n']):
                 CoinTransaction.objects.get_or_create(
                     student=st, key=f'q:{YEAR}:{q["n"]}', defaults=dict(
-                        kind='award', amount=award_for(place), at=q['end'],
+                        kind='award', amount=award_for(place, q['n']), at=q['end'],
                         note=f'{q["n"]} четверть — {place} место ({grade} классы)'))
             if place == 1:
                 banner_module.give(st, 'champion')

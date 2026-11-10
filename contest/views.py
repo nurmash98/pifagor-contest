@@ -735,7 +735,8 @@ def hall_of_fame(request):
     return render(request, 'hall_of_fame.html', {
         'can_disqualify': request.user.is_staff and frozen_q is not None,
         'tabs': tabs, 'sel': sel, 'grades': grades, 'grade': grade, 'podium': rows[:3], 'rest': rows[3:],
-        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL,
+        'class_rows': cls_rows, 'frozen_q': frozen_q, 'awards': quarters.award_table(frozen_q and frozen_q['n'])[0],
+        'award_rest': quarters.award_table(frozen_q and frozen_q['n'])[1], 'award_tail': quarters.award_table(frozen_q and frozen_q['n'])[2],
     })
 
 
@@ -833,7 +834,7 @@ def leaderboard(request):
     totals = solved_counts([st.id for st in students])
     for place, st in enumerate(students, 1):
         st.total_solved = totals.get(st.id, 0)
-        st.prize = quarters.award_for(place) if quarter and by_parallel else 0
+        st.prize = quarters.award_for(place, quarter['n']) if quarter and by_parallel else 0
         st.can_manage = request.user.is_staff and (managed is None or st.school_class in managed)
 
     # ---- Рейтинг классов этой параллели (или параллелей, если у учителя классы из
