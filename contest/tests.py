@@ -2881,3 +2881,25 @@ class TeacherGrantCoinsTests(TestCase):
 
     def test_button_in_student_list(self):
         self.assertContains(self.client.get(reverse('student_list')), reverse('student_coins', args=[self.st.id]))
+
+
+class NewBannersTests(TestCase):
+    """14 новых платных баннеров есть в магазине и покупаются за монеты."""
+
+    def test_new_banners_in_shop_and_buy(self):
+        from .coins import balance
+        from .models import CoinTransaction
+        from . import banners
+        st = Student.objects.create(user=User.objects.create_user('nb_s', password='p'), full_name='Аня', school_class='7A')
+        CoinTransaction.objects.create(student=st, key='seed', kind='task', amount=500, at=timezone.now())
+        self.client.login(username='nb_s', password='p')
+        new = ['matrix', 'python', 'pixel', 'rainbow', 'ocean', 'sakura', 'ice', 'cyber', 'steppe', 'storm', 'shanyrak', 'rocket', 'chess', 'diamond']
+        page = self.client.get(reverse('shop')).content.decode()
+        for k in new:
+            self.assertEqual(banners.CATALOG[k]['kind'], 'paid')
+            self.assertIn(f'b-{k} sm', page)
+            self.assertIn(f'.b-{k}', page)                       # стиль баннера подключён
+        self.client.post(reverse('shop_buy'), {'banner': 'python'})
+        st.refresh_from_db()
+        self.assertIn('python', st.owned_banners)
+        self.assertEqual(balance(st), 100)

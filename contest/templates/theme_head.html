@@ -202,7 +202,67 @@
     @keyframes nb-cpulse { 50% { box-shadow: 0 0 14px var(--cb2); } }
     .b-custom.fx-shine::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent); animation: nb-shine 3s ease-in-out infinite; }
     .cb-icon { margin-right: 2px; }
-    @media (prefers-reduced-motion: reduce) { .nb, .nb::after { animation: none !important; } }
+
+    /* ===== Новые платные баннеры (ноябрь 2026) ===== */
+    .b-matrix, .b-ocean, .b-sakura, .b-steppe, .b-rocket, .b-chess { isolation: isolate; }
+    .b-matrix { background: #020a04; color: #b6ffcb !important; border: 1px solid #14532d; text-shadow: 0 0 6px #22c55e; font-family: "Courier New", monospace; }
+    .b-matrix::before { content: "1 0 1 1 0 0 1 0 1 0 1 1 0 1 0 0 1 1 0 1 0 1 1 0 0 1 0 1 1 0 1 0 0 1"; position: absolute; inset: -100% 0 auto 0; height: 300%; z-index: -1;
+        color: #16a34a; font-size: 10px; line-height: 10px; white-space: normal; word-break: break-all; opacity: .45; animation: mx-fall 4s linear infinite; }
+    @keyframes mx-fall { to { transform: translateY(33%); } }
+    .b-python { background: linear-gradient(135deg, #1e4f7a, #306998 60%, #3b7bbf); color: #fff !important; border: 2px solid #ffd43b; text-shadow: 0 1px 2px rgba(0,0,0,.5); padding-right: 22px; }
+    .nb.sm.b-python { padding-right: 20px; }
+    .b-python::before { content: "🐍"; }
+    .b-python::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 12px; background: repeating-linear-gradient(180deg, #ffd43b 0 6px, #e8b923 6px 12px); background-size: 100% 24px; animation: py-run 1.2s linear infinite; }
+    @keyframes py-run { to { background-position: 0 24px; } }
+    .b-pixel { background: #2b1a4a; color: #ffe86b !important; font-family: "Press Start 2P", monospace; font-size: .62rem; letter-spacing: .5px; padding: 9px 14px; border-radius: 0;
+        box-shadow: 0 -3px 0 0 #fff, 0 3px 0 0 #fff, -3px 0 0 0 #fff, 3px 0 0 0 #fff; margin: 3px; }
+    .nb.sm.b-pixel { font-size: .52rem; padding: 7px 10px; border-radius: 0; }
+    .b-pixel::before { content: "♥"; color: #ff4d6d; animation: px-blink 1s steps(2) infinite; }
+    @keyframes px-blink { 50% { opacity: 0; } }
+    .b-rainbow { background: linear-gradient(90deg, #ff3b3b, #ff9f1c, #ffe14d, #3ddc84, #2bb3ff, #7c5cff, #ff3bd4, #ff3b3b); background-size: 300% 100%; animation: rb-move 5s linear infinite;
+        color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.6); }
+    @keyframes rb-move { to { background-position: 300% 0; } }
+    .b-ocean { background: linear-gradient(180deg, #0ea5e9, #0369a1 70%, #0c4a6e); color: #fff !important; border: 1px solid #7dd3fc; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+    .b-ocean::after { content: ""; position: absolute; left: 0; right: -60px; bottom: 0; height: 45%; z-index: -1;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='20'%3E%3Cpath d='M0 10 Q15 0 30 10 T60 10 V20 H0Z' fill='%23bae6fd' fill-opacity='.45'/%3E%3C/svg%3E") repeat-x bottom / 60px 100%;
+        animation: oc-wave 2.5s linear infinite; }
+    @keyframes oc-wave { to { transform: translateX(-60px); } }
+    .b-sakura { background: linear-gradient(90deg, #fff1f5, #fbcfe8); color: #9d174d !important; border: 1px solid #f9a8d4; }
+    .b-sakura::before { content: "🌸"; }
+    .b-sakura::after { content: "✿  ❀  ✿  ❀  ✿  ❀"; position: absolute; top: -120%; left: 8px; right: 0; z-index: -1; color: #f472b6; font-size: 10px; letter-spacing: 10px; opacity: .8; animation: sk-fall 3.5s linear infinite; }
+    @keyframes sk-fall { to { transform: translateY(260%) translateX(-14px) rotate(8deg); } }
+    .b-ice { background: linear-gradient(135deg, #e0f7ff, #a5e4ff 45%, #e9fbff 55%, #7cc9f0); color: #0c4a6e !important; border: 2px solid #bae6fd; box-shadow: 0 0 10px rgba(125,211,252,.6); }
+    .b-ice::before { content: "❄"; color: #0284c7; }
+    .b-ice::after { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 25%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.95), transparent); animation: nb-shine 2.8s ease-in-out infinite; }
+    .b-cyber { background: #fcee0a; color: #111 !important; border-left: 6px solid #00f0ff; clip-path: polygon(0 0, 100% 0, 100% 70%, 94% 100%, 0 100%); text-transform: uppercase; letter-spacing: .5px; animation: cy-glitch 2.4s steps(1) infinite; }
+    @keyframes cy-glitch { 0%, 88%, 100% { text-shadow: none; } 90% { text-shadow: 2px 0 #ff003c, -2px 0 #00f0ff; } 94% { text-shadow: -2px 0 #ff003c, 2px 0 #00f0ff; } }
+    .b-steppe { background: linear-gradient(180deg, #ffb347, #ff6b6b 55%, #8e3b6e); color: #fff !important; border: 1px solid #ffcf8a; text-shadow: 0 1px 3px rgba(80,20,40,.7); padding-right: 46px; }
+    .nb.sm.b-steppe { padding-right: 38px; }
+    .b-steppe::after { content: ""; position: absolute; inset: 0; z-index: -1;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40' preserveAspectRatio='none'%3E%3Cpath d='M0 40 L20 26 L32 32 L50 14 L64 26 L78 20 L96 30 L120 18 V40Z' fill='%234a1d3f' fill-opacity='.75'/%3E%3Ccircle cx='100' cy='12' r='6' fill='%23fff2b3'/%3E%3C/svg%3E") no-repeat bottom right / 120px 100%; }
+    .b-storm { background: #101828; color: #e0e7ff !important; border: 1px solid #6366f1; text-shadow: 0 0 6px #818cf8; animation: st-flash 3.2s infinite; }
+    .b-storm::before { content: "⚡"; }
+    @keyframes st-flash { 0%, 86%, 100% { background: #101828; box-shadow: none; } 88% { background: #c7d2fe; box-shadow: 0 0 18px #a5b4fc; } 90% { background: #101828; } 92% { background: #e0e7ff; } 94% { background: #101828; } }
+    .b-shanyrak { background: #0b7fa8; color: #ffe066 !important; border: 2px solid #f2c230; padding-left: 34px; text-shadow: 0 1px 2px rgba(0,40,60,.6); }
+    .nb.sm.b-shanyrak { padding-left: 28px; }
+    .b-shanyrak::before { content: ""; position: absolute; left: 6px; top: 50%; width: 22px; height: 22px; margin-top: -11px; animation: sh-spin 12s linear infinite;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23f2c230' stroke-width='2.4'%3E%3Ccircle cx='20' cy='20' r='17'/%3E%3Ccircle cx='20' cy='20' r='7'/%3E%3Cpath d='M13 20 H27 M20 13 V27 M15 15 L25 25 M25 15 L15 25'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; }
+    .nb.sm.b-shanyrak::before { width: 18px; height: 18px; margin-top: -9px; left: 5px; }
+    @keyframes sh-spin { to { transform: rotate(360deg); } }
+    .b-rocket { background: linear-gradient(90deg, #0b1026, #1e1b4b); color: #fff !important; border: 1px solid #4338ca; padding-right: 34px; }
+    .b-rocket::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(1px 1px at 15% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 45% 75%, #fff 50%, transparent 51%),
+        radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 90% 65%, #fff 50%, transparent 51%); }
+    .b-rocket::after { content: "🚀"; position: absolute; top: 50%; left: -30px; margin-top: -10px; font-size: 16px; animation: rk-fly 3.5s ease-in infinite; }
+    @keyframes rk-fly { 0% { left: -30px; } 60%, 100% { left: calc(100% + 10px); } }
+    .b-chess { background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.55)), repeating-conic-gradient(#f5f5f4 0 25%, #a8a29e 0 50%) 0 0 / 12px 12px; color: #111 !important; border: 2px solid #44403c; }
+    .b-chess::before { content: "♞"; font-size: 1.15em; }
+    .b-diamond { background: linear-gradient(135deg, #f0f9ff 0%, #c4b5fd 20%, #f5f3ff 35%, #93c5fd 55%, #fdf4ff 70%, #a5f3fc 100%); background-size: 200% 200%; animation: dm-shift 4s ease-in-out infinite alternate;
+        color: #3b0764 !important; border: 2px solid #fff; box-shadow: 0 0 0 1px #c4b5fd, 0 0 14px rgba(196,181,253,.9); padding-right: 22px; }
+    .b-diamond::before { content: "💎"; }
+    .b-diamond::after { content: "✦"; position: absolute; right: 6px; top: 2px; color: #fff; font-size: 12px; text-shadow: 0 0 6px #fff; animation: dm-twinkle 1.6s ease-in-out infinite; }
+    @keyframes dm-shift { to { background-position: 100% 100%; } }
+    @keyframes dm-twinkle { 50% { opacity: 0; transform: scale(.4) rotate(45deg); } }
+    @media (prefers-reduced-motion: reduce) { .nb, .nb::after, .nb::before { animation: none !important; } }
     /* Монеты в шапке */
     .coin-chip { display: inline-flex; align-items: center; gap: 6px; background: #fff6d6; color: #6b4e00 !important; font-weight: 800; border: 1px solid #f2d27a;
         border-radius: 99px; padding: 3px 12px 3px 4px; text-decoration: none; }
