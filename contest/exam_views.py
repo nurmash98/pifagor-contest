@@ -365,6 +365,9 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         if answer is not None and answer.submissions_count >= EXAM_MAX_SUBMISSIONS:
             messages.warning(request, f'По этой задаче уже использованы все {EXAM_MAX_SUBMISSIONS} отправки.')
             return back_to_task()
+        if not (request.POST.get('code') or '').strip():
+            messages.warning(request, 'Код пустой — напишите решение перед отправкой.')
+            return back_to_task()
         throttle_key = f'exam_submit:{attempt.id}:{task.id}'
         if not cache.add(throttle_key, 1, EXAM_SUBMIT_THROTTLE_SECONDS):
             messages.warning(request, f'Подождите {EXAM_SUBMIT_THROTTLE_SECONDS} секунд перед повторной отправкой.')

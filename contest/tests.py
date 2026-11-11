@@ -2924,3 +2924,27 @@ class NewBannersTests(TestCase):
             self.assertIn(f'.b-{k}', css.split('.has-b:is(')[1].split(')::before')[0])
         from .templatetags.badge_tags import banner_icon
         self.assertIn('♞', banner_icon('chess'))
+
+
+class CodeHintsTests(RetakeTestBase):
+    def _live_exam(self):
+        exam = Exam.objects.create(kind='SOR', title='СОР live', school_class='7F',
+                                   start_at=timezone.now() - timedelta(minutes=5),
+                                   duration_minutes=40, created_by=self.teacher)
+        exam.tasks.set([self.a_tasks[0]])
+        ExamAttempt.objects.create(exam=exam, student=self.students[0], started_at=timezone.now())
+        self.client.force_login(self.students[0].user)
+        return exam
+
+    def test_exam_task_has_editor_with_hints(self):
+        exam = self._live_exam()
+        html = self.client.get(reverse('exam_task', args=[exam.id, self.a_tasks[0].id])).content.decode()
+        self.assertIn('codemirror.min.js', html)
+        self.assertIn('show-hint.min.js', html)
+        self.assertIn("'map'", html)
+        self.assertIn('code-editor', html)
+
+    def test_empty_code_does_not_spend_submission(self):
+        exam = self._live_exam()
+        self.client.post(reverse('exam_task', args=[exam.id, self.a_tasks[0].id]), {'code': '   '})
+        self.assertFalse(ExamAnswer.objects.filter(task=self.a_tasks[0], attempt__exam=exam).exists())

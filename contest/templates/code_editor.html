@@ -2,6 +2,7 @@
 Подключается один раз внизу страницы; превращает все textarea.code-editor в редактор.{% endcomment %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
 <style>
     .CodeMirror { border-radius: .75rem; font-size: 14px; line-height: 1.5; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
     .cm-s-monokai.CodeMirror { background: #272822; }
@@ -15,19 +16,75 @@
     .cm-s-monokai .cm-number   { color: #bd93f9; }
     .cm-s-monokai .cm-comment  { color: #7f8c8d; font-style: italic; }
     .cm-s-monokai .cm-operator { color: #f8f8f2; }
+    /* подсказки автодополнения */
+    .CodeMirror-hints { z-index: 2000; background: #1f201b; border: 1px solid #49483e; border-radius: .5rem; box-shadow: 0 6px 18px rgba(0,0,0,.35); font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; max-height: 14em; padding: 3px; }
+    .CodeMirror-hint { color: #f8f8f2; border-radius: .3rem; padding: 2px 8px; display: flex; justify-content: space-between; gap: 14px; }
+    .CodeMirror-hint .hk { color: #7f8c8d; font-size: 11px; }
+    li.CodeMirror-hint-active { background: #3e7bfa; color: #fff; }
+    li.CodeMirror-hint-active .hk { color: #dbe6ff; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
 <script>
 (function () {
     if (!window.CodeMirror) { return; }   // нет сети/CDN — остаётся обычное поле ввода
     window.codeEditors = {};
+
+    // ---- Подсказки при наборе (m → map, i → int/input …) ----
+    var PY_KW = ['if','elif','else','for','while','in','not','and','or','def','return','break','continue',
+                 'pass','import','from','as','True','False','None','lambda','try','except','finally','with','global','class','is','del'];
+    var PY_FN = ['print','input','int','float','str','bool','list','dict','set','tuple','range','len','map','sum',
+                 'min','max','abs','round','sorted','reversed','enumerate','zip','filter','ord','chr','pow','divmod',
+                 'any','all','open','isinstance','type','bin','hex','oct','exit'];
+    var PY_MOD = ['math','random','sqrt','floor','ceil','gcd','pi','randint','choice'];
+    var PY_METH = ['append','split','join','strip','rstrip','lstrip','lower','upper','count','find','replace','sort',
+                   'reverse','pop','insert','index','remove','extend','isdigit','isalpha','startswith','endswith',
+                   'keys','values','items','get','add','copy','clear','title','capitalize','format','swapcase','isupper','islower'];
+    function pyHint(cm) {
+        var cur = cm.getCursor(), line = cm.getLine(cur.line);
+        var st = cur.ch, en = cur.ch;
+        while (st > 0 && /\w/.test(line.charAt(st - 1))) { st--; }
+        while (en < line.length && /\w/.test(line.charAt(en))) { en++; }
+        var word = line.slice(st, cur.ch);
+        if (!word || /^\d/.test(word)) { return null; }
+        var tok = cm.getTokenAt(cur);
+        if (tok.type === 'string' || tok.type === 'comment') { return null; }
+        var afterDot = st > 0 && line.charAt(st - 1) === '.';
+        var seen = {}, out = [], low = word.toLowerCase();
+        function add(w, kind) {
+            if (seen[w] || w === word || w.toLowerCase().indexOf(low) !== 0) { return; }
+            seen[w] = 1; out.push({text: w, kind: kind});
+        }
+        if (afterDot) { PY_METH.forEach(function (w) { add(w, 'метод'); }); PY_MOD.forEach(function (w) { add(w, ''); }); }
+        else {
+            PY_FN.forEach(function (w) { add(w, 'функция'); });
+            PY_KW.forEach(function (w) { add(w, 'слово'); });
+            PY_MOD.forEach(function (w) { add(w, 'модуль'); });
+        }
+        // имена из уже написанного кода (переменные, функции)
+        var re = /[A-Za-z_]\w*/g, m, txt = cm.getValue();
+        while ((m = re.exec(txt))) { if (m[0].length > 1) { add(m[0], 'имя'); } }
+        if (!out.length) { return null; }
+        out.sort(function (a, b) { return a.text.length - b.text.length; });
+        return {
+            list: out.slice(0, 12).map(function (o) {
+                return {text: o.text, render: function (el) {
+                    var a = document.createElement('span'); a.textContent = o.text; el.appendChild(a);
+                    if (o.kind) { var k = document.createElement('span'); k.className = 'hk'; k.textContent = o.kind; el.appendChild(k); }
+                }};
+            }),
+            from: CodeMirror.Pos(cur.line, st), to: CodeMirror.Pos(cur.line, en)
+        };
+    }
+    var HINT_OPTS = {hint: pyHint, completeSingle: false, closeCharacters: /[\s()\[\]{};:>,=+\-*\/%]/};
     document.querySelectorAll('textarea.code-editor').forEach(function (ta, i) {
         var cm = CodeMirror.fromTextArea(ta, {
             mode: 'python', theme: 'monokai', lineNumbers: true,
             indentUnit: 4, tabSize: 4, smartIndent: true, indentWithTabs: false,
             lineWrapping: false, viewportMargin: Infinity,
             extraKeys: {
+                'Ctrl-Space': function (c) { if (c.showHint) { c.showHint(HINT_OPTS); } },
                 Tab: function (c) { if (c.somethingSelected()) { c.indentSelection('add'); } else { c.execCommand('insertSoftTab'); } },
                 'Shift-Tab': function (c) { c.indentSelection('subtract'); },
                 // Backspace в начале строки стирает сразу целый отступ (4 пробела), как в IDE
@@ -41,6 +98,7 @@
                 }
             }
         });
+        ta.removeAttribute('required');   // скрытое поле с required блокирует отправку без сообщения
         var inp = cm.getInputField();
         inp.setAttribute('autocapitalize', 'off');
         inp.setAttribute('autocorrect', 'off');
@@ -49,6 +107,13 @@
         cm.setSize('100%', ta.getAttribute('data-height') || 280);
         if (ta.disabled) { cm.setOption('readOnly', 'nocursor'); }
         cm.on('change', function () { cm.save(); });
+        if (cm.showHint && !ta.disabled) {
+            cm.on('inputRead', function (c, ch) {
+                if (ch.origin === '+input' && /^[A-Za-z_]$/.test(ch.text.join('')) && !c.state.completionActive) {
+                    c.showHint(HINT_OPTS);
+                }
+            });
+        }
         window.codeEditors[ta.getAttribute('data-task') || ('e' + i)] = cm;
     });
 })();
