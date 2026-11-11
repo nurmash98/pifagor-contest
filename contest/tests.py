@@ -2948,3 +2948,11 @@ class CodeHintsTests(RetakeTestBase):
         exam = self._live_exam()
         self.client.post(reverse('exam_task', args=[exam.id, self.a_tasks[0].id]), {'code': '   '})
         self.assertFalse(ExamAnswer.objects.filter(task=self.a_tasks[0], attempt__exam=exam).exists())
+
+    def test_run_button_with_pyodide_and_2s_limit(self):
+        exam = self._live_exam()
+        html = self.client.get(reverse('exam_task', args=[exam.id, self.a_tasks[0].id])).content.decode()
+        self.assertIn('pyodide', html)
+        self.assertIn('RUN_LIMIT_MS = 2000', html)
+        self.assertIn('data-stdin=', html)
+        self.assertIn('data-expect=', html)

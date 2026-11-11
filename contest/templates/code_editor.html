@@ -1,5 +1,5 @@
 {% comment %}Редактор кода как в IDE: цвета Python, автоотступ после «:», Tab = 4 пробела, без автозаглавной буквы.
-Подключается один раз внизу страницы; превращает все textarea.code-editor в редактор.{% endcomment %}
+Подключается один раз внизу страницы; превращает все textarea.code-editor в редактор.{% endcomment %}{% load ui_i18n %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
@@ -16,6 +16,12 @@
     .cm-s-monokai .cm-number   { color: #bd93f9; }
     .cm-s-monokai .cm-comment  { color: #7f8c8d; font-style: italic; }
     .cm-s-monokai .cm-operator { color: #f8f8f2; }
+    /* кнопка «Запустить» (Python в браузере, Pyodide) */
+    .run-panel { margin: .5rem 0 .75rem; }
+    .run-panel .run-in { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; background: #1f201b; color: #f8f8f2; border: 1px solid #49483e; border-radius: .5rem; width: 100%; min-height: 60px; padding: .4rem .6rem; resize: vertical; }
+    .run-panel .run-out { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; background: #111; color: #e6e6e6; border-radius: .5rem; padding: .5rem .7rem; margin: .4rem 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+    .run-panel .run-out.err { color: #ff8a8a; }
+    .run-panel .run-st { font-size: 12px; }
     /* подсказки автодополнения */
     .CodeMirror-hints { z-index: 2000; background: #1f201b; border: 1px solid #49483e; border-radius: .5rem; box-shadow: 0 6px 18px rgba(0,0,0,.35); font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; max-height: 14em; padding: 3px; }
     .CodeMirror-hint { color: #f8f8f2; border-radius: .3rem; padding: 2px 8px; display: flex; justify-content: space-between; gap: 14px; }
@@ -77,6 +83,104 @@
             from: CodeMirror.Pos(cur.line, st), to: CodeMirror.Pos(cur.line, en)
         };
     }
+
+    // ---- ▶ Запустить: Python прямо в браузере (Pyodide в Web Worker), лимит 2 секунды ----
+    var RUN_LIMIT_MS = 2000, PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+    var TXT = {run: '▶ {% t "Запустить" %}', stop: '■ {% t "Стоп" %}', input: '{% t "Входные данные" %}',
+               loading: '{% t "Загружаем Python в браузер… (первый раз до 15 секунд)" %}', running: '{% t "Выполняется…" %}',
+               tl: '{% t "Превышено время: больше 2 секунд. Проверьте, нет ли бесконечного цикла." %}',
+               ok: '{% t "Совпадает с примером вывода" %}', diff: '{% t "Не совпадает с примером вывода" %}',
+               empty: '{% t "(пустой вывод)" %}', stopped: '{% t "Остановлено" %}', fail: '{% t "Не удалось загрузить Python. Проверьте интернет." %}',
+               note: '{% t "Запуск только для проверки — он не тратит попытки и нигде не сохраняется." %}'};
+    var WORKER_SRC = [
+        "importScripts('" + PYODIDE + "pyodide.js');",
+        "var ready = loadPyodide({indexURL: '" + PYODIDE + "'}).then(function (p) { self.py = p; postMessage({t: 'ready'}); },",
+        "    function (e) { postMessage({t: 'fail', m: String(e)}); });",
+        "onmessage = function (e) { ready.then(function () {",
+        "  var py = self.py, d = e.data, out = '', err = '';",
+        "  py.globals.set('__in', d.stdin);",
+        "  py.runPython('import sys, io\\nsys.stdin = io.StringIO(__in)\\n__o = io.StringIO()\\nsys.stdout = __o\\nsys.stderr = __o');",
+        "  var ns = py.globals.get('dict')();",
+        "  postMessage({t: 'start'});",
+        "  var t0 = performance.now();",
+        "  try { py.runPython(d.code, {globals: ns, filename: 'main.py'}); } catch (x) { err = String(x.message || x); }",
+        "  var ms = Math.round(performance.now() - t0);",
+        "  out = py.runPython('__o.getvalue()');",
+        "  py.runPython('sys.stdout = sys.__stdout__\\nsys.stderr = sys.__stderr__');",
+        "  ns.destroy();",
+        "  postMessage({t: 'done', out: out.slice(0, 20000), err: err, ms: ms});",
+        "}); };"].join('\n');
+    var worker = null, workerReady = false, workerFail = false, pending = null;
+    function getWorker() {
+        if (worker) { return worker; }
+        workerReady = false; workerFail = false;
+        worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], {type: 'text/javascript'})));
+        worker.onmessage = function (e) {
+            var m = e.data;
+            if (m.t === 'ready') { workerReady = true; }
+            else if (m.t === 'fail') { workerFail = true; if (pending) { pending.fail(); } }
+            else if (pending) { pending.msg(m); }
+        };
+        return worker;
+    }
+    function killWorker() { if (worker) { worker.terminate(); } worker = null; workerReady = false; }
+    function cleanTrace(err) {
+        // оставляем только строки про код ученика, без внутренностей Pyodide
+        var lines = err.split('\n'), i = lines.findIndex(function (l) { return l.indexOf('File "main.py"') !== -1; });
+        var keep = i === -1 ? lines.slice(-3) : lines.slice(i);
+        return 'Traceback:\n' + keep.join('\n').replace(/\n+$/, '');
+    }
+    function norm(t) { return t.replace(/\r/g, '').split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).join('\n').replace(/\n+$/, ''); }
+    function addRunner(cm, ta) {
+        var box = document.createElement('div');
+        box.className = 'run-panel';
+        box.innerHTML = '<div class="d-flex flex-wrap align-items-center gap-2">' +
+            '<button type="button" class="btn btn-sm btn-dark rounded-pill px-3 run-btn"></button>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 run-in-tg"></button>' +
+            '<span class="run-st text-muted"></span></div>' +
+            '<pre class="run-out" style="display:none"></pre>';
+        var area = document.createElement('textarea');   // поле «Входные данные»
+        area.className = 'run-in mt-2'; area.spellcheck = false; area.setAttribute('autocomplete', 'off'); area.style.display = 'none';
+        box.insertBefore(area, box.querySelector('.run-out'));
+        cm.getWrapperElement().insertAdjacentElement('afterend', box);
+        var btn = box.querySelector('.run-btn'), tg = box.querySelector('.run-in-tg'), st = box.querySelector('.run-st'),
+            inp = box.querySelector('.run-in'), out = box.querySelector('.run-out'), expect = ta.getAttribute('data-expect');
+        btn.textContent = TXT.run; tg.textContent = TXT.input + ' ▾'; st.textContent = TXT.note;
+        inp.value = ta.getAttribute('data-stdin') || '';
+        if (inp.value) { inp.style.display = ''; }
+        tg.onclick = function () { inp.style.display = inp.style.display ? '' : 'none'; };
+        var running = false, timer = null;
+        function finish() { running = false; btn.textContent = TXT.run; clearTimeout(timer); pending = null; }
+        function show(text, isErr) { out.style.display = ''; out.textContent = text; out.classList.toggle('err', !!isErr); }
+        btn.onclick = function () {
+            if (running) { killWorker(); finish(); st.textContent = TXT.stopped; out.style.display = 'none'; return; }
+            if (pending) { return; }   // другой редактор на странице ещё выполняется
+            running = true; btn.textContent = TXT.stop; out.style.display = 'none';
+            var w = getWorker();
+            st.textContent = workerReady ? TXT.running : TXT.loading;
+            pending = {
+                fail: function () { finish(); killWorker(); st.textContent = ''; show(TXT.fail, true); },
+                msg: function (m) {
+                    if (m.t === 'start') {
+                        st.textContent = TXT.running;
+                        timer = setTimeout(function () { killWorker(); finish(); st.textContent = ''; show(TXT.tl, true); getWorker(); }, RUN_LIMIT_MS);
+                    } else if (m.t === 'done') {
+                        finish();
+                        var text = m.out + (m.err ? (m.out && !/\n$/.test(m.out) ? '\n' : '') + cleanTrace(m.err) : '');
+                        show(text || TXT.empty, !!m.err);
+                        var verdict = '';
+                        if (!m.err && expect !== null && expect.trim() && inp.value === (ta.getAttribute('data-stdin') || '')) {
+                            verdict = norm(m.out) === norm(expect) ? ' · ✅ ' + TXT.ok : ' · ⚠️ ' + TXT.diff;
+                        }
+                        st.textContent = m.ms + ' ms' + verdict;
+                    }
+                }
+            };
+            w.postMessage({code: cm.getValue(), stdin: inp.value});
+        };
+        // заранее прогреваем Python, когда ученик начал писать код
+        cm.on('focus', function () { if (window.Worker) { getWorker(); } });
+    }
     var HINT_OPTS = {hint: pyHint, completeSingle: false, closeCharacters: /[\s()\[\]{};:>,=+\-*\/%]/};
     document.querySelectorAll('textarea.code-editor').forEach(function (ta, i) {
         var cm = CodeMirror.fromTextArea(ta, {
@@ -114,6 +218,7 @@
                 }
             });
         }
+        if (!ta.disabled && window.Worker && !ta.hasAttribute('data-norun')) { addRunner(cm, ta); }
         window.codeEditors[ta.getAttribute('data-task') || ('e' + i)] = cm;
     });
 })();

@@ -117,7 +117,7 @@
                 {% include 'input_help.html' %}
                 <form method="post" class="d-flex flex-column flex-grow-1">
                     {% csrf_token %}
-                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3 code-editor" data-height="340"
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 mb-3 code-editor" data-height="340" data-stdin="{{ task.display_input_example }}" data-expect="{{ task.display_output_example }}"
                               autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
                               placeholder="{% t '# Напишите ваш код здесь...' %}">{{ teacher_code|default:'' }}</textarea>
@@ -149,7 +149,7 @@
                 <input type="hidden" name="pointer_count" id="f-pointer" value="0">
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
                     <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
-                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 code-editor" data-height="340"
+                    <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 code-editor" data-height="340" data-stdin="{{ task.display_input_example }}" data-expect="{{ task.display_output_example }}"
                               autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
                               placeholder="{% t '# Напишите ваш код здесь...' %}" {% if cooldown_minutes %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>

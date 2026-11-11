@@ -79,7 +79,7 @@
                 </div>
                 {% if dt.my_left and enabled %}
                 <form method="post" action="{% url 'duel_submit' duel.id dt.id %}" class="duel-form">{% csrf_token %}
-                    <textarea name="code" data-task="{{ dt.id }}" data-height="280" class="form-control rounded-3 font-monospace p-3 mb-2 code-editor duel-code" rows="9"
+                    <textarea name="code" data-task="{{ dt.id }}" data-height="280" data-stdin="{{ dt.task.display_input_example }}" data-expect="{{ dt.task.display_output_example }}" class="form-control rounded-3 font-monospace p-3 mb-2 code-editor duel-code" rows="9"
                               autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="background-color:#272822;color:#f8f8f2;" placeholder="{% t '# Напишите ваш код здесь...' %}">{{ dt.last_code }}</textarea>
                     <div class="text-end"><button class="btn btn-pifagor-green rounded-pill px-4">{% t "Отправить" %} →</button></div>
