@@ -94,21 +94,18 @@
                note: '{% t "Запуск только для проверки — он не тратит попытки и нигде не сохраняется." %}'};
     var WORKER_SRC = [
         "importScripts('" + PYODIDE + "pyodide.js');",
-        "var ready = loadPyodide({indexURL: '" + PYODIDE + "'}).then(function (p) { self.py = p; postMessage({t: 'ready'}); },",
-        "    function (e) { postMessage({t: 'fail', m: String(e)}); });",
+        "var ready = loadPyodide({indexURL: '" + PYODIDE + "'}).then(function (p) {",
+        "  self.py = p;",
+        "  p.runPython('import sys, io, traceback, linecache\\ndef __run(src, inp):\\n    linecache.cache[\"main.py\"] = (len(src), None, src.splitlines(True), \"main.py\")\\n    sys.stdin = io.StringIO(inp)\\n    o = io.StringIO()\\n    sys.stdout = sys.stderr = o\\n    err = \"\"\\n    try:\\n        exec(compile(src, \"main.py\", \"exec\"), {\"__name__\": \"__main__\"})\\n    except SystemExit:\\n        pass\\n    except BaseException:\\n        err = traceback.format_exc()\\n    finally:\\n        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__\\n    return [o.getvalue()[:20000], err]');",
+        "  postMessage({t: 'ready'});",
+        "}, function (e) { postMessage({t: 'fail', m: String(e)}); });",
         "onmessage = function (e) { ready.then(function () {",
-        "  var py = self.py, d = e.data, out = '', err = '';",
-        "  py.globals.set('__in', d.stdin);",
-        "  py.runPython('import sys, io\\nsys.stdin = io.StringIO(__in)\\n__o = io.StringIO()\\nsys.stdout = __o\\nsys.stderr = __o');",
-        "  var ns = py.globals.get('dict')();",
+        "  var d = e.data, run = self.py.globals.get('__run');",
         "  postMessage({t: 'start'});",
-        "  var t0 = performance.now();",
-        "  try { py.runPython(d.code, {globals: ns, filename: 'main.py'}); } catch (x) { err = String(x.message || x); }",
+        "  var t0 = performance.now(), r = run(d.code, d.stdin).toJs();",
         "  var ms = Math.round(performance.now() - t0);",
-        "  out = py.runPython('__o.getvalue()');",
-        "  py.runPython('sys.stdout = sys.__stdout__\\nsys.stderr = sys.__stderr__');",
-        "  ns.destroy();",
-        "  postMessage({t: 'done', out: out.slice(0, 20000), err: err, ms: ms});",
+        "  run.destroy();",
+        "  postMessage({t: 'done', out: r[0], err: r[1], ms: ms});",
         "}); };"].join('\n');
     var worker = null, workerReady = false, workerFail = false, pending = null;
     function getWorker() {
@@ -128,7 +125,7 @@
         // оставляем только строки про код ученика, без внутренностей Pyodide
         var lines = err.split('\n'), i = lines.findIndex(function (l) { return l.indexOf('File "main.py"') !== -1; });
         var keep = i === -1 ? lines.slice(-3) : lines.slice(i);
-        return 'Traceback:\n' + keep.join('\n').replace(/\n+$/, '');
+        return 'Traceback (most recent call last):\n' + keep.join('\n').replace(/\n+$/, '');
     }
     function norm(t) { return t.replace(/\r/g, '').split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).join('\n').replace(/\n+$/, ''); }
     function addRunner(cm, ta) {
