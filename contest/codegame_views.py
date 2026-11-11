@@ -142,7 +142,7 @@ def games(request):
         won = [r.duration() for r in g.runs.filter(student=st, status='won')]
         items.append({'game': g, 'best': min(won) if won else None, 'wins': len(won),
                       'topics': [cg.TOPIC_LABELS.get(t, t) for t in g.topic_list()]})
-    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT, 'balance': balance(st), 'payout': cg.PAYOUT})
+    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT, 'balance': balance(st)})
 
 
 @login_required
@@ -182,7 +182,7 @@ def game_play(request, run_id):
     qs = [cg.public_question(q, i) for i, q in enumerate(run.questions)]
     return render(request, 'codegame_play.html', {
         'run': run, 'game': run.game, 'questions': qs, 'left': cg.seconds_left(run) if run.status == 'playing' else 0,
-        'penalty': cg.ERROR_PENALTY, 'duration': run.duration(), 'fee': cg.ENTRY_FEE,
+        'penalty': cg.ERROR_PENALTY, 'duration': run.duration(), 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT,
     })
 
 

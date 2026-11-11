@@ -2644,6 +2644,15 @@ class CodeGameTests(TestCase):
         other = cg.generate(self.game, random.Random(2))
         self.assertNotEqual([q['code'] for q in qs], [q['code'] for q in other])
 
+    def test_won_and_lost_pages_open(self):
+        run = self._win(self._start())
+        r = self.client.get(reverse('codegame_play', args=[run.id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, '+2')
+        run2 = self._start()
+        self.client.post(reverse('codegame_forfeit', args=[run2.id]))
+        self.assertEqual(self.client.get(reverse('codegame_play', args=[run2.id])).status_code, 200)
+
     def test_entry_one_coin_win_two(self):
         from .coins import balance
         run = self._start(stake=3)                              # выбора ставки нет — всегда 1
