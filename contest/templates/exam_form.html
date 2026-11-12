@@ -12,8 +12,8 @@
             <h4 class="fw-bold mb-4" style="color: #1a1a4b;">{% if is_new %}{% if v.kind == 'OLYM' %}Новая олимпиада{% else %}Новый СОР/СОЧ{% endif %}{% else %}Изменить {{ exam.get_kind_display }}{% endif %}</h4>
             {% if v.kind == 'OLYM' %}
             <input type="hidden" name="kind" value="OLYM">
-            <div class="small text-muted mb-3">Олимпиаду видят только ученики, которых вы добавите. Задачи можно выбрать ниже
-                или загрузить из JSON после сохранения. Места — по сумме баллов, по {{ olym_subs }} отправок на задачу.</div>
+            <div class="small text-muted mb-3">Олимпиаду видят только ученики, которых вы добавите. Ученики пишут на Python или C++.
+                Места — по сумме баллов, по {{ olym_subs }} отправок на задачу.</div>
             {% else %}
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Тип</label>
@@ -47,10 +47,15 @@
                     <input type="number" name="duration_minutes" class="form-control" value="{{ v.duration_minutes }}" min="1" max="{{ max_duration }}" required>
                 </div>
             </div>
-            <div class="form-check mb-3 olym-only">
-                <input class="form-check-input" type="checkbox" name="hide_tasks" id="hide_tasks" value="1" {% if v.hide_tasks %}checked{% endif %}>
-                <label class="form-check-label small" for="hide_tasks">🔒 Скрыть задачи олимпиады из общего каталога, дуэлей и СОР (их увидят только участники)</label>
-            </div>
+            {% if v.kind == 'OLYM' %}
+            <input type="hidden" name="mode" value="fixed">
+            <p class="text-muted small">Время — по Казахстану. Задачи олимпиады загружаются из JSON на странице «📋 Задачи»
+                {% if is_new %}— она откроется сразу после создания{% endif %}. Изменить можно только до начала.</p>
+            <button type="submit" class="btn btn-warning fw-semibold w-100 py-2 rounded-3">{% if is_new %}Создать и перейти к задачам{% else %}Сохранить{% endif %}</button>
+        </div>
+    </div>
+</div>
+{% else %}
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Задачи для учеников</label>
                 <div class="form-check"><input class="form-check-input" type="radio" name="mode" value="fixed" id="m1" {% if v.mode != 'random' %}checked{% endif %}>
@@ -128,8 +133,9 @@
         </div>
     </div>
 </div>
+{% endif %}
 </form>
-<script>
+{% if v.kind != 'OLYM' %}<script>
 (function () {
     var search = document.getElementById('task-search'), tag = document.getElementById('tag-filter'),
         level = document.getElementById('level-filter');
@@ -258,7 +264,7 @@
         }
     });
 })();
-</script>
+</script>{% endif %}
 <script>
 (function () {
     function sync() {

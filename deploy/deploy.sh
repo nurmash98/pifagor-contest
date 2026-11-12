@@ -28,7 +28,7 @@ sudo timedatectl set-timezone Asia/Almaty || true
 
 say "Пакеты"
 sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-pip git nginx ufw curl ca-certificates openssl util-linux
+sudo apt-get install -y python3-venv python3-pip git nginx ufw curl ca-certificates openssl util-linux g++   # g++ — C++ на олимпиаде
 if [ -n "$PG_MAJOR" ]; then
     # PostgreSQL нужной версии из официального репозитория PGDG (если в Ubuntu версия старее, чем в Neon)
     sudo apt-get install -y postgresql-common

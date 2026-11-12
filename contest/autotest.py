@@ -93,7 +93,7 @@ def _sandbox_user():
     return getattr(settings, 'AUTOTEST_SANDBOX_USER', '') or ''
 
 
-def build_command(tmp_path, sandbox_user=None, time_limit=None):
+def build_command(tmp_path, sandbox_user=None, time_limit=None, target=None):
     """Команда запуска кода ученика. Возвращает (argv, wall_timeout, использовать_ли_preexec).
     Без песочницы — тот же Python, лимиты ставятся в дочернем процессе (preexec_fn).
     С песочницей (на сервере) — под отдельным пользователем без доступа к файлам приложения:
@@ -102,28 +102,32 @@ def build_command(tmp_path, sandbox_user=None, time_limit=None):
     cpu = int(time_limit or TIME_LIMIT_SECONDS)
     wall_clock = cpu + 0.5
     if not sandbox_user:
-        return [sys.executable, tmp_path], wall_clock, True
+        return (target or [sys.executable, tmp_path]), wall_clock, True
     from django.conf import settings
     py = getattr(settings, 'AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3') or '/usr/bin/python3'
     argv = ['sudo', '-n', '-u', sandbox_user, '--', '/usr/bin/prlimit',
             f'--cpu={cpu}', f'--as={MEMORY_LIMIT_BYTES}', '--nproc=64', f'--fsize={10 * 1024 * 1024}', '--core=0',
-            '/usr/bin/timeout', '-s', 'KILL', str(wall_clock), py, '-I', tmp_path]
+            '/usr/bin/timeout', '-s', 'KILL', str(wall_clock)] + (target or [py, '-I', tmp_path])
     return argv, wall_clock + 2.5, False
 
 
-def _run_one(code, stdin_text, time_limit=None):
-    """Запускает code одним процессом Python, скармливает stdin_text на stdin.
+def _run_one(code, stdin_text, time_limit=None, exe=None):
+    """Запускает code одним процессом Python (или готовую программу exe — скомпилированный C++),
+    скармливает stdin_text на stdin.
     Возвращает (stdout, error), где error — None, 'timeout', 'memory' или
     короткое сообщение об ошибке выполнения."""
-    with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as f:
-        f.write(code)
-        tmp_path = f.name
+    if exe:
+        tmp_path = None
+    else:
+        with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as f:
+            f.write(code)
+            tmp_path = f.name
 
     user = _sandbox_user()
-    argv, wall, use_preexec = build_command(tmp_path, user, time_limit)
+    argv, wall, use_preexec = build_command(tmp_path, user, time_limit, target=[exe] if exe else None)
     cpu = int(time_limit or TIME_LIMIT_SECONDS)
     try:
-        if user:
+        if user and tmp_path:
             os.chmod(tmp_path, 0o644)      # пользователь песочницы должен прочитать файл
         proc = subprocess.run(
             argv,
@@ -138,10 +142,11 @@ def _run_one(code, stdin_text, time_limit=None):
     except subprocess.TimeoutExpired:
         return '', 'timeout'
     finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     if user and proc.returncode != 0 and (proc.stderr or '').lstrip().startswith(('sudo:', 'prlimit:')):
         return '', 'песочница недоступна (сообщите учителю)'
@@ -153,8 +158,10 @@ def _run_one(code, stdin_text, time_limit=None):
             return '', 'timeout'
         # RLIMIT_AS обычно приводит к обычному MemoryError внутри интерпретатора
         # (malloc не смог выделить память), а не к убийству процесса ядром.
-        if 'MemoryError' in stderr_text:
+        if 'MemoryError' in stderr_text or 'bad_alloc' in stderr_text:
             return '', 'memory'
+        if exe and proc.returncode in (-11, 139):
+            return '', 'ошибка выполнения (выход за границы массива?)'
         stderr_tail = stderr_text.strip().splitlines()
         message = stderr_tail[-1] if stderr_tail else f'код завершения {proc.returncode}'
         return '', message[:300]
@@ -162,7 +169,56 @@ def _run_one(code, stdin_text, time_limit=None):
     return proc.stdout, None
 
 
-def run_autotests(task, code):
+LANGUAGES = {'python': 'Python 3', 'cpp': 'C++ 17'}
+COMPILE_CPU_SECONDS = 10
+COMPILE_MEMORY_BYTES = 1024 * 1024 * 1024
+COMPILE_ERROR_LIMIT = 1500
+
+
+def cpp_available():
+    import shutil
+    return shutil.which('g++') is not None
+
+
+def compile_cpp(code):
+    """Компилирует C++. Возвращает (путь к программе, папка, None) или (None, папка, текст ошибки).
+    На сервере с песочницей компиляция идёт под её пользователем: #include "/путь/к/секрету"
+    не покажет чужие файлы в сообщении об ошибке."""
+    import shutil
+    workdir = tempfile.mkdtemp(prefix='cpp-')
+    os.chmod(workdir, 0o777)
+    src, exe = os.path.join(workdir, 'main.cpp'), os.path.join(workdir, 'main')
+    with open(src, 'w') as f:
+        f.write(code)
+    os.chmod(src, 0o644)
+    gxx = shutil.which('g++') or '/usr/bin/g++'
+    cmd = [gxx, '-O2', '-std=c++17', '-pipe', '-o', exe, src]
+    user = _sandbox_user()
+    if user:
+        cmd = ['sudo', '-n', '-u', user, '--', '/usr/bin/prlimit', f'--cpu={COMPILE_CPU_SECONDS}',
+               f'--as={COMPILE_MEMORY_BYTES}', '--nproc=64', f'--fsize={64 * 1024 * 1024}', '--core=0',
+               '/usr/bin/timeout', '-s', 'KILL', str(COMPILE_CPU_SECONDS + 5)] + cmd
+
+    def limits():
+        if HAS_RESOURCE:
+            try:
+                resource.setrlimit(resource.RLIMIT_CPU, (COMPILE_CPU_SECONDS, COMPILE_CPU_SECONDS))
+                resource.setrlimit(resource.RLIMIT_AS, (COMPILE_MEMORY_BYTES, COMPILE_MEMORY_BYTES))
+            except (ValueError, OSError):
+                pass
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=COMPILE_CPU_SECONDS + 10,
+                              env=_safe_env(), cwd=workdir, preexec_fn=None if user else limits)
+    except subprocess.TimeoutExpired:
+        return None, workdir, 'компиляция заняла слишком много времени'
+    if proc.returncode != 0 or not os.path.exists(exe):
+        msg = (proc.stderr or proc.stdout or 'ошибка компиляции').replace(src, 'main.cpp').replace(workdir + '/', '')
+        return None, workdir, msg[:COMPILE_ERROR_LIMIT]
+    os.chmod(exe, 0o755)
+    return exe, workdir, None
+
+
+def run_autotests(task, code, language='python'):
     """Прогоняет code против всех test_cases задачи. Ничего не бросает наружу —
     любая непредвиденная ошибка превращается в {'available': False}.
 
@@ -182,11 +238,23 @@ def run_autotests(task, code):
     results = []
     passed = 0
     limit = getattr(task, 'time_limit', None) or TIME_LIMIT_SECONDS
+    exe = workdir = None
+    if language == 'cpp':
+        if not cpp_available():
+            return {'available': False, 'compile_error': 'C++ на сервере недоступен (нет компилятора g++).'}
+        exe, workdir, compile_error = compile_cpp(code)
+        if compile_error:
+            import shutil
+            shutil.rmtree(workdir, ignore_errors=True)
+            results = [{'ok': False, 'error': 'compile', 'input': '', 'expected': str(c.get('output', ''))[:OUTPUT_PREVIEW_LIMIT],
+                        'actual': '', 'group': c.get('group')} for c in test_cases]
+            return {'available': True, 'passed': 0, 'total': len(test_cases), 'results': results,
+                    'compile_error': compile_error}
     try:
         for case in test_cases:
             expected = str(case.get('output', ''))
             stdin_text = str(case.get('input', ''))
-            actual, error = _run_one(code, stdin_text, limit)
+            actual, error = _run_one(code, stdin_text, limit, exe=exe)
             ok = error is None and outputs_match(actual, expected)
             if ok:
                 passed += 1
@@ -200,6 +268,10 @@ def run_autotests(task, code):
             })
     except Exception:
         return {'available': False}
+    finally:
+        if workdir:
+            import shutil
+            shutil.rmtree(workdir, ignore_errors=True)
 
     return {'available': True, 'passed': passed, 'total': len(test_cases), 'results': results}
 

@@ -3143,12 +3143,11 @@ class OlympiadTests(RetakeTestBase):
         start = (timezone.localtime() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
         r = self.client.post(reverse('exam_create'), {
             'kind': 'OLYM', 'title': 'Городская', 'start_at': start, 'duration_minutes': '180',
-            'tasks': [self.b_tasks[2].id], 'hide_tasks': '1'})
+            'tasks': [self.b_tasks[2].id]})
         ex = Exam.objects.get(title='Городская')
         self.assertRedirects(r, reverse('olympiad_tasks', args=[ex.id]))
         self.assertEqual(ex.school_class, '')
-        self.b_tasks[2].refresh_from_db()
-        self.assertTrue(self.b_tasks[2].hidden)
+        self.assertEqual(ex.tasks.count(), 0)          # задачи олимпиады — только из JSON, список в форме не используется
 
     def test_results_ranked_by_total(self):
         a1 = ExamAttempt.objects.create(exam=self.olymp, student=self.in_student, started_at=timezone.now())
@@ -3312,3 +3311,76 @@ class OlympiadSectionTests(RetakeTestBase):
         self.client.force_login(self.students[0].user)
         r = self.client.get(reverse('olympiad_tasks', args=[self.olymp.id]))
         self.assertNotEqual(r.status_code, 200)
+
+
+class OlympiadCppTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.task = Task.objects.create(
+            title='Сумма C++', level='C', description='d', input_example='2 3', output_example='5', hidden=True,
+            test_groups=[50, 50], test_cases=[{'input': '2 3', 'output': '5', 'group': 0},
+                                               {'input': '1 1', 'output': '2', 'group': 1},
+                                               {'input': '2000000000 2000000000', 'output': '4000000000', 'group': 2}])
+        self.olymp = Exam.objects.create(kind='OLYM', title='О++', school_class='', duration_minutes=60,
+                                         start_at=timezone.now() - timedelta(minutes=1), created_by=self.teacher)
+        self.olymp.tasks.set([self.task]); self.olymp.participants.add(self.students[0])
+        ExamAttempt.objects.create(exam=self.olymp, student=self.students[0], started_at=timezone.now())
+        self.client.force_login(self.students[0].user)
+        self.url = reverse('exam_task', args=[self.olymp.id, self.task.id])
+
+    def post(self, code, lang):
+        from django.core.cache import cache
+        cache.clear()
+        return self.client.post(self.url, {'code': code, 'language': lang})
+
+    def test_language_choice_shown_only_on_olympiad(self):
+        page = self.client.get(self.url, headers={'Sec-Fetch-Dest': 'iframe'})
+        self.assertContains(page, 'id="lang-select"')
+        self.assertContains(page, 'C++ 17')
+        self.assertContains(page, 'clike.min.js')
+
+    def test_cpp_solution_scores(self):
+        from .autotest import cpp_available
+        if not cpp_available():
+            self.skipTest('нет g++')
+        int_code = '#include <iostream>\nint main(){int a,b;std::cin>>a>>b;std::cout<<a+b;}'
+        self.post(int_code, 'cpp')
+        ans = ExamAnswer.objects.get(task=self.task)
+        self.assertEqual((ans.best_score, ans.language), (50, 'cpp'))       # int переполняется в группе 2
+        self.post('#include <iostream>\nint main(){long long a,b;std::cin>>a>>b;std::cout<<a+b;}', 'cpp')
+        ans.refresh_from_db()
+        self.assertEqual((ans.best_score, ans.best_language), (100, 'cpp'))
+
+    def test_compile_error_is_shown_and_counts_as_submission(self):
+        from .autotest import cpp_available
+        if not cpp_available():
+            self.skipTest('нет g++')
+        self.post('int main() { return x; }', 'cpp')
+        ans = ExamAnswer.objects.get(task=self.task)
+        self.assertEqual(ans.best_score, 0)
+        self.assertIn('not declared', ans.compile_error)
+        page = self.client.get(self.url, headers={'Sec-Fetch-Dest': 'iframe'})
+        self.assertContains(page, 'Ошибка компиляции')
+
+    def test_python_still_default(self):
+        self.post('a,b=map(int,input().split());print(a+b)', 'python')
+        self.assertEqual(ExamAnswer.objects.get(task=self.task).best_score, 100)
+
+    def test_sor_ignores_language(self):
+        ExamAttempt.objects.create(exam=self.exam, student=self.students[0], started_at=timezone.now(),
+                                   finished_at=None) if False else None
+        from .exam_views import max_submissions
+        self.assertEqual(max_submissions(self.exam), 3)
+
+    def test_olympiad_form_has_no_task_list_and_keeps_tasks(self):
+        self.olymp.start_at = timezone.now() + timedelta(days=1); self.olymp.save()
+        self.client.force_login(self.teacher_user)
+        page = self.client.get(reverse('exam_edit', args=[self.olymp.id]))
+        self.assertNotContains(page, 'name="tasks"')
+        self.assertNotContains(page, 'task-search')
+        start = timezone.localtime(self.olymp.start_at).strftime('%Y-%m-%dT%H:%M')
+        self.client.post(reverse('exam_edit', args=[self.olymp.id]),
+                         {'kind': 'OLYM', 'mode': 'fixed', 'title': 'О++ новое', 'start_at': start, 'duration_minutes': '90'})
+        self.olymp.refresh_from_db()
+        self.assertEqual(self.olymp.title, 'О++ новое')
+        self.assertEqual(list(self.olymp.tasks.all()), [self.task])

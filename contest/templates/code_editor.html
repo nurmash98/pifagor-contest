@@ -31,6 +31,7 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
 <script>
 (function () {
@@ -44,6 +45,14 @@
                  'min','max','abs','round','sorted','reversed','enumerate','zip','filter','ord','chr','pow','divmod',
                  'any','all','open','isinstance','type','bin','hex','oct','exit'];
     var PY_MOD = ['math','random','sqrt','floor','ceil','gcd','pi','randint','choice'];
+    var CPP_WORDS = ['include','iostream','bits','stdc','using','namespace','std','int','long','double','float','char','bool',
+                     'void','string','vector','pair','map','set','queue','deque','stack','priority_queue','cin','cout','endl',
+                     'main','return','for','while','if','else','break','continue','const','auto','true','false','sort',
+                     'reverse','max','min','abs','swap','sqrt','printf','scanf','getline','ios_base','sync_with_stdio','tie',
+                     'unsigned','struct','memset','make_pair','lower_bound','upper_bound','accumulate','INT_MAX','LLONG_MAX'];
+    var CPP_METH = ['push_back','pop_back','size','begin','end','back','front','insert','erase','find','count','substr',
+                    'length','empty','clear','first','second','push','pop','top','resize','assign'];
+    var CPP_TEMPLATE = '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}\n';
     var PY_METH = ['append','split','join','strip','rstrip','lstrip','lower','upper','count','find','replace','sort',
                    'reverse','pop','insert','index','remove','extend','isdigit','isalpha','startswith','endswith',
                    'keys','values','items','get','add','copy','clear','title','capitalize','format','swapcase','isupper','islower'];
@@ -62,7 +71,10 @@
             if (seen[w] || w === word || w.toLowerCase().indexOf(low) !== 0) { return; }
             seen[w] = 1; out.push({text: w, kind: kind});
         }
-        if (afterDot) { PY_METH.forEach(function (w) { add(w, 'метод'); }); PY_MOD.forEach(function (w) { add(w, ''); }); }
+        if (cm.getOption('mode') !== 'python') {      // C++ (олимпиада)
+            if (afterDot) { CPP_METH.forEach(function (w) { add(w, 'метод'); }); }
+            else { CPP_WORDS.forEach(function (w) { add(w, 'C++'); }); }
+        } else if (afterDot) { PY_METH.forEach(function (w) { add(w, 'метод'); }); PY_MOD.forEach(function (w) { add(w, ''); }); }
         else {
             PY_FN.forEach(function (w) { add(w, 'функция'); });
             PY_KW.forEach(function (w) { add(w, 'слово'); });
@@ -176,7 +188,25 @@
             w.postMessage({code: cm.getValue(), stdin: inp.value});
         };
         // заранее прогреваем Python, когда ученик начал писать код
-        cm.on('focus', function () { if (window.Worker) { getWorker(); } });
+        cm.on('focus', function () { if (window.Worker && cm.getOption('mode') === 'python') { getWorker(); } });
+        return box;
+    }
+    // Олимпиада: ученик выбирает язык (Python / C++) — меняем подсветку и подсказки;
+    // кнопка «Запустить» работает только для Python (C++ проверяется на сервере при отправке).
+    function bindLanguage(cm, ta, box) {
+        var sel = ta.getAttribute('data-lang-select') && document.getElementById(ta.getAttribute('data-lang-select'));
+        if (!sel) { return; }
+        function apply(first) {
+            var cpp = sel.value === 'cpp';
+            cm.setOption('mode', cpp ? 'text/x-c++src' : 'python');
+            if (box) { box.style.display = cpp ? 'none' : ''; }
+            if (!first) {
+                if (cpp && !cm.getValue().trim()) { cm.setValue(CPP_TEMPLATE); cm.setCursor({line: 4, ch: 4}); cm.focus(); }
+                else if (!cpp && cm.getValue() === CPP_TEMPLATE) { cm.setValue(''); }
+            }
+        }
+        sel.addEventListener('change', function () { apply(false); });
+        apply(true);
     }
     var HINT_OPTS = {hint: pyHint, completeSingle: false, closeCharacters: /[\s()\[\]{};:>,=+\-*\/%]/};
     document.querySelectorAll('textarea.code-editor').forEach(function (ta, i) {
@@ -215,7 +245,8 @@
                 }
             });
         }
-        if (!ta.disabled && window.Worker && !ta.hasAttribute('data-norun')) { addRunner(cm, ta); }
+        var runBox = (!ta.disabled && window.Worker && !ta.hasAttribute('data-norun')) ? addRunner(cm, ta) : null;
+        bindLanguage(cm, ta, runBox);
         window.codeEditors[ta.getAttribute('data-task') || ('e' + i)] = cm;
     });
 })();

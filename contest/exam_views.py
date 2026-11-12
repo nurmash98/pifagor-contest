@@ -30,7 +30,7 @@ from django.utils import timezone
 
 from . import exam_guard
 from .names import sort_students
-from .autotest import group_summary, olympiad_points, run_autotests
+from .autotest import LANGUAGES, cpp_available, group_summary, olympiad_points, run_autotests
 from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
                      normalize_school_class)
 
@@ -410,7 +410,13 @@ def exam_task(request, exam_id, task_id, retake_id=None):
             messages.warning(request, f'Подождите {EXAM_SUBMIT_THROTTLE_SECONDS} секунд перед повторной отправкой.')
             return back_to_task()
         code = (request.POST.get('code') or '').replace('\r\n', '\n')
-        result = run_autotests(task, code)
+        language = request.POST.get('language', 'python') if exam.is_olympiad else 'python'
+        if language not in LANGUAGES:
+            language = 'python'
+        if language == 'cpp' and not cpp_available():
+            messages.error(request, 'C++ на сервере сейчас недоступен — отправьте решение на Python.')
+            return back_to_task()
+        result = run_autotests(task, code, language)
         passed, total = (result['passed'], result['total']) if result.get('available') else (0, len(task.test_cases or []))
         score = olympiad_points(task, result) if exam.is_olympiad else _score(passed, total)
         answer = answer or ExamAnswer(attempt=attempt, task=task)
@@ -419,8 +425,10 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         answer.submitted_at = timezone.now()
         answer.tests_passed, answer.tests_total = passed, total
         answer.results = result.get('results', [])
+        answer.language = language
+        answer.compile_error = result.get('compile_error', '')
         if score >= answer.best_score:
-            answer.best_score, answer.best_code = score, code
+            answer.best_score, answer.best_code, answer.best_language = score, code, language
         answer.save()
         left = max_subs - answer.submissions_count
         top = task_max(exam)
@@ -428,6 +436,10 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         if exam.is_olympiad and task.test_groups and result.get('available'):
             groups = group_summary(task, answer.results)[0]
             detail = ' Группы: ' + ', '.join(f"{g['n']}) {'✓' if g['got'] else '✗'} {g['got']}/{g['points']}" for g in groups) + '.'
+        if result.get('compile_error'):
+            messages.error(request, 'Ошибка компиляции — программа не запустилась (подробности ниже). '
+                                    f'Осталось отправок: {left} из {max_subs}.')
+            return back_to_task()
         messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов.{detail} '
                                   f'Лучший результат по задаче: {answer.best_score}/{top}. '
                                   f'Осталось отправок: {left} из {max_subs}.')
@@ -439,6 +451,8 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         'exam': exam, 'retake': retake, 'window': retake or exam, 'task': task, 'answer': answer,
         'active': active, 'attempt': attempt, 'run_url': exam_guard.run_url(attempt),
         'task_max': task_max(exam),
+        'languages': (LANGUAGES if cpp_available() else {'python': LANGUAGES['python']}) if exam.is_olympiad else None,
+        'language': (answer.language if answer else 'python'),
         'groups': group_summary(task, answer.results)[0] if (answer and task.test_groups) else None,
         'max_submissions': max_subs,
         'submissions_left': max_subs - (answer.submissions_count if answer else 0),
@@ -519,9 +533,12 @@ def _exam_form(request, exam):
             duration = None
             errors.append(f'Длительность — от 1 до {EXAM_MAX_DURATION} минут.')
         chosen, slots = [], []
-        if mode == 'fixed':
+        if kind == 'OLYM':      # задачи олимпиады — только из JSON на её странице «Задачи»; форма их не трогает
+            mode = 'fixed'
+            chosen = list(exam.tasks.all()) if exam.pk else []
+        elif mode == 'fixed':
             chosen = list(tasks.filter(id__in=task_ids))
-            if not chosen and kind != 'OLYM':          # олимпиаде задачи можно добавить потом из JSON
+            if not chosen:
                 errors.append('Добавьте хотя бы одну задачу.')
         else:
             tag_ids = set(Tag.objects.values_list('id', flat=True))

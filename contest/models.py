@@ -592,6 +592,10 @@ class ExamAnswer(models.Model):
     tests_passed = models.IntegerField(default=0)
     tests_total = models.IntegerField(default=0)
     results = models.JSONField(default=list, blank=True)
+    # Язык последней отправки и лучшего решения: на олимпиаде можно писать на Python или C++.
+    language = models.CharField(max_length=8, default='python', verbose_name="Язык")
+    best_language = models.CharField(max_length=8, default='python', verbose_name="Язык лучшего решения")
+    compile_error = models.TextField(blank=True, default='', verbose_name="Ошибка компиляции")
     submissions_count = models.PositiveIntegerField(default=0)
     submitted_at = models.DateTimeField(null=True, blank=True)
 
