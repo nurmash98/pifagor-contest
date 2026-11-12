@@ -266,6 +266,15 @@ def _apply_task_language(tasks, lang):
         # В старых примерах перенос строки записан текстом "\\n" — показываем как настоящий перенос.
         task.display_input_example = task.get_display_input_example(lang).replace('\\n', '\n')
         task.display_output_example = task.get_display_output_example(lang).replace('\\n', '\n')
+        kk = lang == 'kk'
+        task.display_examples = [
+            {'input': ex.get('input', ''), 'output': ex.get('output', ''),
+             'note': (ex.get('note_kk') if kk and ex.get('note_kk') else ex.get('note', ''))}
+            for ex in (getattr(task, 'examples', None) or [])]
+        task.examples_have_notes = any(ex['note'] for ex in task.display_examples)
+        notes = (task.group_notes_kk if kk and getattr(task, 'group_notes_kk', None) else getattr(task, 'group_notes', None)) or []
+        task.display_groups = [{'n': i, 'points': p, 'note': notes[i - 1] if i - 1 < len(notes) else ''}
+                               for i, p in enumerate(getattr(task, 'test_groups', None) or [], 1)]
     return tasks
 
 
@@ -1813,8 +1822,12 @@ def _parse_tasks_json(data, reuse_existing=False):
             errors.append(f'{where}: поле «level» должно быть A, B или C.')
         item['level'] = level
         if item['title'] in existing and reuse_existing:
-            reused.append(Task.objects.get(title=item['title']))
-            continue
+            old = Task.objects.get(title=item['title'])
+            if not old.hidden:                  # обычная задача сайта — берём как есть
+                reused.append(old)
+                continue
+            item['_update_id'] = old.id         # олимпиадная — обновим её из файла (исправленные условия, тесты)
+            existing = existing - {item['title']}
         if item['title'] in existing:
             errors.append(f'{where}: задача с таким названием уже есть на сайте.')
         elif item['title'] in seen:
@@ -1858,6 +1871,16 @@ def _parse_tasks_json(data, reuse_existing=False):
         if not isinstance(limit, int) or not 1 <= limit <= 5:
             errors.append(f'{where}: «time_limit» — от 1 до 5 секунд.'); limit = 1
         item['time_limit'] = limit
+        for key in ('group_notes', 'group_notes_kk'):
+            notes = raw.get(key) or []
+            if not isinstance(notes, list) or not all(isinstance(x, str) for x in notes):
+                errors.append(f'{where}: «{key}» — список строк, по одной на группу.'); notes = []
+            item[key] = [x.strip() for x in notes]
+        examples = raw.get('examples') or []
+        if not isinstance(examples, list) or not all(isinstance(e, dict) and 'input' in e and 'output' in e for e in examples):
+            errors.append(f'{where}: «examples» — список {{"input", "output", "note"}}.'); examples = []
+        item['examples'] = [{'input': _clean_text(str(e['input'])), 'output': _clean_text(str(e['output'])),
+                             'note': str(e.get('note') or ''), 'note_kk': str(e.get('note_kk') or '')} for e in examples]
         items.append(item)
     return done(items, errors, reused)
 

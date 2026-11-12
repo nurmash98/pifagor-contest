@@ -1,0 +1,31 @@
+{% load ui_i18n %}{% comment %}Примеры задачи и (у олимпиадных) таблица групп тестов. Ждёт task после _apply_task_language.{% endcomment %}
+{% if task.display_examples %}
+<div class="table-responsive mt-3">
+    <table class="table table-bordered align-top mb-0 task-ex">
+        <thead><tr><th style="width: 42%;">{% t "Ввод" %}</th><th style="width: 30%;">{% t "Вывод" %}</th>{% if task.examples_have_notes %}<th>{% t "Пояснение" %}</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for ex in task.display_examples %}
+            <tr><td><pre class="mb-0">{{ ex.input }}</pre></td><td><pre class="mb-0">{{ ex.output }}</pre></td>
+                {% if task.examples_have_notes %}<td class="small">{{ ex.note }}</td>{% endif %}</tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="row g-2 mt-2">
+    <div class="col-md-6"><div class="bg-light p-3 rounded-3 border"><span class="fw-bold text-muted small d-block mb-1">{% t "Пример ввода (Input):" %}</span><code class="text-dark" style="white-space: pre-wrap;">{{ task.display_input_example }}</code></div></div>
+    <div class="col-md-6"><div class="bg-light p-3 rounded-3 border"><span class="fw-bold text-muted small d-block mb-1">{% t "Пример вывода (Output):" %}</span><code class="text-dark" style="white-space: pre-wrap;">{{ task.display_output_example }}</code></div></div>
+</div>
+{% endif %}
+{% if task.display_groups %}
+<div class="table-responsive mt-3">
+    <table class="table table-bordered mb-1 task-groups">
+        <thead><tr><th class="text-center" style="width: 18%;">{% t "Группа" %}</th><th class="text-center" style="width: 18%;">{% t "Баллы" %}</th><th>{% t "Ограничения" %}</th></tr></thead>
+        <tbody>
+        {% for g in task.display_groups %}<tr><td class="text-center">{{ g.n }}</td><td class="text-center fw-semibold">{{ g.points }}</td><td>{{ g.note }}</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="small text-muted">{% t "Баллы группы начисляются, только если пройдены все её тесты." %} {% t "Ограничение времени" %} — {{ task.time_limit }} {% t "с на тест" %}.</div>
+{% endif %}
+<style>.task-ex pre { white-space: pre-wrap; font-size: .95rem; }</style>

@@ -3451,3 +3451,54 @@ class OlympiadWithoutFullscreenTests(RetakeTestBase):
         self.assertContains(r, 'lang-select')
         self.assertRedirects(self.client.get(reverse('exam_run', args=[self.olymp.id])),
                              reverse('exam_detail', args=[self.olymp.id]))
+
+
+class OlympiadExamplesAndGroupsTableTests(RetakeTestBase):
+    def item(self, **kw):
+        d = {'title': 'Олимп. Тест', 'level': 'C', 'description': 'Условие', 'input_example': '1', 'output_example': '1',
+             'examples': [{'input': 'a1', 'output': 'b1', 'note': 'первый'}, {'input': 'a2', 'output': 'b2'},
+                          {'input': 'a3', 'output': 'b3', 'note_kk': 'үшінші'}],
+             'group_notes': ['N ≤ 10', 'N ≤ 1000'], 'group_notes_kk': ['N ≤ 10 (кк)', 'N ≤ 1000 (кк)'],
+             'test_groups': [40, 60], 'time_limit': 2,
+             'test_cases': [{'input': '1', 'output': '1', 'group': 0}, {'input': '2', 'output': '2', 'group': 1},
+                            {'input': '3', 'output': '3', 'group': 2}]}
+        d.update(kw)
+        return d
+
+    def setUp(self):
+        super().setUp()
+        import json
+        self.olymp = Exam.objects.create(kind='OLYM', title='Табл', school_class='', duration_minutes=60,
+                                         start_at=timezone.now() + timedelta(days=1), created_by=self.teacher)
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('olympiad_tasks', args=[self.olymp.id]), {'action': 'import', 'json_text': json.dumps([self.item()])})
+        self.task = Task.objects.get(title='Олимп. Тест')
+
+    def test_all_examples_and_groups_table_render(self):
+        self.olymp.start_at = timezone.now() - timedelta(minutes=1); self.olymp.save()
+        self.olymp.participants.add(self.students[0])
+        ExamAttempt.objects.create(exam=self.olymp, student=self.students[0], started_at=timezone.now())
+        self.client.force_login(self.students[0].user)
+        html = self.client.get(reverse('exam_task', args=[self.olymp.id, self.task.id])).content.decode()
+        for x in ('a1', 'b1', 'a2', 'a3', 'b3', 'первый', 'task-groups', 'N ≤ 1000', '>60<', '2 с на тест'):
+            self.assertIn(x, html)
+        self.assertNotIn('Пример ввода (Input)', html)
+        self.client.get(reverse('set_content_lang', args=['kk']))
+        html = self.client.get(reverse('exam_task', args=[self.olymp.id, self.task.id])).content.decode()
+        self.assertIn('үшінші', html)
+        self.assertIn('N ≤ 1000 (кк)', html)
+
+    def test_reupload_updates_olympiad_task(self):
+        import json
+        self.client.post(reverse('olympiad_tasks', args=[self.olymp.id]),
+                         {'action': 'import', 'json_text': json.dumps([self.item(description='Новое условие', group_notes=['x', 'y'])])})
+        self.assertEqual(Task.objects.filter(title='Олимп. Тест').count(), 1)
+        self.task.refresh_from_db()
+        self.assertEqual((self.task.description, self.task.group_notes), ('Новое условие', ['x', 'y']))
+        self.assertTrue(self.task.hidden)
+
+    def test_plain_task_keeps_two_example_boxes(self):
+        self.client.force_login(self.students[0].user)
+        html = self.client.get(reverse('task_detail', args=[self.a_tasks[0].id])).content.decode()
+        self.assertIn('Пример ввода (Input)', html)
+        self.assertNotIn('task-groups', html)

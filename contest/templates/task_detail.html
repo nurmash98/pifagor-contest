@@ -34,21 +34,7 @@
             <h6 class="fw-bold text-muted mt-3 mb-2">{% t "Условие задачи:" %}</h6>
             <p class="lh-lg" style="color: #2c3e50;">{{ task.display_description|linebreaksbr }}</p>
 
-            <!-- Примеры входных и выходных данных -->
-            <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                    <div class="bg-light p-3 rounded-3 border">
-                        <span class="fw-bold text-muted small d-block mb-1">{% t "Пример ввода (Input):" %}</span>
-                        <code class="text-dark fs-6" style="white-space: pre-wrap;">{{ task.display_input_example }}</code>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="bg-light p-3 rounded-3 border">
-                        <span class="fw-bold text-muted small d-block mb-1">{% t "Пример вывода (Output):" %}</span>
-                        <code class="text-dark fs-6" style="white-space: pre-wrap;">{{ task.display_output_example }}</code>
-                    </div>
-                </div>
-            </div>
+            {% include 'task_examples.html' %}
         </div>
 
         {% if attempts %}

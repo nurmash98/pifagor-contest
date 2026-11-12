@@ -966,18 +966,26 @@ def olympiad_tasks(request, exam_id):
                         messages.error(request, e)
                     messages.warning(request, 'Ничего не добавлено — исправьте ошибки и загрузите снова.')
                 else:
-                    added = []
+                    added, updated = [], 0
                     with transaction.atomic():
                         for item in items:
                             tags = item.pop('tags')
                             item['hidden'] = True
-                            task = Task.objects.create(**item)
+                            update_id = item.pop('_update_id', None)
+                            if update_id:
+                                Task.objects.filter(id=update_id).update(**item)
+                                task = Task.objects.get(id=update_id)
+                                updated += 1
+                            else:
+                                task = Task.objects.create(**item)
                             for name in tags:
                                 tag, _ = Tag.objects.get_or_create(name=name)
                                 task.tags.add(tag)
                             added.append(task)
                         exam.tasks.add(*added, *existing)
                     msg = f'Добавлено задач: {len(added) + len(existing)}'
+                    if updated:
+                        msg += f', из них обновлено из файла: {updated}'
                     if existing:
                         msg += f' (уже были на сайте, взяты оттуда: {len(existing)})'
                     messages.success(request, msg + '.')

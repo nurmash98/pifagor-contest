@@ -99,6 +99,11 @@ class Task(models.Model):
     # группа 0 — примеры, без баллов). Баллы группы даются, только если пройдены ВСЕ её тесты.
     test_groups = models.JSONField(default=list, blank=True, verbose_name="Баллы групп тестов")
     time_limit = models.PositiveSmallIntegerField(default=1, verbose_name="Лимит времени на тест (сек)")
+    # Олимпиадное оформление: ограничения каждой группы тестов (для таблицы групп) и все примеры
+    # [{"input", "output", "note", "note_kk"}] — показываются таблицей под условием.
+    group_notes = models.JSONField(default=list, blank=True, verbose_name="Ограничения групп")
+    group_notes_kk = models.JSONField(default=list, blank=True, verbose_name="Ограничения групп (қазақша)")
+    examples = models.JSONField(default=list, blank=True, verbose_name="Примеры")
 
     # Казахская версия условия — необязательна. Если не заполнена, сайт
     # показывает русский текст (переключатель RU/KZ в шапке сайта).
