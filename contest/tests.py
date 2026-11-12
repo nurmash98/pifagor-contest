@@ -3522,3 +3522,18 @@ class OlympiadReplaceTasksTests(RetakeTestBase):
         self.assertEqual(sorted(olymp.tasks.values_list('title', flat=True)), ['A. Прямоугольники', 'B. Акции', 'C. Принтеры'])
         self.assertEqual(Task.objects.filter(title='C. Принтеры').count(), 1)
         self.assertTrue(Task.objects.get(title='A. Шахматы').hidden)      # старая задача осталась на сайте скрытой
+
+
+class NavProfileLinkTests(TestCase):
+    def test_name_links_to_profile_with_avatar_and_banner(self):
+        u = User.objects.create_user('navst', password='x')
+        st = Student.objects.create(user=u, full_name='Абаев Тимур', school_class='7A')
+        st.name_banner = 'fire'; st.save()
+        self.client.force_login(u)
+        html = self.client.get(reverse('all_tasks')).content.decode()
+        nav = html[html.index('<nav'):html.index('</nav>')]
+        self.assertIn('class="nav-me"', nav)
+        self.assertIn(f'href="{reverse("profile")}" class="nav-me"', nav)
+        self.assertIn('pf-avatar', nav)
+        self.assertIn('nb b-fire', nav)
+        self.assertNotIn('>Профиль<', nav)

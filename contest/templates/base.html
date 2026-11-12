@@ -63,6 +63,9 @@
 </style>
     {% include "theme_head.html" %}
     <script>if (window.self !== window.top) { document.documentElement.classList.add('in-frame'); }</script>
+    <style>.nav-me { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; border-radius: 999px; padding: 2px 10px 2px 2px; }
+        .nav-me:hover { background: rgba(127, 127, 127, .12); }
+        .nav-me .nb.sm { font-size: .9rem; }</style>
     <style>.in-frame body > nav.navbar, .in-frame .exam-back, .in-frame .no-frame { display: none !important; }</style>
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -168,9 +171,6 @@
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'codegames' %}">🎮 {% t "Игры" %}</a>
                             </li>
                             {% endif %}
-                            <li class="nav-item">
-                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'profile' %}">{% t "Профиль" %}</a>
-                            </li>
                             {% if coin_balance is not None %}
                             <li class="nav-item">
                                 <a class="coin-chip" href="{% url 'shop' %}" title="{% t "Магазин" %}"><img src="{% static 'icons/coin-64.png' %}" alt=""><span class="coin-num">{{ coin_balance }}</span></a>
@@ -184,7 +184,12 @@
                                 {% if request.user.is_staff %}
                                     <strong>{{ request.user.username }}</strong> (Admin)
                                 {% else %}
-                                    <strong>{{ user.student.full_name }}</strong> ({{ user.student.school_class }}) {% rank_chip my_solved 'nav' 'sm' %}
+                                    {# Имя — ссылка на профиль: аватар, баннер, класс и ранг #}
+                                    <a href="{% url 'profile' %}" class="nav-me" title="{% t "Профиль" %}">
+                                        {% student_avatar my_solved 32 False 'nav' user.student.avatar %}
+                                        <strong class="nav-me-name">{% student_name user.student True %}</strong>
+                                        <span class="text-muted">({{ user.student.school_class }})</span>
+                                    </a> {% rank_chip my_solved 'nav' 'sm' %}
                                 {% endif %}
                             </span>
                         </li>
