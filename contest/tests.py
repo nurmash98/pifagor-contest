@@ -3505,3 +3505,20 @@ class OlympiadExamplesAndGroupsTableTests(RetakeTestBase):
         html = self.client.get(reverse('task_detail', args=[self.a_tasks[0].id])).content.decode()
         self.assertIn('Пример ввода (Input)', html)
         self.assertNotIn('tx-grid', html)
+
+
+class OlympiadReplaceTasksTests(RetakeTestBase):
+    def test_replace_removes_old_tasks_from_olympiad(self):
+        import json
+        olymp = Exam.objects.create(kind='OLYM', title='Замена', school_class='', duration_minutes=60,
+                                    start_at=timezone.now() + timedelta(days=1), created_by=self.teacher)
+        self.client.force_login(self.teacher_user)
+        url = reverse('olympiad_tasks', args=[olymp.id])
+        item = lambda t: {'title': t, 'level': 'C', 'description': 'd', 'input_example': '1', 'output_example': '1',
+                          'test_cases': [{'input': '1', 'output': '1'}]}
+        self.client.post(url, {'action': 'import', 'json_text': json.dumps([item('A. Шахматы'), item('B. Сад'), item('C. Принтеры')])})
+        self.client.post(url, {'action': 'import', 'replace': '1',
+                               'json_text': json.dumps([item('A. Прямоугольники'), item('B. Акции'), item('C. Принтеры')])})
+        self.assertEqual(sorted(olymp.tasks.values_list('title', flat=True)), ['A. Прямоугольники', 'B. Акции', 'C. Принтеры'])
+        self.assertEqual(Task.objects.filter(title='C. Принтеры').count(), 1)
+        self.assertTrue(Task.objects.get(title='A. Шахматы').hidden)      # старая задача осталась на сайте скрытой

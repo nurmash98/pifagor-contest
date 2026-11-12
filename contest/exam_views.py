@@ -982,7 +982,10 @@ def olympiad_tasks(request, exam_id):
                                 tag, _ = Tag.objects.get_or_create(name=name)
                                 task.tags.add(tag)
                             added.append(task)
-                        exam.tasks.add(*added, *existing)
+                        if request.POST.get('replace'):      # заменить задачи олимпиады задачами из файла
+                            exam.tasks.set([*added, *existing])
+                        else:
+                            exam.tasks.add(*added, *existing)
                     msg = f'Добавлено задач: {len(added) + len(existing)}'
                     if updated:
                         msg += f', из них обновлено из файла: {updated}'

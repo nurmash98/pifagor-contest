@@ -28,6 +28,11 @@
                 <input type="file" name="json_file" class="form-control mb-3" accept=".json,application/json">
                 <label class="form-label fw-semibold small">…или вставьте JSON сюда</label>
                 <textarea name="json_text" class="form-control font-monospace small mb-3" rows="8" placeholder='[{"title": "...", "level": "C", ...}]'>{{ pasted }}</textarea>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="replace" value="1" id="replace">
+                    <label class="form-check-label small" for="replace">Заменить все задачи олимпиады задачами из файла
+                        (старые уберутся из олимпиады, например, если в файле поменялись задачи)</label>
+                </div>
                 <button class="btn btn-pifagor-green px-4 rounded-pill">Добавить в олимпиаду</button>
             </form>
             <details class="small mt-3">
