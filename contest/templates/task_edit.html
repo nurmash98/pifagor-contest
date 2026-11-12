@@ -109,6 +109,13 @@
                 Ученики ожидаемый вывод не видят.
             </p>
 
+            {% if task.test_groups %}
+            <div class="alert alert-warning small">
+                🏆 <strong>Олимпиадная задача</strong>: {{ task.test_cases|length }} тестов в группах
+                ({% for p in task.test_groups %}{{ p }}{% if not forloop.last %} + {% endif %}{% endfor %} баллов), лимит {{ task.time_limit }} с.
+                Тесты здесь не редактируются — при сохранении они остаются как есть. Заменить тесты можно повторным импортом.
+            </div>
+            {% else %}
             <div id="tests">
                 {% for t in test_rows %}
                 <div class="test-row border rounded-3 p-2 mb-2">
@@ -128,6 +135,7 @@
                 {% endfor %}
             </div>
             <button type="button" id="add-test" class="btn btn-outline-secondary btn-sm w-100 mb-3">+ Добавить тест</button>
+            {% endif %}
 
             <button type="submit" class="btn btn-pifagor-green w-100 py-2 rounded-3">{% if is_new %}Создать задачу{% else %}Сохранить задачу{% endif %}</button>
             <p class="text-muted small mt-2 mb-0">Изменения применяются к следующим отправкам — уже выставленные оценки не пересчитываются.</p>
@@ -139,6 +147,7 @@
 <script>
 (function () {
     var box = document.getElementById('tests');
+    if (!box) { return; }
     var MAX = {{ max_tests }};
     function renumber() {
         box.querySelectorAll('.test-num').forEach(function (el, i) { el.textContent = 'Тест ' + (i + 1); });

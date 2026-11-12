@@ -1706,6 +1706,8 @@ def _task_form(request, task):
         values = {f: _clean_text(request.POST.get(f, '')) for f in TASK_TEXT_FIELDS}
         values['title'] = values['title'].strip()
         tests = _tests_from_post(request.POST)
+        if task.pk and task.test_groups:      # олимпиадные тесты (с группами) формой не меняются
+            tests = task.test_cases
         errors = [f'Поле «{label}» не может быть пустым.' for f, label in TASK_REQUIRED_FIELDS.items()
                   if not values[f].strip()]
         level = request.POST.get('level', '') if is_new else task.level
@@ -1772,7 +1774,7 @@ def task_create(request):
     return _task_form(request, Task(level=''))
 
 
-TASK_IMPORT_MAX_BYTES = 1024 * 1024  # 1 МБ JSON
+TASK_IMPORT_MAX_BYTES = 8 * 1024 * 1024  # 8 МБ JSON (олимпиадные тесты бывают большими)
 TASK_IMPORT_MAX_TASKS = 200
 
 
@@ -1822,11 +1824,30 @@ def _parse_tasks_json(data):
             for j, t in enumerate(tests, 1):
                 if not isinstance(t, dict) or 'input' not in t or 'output' not in t:
                     errors.append(f'{where}: тест №{j} должен содержать "input" и "output".'); continue
-                clean_tests.append({'input': _clean_text(str(t['input'])), 'output': _clean_text(str(t['output'])).strip()})
+                ct = {'input': _clean_text(str(t['input'])), 'output': _clean_text(str(t['output'])).strip()}
+                if 'group' in t:
+                    if not isinstance(t['group'], int) or not 0 <= t['group'] <= 10:
+                        errors.append(f'{where}: тест №{j}: «group» — номер группы 0..10 (0 — пример без баллов).')
+                    else:
+                        ct['group'] = t['group']
+                clean_tests.append(ct)
             if len(clean_tests) > MAX_TEST_CASES:
                 errors.append(f'{where}: не больше {MAX_TEST_CASES} тестов.')
         item['test_cases'] = clean_tests
         item['hidden'] = bool(raw.get('hidden'))
+        groups = raw.get('test_groups') or []
+        if not isinstance(groups, list) or not all(isinstance(p, int) and 0 <= p <= 1000 for p in groups) or len(groups) > 10:
+            errors.append(f'{where}: «test_groups» — баллы групп, например [20, 50, 30].'); groups = []
+        elif groups:
+            used = {c.get('group') for c in clean_tests if c.get('group')}
+            missing = [n for n in range(1, len(groups) + 1) if n not in used]
+            if missing:
+                errors.append(f'{where}: нет тестов для группы ' + ', '.join(map(str, missing)) + '.')
+        item['test_groups'] = groups
+        limit = raw.get('time_limit', 1)
+        if not isinstance(limit, int) or not 1 <= limit <= 5:
+            errors.append(f'{where}: «time_limit» — от 1 до 5 секунд.'); limit = 1
+        item['time_limit'] = limit
         items.append(item)
     return items, errors
 
@@ -1842,7 +1863,7 @@ def task_import(request):
         raw = None
         if upload:
             if upload.size > TASK_IMPORT_MAX_BYTES:
-                messages.error(request, 'Файл слишком большой (максимум 1 МБ).')
+                messages.error(request, 'Файл слишком большой (максимум 8 МБ).')
             else:
                 raw = upload.read()
         elif pasted.strip():

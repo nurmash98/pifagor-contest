@@ -3171,3 +3171,71 @@ class OlympiadTests(RetakeTestBase):
                  'test_cases': [{'input': '1', 'output': '1'}]}]
         self.client.post(reverse('task_import'), {'json_text': json.dumps(data), 'hidden': '1'})
         self.assertTrue(Task.objects.get(title='Импорт-олимп').hidden)
+
+
+class OlympiadGroupScoringTests(RetakeTestBase):
+    """Олимпиадная задача: тесты по группам 20/50/30, задача — до 100 баллов."""
+    def setUp(self):
+        super().setUp()
+        cases = [('aaabccdddd', 'a3bc2d4', 0), ('abc', 'abc', 0),
+                 ('zzz', 'z3', 1), ('k', 'k', 1),
+                 ('aabbb', 'a2b3', 2), ('abcdd', 'abcd2', 2),
+                 ('a' * 12, 'a12', 3), ('b' * 10 + 'c', 'b10c', 3)]
+        self.task = Task.objects.create(
+            title='Олимп. Сжатие', level='C', description='d', input_example='abc', output_example='abc',
+            hidden=True, test_groups=[20, 50, 30], time_limit=1,
+            test_cases=[{'input': i, 'output': o, 'group': g} for i, o, g in cases])
+
+    def test_group_points(self):
+        from .autotest import group_summary, olympiad_points
+        res = [{'ok': True, 'group': c['group']} for c in self.task.test_cases]
+        self.assertEqual(olympiad_points(self.task, {'available': True, 'results': res, 'passed': 8, 'total': 8}), 100)
+        res[-1]['ok'] = False                       # один тест 3-й группы не прошёл — вся группа 0
+        groups, total, _ = group_summary(self.task, res)
+        self.assertEqual(total, 70)
+        self.assertEqual([g['got'] for g in groups], [20, 50, 0])
+        res = [{'ok': c['group'] == 0, 'group': c['group']} for c in self.task.test_cases]   # только примеры
+        self.assertEqual(group_summary(self.task, res)[1], 0)
+
+    def test_olympiad_submission_scores_by_groups(self):
+        olymp = Exam.objects.create(kind='OLYM', title='О', school_class='', duration_minutes=60,
+                                    start_at=timezone.now() - timedelta(minutes=1), created_by=self.teacher)
+        olymp.tasks.set([self.task]); olymp.participants.add(self.students[0])
+        ExamAttempt.objects.create(exam=olymp, student=self.students[0], started_at=timezone.now())
+        self.client.force_login(self.students[0].user)
+        # ошибка с числами больше 9 (пишет только последнюю цифру): группы 1 и 2 — да, 3 — нет
+        code = ("s=input().strip();o='';i=0\n"
+                "while i<len(s):\n    j=i\n    while j<len(s) and s[j]==s[i]: j+=1\n"
+                "    n=j-i; o+=s[i]+(str(n%10) if n>1 else ''); i=j\nprint(o)")
+        self.client.post(reverse('exam_task', args=[olymp.id, self.task.id]), {'code': code})
+        ans = ExamAnswer.objects.get(task=self.task)
+        self.assertEqual(ans.best_score, 70)
+        page = self.client.get(reverse('exam_task', args=[olymp.id, self.task.id]), headers={'Sec-Fetch-Dest': 'iframe'})
+        self.assertContains(page, '70/100')
+        self.assertContains(page, '0/30')
+
+    def test_edit_form_keeps_group_tests(self):
+        self.client.force_login(self.teacher_user)
+        url = reverse('task_edit', args=[self.task.id])
+        self.assertContains(self.client.get(url), 'Олимпиадная задача')
+        self.client.post(url, {'title': 'Олимп. Сжатие', 'description': 'новое', 'input_example': 'abc',
+                               'output_example': 'abc', 'hidden': '1'})
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.description, 'новое')
+        self.assertEqual(len(self.task.test_cases), 8)
+        self.assertEqual(self.task.test_cases[-1]['group'], 3)
+
+    def test_import_with_groups_and_time_limit(self):
+        import json
+        self.client.force_login(self.teacher_user)
+        item = {'title': 'Импорт группы', 'level': 'C', 'description': 'd', 'input_example': '1', 'output_example': '1',
+                'hidden': True, 'test_groups': [40, 60], 'time_limit': 2,
+                'test_cases': [{'input': '1', 'output': '1', 'group': 0}, {'input': '2', 'output': '2', 'group': 1},
+                               {'input': '3', 'output': '3', 'group': 2}]}
+        self.client.post(reverse('task_import'), {'json_text': json.dumps([item])})
+        t = Task.objects.get(title='Импорт группы')
+        self.assertEqual((t.test_groups, t.time_limit, t.hidden), ([40, 60], 2, True))
+        self.assertEqual([c['group'] for c in t.test_cases], [0, 1, 2])
+        bad = dict(item, title='Без группы 2', test_cases=item['test_cases'][:2])
+        self.client.post(reverse('task_import'), {'json_text': json.dumps([bad])})
+        self.assertFalse(Task.objects.filter(title='Без группы 2').exists())

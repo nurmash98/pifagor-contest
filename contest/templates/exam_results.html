@@ -116,7 +116,8 @@
                         {% with a=cell.answer %}
                         {% if a %}
                         <details>
-                            <summary class="fw-bold {% if a.best_score >= 8 %}text-success{% elif a.best_score >= 6 %}text-warning{% else %}text-danger{% endif %}" style="cursor: pointer; list-style: none;">{{ a.best_score }}</summary>
+                            {% widthratio a.best_score task_max 10 as s10 %}
+                            <summary class="fw-bold {% if s10|add:0 >= 8 %}text-success{% elif s10|add:0 >= 6 %}text-warning{% else %}text-danger{% endif %}" style="cursor: pointer; list-style: none;">{{ a.best_score }}</summary>
                             <pre class="bg-dark text-light p-2 rounded-3 small text-start mt-1 mb-0" style="max-width: 320px; white-space: pre-wrap;"><code>{{ a.best_code }}</code></pre>
                             <div class="small text-muted">отправок: {{ a.submissions_count }}</div>
                         </details>

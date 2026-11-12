@@ -138,9 +138,10 @@
                     {% else %}<span class="fw-semibold">{{ task.display_title }}</span>{% endif %}
                 </div>
                 {% if task.answer %}
-                    <span class="badge {% if task.answer.best_score >= 8 %}bg-success{% elif task.answer.best_score >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ task.answer.best_score }}/10</span>
+                    {% widthratio task.answer.best_score task_max 10 as s10 %}
+                    <span class="badge {% if s10|add:0 >= 8 %}bg-success{% elif s10|add:0 >= 6 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ task.answer.best_score }}/{{ task_max }}</span>
                 {% else %}
-                    <span class="badge bg-light text-muted border">{% if finished %}0/10{% else %}{% t "не сдано" %}{% endif %}</span>
+                    <span class="badge bg-light text-muted border">{% if finished %}0/{{ task_max }}{% else %}{% t "не сдано" %}{% endif %}</span>
                 {% endif %}
             </li>
             {% endfor %}

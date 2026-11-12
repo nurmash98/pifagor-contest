@@ -89,6 +89,10 @@ class Task(models.Model):
     # Скрытая задача (олимпиадная): её нет в каталоге, дуэлях и случайных СОР/СОЧ —
     # её видят только участники олимпиады, в которую она добавлена.
     hidden = models.BooleanField(default=False, verbose_name="Скрыта (только для олимпиады)")
+    # Олимпиадная оценка по группам тестов: баллы групп [20, 50, 30] (группа N — test_cases[i]['group'] == N;
+    # группа 0 — примеры, без баллов). Баллы группы даются, только если пройдены ВСЕ её тесты.
+    test_groups = models.JSONField(default=list, blank=True, verbose_name="Баллы групп тестов")
+    time_limit = models.PositiveSmallIntegerField(default=1, verbose_name="Лимит времени на тест (сек)")
 
     # Казахская версия условия — необязательна. Если не заполнена, сайт
     # показывает русский текст (переключатель RU/KZ в шапке сайта).
@@ -558,12 +562,12 @@ class ExamAttempt(models.Model):
     def task_list(self):
         """Задачи этого ученика: выпавшие случайно, либо все задачи экзамена."""
         if self.retake_id:
-            by_id = {t.id: t for t in Task.objects.filter(id__in=self.task_ids)}
+            by_id = {t.id: t for t in Task.objects.defer('test_cases').filter(id__in=self.task_ids)}
             return [by_id[i] for i in self.task_ids if i in by_id]
         if self.exam.is_random and self.task_ids:
-            by_id = {t.id: t for t in Task.objects.filter(id__in=self.task_ids)}
+            by_id = {t.id: t for t in Task.objects.defer('test_cases').filter(id__in=self.task_ids)}
             return [by_id[i] for i in self.task_ids if i in by_id]
-        return list(self.exam.tasks.all())
+        return list(self.exam.tasks.defer('test_cases'))
 
     def grade(self):
         """Оценка из 10 — средний балл по ВСЕМ задачам ученика (не сданная задача = 0)."""

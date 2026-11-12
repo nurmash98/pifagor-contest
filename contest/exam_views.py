@@ -30,7 +30,7 @@ from django.utils import timezone
 
 from . import exam_guard
 from .names import sort_students
-from .autotest import run_autotests
+from .autotest import group_summary, olympiad_points, run_autotests
 from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
                      normalize_school_class)
 
@@ -43,6 +43,11 @@ OLYMPIAD_MAX_SUBMISSIONS = 10      # на олимпиаде попыток бо
 
 def max_submissions(exam):
     return OLYMPIAD_MAX_SUBMISSIONS if exam.is_olympiad else EXAM_MAX_SUBMISSIONS
+
+
+def task_max(exam):
+    """Максимум баллов за одну задачу: на олимпиаде 100 (по группам тестов), на СОР/СОЧ — 10."""
+    return 100 if exam.is_olympiad else 10
 
 
 def _slot_candidates(slot, exclude=()):
@@ -95,7 +100,7 @@ def _retake_slots(exam, prev_attempt):
     if prev_attempt is not None and prev_attempt.task_ids:
         base = prev_attempt.task_list()
     else:
-        base = list(exam.tasks.all())[:max(exam.tasks_per_student(), 1)]
+        base = list(exam.tasks.defer('test_cases'))[:max(exam.tasks_per_student(), 1)]
     slots = []
     for task in base:
         tag_id = task.tags.order_by('id').values_list('id', flat=True).first()
@@ -279,7 +284,7 @@ def exam_detail(request, exam_id, retake_id=None):
         tasks = attempt.task_list()
     else:
         # Набор для случайного выбора ученику не показываем — только его выпавшие задачи.
-        tasks = [] if (exam.is_random or retake) else list(exam.tasks.all())
+        tasks = [] if (exam.is_random or retake) else list(exam.tasks.defer('test_cases'))
     from .views import _apply_task_language, _get_content_lang
     _apply_task_language(tasks, _get_content_lang(request))
     answers = {a.task_id: a for a in attempt.answers.all()} if attempt else {}
@@ -306,7 +311,7 @@ def exam_detail(request, exam_id, retake_id=None):
     my_retake_state = _attempt_state(my_retake, retake_attempt, now) if my_retake else None
     olymp = None
     if exam.is_olympiad and attempt is not None:
-        olymp = {'total': sum(a.best_score for a in answers.values()), 'max': 10 * len(tasks)}
+        olymp = {'total': sum(a.best_score for a in answers.values()), 'max': 100 * len(tasks)}
         if state == 'finished':          # места — когда олимпиада закончилась у всех
             everyone = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
             rows = _result_rows(exam, list(exam.participants.all()), everyone, now, per_student=exam.is_random)
@@ -323,7 +328,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'exam_done': exam_done, 'exam_grade': exam_grade,
         'retake_done': retake_done, 'retake_grade': retake_grade, 'earlier_retakes': earlier_retakes,
         'run_url': exam_guard.run_url(attempt) if attempt else '', 'max_exits': exam_guard.MAX_EXITS,
-        'olymp': olymp, 'max_subs': max_submissions(exam),
+        'olymp': olymp, 'max_subs': max_submissions(exam), 'task_max': task_max(exam),
     })
 
 
@@ -372,7 +377,8 @@ def exam_task(request, exam_id, task_id, retake_id=None):
     student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
-    task = get_object_or_404(Task, id=task_id)
+    # Тесты олимпиадных задач большие — грузим их из базы только при отправке решения.
+    task = get_object_or_404(Task if request.method == 'POST' else Task.objects.defer('test_cases'), id=task_id)
     if attempt is None:
         return _to_detail(exam, retake)
     blocked = exam_guard.guard(request, attempt)
@@ -407,7 +413,7 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         code = (request.POST.get('code') or '').replace('\r\n', '\n')
         result = run_autotests(task, code)
         passed, total = (result['passed'], result['total']) if result.get('available') else (0, len(task.test_cases or []))
-        score = _score(passed, total)
+        score = olympiad_points(task, result) if exam.is_olympiad else _score(passed, total)
         answer = answer or ExamAnswer(attempt=attempt, task=task)
         answer.code = code
         answer.submissions_count += 1
@@ -418,8 +424,13 @@ def exam_task(request, exam_id, task_id, retake_id=None):
             answer.best_score, answer.best_code = score, code
         answer.save()
         left = max_subs - answer.submissions_count
-        messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов. '
-                                  f'Лучший результат по задаче: {answer.best_score}/10. '
+        top = task_max(exam)
+        detail = ''
+        if exam.is_olympiad and task.test_groups and result.get('available'):
+            groups = group_summary(task, answer.results)[0]
+            detail = ' Группы: ' + ', '.join(f"{g['n']}) {'✓' if g['got'] else '✗'} {g['got']}/{g['points']}" for g in groups) + '.'
+        messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов.{detail} '
+                                  f'Лучший результат по задаче: {answer.best_score}/{top}. '
                                   f'Осталось отправок: {left} из {max_subs}.')
         return back_to_task()
 
@@ -428,6 +439,8 @@ def exam_task(request, exam_id, task_id, retake_id=None):
     return render(request, 'exam_task.html', {
         'exam': exam, 'retake': retake, 'window': retake or exam, 'task': task, 'answer': answer,
         'active': active, 'attempt': attempt, 'run_url': exam_guard.run_url(attempt),
+        'task_max': task_max(exam),
+        'groups': group_summary(task, answer.results)[0] if (answer and task.test_groups) else None,
         'max_submissions': max_subs,
         'submissions_left': max_subs - (answer.submissions_count if answer else 0),
     })
@@ -469,7 +482,7 @@ def _teacher_exam_list(request):
 def _exam_form(request, exam):
     is_new = exam.pk is None
     classes = _teacher_classes(request.user)
-    tasks = Task.objects.exclude(test_cases=[]).prefetch_related('tags').order_by('level', 'title')
+    tasks = Task.objects.exclude(test_cases=[]).defer('test_cases').prefetch_related('tags').order_by('level', 'title')
 
     if request.method == 'POST':
         errors = []
@@ -617,7 +630,7 @@ def exam_delete(request, exam_id):
 def _result_rows(exam, students, attempts, now, per_student):
     """Строки таблицы результатов. per_student — у каждого ученика свои задачи (случайный
     экзамен или пересдача): колонки «№1..№N», в каждой выпавшая задача и балл."""
-    tasks = list(exam.tasks.all())
+    tasks = list(exam.tasks.defer('test_cases'))
     count = exam.tasks_per_student()
     rows = []
     for st in students:
@@ -663,7 +676,7 @@ def _result_columns(exam, per_student):
     if per_student:
         return [f'№{i}' + (f' {labels[i - 1]}' if i <= len(labels) else '')
                 for i in range(1, exam.tasks_per_student() + 1)], labels
-    return [f'{i}. {t.title}' for i, t in enumerate(exam.tasks.all(), 1)], labels
+    return [f'{i}. {t.title}' for i, t in enumerate(exam.tasks.defer('test_cases'), 1)], labels
 
 
 @staff_member_required
@@ -673,7 +686,7 @@ def exam_results(request, exam_id, retake_id=None):
         messages.error(request, 'Это СОР/СОЧ не вашего класса.')
         return redirect('exam_list')
     now = timezone.now()
-    tasks = list(exam.tasks.all())
+    tasks = list(exam.tasks.defer('test_cases'))
     class_students = sort_students(Student.objects.filter(school_class=exam.school_class).select_related('user'))
     retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam) if retake_id is not None else None
 
@@ -729,7 +742,7 @@ def exam_results(request, exam_id, retake_id=None):
         'exam': exam, 'tasks': tasks, 'rows': rows, 'state': state, 'columns': columns,
         'slot_labels': labels, 'retake': retake, 'retakes': retakes,
         'has_retakes': bool(retakes), 'per_student': per_student,
-        'max_total': 10 * exam.tasks_per_student(),
+        'max_total': task_max(exam) * exam.tasks_per_student(), 'task_max': task_max(exam),
         'exam_finished': exam.status(now) == 'finished',
     })
 

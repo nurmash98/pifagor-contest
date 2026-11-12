@@ -25,9 +25,16 @@
     <div class="col-lg-6">
         <div class="card border-0 shadow-sm rounded-4 p-4">
             {% if answer %}
-            <div class="alert {% if answer.best_score == 10 %}alert-success{% else %}alert-warning{% endif %} rounded-3">
-                <div class="d-flex justify-content-between"><strong>{% t "Лучший результат" %}</strong><span class="badge bg-dark">{{ answer.best_score }}/10</span></div>
+            <div class="alert {% if answer.best_score == task_max %}alert-success{% else %}alert-warning{% endif %} rounded-3">
+                <div class="d-flex justify-content-between"><strong>{% t "Лучший результат" %}</strong><span class="badge bg-dark">{{ answer.best_score }}/{{ task_max }}</span></div>
                 <div class="small mt-1">{% t "Последняя отправка" %}: {% t "пройдено тестов" %} {{ answer.tests_passed }}/{{ answer.tests_total }}</div>
+                {% if groups %}
+                <table class="table table-sm small mb-1 mt-2 bg-transparent">
+                    <tr><th>{% t "Группа" %}</th><th>{% t "Тесты" %}</th><th class="text-end">{% t "Баллы" %}</th></tr>
+                    {% for g in groups %}<tr class="{% if g.got %}text-success{% else %}text-danger{% endif %}"><td>{{ g.n }}</td><td>{{ g.passed }}/{{ g.total }}</td><td class="text-end fw-bold">{{ g.got }}/{{ g.points }}</td></tr>{% endfor %}
+                </table>
+                <div class="small text-muted">{% t "Баллы группы даются, только если пройдены все её тесты. Номера ниже — все тесты по порядку (сначала примеры)." %}</div>
+                {% endif %}
                 <div class="d-flex flex-wrap gap-1 mt-2">
                     {% for r in answer.results %}
                         {% if r.ok %}<span class="badge bg-success">{{ forloop.counter }} ✓</span>

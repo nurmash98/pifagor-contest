@@ -65,12 +65,12 @@ def outputs_match(actual, expected):
     return len(a) == len(e) and all(_tokens_match(x, y) for x, y in zip(a, e))
 
 
-def _limit_resources():
+def _limit_resources(cpu=TIME_LIMIT_SECONDS):
     """Выполняется в дочернем процессе (preexec_fn) перед запуском кода ученика."""
     if not HAS_RESOURCE:
         return
     try:
-        resource.setrlimit(resource.RLIMIT_CPU, (TIME_LIMIT_SECONDS, TIME_LIMIT_SECONDS))
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
         # Ограничение числа процессов — от "форк-бомб" в присланном коде.
         resource.setrlimit(resource.RLIMIT_NPROC, (32, 32))
@@ -93,23 +93,25 @@ def _sandbox_user():
     return getattr(settings, 'AUTOTEST_SANDBOX_USER', '') or ''
 
 
-def build_command(tmp_path, sandbox_user=None):
+def build_command(tmp_path, sandbox_user=None, time_limit=None):
     """Команда запуска кода ученика. Возвращает (argv, wall_timeout, использовать_ли_preexec).
     Без песочницы — тот же Python, лимиты ставятся в дочернем процессе (preexec_fn).
     С песочницей (на сервере) — под отдельным пользователем без доступа к файлам приложения:
     sudo -> prlimit (лимиты CPU/память/процессы/файлы) -> timeout (убить по времени, даже если
     программа «спит») -> python -I."""
+    cpu = int(time_limit or TIME_LIMIT_SECONDS)
+    wall_clock = cpu + 0.5
     if not sandbox_user:
-        return [sys.executable, tmp_path], WALL_CLOCK_TIMEOUT, True
+        return [sys.executable, tmp_path], wall_clock, True
     from django.conf import settings
     py = getattr(settings, 'AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3') or '/usr/bin/python3'
     argv = ['sudo', '-n', '-u', sandbox_user, '--', '/usr/bin/prlimit',
-            f'--cpu={TIME_LIMIT_SECONDS}', f'--as={MEMORY_LIMIT_BYTES}', '--nproc=64', f'--fsize={10 * 1024 * 1024}', '--core=0',
-            '/usr/bin/timeout', '-s', 'KILL', str(WALL_CLOCK_TIMEOUT), py, '-I', tmp_path]
-    return argv, WALL_CLOCK_TIMEOUT + 2.5, False
+            f'--cpu={cpu}', f'--as={MEMORY_LIMIT_BYTES}', '--nproc=64', f'--fsize={10 * 1024 * 1024}', '--core=0',
+            '/usr/bin/timeout', '-s', 'KILL', str(wall_clock), py, '-I', tmp_path]
+    return argv, wall_clock + 2.5, False
 
 
-def _run_one(code, stdin_text):
+def _run_one(code, stdin_text, time_limit=None):
     """Запускает code одним процессом Python, скармливает stdin_text на stdin.
     Возвращает (stdout, error), где error — None, 'timeout', 'memory' или
     короткое сообщение об ошибке выполнения."""
@@ -118,7 +120,8 @@ def _run_one(code, stdin_text):
         tmp_path = f.name
 
     user = _sandbox_user()
-    argv, wall, use_preexec = build_command(tmp_path, user)
+    argv, wall, use_preexec = build_command(tmp_path, user, time_limit)
+    cpu = int(time_limit or TIME_LIMIT_SECONDS)
     try:
         if user:
             os.chmod(tmp_path, 0o644)      # пользователь песочницы должен прочитать файл
@@ -130,7 +133,7 @@ def _run_one(code, stdin_text):
             timeout=wall,
             env=_safe_env(),
             cwd=tempfile.gettempdir(),
-            preexec_fn=_limit_resources if (HAS_RESOURCE and use_preexec) else None,
+            preexec_fn=(lambda: _limit_resources(cpu)) if (HAS_RESOURCE and use_preexec) else None,
         )
     except subprocess.TimeoutExpired:
         return '', 'timeout'
@@ -178,11 +181,12 @@ def run_autotests(task, code):
 
     results = []
     passed = 0
+    limit = getattr(task, 'time_limit', None) or TIME_LIMIT_SECONDS
     try:
         for case in test_cases:
             expected = str(case.get('output', ''))
             stdin_text = str(case.get('input', ''))
-            actual, error = _run_one(code, stdin_text)
+            actual, error = _run_one(code, stdin_text, limit)
             ok = error is None and outputs_match(actual, expected)
             if ok:
                 passed += 1
@@ -192,8 +196,33 @@ def run_autotests(task, code):
                 'input': stdin_text[:OUTPUT_PREVIEW_LIMIT],
                 'expected': expected[:OUTPUT_PREVIEW_LIMIT],
                 'actual': actual.strip()[:OUTPUT_PREVIEW_LIMIT],
+                'group': case.get('group'),
             })
     except Exception:
         return {'available': False}
 
     return {'available': True, 'passed': passed, 'total': len(test_cases), 'results': results}
+
+
+def group_summary(task, results):
+    """Олимпиадная оценка по группам: [{'n', 'points', 'got', 'passed', 'total'}] и сумма баллов.
+    Баллы группы засчитываются, только если пройдены все её тесты."""
+    weights = list(getattr(task, 'test_groups', None) or [])
+    groups = []
+    for n, points in enumerate(weights, 1):
+        mine = [r for r in results if r.get('group') == n]
+        passed = sum(1 for r in mine if r.get('ok'))
+        ok = bool(mine) and passed == len(mine)
+        groups.append({'n': n, 'points': points, 'got': points if ok else 0, 'passed': passed, 'total': len(mine)})
+    examples = [r for r in results if not r.get('group')]
+    return groups, sum(g['got'] for g in groups), examples
+
+
+def olympiad_points(task, result):
+    """Баллы олимпиады за задачу (из 100): по группам тестов, а если групп нет — доля пройденных тестов."""
+    if not result.get('available'):
+        return 0
+    if getattr(task, 'test_groups', None):
+        return group_summary(task, result['results'])[1]
+    total = result['total']
+    return int(100 * result['passed'] / total + 0.5) if total else 0
