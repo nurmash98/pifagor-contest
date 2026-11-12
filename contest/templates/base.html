@@ -62,6 +62,8 @@
         .coin-ico { display:inline-block; width:1.25em; height:1.25em; vertical-align:-.28em; object-fit:contain; }
 </style>
     {% include "theme_head.html" %}
+    <script>if (window.self !== window.top) { document.documentElement.classList.add('in-frame'); }</script>
+    <style>.in-frame body > nav.navbar, .in-frame .exam-back, .in-frame .no-frame { display: none !important; }</style>
 </head>
 <body class="d-flex flex-column min-vh-100">
 

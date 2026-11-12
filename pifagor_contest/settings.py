@@ -218,3 +218,6 @@ SESSION_COOKIE_AGE = 3600  # 60 минут
 # политику браузеров: другим сайтам передаётся только домен, без пути и параметров.
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SESSION_SAVE_EVERY_REQUEST = True
+
+# СОР/СОЧ открываются внутри полноэкранной страницы-оболочки (iframe того же сайта)
+X_FRAME_OPTIONS = 'SAMEORIGIN'

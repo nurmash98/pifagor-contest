@@ -28,6 +28,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from . import exam_guard
 from .names import sort_students
 from .autotest import run_autotests
 from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
@@ -253,6 +254,9 @@ def exam_detail(request, exam_id, retake_id=None):
     student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
+    blocked = exam_guard.guard(request, attempt)
+    if blocked is not None:
+        return blocked
     now = timezone.now()
     window = retake or exam
     state = window.status(now)
@@ -296,6 +300,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'my_retake': my_retake, 'my_retake_state': my_retake_state,
         'exam_done': exam_done, 'exam_grade': exam_grade,
         'retake_done': retake_done, 'retake_grade': retake_grade, 'earlier_retakes': earlier_retakes,
+        'run_url': exam_guard.run_url(attempt) if attempt else '', 'max_exits': exam_guard.MAX_EXITS,
     })
 
 
@@ -347,6 +352,9 @@ def exam_task(request, exam_id, task_id, retake_id=None):
     task = get_object_or_404(Task, id=task_id)
     if attempt is None:
         return _to_detail(exam, retake)
+    blocked = exam_guard.guard(request, attempt)
+    if blocked is not None:
+        return blocked
     if task.id not in {t.id for t in attempt.task_list()}:
         messages.warning(request, 'Эта задача вам не выпала.')
         return _to_detail(exam, retake)
@@ -395,7 +403,7 @@ def exam_task(request, exam_id, task_id, retake_id=None):
     _apply_task_language([task], _get_content_lang(request))
     return render(request, 'exam_task.html', {
         'exam': exam, 'retake': retake, 'window': retake or exam, 'task': task, 'answer': answer,
-        'active': active, 'attempt': attempt,
+        'active': active, 'attempt': attempt, 'run_url': exam_guard.run_url(attempt),
         'max_submissions': EXAM_MAX_SUBMISSIONS,
         'submissions_left': EXAM_MAX_SUBMISSIONS - (answer.submissions_count if answer else 0),
     })
@@ -595,7 +603,10 @@ def _result_rows(exam, students, attempts, now, per_student):
         else:
             cells = [{'task': t, 'answer': answers.get(t.id)} for t in tasks]
         rows.append({'student': st, 'attempt': attempt, 'status': status, 'cells': cells,
-                     'grade': attempt.grade() if attempt else 0})
+                     'grade': attempt.grade() if attempt else 0,
+                     'exit_rows': exam_guard.exit_rows(attempt) if attempt else [],
+                     'can_restore': attempt is not None and now < attempt.window.end_at
+                                    and (not attempt.is_active(now) or attempt.exits or attempt.client)})
     return rows
 
 

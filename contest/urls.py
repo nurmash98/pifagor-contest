@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import exam_views
+from . import exam_guard
 from . import moderation_views
 from . import activity
 from . import codegame_views
@@ -68,6 +69,11 @@ urlpatterns = [
     path('exams/<int:exam_id>/', exam_views.exam_detail, name='exam_detail'),
     path('exams/<int:exam_id>/start/', exam_views.exam_start, name='exam_start'),
     path('exams/<int:exam_id>/finish/', exam_views.exam_finish, name='exam_finish'),
+    path('exams/<int:exam_id>/run/', exam_guard.exam_run, name='exam_run'),
+    path('exams/<int:exam_id>/retake/<int:retake_id>/run/', exam_guard.exam_run, name='retake_run'),
+    path('exams/attempt/<int:attempt_id>/arm/', exam_guard.exam_arm, name='exam_arm'),
+    path('exams/attempt/<int:attempt_id>/leave/', exam_guard.exam_leave, name='exam_leave'),
+    path('exams/attempt/<int:attempt_id>/restore/', exam_guard.exam_restore, name='exam_restore'),
     path('exams/<int:exam_id>/task/<int:task_id>/', exam_views.exam_task, name='exam_task'),
     path('exams/<int:exam_id>/edit/', exam_views.exam_edit, name='exam_edit'),
     path('exams/<int:exam_id>/delete/', exam_views.exam_delete, name='exam_delete'),

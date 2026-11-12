@@ -4,7 +4,8 @@
 {% block title %}{{ exam.title }} - Pifagor Contest{% endblock %}
 
 {% block content %}
-<div class="mb-3">
+{% include 'exam_frame_mark.html' with active=in_progress %}
+<div class="mb-3 exam-back">
     {% if retake %}<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
     {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a>{% endif %}
 </div>
@@ -36,13 +37,36 @@
         <p class="text-muted small mb-1">{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}</p>
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
-        <p class="text-muted small mb-4">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
-        <form method="post" action="{% if retake %}{% url 'retake_start' exam.id retake.id %}{% else %}{% url 'exam_start' exam.id %}{% endif %}">{% csrf_token %}
-            <button class="btn btn-danger btn-lg px-5 rounded-pill">▶ {% t "Начать" %}</button>
+        <p class="text-muted small mb-3">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
+        <div class="alert alert-warning rounded-4 text-start small mx-auto mb-4" style="max-width: 640px;">
+            <div class="fw-bold mb-1">🖥 {% t "СОР/СОЧ проходит в полноэкранном режиме" %}</div>
+            <ul class="mb-0 ps-3">
+                <li>{% t "Выход из полного экрана (Esc), переключение на другое окно, программу или вкладку, обновление страницы — это выход." %}</li>
+                <li>{% t "Каждый выход записывается со временем, учитель его видит." %} <strong>{% t "На 3-м выходе работа завершается." %}</strong></li>
+                <li>{% t "Работать можно только в одном браузере. Копировать и вставлять текст нельзя." %}</li>
+                <li>{% t "Если компьютер сломался или завис — сообщите учителю, он вернёт доступ." %}</li>
+            </ul>
+        </div>
+        <form method="post" id="exam-start-form" action="{% if retake %}{% url 'retake_start' exam.id retake.id %}{% else %}{% url 'exam_start' exam.id %}{% endif %}">{% csrf_token %}
+            <button class="btn btn-danger btn-lg px-5 rounded-pill" id="exam-start-btn">▶ {% t "Начать" %}</button>
         </form>
+        <p class="text-danger small mt-3 mb-0" id="exam-no-fs" style="display:none;">{% t "На этом устройстве нет полноэкранного режима. Откройте СОР/СОЧ на компьютере в Chrome или Edge." %}</p>
+        <script>
+        (function () {
+            var r = document.documentElement;
+            if (!(r.requestFullscreen || r.webkitRequestFullscreen)) {
+                document.getElementById('exam-start-btn').disabled = true;
+                document.getElementById('exam-no-fs').style.display = '';
+            }
+        })();
+        </script>
     </div>
 
 {% else %}
+    {% if attempt.finish_reason == 'exits' %}
+    <div class="alert alert-danger rounded-4">⛔ {% t "Работа завершена: было 3 выхода из полноэкранного режима." %}
+        {% t "Если это была проблема с компьютером — сообщите учителю, он может вернуть доступ." %}</div>
+    {% endif %}
     {% if finished %}
     <div class="row g-3 mb-3">
         <div class="{% if my_retake %}col-md-6{% else %}col-12{% endif %}">
@@ -118,7 +142,7 @@
 
     {% if in_progress %}
     <form method="post" action="{% if retake %}{% url 'retake_finish' exam.id retake.id %}{% else %}{% url 'exam_finish' exam.id %}{% endif %}" class="text-end"
-          onsubmit="return confirm('{% t "Завершить СОР/СОЧ? Изменить ответы потом будет нельзя." %}');">
+          onsubmit="if (this.dataset.sure) { return true; } this.dataset.sure = '1'; var b = this.querySelector('button'); b.className = 'btn btn-danger rounded-pill px-4'; b.textContent = '{% t "Завершить СОР/СОЧ? Изменить ответы потом будет нельзя." %} — {% t "нажмите ещё раз" %}'; return false;">
         {% csrf_token %}
         <button class="btn btn-outline-danger rounded-pill px-4">{% t "Завершить" %}</button>
     </form>

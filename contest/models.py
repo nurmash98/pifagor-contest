@@ -512,6 +512,12 @@ class ExamAttempt(models.Model):
     # Пусто — это попытка самого экзамена; иначе — попытка пересдачи (задачи всегда случайные).
     retake = models.ForeignKey(ExamRetake, null=True, blank=True, on_delete=models.CASCADE,
                                related_name='attempts', verbose_name="Пересдача")
+    # Полноэкранный режим: каждый выход (Esc, другое окно, другая вкладка, обновление) записывается;
+    # на 3-м выходе работа завершается. Попытка привязана к одному браузеру (ключ сессии).
+    exits = models.PositiveSmallIntegerField(default=0, verbose_name="Выходов из полного экрана")
+    exit_log = models.JSONField(default=list, blank=True, verbose_name="Журнал выходов")
+    client = models.CharField(max_length=64, blank=True, default='', verbose_name="Браузер (сессия)")
+    finish_reason = models.CharField(max_length=16, blank=True, default='', verbose_name="Причина завершения")
 
     class Meta:
         verbose_name = "Попытка СОР/СОЧ"

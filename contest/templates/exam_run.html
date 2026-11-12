@@ -1,0 +1,168 @@
+{% load ui_i18n %}<!DOCTYPE html>
+<html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ exam.title }} — {% t "полноэкранный режим" %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; background: #0f172a; overflow: hidden; }
+        body { font-family: 'Montserrat', system-ui, sans-serif; }
+        #bar { height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: #111827; color: #e5e7eb; font-size: 14px; }
+        #bar .ttl { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #bar .ex { margin-left: auto; white-space: nowrap; }
+        #bar .ex b { color: #fbbf24; }
+        #bar .ex.bad b { color: #f87171; }
+        #frame { display: block; width: 100%; height: calc(100% - 38px); border: 0; background: #fff; }
+        #gate { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px;
+                background: rgba(15, 23, 42, .97); color: #f8fafc; }
+        #gate .box { max-width: 560px; text-align: center; }
+        #gate h2 { font-weight: 800; }
+        #gate .warn { color: #fca5a5; font-weight: 700; }
+        .exit-dots { display: inline-flex; gap: 8px; margin: 10px 0 4px; }
+        .exit-dots span { width: 16px; height: 16px; border-radius: 50%; background: #334155; }
+        .exit-dots span.on { background: #ef4444; }
+    </style>
+</head>
+<body>
+<div id="bar">
+    <span class="ttl">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %} · {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</span>
+    <span class="ex" id="bar-exits">{% t "Выходы" %}: <b id="bar-n">{{ attempt.exits }}</b> / {{ max_exits }}</span>
+</div>
+<iframe id="frame" title="{{ exam.title }}"></iframe>
+
+<div id="gate">
+    <div class="box">
+        <div class="fs-1 mb-2" id="gate-icon">🖥</div>
+        <h2 id="gate-title">{% t "СОР/СОЧ — в полноэкранном режиме" %}</h2>
+        <p id="gate-text" class="mb-2">{% t "Нажмите кнопку, чтобы развернуть работу на весь экран. Не выходите из него до конца." %}</p>
+        <div class="exit-dots" id="dots">{% for i in "123"|make_list %}<span></span>{% endfor %}</div>
+        <p class="small text-secondary mb-4" id="gate-rule">{% t "Выход из полного экрана, другое окно или вкладка, обновление страницы — это выход. На 3-м выходе работа завершается." %}</p>
+        <button id="gate-btn" class="btn btn-danger btn-lg rounded-pill px-5">⛶ {% t "Войти в полноэкранный режим" %}</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    var MAX = {{ max_exits }}, exits = {{ attempt.exits }};
+    var armUrl = '{% url "exam_arm" attempt.id %}', leaveUrl = '{% url "exam_leave" attempt.id %}';
+    var frameUrl = '{{ frame_url }}', csrf = '{{ csrf_token }}';
+    var TXT = {
+        out: '{% t "Вы вышли из полноэкранного режима" %}',
+        outText: '{% t "Выход записан. Вернитесь в полноэкранный режим, чтобы продолжить." %}',
+        last: '{% t "Внимание: следующий выход завершит работу!" %}',
+        back: '{% t "Вернуться в полноэкранный режим" %}',
+        cont: '{% t "Продолжить работу" %}',
+        done: '{% t "Работа завершена" %}',
+        doneText: '{% t "Было 3 выхода из полноэкранного режима. Если это была проблема с компьютером — сообщите учителю." %}',
+        other: '{% t "Работа открыта в другом браузере" %}',
+        noFs: '{% t "На этом устройстве нет полноэкранного режима. Откройте СОР/СОЧ на компьютере в Chrome или Edge." %}'
+    };
+    var gate = document.getElementById('gate'), btn = document.getElementById('gate-btn'), frame = document.getElementById('frame');
+    var root = document.documentElement, canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    // state: gate — ещё не вошли; in — работа идёт; out — был выход, ждём возврата; done — конец
+    var state = 'gate', armed = false, loaded = false;
+
+    function inFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+    function enterFs() { try { var p = (root.requestFullscreen || root.webkitRequestFullscreen).call(root); if (p && p.catch) { p.catch(function () {}); } } catch (e) {} }
+    function exitFs() { try { if (inFs()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } } catch (e) {} }
+    function lockKeys() { try { if (navigator.keyboard && navigator.keyboard.lock) { navigator.keyboard.lock().catch(function () {}); } } catch (e) {} }
+    function post(url, data) {
+        var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+        for (var k in (data || {})) { fd.append(k, data[k]); }
+        return fetch(url, {method: 'POST', body: fd, credentials: 'same-origin', keepalive: true}).then(function (r) { return r.json(); });
+    }
+    function drawExits() {
+        document.getElementById('bar-n').textContent = exits;
+        document.getElementById('bar-exits').classList.toggle('bad', exits >= MAX - 1);
+        var d = document.querySelectorAll('#dots span');
+        for (var i = 0; i < d.length; i++) { d[i].classList.toggle('on', i < exits); }
+    }
+    function showGate(icon, title, text, btnText, warn) {
+        document.getElementById('gate-icon').textContent = icon;
+        document.getElementById('gate-title').textContent = title;
+        var t = document.getElementById('gate-text'); t.textContent = text; t.classList.toggle('warn', !!warn);
+        if (btnText) { btn.style.display = ''; btn.textContent = btnText; } else { btn.style.display = 'none'; }
+        gate.style.display = 'flex';
+    }
+    function finish(url) {
+        state = 'done'; exitFs();
+        try { if (navigator.keyboard && navigator.keyboard.unlock) { navigator.keyboard.unlock(); } } catch (e) {}
+        location.href = url || frameUrl;
+    }
+    function violation(kind) {
+        if (state !== 'in') { return; }
+        state = 'out';
+        exits = Math.min(MAX, exits + 1); drawExits();
+        showGate('⚠️', TXT.out + ' (' + exits + ' / ' + MAX + ')', exits >= MAX - 1 ? TXT.last : TXT.outText,
+                 inFs() ? TXT.cont : TXT.back, exits >= MAX - 1);
+        post(leaveUrl, {kind: kind}).then(function (d) {
+            exits = d.exits; drawExits();
+            if (!d.active) {
+                showGate('⛔', TXT.done, TXT.doneText, '', true);
+                setTimeout(function () { finish(d.detail); }, 3500);
+            }
+        }).catch(function () {});
+    }
+    function resume() {
+        if (state === 'done') { return; }
+        if (!inFs()) { enterFs(); return; }
+        if (!armed) { arm(); return; }
+        state = 'in'; gate.style.display = 'none';
+        try { frame.focus(); } catch (e) {}
+    }
+    function arm() {
+        post(armUrl).then(function (d) {
+            exits = d.exits; drawExits();
+            if (!d.active) { finish(d.detail); return; }
+            if (!d.ok) { showGate('🔒', TXT.other, '', '', true); exitFs(); return; }
+            armed = true; state = 'in'; gate.style.display = 'none';
+            if (!loaded) { loaded = true; frame.src = frameUrl; }
+        }).catch(function () { location.reload(); });
+    }
+
+    // ---- Защита страницы внутри рамки: клавиши, копирование, вставка, меню ----
+    function protect(doc) {
+        doc.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+        ['copy', 'cut', 'paste', 'drop', 'dragstart'].forEach(function (ev) {
+            doc.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); }, true);
+        });
+        doc.addEventListener('keydown', function (e) {
+            var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+            if (k === 'f12' || k === 'f11' || (mod && e.shiftKey && 'ijc'.indexOf(k) >= 0) ||
+                (mod && k.length === 1 && 'uspfcxvtnwrlo'.indexOf(k) >= 0)) {
+                e.preventDefault(); e.stopPropagation();
+            }
+        }, true);
+    }
+    protect(document);
+    function lostFocus(kind) {
+        // Клик внутрь рамки тоже снимает фокус с оболочки — считаем выходом, только если фокус ушёл со всей страницы.
+        setTimeout(function () { if (state === 'in' && !document.hasFocus()) { violation(kind); } }, 250);
+    }
+    frame.addEventListener('load', function () {
+        var win, doc;
+        try { win = frame.contentWindow; doc = frame.contentDocument; void doc.body; } catch (e) { frame.src = frameUrl; return; }
+        var mark = doc.getElementById('exam-state');
+        if (!mark) { frame.src = frameUrl; return; }                    // ушли на другую страницу сайта — назад к СОР
+        if (mark.getAttribute('data-active') !== '1') { finish(win.location.href); return; }   // работа завершена / время вышло
+        protect(doc);
+        win.addEventListener('blur', function () { lostFocus('blur'); });
+        doc.addEventListener('visibilitychange', function () { if (doc.hidden) { violation('hidden'); } });
+    });
+
+    if (!canFs) { showGate('🚫', TXT.noFs, '', '', true); return; }
+    drawExits();
+    btn.addEventListener('click', resume);
+    function onFs() {
+        if (inFs()) { lockKeys(); if (state === 'gate' || state === 'out') { resume(); } }
+        else if (state === 'in') { violation('fullscreen'); }
+    }
+    document.addEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    window.addEventListener('blur', function () { lostFocus('blur'); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { violation('hidden'); } });
+})();
+</script>
+</body>
+</html>

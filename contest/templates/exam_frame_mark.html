@@ -1,0 +1,3 @@
+{% comment %}Метка для полноэкранной оболочки СОР/СОЧ (exam_run): идёт ли работа. Если идущую работу открыли
+не внутри оболочки (напрямую во вкладке) — сразу переводим в оболочку.{% endcomment %}<div id="exam-state" data-active="{% if active %}1{% else %}0{% endif %}" hidden></div>
+{% if active and run_url %}<script>if (window.self === window.top) { location.replace('{{ run_url }}'); }</script>{% endif %}
