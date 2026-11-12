@@ -88,23 +88,12 @@
                         <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>{% if exam.is_olympiad %} <span class="badge bg-light text-dark border">{{ row.student.school_class }}</span>{% endif %}
                         <div class="small">{% if row.status == 'not_started' %}<span class="text-muted">не начинал</span>
                             {% elif row.status == 'in_progress' %}<span class="text-danger">пишет сейчас</span>
-                            {% elif row.attempt.finish_reason == 'exits' %}<span class="text-danger fw-semibold">завершено: 3 выхода</span>
                             {% else %}<span class="text-success">сдал</span>{% endif %}</div>
                         {% if row.attempt %}
                         <div class="small mt-1 d-flex flex-wrap align-items-center gap-1">
-                            {% if row.exit_rows %}
-                            <details>
-                                <summary class="badge {% if row.attempt.exits >= 3 %}bg-danger{% elif row.attempt.exits %}bg-warning text-dark{% else %}bg-light text-dark border{% endif %}" style="cursor: pointer; list-style: none;">🖥 выходов: {{ row.attempt.exits }}/3</summary>
-                                <ul class="list-unstyled small mb-0 mt-1 text-start">
-                                    {% for e in row.exit_rows %}
-                                    <li class="{% if e.restored %}text-success{% elif e.counted %}text-danger{% else %}text-muted{% endif %}"><span class="font-monospace">{{ e.at|date:"H:i:s" }}</span> — {% if e.n %}№{{ e.n }}: {% endif %}{{ e.text }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </details>
-                            {% else %}<span class="badge bg-light text-muted border">🖥 выходов: 0</span>{% endif %}
                             {% if row.can_restore %}
                             <form method="post" action="{% url 'exam_restore' row.attempt.id %}" class="d-inline"
-                                  onsubmit="return confirm('Вернуть доступ ученику {{ row.student.full_name|escapejs }}? Работа снова откроется, счётчик выходов обнулится, можно будет продолжить на другом компьютере.');">
+                                  onsubmit="return confirm('Вернуть доступ ученику {{ row.student.full_name|escapejs }}? Работа снова откроется, можно будет продолжить на другом компьютере.');">
                                 {% csrf_token %}
                                 <button class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" title="Если у ученика сломался или завис компьютер">↩ Вернуть доступ</button>
                             </form>

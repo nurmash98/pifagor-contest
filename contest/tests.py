@@ -2961,20 +2961,13 @@ class CodeHintsTests(RetakeTestBase):
 class ExamFullscreenTests(RetakeTestBase):
     def setUp(self):
         super().setUp()
-        from . import exam_guard
-        self._dedupe = exam_guard.DEDUPE_SECONDS
-        exam_guard.DEDUPE_SECONDS = 0
         self.live = Exam.objects.create(kind='SOR', title='СОР экран', school_class='7F',
                                         start_at=timezone.now() - timedelta(minutes=5),
                                         duration_minutes=40, created_by=self.teacher)
-        self.live.tasks.set([self.a_tasks[0]])
+        self.live.tasks.set([self.a_tasks[0], self.b_tasks[0]])
         self.st = self.students[0]
         self.att = ExamAttempt.objects.create(exam=self.live, student=self.st, started_at=timezone.now())
         self.client.force_login(self.st.user)
-
-    def tearDown(self):
-        from . import exam_guard
-        exam_guard.DEDUPE_SECONDS = self._dedupe
 
     def arm(self, client=None):
         return (client or self.client).post(reverse('exam_arm', args=[self.att.id])).json()
@@ -2990,46 +2983,24 @@ class ExamFullscreenTests(RetakeTestBase):
         self.assertRedirects(r, reverse('exam_run', args=[self.live.id]))
         r = self.client.get(reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]), headers={'Sec-Fetch-Dest': 'document'})
         self.assertRedirects(r, reverse('exam_run', args=[self.live.id]))
-        # внутри рамки страница открывается
         r = self.client.get(reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]), headers={'Sec-Fetch-Dest': 'iframe'})
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'data-active="1"')
         self.assertNotEqual(r.headers.get('X-Frame-Options'), 'DENY')
 
-    def test_shell_arm_binds_browser_and_reload_counts_exit(self):
+    def test_shell_has_task_tabs_and_no_exit_counting(self):
         r = self.client.get(reverse('exam_run', args=[self.live.id]))
         self.assertContains(r, 'Войти в полноэкранный режим')
-        self.att.refresh_from_db(); self.assertEqual(self.att.exits, 0)       # первый вход — не выход
-        d = self.arm()
-        self.assertTrue(d['ok'])
-        self.att.refresh_from_db(); self.assertTrue(self.att.client)
-        self.client.get(reverse('exam_run', args=[self.live.id]))           # обновил страницу
+        tabs = r.context['tabs']
+        self.assertEqual([t['letter'] for t in tabs], ['A', 'B'])
+        self.assertEqual(tabs[0]['url'], reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]))
+        self.assertNotContains(r, 'exam_leave')
+        self.assertTrue(self.arm()['ok'])
+        for _ in range(5):                                                   # обновлял страницу сколько угодно
+            self.client.get(reverse('exam_run', args=[self.live.id]))
         self.att.refresh_from_db()
-        self.assertEqual(self.att.exits, 1)
-        self.assertEqual(self.att.exit_log[-1]['kind'], 'reload')
-
-    def test_third_exit_finishes_work(self):
-        self.arm()
-        for i, kind in enumerate(['fullscreen', 'blur', 'hidden'], 1):
-            d = self.client.post(reverse('exam_leave', args=[self.att.id]), {'kind': kind}).json()
-            self.assertEqual(d['exits'], i)
-        self.assertFalse(d['active'])
-        self.att.refresh_from_db()
-        self.assertIsNotNone(self.att.finished_at)
-        self.assertEqual(self.att.finish_reason, 'exits')
-        self.assertEqual([e['kind'] for e in self.att.exit_log], ['fullscreen', 'blur', 'hidden'])
-        # ответы больше не принимаются
-        self.client.post(reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]), {'code': 'print(1)'})
-        self.assertFalse(ExamAnswer.objects.filter(attempt=self.att).exists())
-
-    def test_duplicate_exit_within_seconds_counts_once(self):
-        from . import exam_guard
-        exam_guard.DEDUPE_SECONDS = 3
-        self.arm()
-        self.client.post(reverse('exam_leave', args=[self.att.id]), {'kind': 'fullscreen'})
-        self.client.post(reverse('exam_leave', args=[self.att.id]), {'kind': 'blur'})
-        self.att.refresh_from_db()
-        self.assertEqual(self.att.exits, 1)
+        self.assertIsNone(self.att.finished_at)
+        self.assertEqual(self.att.exits, 0)
 
     def test_second_browser_is_locked(self):
         from django.test import Client
@@ -3042,26 +3013,26 @@ class ExamFullscreenTests(RetakeTestBase):
         other.post(reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]), {'code': 'print(1)'})
         self.assertFalse(ExamAnswer.objects.filter(attempt=self.att).exists())
         self.att.refresh_from_db()
-        self.assertEqual(self.att.exits, 0)                                  # попытка с чужого браузера не засчитана
         self.assertEqual(self.att.exit_log[-1]['kind'], 'device')
 
-    def test_teacher_restores_access(self):
+    def test_teacher_restores_access_on_other_computer(self):
         self.arm()
-        for _ in range(3):
-            self.client.post(reverse('exam_leave', args=[self.att.id]), {'kind': 'blur'})
         self.client.force_login(self.teacher_user)
-        html = self.client.get(reverse('exam_results', args=[self.live.id])).content.decode()
-        self.assertIn('выходов: 3/3', html)
-        self.assertIn('Вернуть доступ', html)
+        self.assertContains(self.client.get(reverse('exam_results', args=[self.live.id])), 'Вернуть доступ')
         self.client.post(reverse('exam_restore', args=[self.att.id]))
         self.att.refresh_from_db()
-        self.assertIsNone(self.att.finished_at)
-        self.assertEqual((self.att.exits, self.att.client, self.att.finish_reason), (0, '', ''))
+        self.assertEqual(self.att.client, '')
         self.assertEqual(self.att.exit_log[-1]['kind'], 'restored')
-        # ученик может продолжить на другом компьютере
         from django.test import Client
         other = Client(); other.force_login(self.st.user)
         self.assertTrue(self.arm(other)['ok'])
+
+    def test_teacher_reopens_finished_work(self):
+        self.att.finished_at = timezone.now(); self.att.save()
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('exam_restore', args=[self.att.id]))
+        self.att.refresh_from_db()
+        self.assertIsNone(self.att.finished_at)
 
     def test_restore_refused_after_time_is_over(self):
         self.att.finished_at = timezone.now(); self.att.save()
@@ -3076,7 +3047,6 @@ class ExamFullscreenTests(RetakeTestBase):
         self.client.post(reverse('exam_restore', args=[self.att.id]))
         self.att.refresh_from_db()
         self.assertIsNotNone(self.att.finished_at)
-
 
 class OlympiadTests(RetakeTestBase):
     def setUp(self):

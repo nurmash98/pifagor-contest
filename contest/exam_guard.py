@@ -1,10 +1,10 @@
-"""СОР/СОЧ в полноэкранном режиме — как в игре «Бомба».
+"""СОР/СОЧ и олимпиада в полноэкранном режиме.
 
-Работа идёт на странице-«оболочке» (exam_run): она одна разворачивается на весь экран, а задачи,
-отправки и переходы открываются внутри неё в рамке (iframe), поэтому полный экран не слетает.
-Любой выход — Esc, другое окно или программа (Alt+Tab), другая вкладка, обновление страницы —
-записывается с временем; на MAX_EXITS-м выходе работа завершается. Попытка привязана к одному
-браузеру: открыть её в другом нельзя. Учитель может вернуть доступ (если у ученика сломался компьютер).
+Работа идёт на странице-«оболочке» (exam_run): она одна разворачивается на весь экран, а задачи
+(вкладки A, B, C…), отправки и переходы открываются внутри неё в рамке (iframe), поэтому полный экран
+не слетает. Вышел из полного экрана — работа закрыта заставкой, пока не вернётся (выходы не считаются).
+Попытка привязана к одному браузеру: открыть её в другом нельзя. Учитель может вернуть доступ
+(если у ученика сломался компьютер) — тогда можно продолжить на другом.
 """
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -18,8 +18,6 @@ from django.views.decorators.http import require_POST
 
 from .models import ExamAttempt, Student
 
-MAX_EXITS = 3
-DEDUPE_SECONDS = 3          # Esc + потеря фокуса одновременно — это один выход
 KINDS = {
     'fullscreen': 'вышел из полноэкранного режима',
     'blur': 'переключился на другое окно или программу',
@@ -51,29 +49,6 @@ def _log(attempt, kind, **extra):
     entry = {'at': timezone.now().isoformat(), 'kind': kind}
     entry.update(extra)
     attempt.exit_log = list(attempt.exit_log or []) + [entry]
-
-
-def record_exit(attempt, kind):
-    """Засчитать выход (с защитой от двойного счёта). Возвращает обновлённую попытку."""
-    with transaction.atomic():
-        attempt = ExamAttempt.objects.select_for_update().get(pk=attempt.pk)
-        if not attempt.is_active():
-            return attempt
-        now = timezone.now()
-        counted = [e for e in (attempt.exit_log or []) if e.get('counted')]
-        if counted:
-            last = timezone.datetime.fromisoformat(counted[-1]['at'])
-            if (now - last).total_seconds() < DEDUPE_SECONDS:
-                return attempt
-        attempt.exits += 1
-        _log(attempt, kind if kind in KINDS else 'fullscreen', counted=True, n=attempt.exits)
-        fields = ['exits', 'exit_log']
-        if attempt.exits >= MAX_EXITS:
-            attempt.finished_at = now
-            attempt.finish_reason = 'exits'
-            fields += ['finished_at', 'finish_reason']
-        attempt.save(update_fields=fields)
-        return attempt
 
 
 def guard(request, attempt):
@@ -110,14 +85,16 @@ def exam_run(request, exam_id, retake_id=None):
         _log(attempt, 'device')
         attempt.save(update_fields=['exit_log'])
         return render(request, 'exam_locked.html', {'attempt': attempt, 'exam': exam})
-    if attempt.client == me:
-        # Попытка уже шла в полном экране, а оболочку открыли заново (обновили, закрыли и открыли).
-        attempt = record_exit(attempt, 'reload')
-        if not attempt.is_active():
-            return redirect(detail_url(attempt))
+    # Вкладки задач A, B, C… — переход по ним идёт внутри рамки, полный экран не слетает.
+    letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    tabs = []
+    for i, task in enumerate(attempt.task_list()):
+        url = (reverse('retake_task', args=[exam.id, retake.id, task.id]) if retake
+               else reverse('exam_task', args=[exam.id, task.id]))
+        tabs.append({'letter': letters[i] if i < len(letters) else str(i + 1), 'title': task.title, 'url': url})
     return render(request, 'exam_run.html', {
         'exam': exam, 'retake': retake, 'attempt': attempt, 'window': retake or exam,
-        'max_exits': MAX_EXITS, 'frame_url': detail_url(attempt),
+        'frame_url': detail_url(attempt), 'tabs': tabs,
     })
 
 
@@ -127,8 +104,7 @@ def _own_attempt(request, attempt_id):
 
 
 def _state(attempt, ok=True):
-    return JsonResponse({'ok': ok, 'exits': attempt.exits, 'max': MAX_EXITS,
-                         'active': attempt.is_active(), 'detail': detail_url(attempt)})
+    return JsonResponse({'ok': ok, 'active': attempt.is_active(), 'detail': detail_url(attempt)})
 
 
 @login_required
@@ -141,17 +117,6 @@ def exam_arm(request, attempt_id):
         ExamAttempt.objects.filter(pk=attempt.pk, client='').update(client=me)
         attempt.refresh_from_db()
     return _state(attempt, ok=attempt.is_active() and attempt.client == me)
-
-
-@login_required
-@require_POST
-def exam_leave(request, attempt_id):
-    """Браузер сообщает о выходе из полноэкранного режима (или потере фокуса)."""
-    attempt = _own_attempt(request, attempt_id)
-    if attempt.client and attempt.client != client_key(request):
-        return _state(attempt, ok=False)
-    attempt = record_exit(attempt, request.POST.get('kind', 'fullscreen'))
-    return _state(attempt)
 
 
 @staff_member_required
@@ -170,15 +135,13 @@ def exam_restore(request, attempt_id):
         messages.warning(request, f'Время уже вышло — вернуть доступ нельзя. Назначьте ученику пересдачу.')
         return redirect(back)
     teacher = getattr(request.user, 'teacher', None)
-    _log(attempt, 'restored', by=(teacher.full_name if teacher else request.user.username),
-         exits_before=attempt.exits)
+    _log(attempt, 'restored', by=(teacher.full_name if teacher else request.user.username))
     attempt.finished_at = None
     attempt.finish_reason = ''
-    attempt.exits = 0
     attempt.client = ''
-    attempt.save(update_fields=['exit_log', 'finished_at', 'finish_reason', 'exits', 'client'])
+    attempt.save(update_fields=['exit_log', 'finished_at', 'finish_reason', 'client'])
     messages.success(request, f'Доступ возвращён: {attempt.student.full_name} может продолжить '
-                              f'(на этом или другом компьютере), счётчик выходов обнулён.')
+                              f'на этом или другом компьютере.')
     return redirect(back)
 
 

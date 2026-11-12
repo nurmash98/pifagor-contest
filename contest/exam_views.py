@@ -326,7 +326,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'my_retake': my_retake, 'my_retake_state': my_retake_state,
         'exam_done': exam_done, 'exam_grade': exam_grade,
         'retake_done': retake_done, 'retake_grade': retake_grade, 'earlier_retakes': earlier_retakes,
-        'run_url': exam_guard.run_url(attempt) if attempt else '', 'max_exits': exam_guard.MAX_EXITS,
+        'run_url': exam_guard.run_url(attempt) if attempt else '',
         'olymp': olymp, 'max_subs': max_submissions(exam), 'task_max': task_max(exam),
     })
 
@@ -670,7 +670,7 @@ def _result_rows(exam, students, attempts, now, per_student):
                      'grade': attempt.grade() if attempt else 0,
                      'exit_rows': exam_guard.exit_rows(attempt) if attempt else [],
                      'can_restore': attempt is not None and now < attempt.window.end_at
-                                    and (not attempt.is_active(now) or attempt.exits or attempt.client)})
+                                    and (not attempt.is_active(now) or bool(attempt.client))})
     return rows
 
 
