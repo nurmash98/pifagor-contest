@@ -3424,3 +3424,30 @@ class RunCppTests(TestCase):
         self.assertEqual(self.client.get(reverse('run_cpp')).status_code, 405)
         self.client.logout()
         self.assertEqual(self.client.post(reverse('run_cpp'), {'code': 'x'}).status_code, 302)
+
+
+class OlympiadWithoutFullscreenTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.task = make_task('Олимп-без-экрана', 'C', self.tag1)
+        self.olymp = Exam.objects.create(kind='OLYM', title='Свободная', school_class='', duration_minutes=60,
+                                         start_at=timezone.now() - timedelta(minutes=1), created_by=self.teacher)
+        self.olymp.tasks.set([self.task]); self.olymp.participants.add(self.students[0])
+        self.client.force_login(self.students[0].user)
+
+    def test_start_page_has_no_fullscreen_rules(self):
+        html = self.client.get(reverse('exam_detail', args=[self.olymp.id])).content.decode()
+        self.assertNotIn('СОР/СОЧ проходит в полноэкранном режиме', html)
+        self.assertIn('любом удобном компиляторе', html)
+
+    def test_pages_open_directly_without_shell_and_without_run_button(self):
+        ExamAttempt.objects.create(exam=self.olymp, student=self.students[0], started_at=timezone.now())
+        r = self.client.get(reverse('exam_detail', args=[self.olymp.id]), headers={'Sec-Fetch-Dest': 'document'})
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn('location.replace', r.content.decode())
+        r = self.client.get(reverse('exam_task', args=[self.olymp.id, self.task.id]), headers={'Sec-Fetch-Dest': 'document'})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'data-norun')
+        self.assertContains(r, 'lang-select')
+        self.assertRedirects(self.client.get(reverse('exam_run', args=[self.olymp.id])),
+                             reverse('exam_detail', args=[self.olymp.id]))

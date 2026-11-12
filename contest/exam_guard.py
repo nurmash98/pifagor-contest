@@ -36,6 +36,9 @@ def client_key(request):
 
 
 def run_url(attempt):
+    """Полноэкранная оболочка работы; у олимпиады её нет (пишут в любых своих компиляторах)."""
+    if attempt.exam.is_olympiad:
+        return ''
     if attempt.retake_id:
         return reverse('retake_run', args=[attempt.exam_id, attempt.retake_id])
     return reverse('exam_run', args=[attempt.exam_id])
@@ -53,8 +56,8 @@ def _log(attempt, kind, **extra):
 
 def guard(request, attempt):
     """Для страниц СОР/СОЧ ученика (список задач, задача). None — можно показывать страницу."""
-    if attempt is None or not attempt.is_active():
-        return None
+    if attempt is None or not attempt.is_active() or attempt.exam.is_olympiad:
+        return None            # олимпиада — без полного экрана и без привязки к браузеру
     me = client_key(request)
     if attempt.client and attempt.client != me:
         return render(request, 'exam_locked.html', {'attempt': attempt, 'exam': attempt.exam})
@@ -77,7 +80,7 @@ def exam_run(request, exam_id, retake_id=None):
     exam, retake, attempt = _student_attempt(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
-    if attempt is None or not attempt.is_active():
+    if attempt is None or not attempt.is_active() or exam.is_olympiad:
         return redirect(reverse('retake_detail', args=[exam.id, retake.id]) if retake
                         else reverse('exam_detail', args=[exam.id]))
     me = client_key(request)

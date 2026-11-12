@@ -39,6 +39,7 @@
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
         <p class="text-muted small mb-3">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
+{% if not exam.is_olympiad %}
         <div class="alert alert-warning rounded-4 text-start small mx-auto mb-4" style="max-width: 640px;">
             <div class="fw-bold mb-1">🖥 {% t "СОР/СОЧ проходит в полноэкранном режиме" %}</div>
             <ul class="mb-0 ps-3">
@@ -47,6 +48,7 @@
                 <li>{% t "Если компьютер сломался или завис — сообщите учителю, он вернёт доступ." %}</li>
             </ul>
         </div>
+        {% else %}<p class="text-muted small mb-4">{% t "Решать можно в любом удобном компиляторе (Python или C++) — сюда вставьте готовый код и отправьте." %}</p>{% endif %}
         <form method="post" id="exam-start-form" action="{% if retake %}{% url 'retake_start' exam.id retake.id %}{% else %}{% url 'exam_start' exam.id %}{% endif %}">{% csrf_token %}
             <button class="btn btn-danger btn-lg px-5 rounded-pill" id="exam-start-btn">▶ {% t "Начать" %}</button>
         </form>
@@ -54,6 +56,7 @@
         <script>
         (function () {
             var r = document.documentElement;
+            if ({{ exam.is_olympiad|yesno:"true,false" }}) { return; }
             if (!(r.requestFullscreen || r.webkitRequestFullscreen)) {
                 document.getElementById('exam-start-btn').disabled = true;
                 document.getElementById('exam-no-fs').style.display = '';
