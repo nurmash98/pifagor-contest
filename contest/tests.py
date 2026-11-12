@@ -3095,12 +3095,17 @@ class OlympiadTests(RetakeTestBase):
 
     def test_only_added_students_see_olympiad(self):
         self.client.force_login(self.in_student.user)
-        self.assertContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        page = self.client.get(reverse('olympiad_list'))
+        self.assertContains(page, 'Школьная олимпиада')
+        self.assertContains(page, reverse('olympiad_list'))                # пункт меню «Олимпиада»
+        self.assertNotContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')   # не в СОР/СОЧ
         self.assertEqual(self.client.get(reverse('exam_detail', args=[self.olymp.id])).status_code, 200)
         self.client.force_login(self.other_class_in.user)              # другой класс — тоже видит
-        self.assertContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        self.assertContains(self.client.get(reverse('olympiad_list')), 'Школьная олимпиада')
         self.client.force_login(self.out_student.user)                  # одноклассник без приглашения — нет
-        self.assertNotContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        page = self.client.get(reverse('olympiad_list'))
+        self.assertNotContains(page, 'Школьная олимпиада')
+        self.assertNotContains(self.client.get(reverse('all_tasks')), reverse('olympiad_list'))   # и пункта меню нет
         r = self.client.get(reverse('exam_detail', args=[self.olymp.id]))
         self.assertRedirects(r, reverse('exam_list'))
         self.client.post(reverse('exam_start', args=[self.olymp.id]))
@@ -3140,7 +3145,7 @@ class OlympiadTests(RetakeTestBase):
             'kind': 'OLYM', 'title': 'Городская', 'start_at': start, 'duration_minutes': '180',
             'tasks': [self.b_tasks[2].id], 'hide_tasks': '1'})
         ex = Exam.objects.get(title='Городская')
-        self.assertRedirects(r, reverse('olympiad_participants', args=[ex.id]))
+        self.assertRedirects(r, reverse('olympiad_tasks', args=[ex.id]))
         self.assertEqual(ex.school_class, '')
         self.b_tasks[2].refresh_from_db()
         self.assertTrue(self.b_tasks[2].hidden)
@@ -3239,3 +3244,71 @@ class OlympiadGroupScoringTests(RetakeTestBase):
         bad = dict(item, title='Без группы 2', test_cases=item['test_cases'][:2])
         self.client.post(reverse('task_import'), {'json_text': json.dumps([bad])})
         self.assertFalse(Task.objects.filter(title='Без группы 2').exists())
+
+
+class OlympiadSectionTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.olymp = Exam.objects.create(kind='OLYM', title='Весенняя', school_class='', duration_minutes=60,
+                                         start_at=timezone.now() + timedelta(days=1), created_by=self.teacher)
+        self.client.force_login(self.teacher_user)
+
+    def item(self, title, **kw):
+        d = {'title': title, 'level': 'C', 'description': 'd', 'input_example': '1', 'output_example': '1',
+             'test_groups': [40, 60], 'time_limit': 2,
+             'test_cases': [{'input': '1', 'output': '1', 'group': 0}, {'input': '2', 'output': '2', 'group': 1},
+                            {'input': '3', 'output': '3', 'group': 2}]}
+        d.update(kw)
+        return d
+
+    def test_teacher_section_lists_olympiads_not_exams(self):
+        page = self.client.get(reverse('olympiad_list'))
+        self.assertContains(page, 'Весенняя')
+        self.assertNotContains(page, 'СОР 1')
+        self.assertNotContains(self.client.get(reverse('exam_list')), 'Весенняя')
+
+    def test_create_olympiad_without_tasks(self):
+        start = (timezone.localtime() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M')
+        self.client.post(reverse('exam_create'), {'kind': 'OLYM', 'title': 'Пустая', 'start_at': start, 'duration_minutes': '90'})
+        self.assertTrue(Exam.objects.filter(title='Пустая', kind='OLYM').exists())
+
+    def test_json_upload_adds_hidden_tasks_to_olympiad(self):
+        import json
+        url = reverse('olympiad_tasks', args=[self.olymp.id])
+        r = self.client.post(url, {'action': 'import', 'json_text': json.dumps([self.item('O-1'), self.item('O-2')])})
+        self.assertRedirects(r, url)
+        self.assertEqual(sorted(self.olymp.tasks.values_list('title', flat=True)), ['O-1', 'O-2'])
+        t = Task.objects.get(title='O-1')
+        self.assertTrue(t.hidden)
+        self.assertEqual((t.test_groups, t.time_limit), ([40, 60], 2))
+        # повторная загрузка того же файла в другую олимпиаду — задачи берутся с сайта, дубликатов нет
+        other = Exam.objects.create(kind='OLYM', title='Вторая', school_class='', duration_minutes=60,
+                                    start_at=timezone.now() + timedelta(days=1), created_by=self.teacher)
+        self.client.post(reverse('olympiad_tasks', args=[other.id]), {'action': 'import', 'json_text': json.dumps([self.item('O-1')])})
+        self.assertEqual(Task.objects.filter(title='O-1').count(), 1)
+        self.assertEqual(list(other.tasks.values_list('title', flat=True)), ['O-1'])
+        self.assertContains(self.client.get(url), 'O-2')
+        # убрать задачу из олимпиады
+        self.client.post(url, {'action': 'remove', 'task': t.id})
+        self.assertEqual(list(self.olymp.tasks.values_list('title', flat=True)), ['O-2'])
+
+    def test_upload_from_file_and_errors(self):
+        import io, json
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        url = reverse('olympiad_tasks', args=[self.olymp.id])
+        f = SimpleUploadedFile('o.json', json.dumps([self.item('F-1')]).encode(), content_type='application/json')
+        self.client.post(url, {'action': 'import', 'json_file': f})
+        self.assertTrue(self.olymp.tasks.filter(title='F-1').exists())
+        self.client.post(url, {'action': 'import', 'json_text': json.dumps([self.item('Bad', test_groups=[1, 2, 3])])})
+        self.assertFalse(Task.objects.filter(title='Bad').exists())          # нет тестов группы 3
+
+    def test_no_changes_after_start(self):
+        import json
+        self.olymp.start_at = timezone.now() - timedelta(minutes=1); self.olymp.save()
+        self.client.post(reverse('olympiad_tasks', args=[self.olymp.id]), {'action': 'import', 'json_text': json.dumps([self.item('Late')])})
+        self.assertFalse(Task.objects.filter(title='Late').exists())
+
+    def test_student_cannot_open_tasks_page(self):
+        self.client.force_login(self.students[0].user)
+        r = self.client.get(reverse('olympiad_tasks', args=[self.olymp.id]))
+        self.assertNotEqual(r.status_code, 200)

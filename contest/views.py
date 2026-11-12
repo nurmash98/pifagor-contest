@@ -1778,15 +1778,20 @@ TASK_IMPORT_MAX_BYTES = 8 * 1024 * 1024  # 8 МБ JSON (олимпиадные �
 TASK_IMPORT_MAX_TASKS = 200
 
 
-def _parse_tasks_json(data):
+def _parse_tasks_json(data, reuse_existing=False):
     """Проверка JSON для импорта задач. Принимает список задач (или одну задачу-объект).
-    Возвращает (задачи, ошибки); если есть хоть одна ошибка — ничего не импортируем."""
+    Возвращает (задачи, ошибки); если есть хоть одна ошибка — ничего не импортируем.
+    reuse_existing=True (олимпиада): задача с уже существующим названием не ошибка — она берётся
+    с сайта; тогда возвращается третьим элементом список таких задач."""
+    def done(items, errors, existing=()):
+        return (items, errors, list(existing)) if reuse_existing else (items, errors)
     if isinstance(data, dict):
         data = [data]
     if not isinstance(data, list) or not data:
-        return [], ['Ожидается список задач: [ {...}, {...} ].']
+        return done([], ['Ожидается список задач: [ {...}, {...} ].'])
     if len(data) > TASK_IMPORT_MAX_TASKS:
-        return [], [f'За раз можно загрузить не больше {TASK_IMPORT_MAX_TASKS} задач.']
+        return done([], [f'За раз можно загрузить не больше {TASK_IMPORT_MAX_TASKS} задач.'])
+    reused = []
 
     existing = set(Task.objects.values_list('title', flat=True))
     seen, items, errors = set(), [], []
@@ -1805,6 +1810,9 @@ def _parse_tasks_json(data):
         if level not in TASK_LEVELS:
             errors.append(f'{where}: поле «level» должно быть A, B или C.')
         item['level'] = level
+        if item['title'] in existing and reuse_existing:
+            reused.append(Task.objects.get(title=item['title']))
+            continue
         if item['title'] in existing:
             errors.append(f'{where}: задача с таким названием уже есть на сайте.')
         elif item['title'] in seen:
@@ -1849,7 +1857,7 @@ def _parse_tasks_json(data):
             errors.append(f'{where}: «time_limit» — от 1 до 5 секунд.'); limit = 1
         item['time_limit'] = limit
         items.append(item)
-    return items, errors
+    return done(items, errors, reused)
 
 
 @staff_member_required

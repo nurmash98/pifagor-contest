@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Олимпиада - Pifagor Contest{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">🏆 Олимпиада</h3>
+    <a href="{% url 'exam_create' %}?kind=OLYM" class="btn btn-warning rounded-pill px-3 fw-semibold">+ Создать олимпиаду</a>
+</div>
+<p class="text-muted small">Олимпиаду видят только ученики, которых вы добавите. Задачи загружаются из JSON и скрыты из общего каталога.
+    Проходит по времени в полноэкранном режиме, места — по сумме баллов.</p>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <ul class="list-group list-group-flush">
+        {% for o in olympiads %}
+        <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <strong style="color: #1a1a4b;">{{ o.title }}</strong>
+                {% if o.state == 'active' %}<span class="badge bg-danger ms-1">идёт</span>
+                {% elif o.state == 'upcoming' %}<span class="badge bg-info text-dark ms-1">запланирована</span>
+                {% else %}<span class="badge bg-light text-muted border ms-1">завершена</span>{% endif %}
+                <div class="text-muted small">{{ o.start_at|date:"d.m.Y H:i" }} · {{ o.duration_minutes }} мин ·
+                    задач: {{ o.task_count }}{% if not o.task_count %} <span class="text-danger">(добавьте задачи)</span>{% endif %} ·
+                    участников: {{ o.participant_count }}{% if not o.participant_count %} <span class="text-danger">(добавьте учеников)</span>{% endif %}</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'olympiad_tasks' o.id %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📋 Задачи</a>
+                <a href="{% url 'olympiad_participants' o.id %}" class="btn btn-outline-warning btn-sm rounded-pill px-3">👥 Участники</a>
+                <a href="{% url 'exam_results' o.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
+                {% if o.state == 'upcoming' %}
+                <a href="{% url 'exam_edit' o.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Изменить</a>
+                {% endif %}
+                <form method="post" action="{% url 'exam_delete' o.id %}" onsubmit="return confirm('Удалить олимпиаду «{{ o.title|escapejs }}» вместе с ответами учеников? Задачи останутся на сайте скрытыми.');">
+                    {% csrf_token %}<button class="btn btn-outline-danger btn-sm rounded-pill px-3">Удалить</button>
+                </form>
+            </div>
+        </li>
+        {% empty %}
+        <li class="list-group-item p-4 text-center text-muted">Олимпиад пока нет — создайте первую.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

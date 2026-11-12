@@ -122,10 +122,13 @@
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'leaderboard' %}">{% t "Лидерборд" %}</a>
                             </li>
                             {% if duels_visible %}
-                            <li class="nav-item me-3">
+                            <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'duels' %}">⚔️ {% t "Дуэли" %}</a>
                             </li>
                             {% endif %}
+                            <li class="nav-item me-3">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'olympiad_list' %}">🏆 {% t "Олимпиада" %}</a>
+                            </li>
 
                         <!-- ЕСЛИ ПОЛЬЗОВАТЕЛЬ — УЧЕНИК -->
                         {% else %}
@@ -133,7 +136,7 @@
                             <!-- Идёт СОР/СОЧ: Курсы и Все задачи закрыты до его окончания -->
                             <li class="nav-item me-2">
                                 <a class="btn btn-danger btn-sm fw-bold rounded-pill px-3" href="{{ active_exam_attempt.get_absolute_url }}">
-                                    ⏱ {% t "Идёт СОР/СОЧ" %}
+                                    ⏱ {% if active_exam_attempt.exam.is_olympiad %}{% t "Идёт олимпиада" %}{% else %}{% t "Идёт СОР/СОЧ" %}{% endif %}
                                 </a>
                             </li>
                             {% else %}
@@ -153,6 +156,11 @@
                             {% if duels_visible %}
                             <li class="nav-item">
                                 <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'duels' %}">⚔️ {% t "Дуэли" %}</a>
+                            </li>
+                            {% endif %}
+                            {% if olympiads_visible %}
+                            <li class="nav-item">
+                                <a class="nav-link fw-semibold text-pifagor-blue" href="{% url 'olympiad_list' %}">🏆 {% t "Олимпиада" %}</a>
                             </li>
                             {% endif %}
                             {% if games_visible %}

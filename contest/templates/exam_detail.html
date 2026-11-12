@@ -7,6 +7,7 @@
 {% include 'exam_frame_mark.html' with active=in_progress %}
 <div class="mb-3 exam-back">
     {% if retake %}<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
+    {% elif exam.is_olympiad %}<a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← {% t "Олимпиада" %}</a>
     {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a>{% endif %}
 </div>
 

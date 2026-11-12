@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Задачи: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← Олимпиада</a></div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">🏆 «{{ exam.title }}» — задачи</h3>
+    <div class="d-flex gap-2">
+        <a href="{% url 'olympiad_participants' exam.id %}" class="btn btn-outline-warning rounded-pill px-3">👥 Участники</a>
+        <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary rounded-pill px-3">Результаты</a>
+    </div>
+</div>
+<p class="text-muted small mb-4">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} ·
+    загруженные задачи скрыты из каталога, дуэлей и СОР — их видят только участники олимпиады.</p>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3">📥 Добавить задачи из JSON</h5>
+            {% if started %}
+            <div class="alert alert-secondary small mb-0">Олимпиада уже началась — задачи менять нельзя.</div>
+            {% else %}
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="import">
+                <label class="form-label fw-semibold small">JSON-файл (до {{ max_mb }} МБ)</label>
+                <input type="file" name="json_file" class="form-control mb-3" accept=".json,application/json">
+                <label class="form-label fw-semibold small">…или вставьте JSON сюда</label>
+                <textarea name="json_text" class="form-control font-monospace small mb-3" rows="8" placeholder='[{"title": "...", "level": "C", ...}]'>{{ pasted }}</textarea>
+                <button class="btn btn-pifagor-green px-4 rounded-pill">Добавить в олимпиаду</button>
+            </form>
+            <details class="small mt-3">
+                <summary class="text-muted" style="cursor: pointer;">Формат JSON</summary>
+                <p class="mt-2 mb-1">Список задач. Обязательно: <code>title</code>, <code>level</code> (A/B/C), <code>description</code>,
+                    <code>input_example</code>, <code>output_example</code>. Необязательно: <code>title_kk</code>, <code>description_kk</code>,
+                    <code>tags</code>, <code>time_limit</code> (1–5 с), <code>test_groups</code> — баллы групп, например <code>[20, 50, 30]</code>,
+                    <code>test_cases</code> — до 20 тестов <code>{"input", "output", "group"}</code> (группа 0 — примеры без баллов).</p>
+                <p class="mb-1">Если задача с таким названием уже есть на сайте, берётся она — повторно не создаётся.</p>
+                <pre class="bg-light p-2 rounded small mb-0">[{"title": "A. Сумма", "level": "C",
+  "description": "...", "input_example": "2 3",
+  "output_example": "5", "time_limit": 1,
+  "test_groups": [20, 50, 30],
+  "test_cases": [
+    {"input": "2 3", "output": "5", "group": 0},
+    {"input": "1 1", "output": "2", "group": 1}, ...]}]</pre>
+            </details>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white fw-bold py-3">📋 Задачи олимпиады: {{ tasks|length }}</div>
+            <ul class="list-group list-group-flush">
+                {% for t in tasks %}
+                <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <span class="fw-semibold">{{ forloop.counter }}. {{ t.title }}</span>
+                        <div class="small text-muted">тестов: {{ t.test_count }}{% if t.test_groups %} · группы {% for p in t.test_groups %}{{ p }}{% if not forloop.last %}+{% endif %}{% endfor %}{% endif %} · лимит {{ t.time_limit }} с
+                            {% if t.hidden %} · 🔒 скрыта{% endif %} · <a href="{% url 'task_edit' t.id %}">изменить условие</a></div>
+                    </div>
+                    {% if not started %}
+                    <form method="post" onsubmit="return confirm('Убрать «{{ t.title|escapejs }}» из олимпиады?');">{% csrf_token %}
+                        <input type="hidden" name="action" value="remove"><input type="hidden" name="task" value="{{ t.id }}">
+                        <button class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0">✕</button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="list-group-item p-4 text-center text-muted">Задач пока нет — загрузите JSON слева.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

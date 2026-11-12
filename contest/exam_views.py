@@ -190,8 +190,7 @@ def exam_list(request):
         return _teacher_exam_list(request)
     student = get_object_or_404(Student, user=request.user)
     now = timezone.now()
-    exams = list(Exam.objects.filter(Q(school_class=student.school_class) & ~Q(kind='OLYM') |
-                                     Q(kind='OLYM', participants=student)).distinct().prefetch_related('tasks'))
+    exams = list(Exam.objects.filter(school_class=student.school_class).exclude(kind='OLYM').prefetch_related('tasks'))
     attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=exams, retake__isnull=True)
                 .prefetch_related('answers')}
     retakes = list(ExamRetake.objects.filter(students=student, exam__in=exams).select_related('exam'))
@@ -467,7 +466,7 @@ def _can_manage(user, exam):
 
 def _teacher_exam_list(request):
     classes = _teacher_classes(request.user)
-    exams = Exam.objects.prefetch_related('tasks').all()
+    exams = Exam.objects.prefetch_related('tasks').exclude(kind='OLYM')   # олимпиады — в своём разделе
     if classes is not None:
         teacher = _teacher(request.user)
         exams = [e for e in exams if e.is_olympiad or e.school_class in classes or e.created_by_id == teacher.id]
@@ -522,7 +521,7 @@ def _exam_form(request, exam):
         chosen, slots = [], []
         if mode == 'fixed':
             chosen = list(tasks.filter(id__in=task_ids))
-            if not chosen:
+            if not chosen and kind != 'OLYM':          # олимпиаде задачи можно добавить потом из JSON
                 errors.append('Добавьте хотя бы одну задачу.')
         else:
             tag_ids = set(Tag.objects.values_list('id', flat=True))
@@ -568,7 +567,7 @@ def _exam_form(request, exam):
             messages.success(request, f'{exam.get_kind_display()} «{exam.title}» сохранён: {what}, '
                                       f'{timezone.localtime(exam.start_at):%d.%m.%Y %H:%M}, {duration} мин.')
             if exam.is_olympiad:
-                return redirect('olympiad_participants', exam_id=exam.id)
+                return redirect('olympiad_tasks' if is_new else 'olympiad_list', *([exam.id] if is_new else []))
             return redirect('exam_list')
         for e in errors:
             messages.error(request, e)
@@ -612,7 +611,7 @@ def exam_edit(request, exam_id):
         messages.error(request, 'Это СОР/СОЧ не вашего класса.')
         return redirect('exam_list')
     if exam.status() != 'upcoming':
-        messages.warning(request, 'СОР/СОЧ уже начался — изменить его нельзя.')
+        messages.warning(request, ('Олимпиада' if exam.is_olympiad else 'СОР/СОЧ') + ' уже началась — изменить нельзя.')
         return redirect('exam_results', exam_id=exam.id)
     return _exam_form(request, exam)
 
@@ -621,9 +620,11 @@ def exam_edit(request, exam_id):
 def exam_delete(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     if request.method == 'POST' and _can_manage(request.user, exam):
-        name = str(exam)
+        name, olymp = str(exam), exam.is_olympiad
         exam.delete()
         messages.success(request, f'{name} удалён.')
+        if olymp:
+            return redirect('olympiad_list')
     return redirect('exam_list')
 
 
@@ -873,4 +874,102 @@ def olympiad_participants(request, exam_id):
         st.started = st.id in started
     return render(request, 'olympiad_participants.html', {
         'exam': exam, 'participants': participants, 'classes': classes, 'by_class': by_class,
+    })
+
+
+# ---------------------------------------------------------------- раздел «Олимпиада» (отдельно от СОР/СОЧ)
+
+@login_required
+def olympiad_list(request):
+    now = timezone.now()
+    if request.user.is_staff:
+        olymps = list(Exam.objects.filter(kind='OLYM').prefetch_related('tasks'))
+        for o in olymps:
+            o.state = o.status(now)
+            o.participant_count = o.participants.count()
+            o.task_count = len(o.tasks.all())
+        return render(request, 'olympiads_teacher.html', {'olympiads': olymps})
+    student = get_object_or_404(Student, user=request.user)
+    olymps = list(Exam.objects.filter(kind='OLYM', participants=student).prefetch_related('tasks'))
+    attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=olymps, retake__isnull=True)
+                .prefetch_related('answers')}
+    active, upcoming, finished = [], [], []
+    for o in olymps:
+        o.my_attempt = attempts.get(o.id)
+        o.state = _attempt_state(o, o.my_attempt, now)
+        o.my_total = sum(a.best_score for a in o.my_attempt.answers.all()) if o.my_attempt else 0
+        o.max_total = 100 * len(o.tasks.all())
+        {'active': active, 'upcoming': upcoming}.get(o.state, finished).append(o)
+    upcoming.sort(key=lambda e: e.start_at)
+    return render(request, 'olympiads_student.html', {'active': active, 'upcoming': upcoming, 'finished': finished})
+
+
+@staff_member_required
+def olympiad_tasks(request, exam_id):
+    """Задачи олимпиады: загрузка из JSON (как импорт задач) и удаление из олимпиады.
+    Загруженные задачи скрыты из каталога — их видят только участники."""
+    from .views import TASK_IMPORT_MAX_BYTES, _parse_tasks_json
+    import json
+    from django.db import transaction
+    exam = get_object_or_404(Exam, id=exam_id, kind='OLYM')
+    started = exam.status() != 'upcoming'
+    pasted = ''
+    if request.method == 'POST':
+        action = request.POST.get('action', 'import')
+        if action == 'remove':
+            if started:
+                messages.warning(request, 'Олимпиада уже началась — убирать задачи нельзя.')
+            else:
+                exam.tasks.remove(*Task.objects.filter(id__in=[int(x) for x in request.POST.getlist('task') if x.isdigit()]))
+                messages.success(request, 'Задача убрана из олимпиады (на сайте она осталась скрытой).')
+            return redirect('olympiad_tasks', exam_id=exam.id)
+        upload = request.FILES.get('json_file')
+        pasted = request.POST.get('json_text', '')
+        raw = None
+        if started:
+            messages.warning(request, 'Олимпиада уже началась — добавлять задачи нельзя.')
+        elif upload:
+            if upload.size > TASK_IMPORT_MAX_BYTES:
+                messages.error(request, f'Файл слишком большой (максимум {TASK_IMPORT_MAX_BYTES // 1024 // 1024} МБ).')
+            else:
+                raw = upload.read()
+        elif pasted.strip():
+            raw = pasted.encode('utf-8')
+        else:
+            messages.error(request, 'Выберите JSON-файл или вставьте JSON в поле.')
+        if raw is not None:
+            try:
+                data = json.loads(raw.decode('utf-8-sig'))
+            except (UnicodeDecodeError, ValueError) as exc:
+                messages.error(request, f'Это не похоже на правильный JSON: {exc}')
+            else:
+                items, errors, existing = _parse_tasks_json(data, reuse_existing=True)
+                if errors:
+                    for e in errors[:30]:
+                        messages.error(request, e)
+                    messages.warning(request, 'Ничего не добавлено — исправьте ошибки и загрузите снова.')
+                else:
+                    added = []
+                    with transaction.atomic():
+                        for item in items:
+                            tags = item.pop('tags')
+                            item['hidden'] = True
+                            task = Task.objects.create(**item)
+                            for name in tags:
+                                tag, _ = Tag.objects.get_or_create(name=name)
+                                task.tags.add(tag)
+                            added.append(task)
+                        exam.tasks.add(*added, *existing)
+                    msg = f'Добавлено задач: {len(added) + len(existing)}'
+                    if existing:
+                        msg += f' (уже были на сайте, взяты оттуда: {len(existing)})'
+                    messages.success(request, msg + '.')
+                    return redirect('olympiad_tasks', exam_id=exam.id)
+    tasks = list(exam.tasks.defer('test_cases').prefetch_related('tags'))
+    counts = dict(exam.tasks.values_list('id', 'test_cases'))
+    for t in tasks:
+        t.test_count = len(counts.get(t.id) or [])
+    return render(request, 'olympiad_tasks.html', {
+        'exam': exam, 'tasks': tasks, 'started': started, 'pasted': pasted,
+        'max_mb': TASK_IMPORT_MAX_BYTES // 1024 // 1024,
     })
