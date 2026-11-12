@@ -3483,7 +3483,7 @@ class OlympiadExamplesAndGroupsTableTests(RetakeTestBase):
         ExamAttempt.objects.create(exam=self.olymp, student=self.students[0], started_at=timezone.now())
         self.client.force_login(self.students[0].user)
         html = self.client.get(reverse('exam_task', args=[self.olymp.id, self.task.id])).content.decode()
-        for x in ('a1', 'b1', 'a2', 'a3', 'b3', 'первый', 'task-groups', 'N ≤ 1000', '>60<', '2 с на тест'):
+        for x in ('a1', 'b1', 'a2', 'a3', 'b3', 'первый', 'tx-grid', 'N ≤ 1000', '>60<', '2 с на тест'):
             self.assertIn(x, html)
         self.assertNotIn('Пример ввода (Input)', html)
         self.client.get(reverse('set_content_lang', args=['kk']))
@@ -3504,4 +3504,4 @@ class OlympiadExamplesAndGroupsTableTests(RetakeTestBase):
         self.client.force_login(self.students[0].user)
         html = self.client.get(reverse('task_detail', args=[self.a_tasks[0].id])).content.decode()
         self.assertIn('Пример ввода (Input)', html)
-        self.assertNotIn('task-groups', html)
+        self.assertNotIn('tx-grid', html)
