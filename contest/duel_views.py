@@ -31,7 +31,7 @@ def _manageable_classes(user):
 def _class_rows(user):
     obj = SiteSettings.get()
     opened = set(obj.duel_class_list())
-    all_tags = list(Tag.objects.order_by('name'))
+    all_tags = list(Tag.visible().order_by('name'))
     rows = []
     for name in _manageable_classes(user):
         chosen = set((obj.duels_class_tags or {}).get(name) or [])

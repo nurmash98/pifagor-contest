@@ -61,6 +61,12 @@ class Student(models.Model):
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True, verbose_name="Название тега")
 
+    @classmethod
+    def visible(cls):
+        """Теги без олимпиадных: тег, у которого все задачи скрытые (олимпиадные), нигде не показываем."""
+        olymp_only = cls.objects.filter(tasks__hidden=True).exclude(tasks__hidden=False).values('id')
+        return cls.objects.exclude(id__in=olymp_only)
+
     class Meta:
         verbose_name = "Тег"
         verbose_name_plural = "Теги"

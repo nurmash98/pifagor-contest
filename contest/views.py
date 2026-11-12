@@ -347,7 +347,7 @@ def all_tasks_view(request):
         base = reverse('all_tasks')
         return f'{base}?{urlencode(params)}' if params else f'{base}?all=1'
 
-    all_tags = list(Tag.objects.all())
+    all_tags = list(Tag.visible())
     context = {
         'tasks': tasks,
         'current_level': level_filter,
@@ -1223,10 +1223,10 @@ def course_detail(request, course_id):
 
     # theory_html (до 2 МБ на тему) на странице курса не нужен — только признак, что он есть.
     topics = course.topics.prefetch_related(
-        Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))
+        Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags')))
     ).prefetch_related(
         Prefetch('subtopics', queryset=Subtopic.objects.defer('theory_html').prefetch_related(
-            Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.prefetch_related('tags')))))
+            Prefetch('tasks', queryset=_tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags')))))
     ).defer('theory_html')
     lang = _get_content_lang(request)
     for topic in topics:
@@ -1418,7 +1418,7 @@ def topic_create(request, course_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    all_tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
+    all_tasks = _tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags'))
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -1442,7 +1442,7 @@ def topic_create(request, course_id):
 
     return render(request, 'topic_form.html', {
         'course': course, 'topic': None, 'all_tasks': all_tasks, 'selected_task_ids': set(),
-        'all_tags': Tag.objects.all(),
+        'all_tags': Tag.visible(),
     })
 
 
@@ -1499,7 +1499,7 @@ def topic_edit(request, topic_id):
         messages.error(request, 'Это не ваш курс.')
         return redirect('teacher_dashboard')
 
-    all_tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
+    all_tasks = _tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags'))
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -1521,7 +1521,7 @@ def topic_edit(request, topic_id):
         'course': course, 'topic': topic, 'all_tasks': all_tasks,
         'subtopics': topic.subtopics.defer('theory_html').prefetch_related('tasks'),
         'selected_task_ids': set(topic.tasks.values_list('id', flat=True)),
-        'all_tags': Tag.objects.all(),
+        'all_tags': Tag.visible(),
     })
 
 
@@ -1597,7 +1597,7 @@ def subtopic_create(request, topic_id):
             return redirect('topic_edit', topic_id=topic.id)
     return render(request, 'subtopic_form.html', {
         'topic': topic, 'course': topic.course, 'sub': None, 'selected_task_ids': set(),
-        'all_tasks': _tasks_by_level_and_solved(Task.objects.prefetch_related('tags')), 'all_tags': Tag.objects.all(),
+        'all_tasks': _tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags')), 'all_tags': Tag.visible(),
     })
 
 
@@ -1626,7 +1626,7 @@ def subtopic_edit(request, subtopic_id):
     return render(request, 'subtopic_form.html', {
         'topic': sub.topic, 'course': sub.topic.course, 'sub': sub,
         'selected_task_ids': set(sub.tasks.values_list('id', flat=True)),
-        'all_tasks': _tasks_by_level_and_solved(Task.objects.prefetch_related('tags')), 'all_tags': Tag.objects.all(),
+        'all_tasks': _tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags')), 'all_tags': Tag.visible(),
     })
 
 
@@ -1650,7 +1650,7 @@ def task_tags_list(request):
     restored = _restore_filters(request, 'task_tags_list')
     if restored:
         return restored
-    tasks = _tasks_by_level_and_solved(Task.objects.prefetch_related('tags'))
+    tasks = _tasks_by_level_and_solved(Task.objects.filter(hidden=False).prefetch_related('tags'))
 
     level_filter = request.GET.get('level', '')
     if level_filter in ['A', 'B', 'C']:
@@ -1756,7 +1756,9 @@ def _task_form(request, task):
         'is_new': is_new,
         'v': form_values,
         'test_rows': test_rows,
-        'all_tags': Tag.objects.all(),
+        # олимпиадные теги видны только в самой олимпиадной задаче
+        'all_tags': (Tag.objects.filter(Q(id__in=Tag.visible().values('id')) | Q(tasks=task)).distinct()
+                     if task.pk else Tag.visible()),
         'selected_tag_ids': selected_tag_ids,
         'max_tests': MAX_TEST_CASES,
     })

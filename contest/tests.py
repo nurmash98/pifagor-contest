@@ -3354,3 +3354,73 @@ class OlympiadCppTests(RetakeTestBase):
         self.olymp.refresh_from_db()
         self.assertEqual(self.olymp.title, 'О++ новое')
         self.assertEqual(list(self.olymp.tasks.all()), [self.task])
+
+
+class OlympiadHiddenEverywhereTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.otag = Tag.objects.create(name='олимпиада 7–8')
+        self.secret = make_task('Секретная олимп', 'C', self.otag)
+        self.secret.hidden = True; self.secret.save()
+        self.mixed = Tag.objects.create(name='смешанный')            # тег и с обычной, и со скрытой задачей — виден
+        make_task('Обычная', 'A', self.mixed)
+        self.secret.tags.add(self.mixed)
+
+    def test_visible_tags(self):
+        names = set(Tag.visible().values_list('name', flat=True))
+        self.assertNotIn('олимпиада 7–8', names)
+        self.assertIn('смешанный', names)
+        self.assertIn('циклы', names)
+
+    def test_catalog_hides_task_and_tag_for_student_and_teacher(self):
+        for user in (self.students[0].user, self.teacher_user):
+            self.client.force_login(user)
+            html = self.client.get(reverse('all_tasks')).content.decode()
+            self.assertNotIn('Секретная олимп', html)
+            self.assertNotIn('олимпиада 7–8', html)
+
+    def test_teacher_lists_and_pickers_hide_olympiad(self):
+        self.client.force_login(self.teacher_user)
+        html = self.client.get(reverse('task_tags_list')).content.decode()
+        self.assertNotIn('Секретная олимп', html)
+        self.assertNotIn('олимпиада 7–8', html)
+        html = self.client.get(reverse('exam_create')).content.decode()        # форма СОР
+        self.assertNotIn('Секретная олимп', html)
+        self.assertNotIn('олимпиада 7–8', html)
+
+    def test_olympiad_task_edit_keeps_its_tag(self):
+        self.client.force_login(self.teacher_user)
+        html = self.client.get(reverse('task_edit', args=[self.secret.id])).content.decode()
+        self.assertIn('олимпиада 7–8', html)
+        other = Task.objects.get(title='Обычная')
+        self.assertNotIn('олимпиада 7–8', self.client.get(reverse('task_edit', args=[other.id])).content.decode())
+
+
+class RunCppTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        u = User.objects.create_user('cpp', password='x')
+        Student.objects.create(user=u, full_name='C++ Ученик', school_class='7F')
+        self.client.force_login(u)
+
+    def test_run_compile_error_and_throttle(self):
+        from .autotest import cpp_available
+        if not cpp_available():
+            self.skipTest('нет g++')
+        from django.core.cache import cache
+        url = reverse('run_cpp')
+        d = self.client.post(url, {'code': '#include <iostream>\nint main(){int a,b;std::cin>>a>>b;std::cout<<a*b;}', 'stdin': '6 7'}).json()
+        self.assertEqual((d['out'].strip(), d['compile_error']), ('42', ''))
+        self.assertIn('wait', self.client.post(url, {'code': 'int main(){}', 'stdin': ''}).json())   # не чаще раза в 5 с
+        cache.clear()
+        d = self.client.post(url, {'code': 'int main(){ return y; }', 'stdin': ''}).json()
+        self.assertIn('not declared', d['compile_error'])
+        cache.clear()
+        d = self.client.post(url, {'code': 'int main(){ while(1){} }', 'stdin': ''}).json()
+        self.assertEqual(d['error'], 'timeout')
+
+    def test_needs_login_and_post(self):
+        self.assertEqual(self.client.get(reverse('run_cpp')).status_code, 405)
+        self.client.logout()
+        self.assertEqual(self.client.post(reverse('run_cpp'), {'code': 'x'}).status_code, 302)

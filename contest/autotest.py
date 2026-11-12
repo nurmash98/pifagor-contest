@@ -298,3 +298,19 @@ def olympiad_points(task, result):
         return group_summary(task, result['results'])[1]
     total = result['total']
     return int(100 * result['passed'] / total + 0.5) if total else 0
+
+
+def run_cpp_once(code, stdin_text, time_limit=2):
+    """Кнопка «▶ Запустить» для C++: компиляция и один запуск на введённых данных.
+    Возвращает {'out', 'error', 'compile_error', 'ms'}."""
+    import shutil
+    import time
+    exe, workdir, compile_error = compile_cpp(code)
+    try:
+        if compile_error:
+            return {'out': '', 'error': None, 'compile_error': compile_error, 'ms': 0}
+        t0 = time.time()
+        out, error = _run_one(code, stdin_text, time_limit, exe=exe)
+        return {'out': (out or '')[:20000], 'error': error, 'compile_error': '', 'ms': int((time.time() - t0) * 1000)}
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)

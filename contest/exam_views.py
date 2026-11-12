@@ -495,7 +495,7 @@ def _teacher_exam_list(request):
 def _exam_form(request, exam):
     is_new = exam.pk is None
     classes = _teacher_classes(request.user)
-    tasks = Task.objects.exclude(test_cases=[]).defer('test_cases').prefetch_related('tags').order_by('level', 'title')
+    tasks = Task.objects.exclude(test_cases=[]).filter(hidden=False).defer('test_cases').prefetch_related('tags').order_by('level', 'title')
 
     if request.method == 'POST':
         errors = []
@@ -606,7 +606,7 @@ def _exam_form(request, exam):
     return render(request, 'exam_form.html', {
         'exam': exam, 'is_new': is_new, 'v': values, 'tasks': tasks, 'selected': selected,
         'class_choices': sorted(set(classes)) if classes is not None else None,
-        'all_tags': Tag.objects.all(), 'max_duration': EXAM_MAX_DURATION, 'olym_subs': OLYMPIAD_MAX_SUBMISSIONS,
+        'all_tags': Tag.visible(), 'max_duration': EXAM_MAX_DURATION, 'olym_subs': OLYMPIAD_MAX_SUBMISSIONS,
         'levels': Task.LEVEL_CHOICES, 'max_slots': EXAM_MAX_RANDOM_SLOTS,
         'slots': slot_values or [{'tag': None, 'level': '', 'pool': ''} for _ in range(3)],
     })
@@ -990,3 +990,31 @@ def olympiad_tasks(request, exam_id):
         'exam': exam, 'tasks': tasks, 'started': started, 'pasted': pasted,
         'max_mb': TASK_IMPORT_MAX_BYTES // 1024 // 1024,
     })
+
+
+# ---------------------------------------------------------------- «▶ Запустить» для C++ (на сервере)
+
+CPP_RUN_THROTTLE_SECONDS = 5
+CPP_RUN_MAX_CODE = 64 * 1024
+CPP_RUN_MAX_INPUT = 1024 * 1024
+
+
+@login_required
+def run_cpp(request):
+    """Запуск C++ без проверки тестами: браузер сам C++ не умеет, поэтому компилируем на сервере.
+    Не чаще раза в CPP_RUN_THROTTLE_SECONDS секунд на ученика, 2 секунды на запуск."""
+    from django.http import JsonResponse
+    from .autotest import run_cpp_once
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST'}, status=405)
+    if not cpp_available():
+        return JsonResponse({'compile_error': 'C++ на сервере недоступен (нет компилятора g++).'})
+    code = (request.POST.get('code') or '').replace('\r\n', '\n')
+    stdin = (request.POST.get('stdin') or '').replace('\r\n', '\n')
+    if not code.strip():
+        return JsonResponse({'compile_error': 'Код пустой.'})
+    if len(code) > CPP_RUN_MAX_CODE or len(stdin) > CPP_RUN_MAX_INPUT:
+        return JsonResponse({'compile_error': 'Слишком большой код или ввод.'})
+    if not cache.add(f'cpp_run:{request.user.id}', 1, CPP_RUN_THROTTLE_SECONDS):
+        return JsonResponse({'wait': CPP_RUN_THROTTLE_SECONDS})
+    return JsonResponse(run_cpp_once(code, stdin, time_limit=2))

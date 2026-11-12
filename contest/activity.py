@@ -104,7 +104,7 @@ def student_activity(request):
     return render(request, 'student_activity.html', {
         'rows': rows, 'totals': totals, 'periods': [(k, label) for k, label, _ in PERIODS], 'period': period,
         'all_classes': all_classes, 'class_filter': class_filter, 'levels': Task.LEVEL_CHOICES,
-        'picked_levels': levels, 'tags': Tag.objects.all(), 'tag_id': tag_id, 'start': start, 'my_classes': classes,
+        'picked_levels': levels, 'tags': Tag.visible(), 'tag_id': tag_id, 'start': start, 'my_classes': classes,
     })
 
 

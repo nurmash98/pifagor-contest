@@ -97,12 +97,17 @@
     }
 
     // ---- ▶ Запустить: Python прямо в браузере (Pyodide в Web Worker), лимит 2 секунды ----
+    var RUN_CPP_URL = '{% url "run_cpp" %}';
     var RUN_LIMIT_MS = 2000, PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
     var TXT = {run: '▶ {% t "Запустить" %}', stop: '■ {% t "Стоп" %}', input: '{% t "Входные данные" %}',
                loading: '{% t "Загружаем Python в браузер… (первый раз до 15 секунд)" %}', running: '{% t "Выполняется…" %}',
                tl: '{% t "Превышено время: больше 2 секунд. Проверьте, нет ли бесконечного цикла." %}',
                ok: '{% t "Совпадает с примером вывода" %}', diff: '{% t "Не совпадает с примером вывода" %}',
-               empty: '{% t "(пустой вывод)" %}', stopped: '{% t "Остановлено" %}', fail: '{% t "Не удалось загрузить Python. Проверьте интернет." %}',
+               empty: '{% t "(пустой вывод)" %}', stopped: '{% t "Остановлено" %}',
+               compiling: '{% t "Компилируем и запускаем на сервере…" %}', cerr: '{% t "Ошибка компиляции" %}',
+               rerr: '{% t "Ошибка выполнения" %}', wait: '{% t "Подождите N секунд перед следующим запуском." %}',
+               netfail: '{% t "Не удалось связаться с сервером." %}',
+               cppnote: '{% t "C++ запускается на сервере: не чаще раза в 5 секунд, до 2 секунд. Попытки не тратятся." %}', fail: '{% t "Не удалось загрузить Python. Проверьте интернет." %}',
                note: '{% t "Запуск только для проверки — он не тратит попытки и нигде не сохраняется." %}'};
     var WORKER_SRC = [
         "importScripts('" + PYODIDE + "pyodide.js');",
@@ -161,7 +166,34 @@
         var running = false, timer = null;
         function finish() { running = false; btn.textContent = TXT.run; clearTimeout(timer); pending = null; }
         function show(text, isErr) { out.style.display = ''; out.textContent = text; out.classList.toggle('err', !!isErr); }
+        function verdictFor(outText) {
+            if (expect !== null && expect.trim() && inp.value === (ta.getAttribute('data-stdin') || '')) {
+                return norm(outText) === norm(expect) ? ' · ✅ ' + TXT.ok : ' · ⚠️ ' + TXT.diff;
+            }
+            return '';
+        }
+        // C++: браузер его не выполняет — компилируем и запускаем на сервере (2 секунды, не чаще раза в 5 секунд)
+        function runCpp() {
+            var tok = document.querySelector('[name=csrfmiddlewaretoken]');
+            var fd = new FormData();
+            fd.append('code', cm.getValue()); fd.append('stdin', inp.value);
+            if (tok) { fd.append('csrfmiddlewaretoken', tok.value); }
+            btn.disabled = true; out.style.display = 'none'; st.textContent = TXT.compiling;
+            fetch(RUN_CPP_URL, {method: 'POST', body: fd, credentials: 'same-origin'})
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    btn.disabled = false;
+                    if (d.wait) { st.textContent = TXT.wait.replace('N', d.wait); return; }
+                    if (d.compile_error) { st.textContent = TXT.cerr; show(d.compile_error, true); return; }
+                    if (d.error === 'timeout') { st.textContent = ''; show((d.out || '') + TXT.tl, true); return; }
+                    if (d.error) { st.textContent = d.ms + ' ms'; show((d.out || '') + (d.out ? '\n' : '') + TXT.rerr + ': ' + d.error, true); return; }
+                    show(d.out || TXT.empty, false);
+                    st.textContent = d.ms + ' ms' + verdictFor(d.out || '');
+                })
+                .catch(function () { btn.disabled = false; st.textContent = ''; show(TXT.netfail, true); });
+        }
         btn.onclick = function () {
+            if (cm.getOption('mode') !== 'python') { runCpp(); return; }
             if (running) { killWorker(); finish(); st.textContent = TXT.stopped; out.style.display = 'none'; return; }
             if (pending) { return; }   // другой редактор на странице ещё выполняется
             running = true; btn.textContent = TXT.stop; out.style.display = 'none';
@@ -177,11 +209,7 @@
                         finish();
                         var text = m.out + (m.err ? (m.out && !/\n$/.test(m.out) ? '\n' : '') + cleanTrace(m.err) : '');
                         show(text || TXT.empty, !!m.err);
-                        var verdict = '';
-                        if (!m.err && expect !== null && expect.trim() && inp.value === (ta.getAttribute('data-stdin') || '')) {
-                            verdict = norm(m.out) === norm(expect) ? ' · ✅ ' + TXT.ok : ' · ⚠️ ' + TXT.diff;
-                        }
-                        st.textContent = m.ms + ' ms' + verdict;
+                        st.textContent = m.ms + ' ms' + (m.err ? '' : verdictFor(m.out));
                     }
                 }
             };
@@ -199,7 +227,7 @@
         function apply(first) {
             var cpp = sel.value === 'cpp';
             cm.setOption('mode', cpp ? 'text/x-c++src' : 'python');
-            if (box) { box.style.display = cpp ? 'none' : ''; }
+            if (box) { box.querySelector('.run-st').textContent = cpp ? TXT.cppnote : TXT.note; }
             if (!first) {
                 if (cpp && !cm.getValue().trim()) { cm.setValue(CPP_TEMPLATE); cm.setCursor({line: 4, ch: 4}); cm.focus(); }
                 else if (!cpp && cm.getValue() === CPP_TEMPLATE) { cm.setValue(''); }
