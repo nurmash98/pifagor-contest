@@ -12,7 +12,7 @@
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
-        <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
+        <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
         {% if retake %}<span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>{% endif %}
         <h3 class="fw-bold d-inline" style="color: #1a1a4b;">{{ exam.title }}</h3>
         <div class="text-muted small mt-1">{{ window.start_at|date:"d.m.Y H:i" }} – {{ window.end_at|date:"H:i" }} · {{ window.duration_minutes }} {% t "мин" %} · {% t "каждая задача — до 10 баллов" %}</div>
@@ -34,7 +34,7 @@
 {% elif not attempt and state == 'active' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
         <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ window.end_at|date:"H:i" }}</p>
-        <p class="text-muted small mb-1">{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}</p>
+        <p class="text-muted small mb-1">{% if exam.is_olympiad %}{% t "По каждой задаче — максимум" %} {{ max_subs }} {% t "отправок, засчитывается лучший результат. Места — по сумме баллов." %}{% else %}{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}{% endif %}</p>
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
         <p class="text-muted small mb-3">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
@@ -77,8 +77,15 @@
                 <div class="display-6 fw-bold {% if exam_grade >= 8 %}text-success{% elif exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ exam_grade }}/10</div>
                 {% else %}<div class="display-6 fw-bold text-muted">—</div>{% endif %}
                 {% else %}
+                {% if olymp %}
+                <div class="text-muted small">{% t "Сумма баллов" %}</div>
+                <div class="display-6 fw-bold text-primary">{{ olymp.total }} / {{ olymp.max }}</div>
+                {% if olymp.place %}<div class="fs-4 fw-bold mt-1">{% if olymp.place == 1 %}🥇{% elif olymp.place == 2 %}🥈{% elif olymp.place == 3 %}🥉{% else %}🏅{% endif %} {{ olymp.place }} {% t "место из" %} {{ olymp.count }}</div>
+                {% elif state != 'finished' %}<div class="text-muted small">{% t "Места появятся, когда олимпиада закончится." %}</div>{% endif %}
+                {% else %}
                 <div class="text-muted small">{% t "Оценка (средний балл по всем задачам)" %}</div>
                 <div class="display-6 fw-bold {% if grade >= 8 %}text-success{% elif grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ grade }}/10</div>
+                {% endif %}
                 {% if not attempt %}<div class="text-muted small">{% t "Вы не участвовали в этом СОР/СОЧ." %}</div>{% endif %}
                 {% endif %}
             </div>

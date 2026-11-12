@@ -3076,3 +3076,98 @@ class ExamFullscreenTests(RetakeTestBase):
         self.client.post(reverse('exam_restore', args=[self.att.id]))
         self.att.refresh_from_db()
         self.assertIsNotNone(self.att.finished_at)
+
+
+class OlympiadTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.secret = make_task('Олимп-задача', 'C', self.tag1)
+        self.secret.hidden = True; self.secret.save()
+        self.olymp = Exam.objects.create(kind='OLYM', title='Школьная олимпиада', school_class='',
+                                         start_at=timezone.now() - timedelta(minutes=5), duration_minutes=120,
+                                         created_by=self.teacher)
+        self.olymp.tasks.set([self.secret, self.a_tasks[1]])
+        self.in_student, self.out_student = self.students[0], self.students[1]
+        self.olymp.participants.add(self.in_student)
+        ou = User.objects.create_user('eighth', password='x')
+        self.other_class_in = Student.objects.create(user=ou, full_name='Бекова Айя', school_class='8A')
+        self.olymp.participants.add(self.other_class_in)
+
+    def test_only_added_students_see_olympiad(self):
+        self.client.force_login(self.in_student.user)
+        self.assertContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        self.assertEqual(self.client.get(reverse('exam_detail', args=[self.olymp.id])).status_code, 200)
+        self.client.force_login(self.other_class_in.user)              # другой класс — тоже видит
+        self.assertContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        self.client.force_login(self.out_student.user)                  # одноклассник без приглашения — нет
+        self.assertNotContains(self.client.get(reverse('exam_list')), 'Школьная олимпиада')
+        r = self.client.get(reverse('exam_detail', args=[self.olymp.id]))
+        self.assertRedirects(r, reverse('exam_list'))
+        self.client.post(reverse('exam_start', args=[self.olymp.id]))
+        self.assertFalse(ExamAttempt.objects.filter(exam=self.olymp, student=self.out_student).exists())
+
+    def test_hidden_task_not_in_catalog_or_task_page(self):
+        self.client.force_login(self.out_student.user)
+        self.assertNotContains(self.client.get(reverse('all_tasks')), 'Олимп-задача')
+        self.assertRedirects(self.client.get(reverse('task_detail', args=[self.secret.id])), reverse('all_tasks'))
+        from .exam_views import _slot_candidates
+        self.assertNotIn(self.secret.id, _slot_candidates({'tag': self.tag1.id, 'level': 'C'}))
+
+    def test_participants_page_add_and_remove(self):
+        self.client.force_login(self.teacher_user)
+        url = reverse('olympiad_participants', args=[self.olymp.id])
+        html = self.client.get(url).content.decode()
+        self.assertIn('pick-class', html)
+        self.assertIn('"8A"', html)                                       # классы для выпадающего списка
+        self.client.post(url, {'action': 'add', 'student': self.out_student.id})
+        self.assertTrue(self.olymp.participants.filter(id=self.out_student.id).exists())
+        self.client.post(url, {'action': 'remove', 'student': self.out_student.id})
+        self.assertFalse(self.olymp.participants.filter(id=self.out_student.id).exists())
+        self.client.post(url, {'action': ['add', 'add_class'], 'school_class': '7F'})
+        self.assertEqual(self.olymp.participants.filter(school_class='7F').count(), 3)
+
+    def test_started_participant_cannot_be_removed(self):
+        ExamAttempt.objects.create(exam=self.olymp, student=self.in_student, started_at=timezone.now())
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('olympiad_participants', args=[self.olymp.id]),
+                         {'action': 'remove', 'student': self.in_student.id})
+        self.assertTrue(self.olymp.participants.filter(id=self.in_student.id).exists())
+
+    def test_create_olympiad_without_class_and_hide_tasks(self):
+        self.client.force_login(self.teacher_user)
+        start = (timezone.localtime() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
+        r = self.client.post(reverse('exam_create'), {
+            'kind': 'OLYM', 'title': 'Городская', 'start_at': start, 'duration_minutes': '180',
+            'tasks': [self.b_tasks[2].id], 'hide_tasks': '1'})
+        ex = Exam.objects.get(title='Городская')
+        self.assertRedirects(r, reverse('olympiad_participants', args=[ex.id]))
+        self.assertEqual(ex.school_class, '')
+        self.b_tasks[2].refresh_from_db()
+        self.assertTrue(self.b_tasks[2].hidden)
+
+    def test_results_ranked_by_total(self):
+        a1 = ExamAttempt.objects.create(exam=self.olymp, student=self.in_student, started_at=timezone.now())
+        a2 = ExamAttempt.objects.create(exam=self.olymp, student=self.other_class_in, started_at=timezone.now())
+        ExamAnswer.objects.create(attempt=a1, task=self.secret, best_score=4, submissions_count=1, submitted_at=timezone.now())
+        ExamAnswer.objects.create(attempt=a2, task=self.secret, best_score=10, submissions_count=1, submitted_at=timezone.now())
+        ExamAnswer.objects.create(attempt=a2, task=self.a_tasks[1], best_score=6, submissions_count=1, submitted_at=timezone.now())
+        self.client.force_login(self.teacher_user)
+        r = self.client.get(reverse('exam_results', args=[self.olymp.id]))
+        rows = r.context['rows']
+        self.assertEqual([row['student'] for row in rows], [self.other_class_in, self.in_student])
+        self.assertEqual([row['total'] for row in rows], [16, 4])
+        self.assertEqual(rows[0]['place'], 1)
+        self.assertContains(r, '🥇')
+
+    def test_olympiad_allows_more_submissions(self):
+        from .exam_views import max_submissions, OLYMPIAD_MAX_SUBMISSIONS
+        self.assertEqual(max_submissions(self.olymp), OLYMPIAD_MAX_SUBMISSIONS)
+        self.assertEqual(max_submissions(self.exam), 3)
+
+    def test_import_hidden_tasks(self):
+        import json
+        self.client.force_login(self.teacher_user)
+        data = [{'title': 'Импорт-олимп', 'level': 'B', 'description': 'd', 'input_example': '1', 'output_example': '1',
+                 'test_cases': [{'input': '1', 'output': '1'}]}]
+        self.client.post(reverse('task_import'), {'json_text': json.dumps(data), 'hidden': '1'})
+        self.assertTrue(Task.objects.get(title='Импорт-олимп').hidden)

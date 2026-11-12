@@ -165,7 +165,7 @@ def pick_tasks(a, b):
     """3 случайные задачи с автотестами подходящего уровня и (если учитель выбрал) нужных тегов;
     сначала те, которые оба ещё не решали на 10/10 (если таких не хватает — добираем остальные)."""
     levels = levels_for((a.duel_rating + b.duel_rating) / 2)
-    pool = [(tid, lvl) for tid, lvl, tc in Task.objects.values_list('id', 'level', 'test_cases') if tc]
+    pool = [(tid, lvl) for tid, lvl, tc in Task.objects.filter(hidden=False).values_list('id', 'level', 'test_cases') if tc]
     tag_ids = allowed_tags(a, b)
     if tag_ids:
         tagged = set(Task.objects.filter(tags__id__in=tag_ids).values_list('id', flat=True))

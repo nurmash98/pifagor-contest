@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if is_new %}Новый СОР/СОЧ{% else %}Изменить СОР/СОЧ{% endif %}{% endblock %}
+{% block title %}{% if is_new %}{% if v.kind == 'OLYM' %}Новая олимпиада{% else %}Новый СОР/СОЧ{% endif %}{% else %}Изменить {{ exam.get_kind_display }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a></div>
@@ -9,26 +9,28 @@
 <div class="row g-4">
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm rounded-4 p-4">
-            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">{% if is_new %}Новый СОР/СОЧ{% else %}Изменить СОР/СОЧ{% endif %}</h4>
+            <h4 class="fw-bold mb-4" style="color: #1a1a4b;">{% if is_new %}{% if v.kind == 'OLYM' %}Новая олимпиада{% else %}Новый СОР/СОЧ{% endif %}{% else %}Изменить {{ exam.get_kind_display }}{% endif %}</h4>
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Тип</label>
                 <div class="d-flex gap-3">
                     <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="SOR" id="k1" {% if v.kind != 'SOCH' %}checked{% endif %}><label class="form-check-label" for="k1">СОР (БЖБ)</label></div>
                     <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="SOCH" id="k2" {% if v.kind == 'SOCH' %}checked{% endif %}><label class="form-check-label" for="k2">СОЧ (ТЖБ)</label></div>
+                    <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="OLYM" id="k3" {% if v.kind == 'OLYM' %}checked{% endif %}><label class="form-check-label" for="k3">🏆 Олимпиада</label></div>
                 </div>
+                <div class="small text-muted mt-1 olym-only">Олимпиаду видят только ученики, которых вы добавите (после сохранения откроется список участников). Места — по сумме баллов, по {{ olym_subs }} отправок на задачу.</div>
             </div>
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Название</label>
                 <input type="text" name="title" class="form-control" value="{{ v.title }}" placeholder="например, СОР №1: Условия" maxlength="200" required>
             </div>
-            <div class="mb-3">
+            <div class="mb-3 no-olym">
                 <label class="form-label fw-semibold small">Класс</label>
                 {% if class_choices is not None %}
-                <select name="school_class" class="form-select" required>
+                <select name="school_class" class="form-select class-field" required>
                     {% for cls in class_choices %}<option value="{{ cls }}" {% if v.school_class == cls %}selected{% endif %}>{{ cls }}</option>{% endfor %}
                 </select>
                 {% else %}
-                <input type="text" name="school_class" class="form-control" value="{{ v.school_class }}" placeholder="например, 7F" required>
+                <input type="text" name="school_class" class="form-control class-field" value="{{ v.school_class }}" placeholder="например, 7F" required>
                 {% endif %}
             </div>
             <div class="row g-2 mb-3">
@@ -40,6 +42,10 @@
                     <label class="form-label fw-semibold small">Минут</label>
                     <input type="number" name="duration_minutes" class="form-control" value="{{ v.duration_minutes }}" min="1" max="{{ max_duration }}" required>
                 </div>
+            </div>
+            <div class="form-check mb-3 olym-only">
+                <input class="form-check-input" type="checkbox" name="hide_tasks" id="hide_tasks" value="1" {% if v.hide_tasks %}checked{% endif %}>
+                <label class="form-check-label small" for="hide_tasks">🔒 Скрыть задачи олимпиады из общего каталога, дуэлей и СОР (их увидят только участники)</label>
             </div>
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Задачи для учеников</label>
@@ -109,7 +115,7 @@
                 {% for task in tasks %}
                 <div class="form-check py-1 task-row" data-title="{{ task.title|lower }}" data-level="{{ task.level }}" data-tagids="|{% for tag in task.tags.all %}{{ tag.id }}|{% endfor %}" data-tags="|{% for tag in task.tags.all %}{{ tag.name }}|{% endfor %}">
                     <input class="form-check-input" type="checkbox" name="tasks" value="{{ task.id }}" id="t{{ task.id }}" {% if task.id in selected %}checked{% endif %}>
-                    <label class="form-check-label" for="t{{ task.id }}">[{{ task.level }}] {{ task.title }}
+                    <label class="form-check-label" for="t{{ task.id }}">[{{ task.level }}] {{ task.title }}{% if task.hidden %} <span class="badge bg-dark ms-1" title="Скрыта из каталога — только для олимпиады">🔒 олимп.</span>{% endif %}
                         {% for tag in task.tags.all %}<span class="badge bg-light text-dark border ms-1">#{{ tag.name }}</span>{% endfor %}</label>
                 </div>
                 {% empty %}<div class="text-muted small p-2">Нет задач с тестами.</div>{% endfor %}
@@ -247,6 +253,18 @@
             document.getElementById('fixed-box').style.display = rnd ? 'none' : '';
         }
     });
+})();
+</script>
+<script>
+(function () {
+    function sync() {
+        var k = document.querySelector('input[name=kind]:checked'), ol = k && k.value === 'OLYM';
+        document.querySelectorAll('.olym-only').forEach(function (e) { e.style.display = ol ? '' : 'none'; });
+        document.querySelectorAll('.no-olym').forEach(function (e) { e.style.display = ol ? 'none' : ''; });
+        document.querySelectorAll('.class-field').forEach(function (e) { e.required = !ol; });
+    }
+    document.querySelectorAll('input[name=kind]').forEach(function (r) { r.addEventListener('change', sync); });
+    sync();
 })();
 </script>
 {% endblock %}

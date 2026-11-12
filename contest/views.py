@@ -290,7 +290,7 @@ def all_tasks_view(request):
     lang = _get_content_lang(request)
 
     level_filter = request.GET.get('level', '')
-    tasks = Task.objects.prefetch_related('tags').all()
+    tasks = Task.objects.prefetch_related('tags').filter(hidden=False)   # олимпиадные — только на олимпиаде
     if level_filter in ['A', 'B', 'C']:
         tasks = tasks.filter(level=level_filter)
 
@@ -401,6 +401,9 @@ def task_detail(request, task_id):
     без формы отправки решения (у него нет своих посылок)."""
     task = get_object_or_404(Task, id=task_id)
     student = Student.objects.filter(user=request.user).first()
+    if task.hidden and student is not None:
+        messages.info(request, 'Эта задача доступна только на олимпиаде.')
+        return redirect('all_tasks')
     back_url = _safe_back_url(request)
     lang = _get_content_lang(request)
     _apply_task_language([task], lang)
@@ -1718,6 +1721,7 @@ def _task_form(request, task):
                 setattr(task, f, values[f])
             task.level = level
             task.test_cases = tests
+            task.hidden = bool(request.POST.get('hidden'))
             task.save()
             task.tags.set(request.POST.getlist('tags'))
             new_tag_name = request.POST.get('new_tag', '').strip()
@@ -1822,6 +1826,7 @@ def _parse_tasks_json(data):
             if len(clean_tests) > MAX_TEST_CASES:
                 errors.append(f'{where}: не больше {MAX_TEST_CASES} тестов.')
         item['test_cases'] = clean_tests
+        item['hidden'] = bool(raw.get('hidden'))
         items.append(item)
     return items, errors
 
@@ -1859,8 +1864,10 @@ def task_import(request):
                         messages.error(request, f'…и ещё ошибок: {len(errors) - 30}.')
                     messages.warning(request, 'Ничего не импортировано — исправьте ошибки и загрузите снова.')
                 else:
+                    hide_all = bool(request.POST.get('hidden'))
                     with transaction.atomic():
                         for item in items:
+                            item['hidden'] = item['hidden'] or hide_all
                             task = Task.objects.create(**{k: v for k, v in item.items() if k != 'tags'})
                             for name in item['tags']:
                                 tag, _ = Tag.objects.get_or_create(name=name)

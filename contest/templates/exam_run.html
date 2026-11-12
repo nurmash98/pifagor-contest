@@ -26,7 +26,7 @@
 </head>
 <body>
 <div id="bar">
-    <span class="ttl">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% else %}{% t "СОЧ" %}{% endif %} · {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</span>
+    <span class="ttl">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %} · {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</span>
     <span class="ex" id="bar-exits">{% t "Выходы" %}: <b id="bar-n">{{ attempt.exits }}</b> / {{ max_exits }}</span>
 </div>
 <iframe id="frame" title="{{ exam.title }}"></iframe>

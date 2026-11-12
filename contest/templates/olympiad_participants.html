@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Участники: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ и олимпиады</a></div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <h3 class="fw-bold mb-0" style="color: #1a1a4b;">🏆 «{{ exam.title }}» — участники</h3>
+    <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary rounded-pill px-3">Результаты</a>
+</div>
+<p class="text-muted small mb-4">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} · задач: {{ exam.tasks_per_student }} ·
+    олимпиаду видят <strong>только</strong> добавленные здесь ученики.</p>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h5 class="fw-bold mb-3">➕ Добавить ученика</h5>
+            <form method="post" id="add-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add">
+                <label class="form-label small fw-semibold">1. Класс</label>
+                <select class="form-select mb-3" id="pick-class" name="school_class">
+                    <option value="">— выберите класс —</option>
+                    {% for cls in classes %}<option value="{{ cls }}">{{ cls }}</option>{% endfor %}
+                </select>
+                <label class="form-label small fw-semibold">2. Ученик</label>
+                <select class="form-select mb-3" id="pick-student" name="student" disabled>
+                    <option value="">— сначала выберите класс —</option>
+                </select>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-pifagor-green rounded-pill px-4" id="add-btn" disabled>Добавить</button>
+                    <button class="btn btn-outline-secondary rounded-pill px-3" id="add-class-btn" name="action" value="add_class" disabled
+                            title="Добавить сразу всех учеников выбранного класса">+ весь класс</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white fw-bold py-3">👥 Участники: {{ participants|length }}</div>
+            <ul class="list-group list-group-flush">
+                {% for st in participants %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><span class="badge bg-light text-dark border me-2">{{ st.school_class }}</span>{{ st.full_name }}
+                        {% if st.started %}<span class="badge bg-info text-dark ms-1">начал</span>{% endif %}</span>
+                    {% if not st.started %}
+                    <form method="post">{% csrf_token %}
+                        <input type="hidden" name="action" value="remove"><input type="hidden" name="student" value="{{ st.id }}">
+                        <button class="btn btn-sm btn-outline-danger rounded-pill px-2 py-0" title="Убрать из олимпиады">✕</button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="list-group-item p-4 text-center text-muted">Пока никого нет — выберите класс и ученика слева.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{{ by_class|json_script:"olymp-classes" }}
+<script>
+(function () {
+    var data = JSON.parse(document.getElementById('olymp-classes').textContent);
+    var cls = document.getElementById('pick-class'), st = document.getElementById('pick-student');
+    var add = document.getElementById('add-btn'), addAll = document.getElementById('add-class-btn');
+    cls.addEventListener('change', function () {
+        var list = data[cls.value] || [];
+        st.innerHTML = '';
+        var first = document.createElement('option');
+        first.value = ''; first.textContent = list.length ? '— выберите ученика —' : '— в классе нет учеников —';
+        st.appendChild(first);
+        list.forEach(function (s) {
+            var o = document.createElement('option');
+            o.value = s.id; o.textContent = s.name + (s['in'] ? ' ✓ уже добавлен' : '');
+            o.disabled = s['in'];
+            st.appendChild(o);
+        });
+        st.disabled = !list.length; add.disabled = true;
+        addAll.disabled = !list.some(function (s) { return !s['in']; });
+    });
+    st.addEventListener('change', function () { add.disabled = !st.value; });
+})();
+</script>
+{% endblock %}

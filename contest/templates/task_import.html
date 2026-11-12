@@ -21,6 +21,10 @@
                 <input type="file" name="json_file" class="form-control mb-3" accept=".json,application/json">
                 <label class="form-label fw-semibold small">…или вставьте JSON сюда</label>
                 <textarea name="json_text" class="form-control font-monospace small mb-3" rows="12" placeholder='[{"title": "...", "level": "A", ...}]'>{{ pasted }}</textarea>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="hidden" value="1" id="imp-hidden">
+                    <label class="form-check-label small" for="imp-hidden">🔒 Олимпиадные задачи: скрыть из каталога, дуэлей и СОР (их увидят только участники олимпиады)</label>
+                </div>
                 <button type="submit" class="btn btn-pifagor-green px-4">Импортировать</button>
             </form>
         </div>

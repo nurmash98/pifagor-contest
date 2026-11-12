@@ -38,12 +38,17 @@ EXAM_MAX_DURATION = 600          # минут
 EXAM_SUBMIT_THROTTLE_SECONDS = 10  # повторная отправка одной задачи — не чаще (защита CPU)
 EXAM_MAX_RANDOM_SLOTS = 20
 EXAM_MAX_SUBMISSIONS = 3           # сколько раз можно отправить решение одной задачи на СОР/СОЧ
+OLYMPIAD_MAX_SUBMISSIONS = 10      # на олимпиаде попыток больше
+
+
+def max_submissions(exam):
+    return OLYMPIAD_MAX_SUBMISSIONS if exam.is_olympiad else EXAM_MAX_SUBMISSIONS
 
 
 def _slot_candidates(slot, exclude=()):
     """id задач с тестами, подходящих под условие {'tag': id|None, 'level': 'A'|'B'|'C'|''}.
     exclude — id задач, которые выбирать нельзя."""
-    qs = Task.objects.exclude(test_cases=[])
+    qs = Task.objects.exclude(test_cases=[]).filter(hidden=False)
     if exclude:
         qs = qs.exclude(id__in=list(exclude))
     if slot.get('tag'):
@@ -180,7 +185,8 @@ def exam_list(request):
         return _teacher_exam_list(request)
     student = get_object_or_404(Student, user=request.user)
     now = timezone.now()
-    exams = list(Exam.objects.filter(school_class=student.school_class).prefetch_related('tasks'))
+    exams = list(Exam.objects.filter(Q(school_class=student.school_class) & ~Q(kind='OLYM') |
+                                     Q(kind='OLYM', participants=student)).distinct().prefetch_related('tasks'))
     attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=exams, retake__isnull=True)
                 .prefetch_related('answers')}
     retakes = list(ExamRetake.objects.filter(students=student, exam__in=exams).select_related('exam'))
@@ -226,7 +232,13 @@ def _student_exam_or_redirect(request, exam_id, retake_id=None):
     """(ученик, экзамен, пересдача, попытка). Для пересдачи ученик должен быть в её списке."""
     student = Student.objects.filter(user=request.user).first()
     exam = get_object_or_404(Exam, id=exam_id)
-    if student is None or exam.school_class != student.school_class:
+    if student is None:
+        return None, None, None, None
+    if exam.is_olympiad:
+        if not exam.participants.filter(id=student.id).exists():
+            messages.error(request, 'Вас не добавили в эту олимпиаду.')
+            return None, None, None, None
+    elif exam.school_class != student.school_class:
         messages.error(request, 'Этот СОР/СОЧ не для вашего класса.')
         return None, None, None, None
     retake = None
@@ -292,6 +304,16 @@ def exam_detail(request, exam_id, retake_id=None):
             done, g = _grade_info(rt, ra, now)
             earlier_retakes.append({'retake': rt, 'done': done, 'grade': g})
     my_retake_state = _attempt_state(my_retake, retake_attempt, now) if my_retake else None
+    olymp = None
+    if exam.is_olympiad and attempt is not None:
+        olymp = {'total': sum(a.best_score for a in answers.values()), 'max': 10 * len(tasks)}
+        if state == 'finished':          # места — когда олимпиада закончилась у всех
+            everyone = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
+            rows = _result_rows(exam, list(exam.participants.all()), everyone, now, per_student=exam.is_random)
+            _olympiad_places(rows)
+            mine = next((r for r in rows if r['student'].id == student.id), None)
+            olymp['place'] = mine['place'] if mine else None
+            olymp['count'] = sum(1 for r in rows if r['attempt'] is not None)
 
     return render(request, 'exam_detail.html', {
         'exam': exam, 'retake': retake, 'window': window, 'attempt': attempt, 'state': state, 'tasks': tasks,
@@ -301,6 +323,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'exam_done': exam_done, 'exam_grade': exam_grade,
         'retake_done': retake_done, 'retake_grade': retake_grade, 'earlier_retakes': earlier_retakes,
         'run_url': exam_guard.run_url(attempt) if attempt else '', 'max_exits': exam_guard.MAX_EXITS,
+        'olymp': olymp, 'max_subs': max_submissions(exam),
     })
 
 
@@ -366,12 +389,13 @@ def exam_task(request, exam_id, task_id, retake_id=None):
             return redirect('retake_task', exam_id=exam.id, retake_id=retake.id, task_id=task.id)
         return redirect('exam_task', exam_id=exam.id, task_id=task.id)
 
+    max_subs = max_submissions(exam)
     if request.method == 'POST':
         if not active:
             messages.warning(request, 'Время СОР/СОЧ вышло — ответы больше не принимаются.')
             return _to_detail(exam, retake)
-        if answer is not None and answer.submissions_count >= EXAM_MAX_SUBMISSIONS:
-            messages.warning(request, f'По этой задаче уже использованы все {EXAM_MAX_SUBMISSIONS} отправки.')
+        if answer is not None and answer.submissions_count >= max_subs:
+            messages.warning(request, f'По этой задаче уже использованы все {max_subs} отправки.')
             return back_to_task()
         if not (request.POST.get('code') or '').strip():
             messages.warning(request, 'Код пустой — напишите решение перед отправкой.')
@@ -393,10 +417,10 @@ def exam_task(request, exam_id, task_id, retake_id=None):
         if score >= answer.best_score:
             answer.best_score, answer.best_code = score, code
         answer.save()
-        left = EXAM_MAX_SUBMISSIONS - answer.submissions_count
+        left = max_subs - answer.submissions_count
         messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов. '
                                   f'Лучший результат по задаче: {answer.best_score}/10. '
-                                  f'Осталось отправок: {left} из {EXAM_MAX_SUBMISSIONS}.')
+                                  f'Осталось отправок: {left} из {max_subs}.')
         return back_to_task()
 
     from .views import _apply_task_language, _get_content_lang
@@ -404,8 +428,8 @@ def exam_task(request, exam_id, task_id, retake_id=None):
     return render(request, 'exam_task.html', {
         'exam': exam, 'retake': retake, 'window': retake or exam, 'task': task, 'answer': answer,
         'active': active, 'attempt': attempt, 'run_url': exam_guard.run_url(attempt),
-        'max_submissions': EXAM_MAX_SUBMISSIONS,
-        'submissions_left': EXAM_MAX_SUBMISSIONS - (answer.submissions_count if answer else 0),
+        'max_submissions': max_subs,
+        'submissions_left': max_subs - (answer.submissions_count if answer else 0),
     })
 
 
@@ -422,7 +446,7 @@ def _teacher_classes(user):
 
 def _can_manage(user, exam):
     classes = _teacher_classes(user)
-    if classes is None:
+    if classes is None or exam.is_olympiad:    # олимпиаду может вести любой учитель
         return True
     teacher = _teacher(user)
     return exam.school_class in classes or (teacher is not None and exam.created_by_id == teacher.id)
@@ -433,11 +457,12 @@ def _teacher_exam_list(request):
     exams = Exam.objects.prefetch_related('tasks').all()
     if classes is not None:
         teacher = _teacher(request.user)
-        exams = [e for e in exams if e.school_class in classes or e.created_by_id == teacher.id]
+        exams = [e for e in exams if e.is_olympiad or e.school_class in classes or e.created_by_id == teacher.id]
     now = timezone.now()
     for exam in exams:
         exam.state = exam.status(now)
         exam.retake_count = exam.retakes.count()
+        exam.participant_count = exam.participants.count() if exam.is_olympiad else 0
     return render(request, 'exams_teacher.html', {'exams': exams})
 
 
@@ -459,11 +484,13 @@ def _exam_form(request, exam):
         slot_levels = request.POST.getlist('slot_level')
         slot_pools = request.POST.getlist('slot_pool')
 
-        if kind not in ('SOR', 'SOCH'):
-            errors.append('Выберите тип: СОР или СОЧ.')
+        if kind not in ('SOR', 'SOCH', 'OLYM'):
+            errors.append('Выберите тип: СОР, СОЧ или олимпиада.')
         if not title:
             errors.append('Укажите название.')
-        if not school_class:
+        if kind == 'OLYM':
+            school_class = ''          # у олимпиады нет класса — участников учитель добавляет сам
+        elif not school_class:
             errors.append('Выберите класс.')
         elif classes is not None and school_class not in classes:
             errors.append('Можно создавать СОР/СОЧ только для своих классов.')
@@ -521,15 +548,19 @@ def _exam_form(request, exam):
                 exam.created_by = _teacher(request.user)
             exam.save()
             exam.tasks.set(chosen)
+            if kind == 'OLYM' and request.POST.get('hide_tasks'):
+                Task.objects.filter(id__in=[t.id for t in chosen]).update(hidden=True)
             what = (f'каждому {random_count} случайных задач по тегу и сложности' if random_count
                     else f'{len(chosen)} задач')
             messages.success(request, f'{exam.get_kind_display()} «{exam.title}» сохранён: {what}, '
                                       f'{timezone.localtime(exam.start_at):%d.%m.%Y %H:%M}, {duration} мин.')
+            if exam.is_olympiad:
+                return redirect('olympiad_participants', exam_id=exam.id)
             return redirect('exam_list')
         for e in errors:
             messages.error(request, e)
         values = {'kind': kind, 'title': title, 'school_class': school_class, 'start_at': start_raw,
-                  'duration_minutes': duration_raw, 'mode': mode}
+                  'duration_minutes': duration_raw, 'mode': mode, 'hide_tasks': bool(request.POST.get('hide_tasks'))}
         slot_values = [{'tag': sl['tag'], 'level': sl['level'], 'pool': ','.join(map(str, sl.get('tasks', [])))} for sl in slots] if mode == 'random' else None
         selected = set(task_ids)
     else:
@@ -538,6 +569,7 @@ def _exam_form(request, exam):
             'start_at': timezone.localtime(exam.start_at).strftime('%Y-%m-%dT%H:%M') if exam.start_at else '',
             'duration_minutes': exam.duration_minutes or 40,
             'mode': 'random' if exam.random_count else 'fixed',
+            'hide_tasks': True,
         }
         slot_values = [{'tag': sl.get('tag'), 'level': sl.get('level') or '', 'pool': ','.join(map(str, sl.get('tasks') or []))} for sl in exam.random_slots] or None
         selected = set(exam.tasks.values_list('id', flat=True)) if not is_new else set()
@@ -545,7 +577,7 @@ def _exam_form(request, exam):
     return render(request, 'exam_form.html', {
         'exam': exam, 'is_new': is_new, 'v': values, 'tasks': tasks, 'selected': selected,
         'class_choices': sorted(set(classes)) if classes is not None else None,
-        'all_tags': Tag.objects.all(), 'max_duration': EXAM_MAX_DURATION,
+        'all_tags': Tag.objects.all(), 'max_duration': EXAM_MAX_DURATION, 'olym_subs': OLYMPIAD_MAX_SUBMISSIONS,
         'levels': Task.LEVEL_CHOICES, 'max_slots': EXAM_MAX_RANDOM_SLOTS,
         'slots': slot_values or [{'tag': None, 'level': '', 'pool': ''} for _ in range(3)],
     })
@@ -553,10 +585,11 @@ def _exam_form(request, exam):
 
 @staff_member_required
 def exam_create(request):
-    if _teacher_classes(request.user) == []:
+    olymp = (request.POST.get('kind') or request.GET.get('kind')) == 'OLYM'
+    if _teacher_classes(request.user) == [] and not olymp:
         messages.error(request, 'Вам пока не назначены классы — обратитесь к администратору.')
         return redirect('exam_list')
-    return _exam_form(request, Exam())
+    return _exam_form(request, Exam(kind='OLYM' if olymp else 'SOR'))
 
 
 @staff_member_required
@@ -610,6 +643,21 @@ def _result_rows(exam, students, attempts, now, per_student):
     return rows
 
 
+def _olympiad_places(rows):
+    """Олимпиада: сумма баллов по задачам, места (при равной сумме — кто раньше набрал последний балл)."""
+    for row in rows:
+        answers = [c['answer'] for c in row['cells'] if c['answer']]
+        row['total'] = sum(a.best_score for a in answers)
+        scored = [a.submitted_at for a in answers if a.best_score and a.submitted_at]
+        row['last_at'] = max(scored) if scored else None
+    rows.sort(key=lambda r: (-r['total'], r['last_at'] or timezone.now(), r['student'].full_name))
+    place, prev = 0, None
+    for i, row in enumerate(rows, 1):
+        if row['total'] != prev:
+            place, prev = i, row['total']
+        row['place'] = place if row['attempt'] is not None else None
+
+
 def _result_columns(exam, per_student):
     labels = [sl['label'] for sl in exam.slot_list()]
     if per_student:
@@ -639,6 +687,12 @@ def exam_results(request, exam_id, retake_id=None):
             row['exam_grade'] = ea.grade() if ea else 0
         state = retake.status(now)
         per_student = True
+    elif exam.is_olympiad:
+        students = sort_students(exam.participants.select_related('user'))
+        rows = _result_rows(exam, students, exam_attempts, now, per_student=exam.is_random)
+        _olympiad_places(rows)
+        state = exam.status(now)
+        per_student = exam.is_random
     else:
         rows = _result_rows(exam, class_students, exam_attempts, now, per_student=exam.is_random)
         state = exam.status(now)
@@ -675,6 +729,7 @@ def exam_results(request, exam_id, retake_id=None):
         'exam': exam, 'tasks': tasks, 'rows': rows, 'state': state, 'columns': columns,
         'slot_labels': labels, 'retake': retake, 'retakes': retakes,
         'has_retakes': bool(retakes), 'per_student': per_student,
+        'max_total': 10 * exam.tasks_per_student(),
         'exam_finished': exam.status(now) == 'finished',
     })
 
@@ -762,3 +817,47 @@ def retake_delete(request, exam_id, retake_id):
             retake.delete()
             messages.success(request, 'Пересдача удалена.')
     return redirect('exam_results', exam_id=exam.id)
+
+
+# ---------------------------------------------------------------- олимпиада: участники
+
+@staff_member_required
+def olympiad_participants(request, exam_id):
+    """Кто видит олимпиаду: учитель выбирает класс, затем ученика из этого класса и добавляет."""
+    exam = get_object_or_404(Exam, id=exam_id, kind='OLYM')
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        ids = [int(x) for x in request.POST.getlist('student') if x.isdigit()]
+        students = list(Student.objects.filter(id__in=ids))
+        if action == 'add' and students:
+            exam.participants.add(*students)
+            messages.success(request, 'Добавлены: ' + ', '.join(s.full_name for s in students) + '.')
+        elif action == 'add_class':
+            cls = normalize_school_class(request.POST.get('school_class', ''))
+            whole = list(Student.objects.filter(school_class=cls))
+            if whole:
+                exam.participants.add(*whole)
+                messages.success(request, f'Добавлен весь класс {cls}: {len(whole)} учеников.')
+        elif action == 'remove' and students:
+            started = set(exam.attempts.filter(student__in=students).values_list('student_id', flat=True))
+            keep = [s for s in students if s.id in started]
+            exam.participants.remove(*[s for s in students if s.id not in started])
+            if keep:
+                messages.warning(request, 'Уже начали олимпиаду — убрать нельзя: ' + ', '.join(s.full_name for s in keep) + '.')
+            else:
+                messages.success(request, 'Убраны: ' + ', '.join(s.full_name for s in students) + '.')
+        return redirect('olympiad_participants', exam_id=exam.id)
+
+    participants = sort_students(exam.participants.all())
+    chosen = {s.id for s in participants}
+    by_class = {}
+    for st in sort_students(Student.objects.exclude(school_class='')):
+        by_class.setdefault(st.school_class, []).append(
+            {'id': st.id, 'name': st.full_name, 'in': st.id in chosen})
+    classes = sorted(by_class, key=lambda c: (len(c), c))
+    started = set(exam.attempts.values_list('student_id', flat=True))
+    for st in participants:
+        st.started = st.id in started
+    return render(request, 'olympiad_participants.html', {
+        'exam': exam, 'participants': participants, 'classes': classes, 'by_class': by_class,
+    })

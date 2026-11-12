@@ -86,6 +86,9 @@ class Task(models.Model):
     input_example = models.TextField(verbose_name="Пример ввода")
     output_example = models.TextField(verbose_name="Пример вывода")
     tags = models.ManyToManyField(Tag, related_name='tasks', verbose_name="Теги")
+    # Скрытая задача (олимпиадная): её нет в каталоге, дуэлях и случайных СОР/СОЧ —
+    # её видят только участники олимпиады, в которую она добавлена.
+    hidden = models.BooleanField(default=False, verbose_name="Скрыта (только для олимпиады)")
 
     # Казахская версия условия — необязательна. Если не заполнена, сайт
     # показывает русский текст (переключатель RU/KZ в шапке сайта).
@@ -397,7 +400,7 @@ class Exam(models.Model):
     """СОР / СОЧ (БЖБ / ТЖБ): учитель выбирает класс, время начала, длительность и задачи.
     Каждая задача — до 10 баллов (по автотестам), оценка за экзамен — средний балл по всем
     задачам экзамена. Сложность задач здесь не влияет на баллы."""
-    KIND_CHOICES = [('SOR', 'СОР'), ('SOCH', 'СОЧ')]
+    KIND_CHOICES = [('SOR', 'СОР'), ('SOCH', 'СОЧ'), ('OLYM', 'Олимпиада')]
 
     kind = models.CharField(max_length=4, choices=KIND_CHOICES, default='SOR', verbose_name="Тип")
     title = models.CharField(max_length=200, verbose_name="Название")
@@ -412,6 +415,9 @@ class Exam(models.Model):
     # Необязательное "tasks": [id, ...] — учитель сам выбрал, какие именно задачи могут выпасть.
     # При старте каждому ученику для каждого условия выпадает своя случайная задача с тестами.
     random_slots = models.JSONField(default=list, blank=True, verbose_name="Условия случайных задач")
+    # Олимпиада: видят только ученики, которых добавил учитель (из любых классов); класс не нужен.
+    participants = models.ManyToManyField('Student', blank=True, related_name='olympiads',
+                                          verbose_name="Участники олимпиады")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name='exams', verbose_name="Кто создал")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -433,6 +439,10 @@ class Exam(models.Model):
     @property
     def is_random(self):
         return self.random_count > 0
+
+    @property
+    def is_olympiad(self):
+        return self.kind == 'OLYM'
 
     def slot_list(self):
         """Условия случайных задач с подписями: [{'tag': id, 'level': 'B', 'label': '#циклы · B'}]."""
@@ -463,7 +473,7 @@ class Exam(models.Model):
         return 'active' if now < self.end_at else 'finished'
 
     def __str__(self):
-        return f"{self.get_kind_display()} «{self.title}» ({self.school_class})"
+        return f"{self.get_kind_display()} «{self.title}»" + (f" ({self.school_class})" if self.school_class else "")
 
 
 class ExamRetake(models.Model):
