@@ -3307,7 +3307,7 @@ class OlympiadCppTests(RetakeTestBase):
         page = self.client.get(self.url, headers={'Sec-Fetch-Dest': 'iframe'})
         self.assertContains(page, 'id="lang-select"')
         self.assertContains(page, 'C++ 17')
-        self.assertContains(page, 'clike.min.js')
+        self.assertNotContains(page, 'CPP_TEMPLATE')
 
     def test_cpp_solution_scores(self):
         from .autotest import cpp_available
@@ -3447,8 +3447,11 @@ class OlympiadWithoutFullscreenTests(RetakeTestBase):
         self.assertNotIn('location.replace', r.content.decode())
         r = self.client.get(reverse('exam_task', args=[self.olymp.id, self.task.id]), headers={'Sec-Fetch-Dest': 'document'})
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'data-norun')
+        self.assertContains(r, 'olymp-code')                  # простое поле для кода, без редактора и «Запустить»
+        self.assertNotContains(r, 'code-editor')
         self.assertContains(r, 'lang-select')
+        self.assertContains(r, 'class="col-12"')             # условие на всю ширину, ниже — язык и отправка
+        self.assertContains(r, '10 раз<')
         self.assertRedirects(self.client.get(reverse('exam_run', args=[self.olymp.id])),
                              reverse('exam_detail', args=[self.olymp.id]))
 

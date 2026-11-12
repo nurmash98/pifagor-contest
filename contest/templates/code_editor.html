@@ -228,10 +228,7 @@
             var cpp = sel.value === 'cpp';
             cm.setOption('mode', cpp ? 'text/x-c++src' : 'python');
             if (box) { box.querySelector('.run-st').textContent = cpp ? TXT.cppnote : TXT.note; }
-            if (!first) {
-                if (cpp && !cm.getValue().trim()) { cm.setValue(CPP_TEMPLATE); cm.setCursor({line: 4, ch: 4}); cm.focus(); }
-                else if (!cpp && cm.getValue() === CPP_TEMPLATE) { cm.setValue(''); }
-            }
+
         }
         sel.addEventListener('change', function () { apply(false); });
         apply(true);
