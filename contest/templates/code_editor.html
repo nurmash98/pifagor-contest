@@ -33,6 +33,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
 <script>
 (function () {
     if (!window.CodeMirror) { return; }   // нет сети/CDN — остаётся обычное поле ввода
@@ -71,6 +72,25 @@
             if (seen[w] || w === word || w.toLowerCase().indexOf(low) !== 0) { return; }
             seen[w] = 1; out.push({text: w, kind: kind});
         }
+        // Функции и методы вставляются сразу со скобками, курсор — внутри: print(|)
+        var NOT_CALL = {pi: 1, first: 1, second: 1, math: 1, random: 1};
+        var CPP_CALL = {main: 1, sort: 1, reverse: 1, max: 1, min: 1, abs: 1, swap: 1, sqrt: 1, printf: 1, scanf: 1, getline: 1,
+                        memset: 1, make_pair: 1, lower_bound: 1, upper_bound: 1, accumulate: 1};
+        var defs = {}, dm, dre = /def\s+([A-Za-z_]\w*)\s*\(/g, allText = cm.getValue();
+        while ((dm = dre.exec(allText))) { defs[dm[1]] = 1; }
+        function callable(o) {
+            if (NOT_CALL[o.text]) { return false; }
+            if (o.kind === 'функция' || o.kind === 'метод') { return true; }
+            if (o.kind === 'C++') { return !!CPP_CALL[o.text]; }
+            if (o.kind === 'имя') { return !!defs[o.text]; }
+            return afterDot && o.kind === '';          // math.sqrt, random.randint …
+        }
+        function pick(c, data, completion) {
+            var hasParen = c.getRange(data.to, CodeMirror.Pos(data.to.line, data.to.ch + 1)) === '(';
+            if (!completion.call || hasParen) { c.replaceRange(completion.name, data.from, data.to, 'complete'); return; }
+            c.replaceRange(completion.name + '()', data.from, data.to, 'complete');
+            c.setCursor(CodeMirror.Pos(data.from.line, data.from.ch + completion.name.length + 1));
+        }
         if (cm.getOption('mode') !== 'python') {      // C++ (олимпиада)
             if (afterDot) { CPP_METH.forEach(function (w) { add(w, 'метод'); }); }
             else { CPP_WORDS.forEach(function (w) { add(w, 'C++'); }); }
@@ -87,8 +107,9 @@
         out.sort(function (a, b) { return a.text.length - b.text.length; });
         return {
             list: out.slice(0, 12).map(function (o) {
-                return {text: o.text, render: function (el) {
-                    var a = document.createElement('span'); a.textContent = o.text; el.appendChild(a);
+                var call = callable(o);
+                return {text: o.text, name: o.text, call: call, hint: pick, render: function (el) {
+                    var a = document.createElement('span'); a.textContent = o.text + (call ? '()' : ''); el.appendChild(a);
                     if (o.kind) { var k = document.createElement('span'); k.className = 'hk'; k.textContent = o.kind; el.appendChild(k); }
                 }};
             }),
@@ -237,6 +258,7 @@
     document.querySelectorAll('textarea.code-editor').forEach(function (ta, i) {
         var cm = CodeMirror.fromTextArea(ta, {
             mode: 'python', theme: 'monokai', lineNumbers: true,
+            autoCloseBrackets: true,       // открыл ( [ { или кавычку — закрывающая ставится сама
             indentUnit: 4, tabSize: 4, smartIndent: true, indentWithTabs: false,
             lineWrapping: false, viewportMargin: Infinity,
             extraKeys: {

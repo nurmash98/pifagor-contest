@@ -2947,6 +2947,8 @@ class CodeHintsTests(RetakeTestBase):
         html = self.client.get(reverse('exam_task', args=[exam.id, self.a_tasks[0].id])).content.decode()
         self.assertIn('codemirror.min.js', html)
         self.assertIn('show-hint.min.js', html)
+        self.assertIn('closebrackets.min.js', html)          # скобки закрываются сами
+        self.assertIn('autoCloseBrackets: true', html)
         self.assertIn("'map'", html)
         self.assertIn('code-editor', html)
 
