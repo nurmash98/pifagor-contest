@@ -3576,3 +3576,42 @@ class OlympiadNoPlaceForStudentTests(RetakeTestBase):
         self.assertNotIn('🥇', html)
         self.client.force_login(self.teacher_user)                 # у учителя места остаются
         self.assertContains(self.client.get(reverse('exam_results', args=[olymp.id])), '🥇')
+
+
+class ExamPreviewTests(RetakeTestBase):
+    def test_teacher_previews_sor_and_checks_without_saving(self):
+        self.client.force_login(self.teacher_user)
+        self.assertContains(self.client.get(reverse('exam_list')), reverse('exam_preview', args=[self.exam.id]))
+        page = self.client.get(reverse('exam_preview', args=[self.exam.id]))
+        self.assertContains(page, 'Предпросмотр')
+        task = page.context['tasks'][0]
+        self.assertEqual(task.letter, 'A')
+        url = reverse('exam_preview_task', args=[self.exam.id, task.id])
+        page = self.client.get(url)
+        self.assertContains(page, 'code-editor')
+        self.assertContains(page, task.title)
+        r = self.client.post(url, {'code': 'print(input())'})
+        self.assertIsNotNone(r.context['check'])
+        self.assertContains(r, 'Проверка (не сохраняется)')
+        self.assertFalse(ExamAttempt.objects.filter(exam=self.exam).exists())
+        self.assertFalse(ExamAnswer.objects.exists())
+
+    def test_olympiad_preview_has_language_and_plain_field(self):
+        task = Task.objects.create(title='Олимп П', level='C', description='d', input_example='1', output_example='1',
+                                   hidden=True, test_groups=[100], test_cases=[{'input': '1', 'output': '1', 'group': 1}])
+        olymp = Exam.objects.create(kind='OLYM', title='Пред', school_class='', duration_minutes=60,
+                                    start_at=timezone.now() + timedelta(days=1), created_by=self.teacher)
+        olymp.tasks.set([task])
+        self.client.force_login(self.teacher_user)
+        self.assertContains(self.client.get(reverse('olympiad_list')), reverse('exam_preview', args=[olymp.id]))
+        url = reverse('exam_preview_task', args=[olymp.id, task.id])
+        page = self.client.get(url)
+        self.assertContains(page, 'lang-select')
+        self.assertNotContains(page, 'code-editor')
+        r = self.client.post(url, {'code': 'print(input())', 'language': 'python'})
+        self.assertEqual(r.context['check']['score'], 100)
+        self.assertEqual([g['got'] for g in r.context['check']['groups']], [100])
+
+    def test_students_cannot_preview(self):
+        self.client.force_login(self.students[0].user)
+        self.assertNotEqual(self.client.get(reverse('exam_preview', args=[self.exam.id])).status_code, 200)

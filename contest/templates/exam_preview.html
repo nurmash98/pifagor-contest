@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}Предпросмотр: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning rounded-4 d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+    <div>👁 <strong>Предпросмотр</strong> — так ученик увидит
+        {% if exam.is_olympiad %}олимпиаду{% else %}{{ exam.get_kind_display }}{% endif %} «{{ exam.title }}».
+        Решение можно проверить тестами — <strong>ничего не сохраняется</strong>.
+        {% if not exam.is_olympiad %}<span class="text-muted">Ученик пишет его в полноэкранном режиме, здесь — без него.</span>{% endif %}</div>
+    <div class="d-flex gap-2">
+        {% if randomized %}<a href="{% url 'exam_preview' exam.id %}?shuffle=1" class="btn btn-sm btn-outline-dark rounded-pill" title="У каждого ученика свой набор задач">🔀 Другой вариант</a>{% endif %}
+        <a href="{% if exam.is_olympiad %}{% url 'olympiad_list' %}{% else %}{% url 'exam_results' exam.id %}{% endif %}" class="btn btn-sm btn-dark rounded-pill">✕ Выйти из предпросмотра</a>
+    </div>
+</div>
+
+<div class="pv-bar mb-4">
+    <span class="pv-ttl">{% if exam.kind == 'SOR' %}СОР{% elif exam.kind == 'OLYM' %}🏆 Олимпиада{% else %}СОЧ{% endif %} · {{ exam.title }}</span>
+    <nav class="pv-tabs">
+        <a href="{% url 'exam_preview' exam.id %}" class="all{% if not task %} on{% endif %}">≡ {% t "Все" %}</a>
+        {% for t in tasks %}<a href="{% url 'exam_preview_task' exam.id t.id %}" class="{% if task and t.id == task.id %}on{% endif %}" title="{{ t.display_title }}">{{ t.letter }}</a>{% endfor %}
+    </nav>
+</div>
+
+{% if not task %}
+<div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+    <h3 class="fw-bold mb-1" style="color: #1a1a4b;">{{ exam.title }}</h3>
+    <div class="text-muted small mb-3">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} · {{ exam.duration_minutes }} {% t "мин" %} ·
+        {% if exam.is_olympiad %}{% t "каждая задача — до 100 баллов" %}{% else %}{% t "каждая задача — до 10 баллов" %}{% endif %}</div>
+    <p class="small mb-0">{% t "По каждой задаче — максимум" %} {{ max_subs }} {% if max_subs >= 5 %}{% t "раз" %}{% else %}{% t "раза" %}{% endif %}.
+        {% if exam.is_olympiad %}{% t "Решать можно в любом удобном компиляторе (Python или C++) — сюда вставьте готовый код и отправьте." %}
+        {% else %}{% t "Задачи открываются вкладками A, B, C… вверху экрана. Если выйти из полного экрана, работа скроется, пока не вернётесь." %}{% endif %}</p>
+</div>
+<div class="row g-3">
+    {% for t in tasks %}
+    <div class="col-md-6 col-lg-4">
+        <a href="{% url 'exam_preview_task' exam.id t.id %}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center gap-2"><span class="pv-letter">{{ t.letter }}</span>
+                    <strong style="color: #1a1a4b;">{{ t.display_title }}</strong></div>
+                <div class="small text-muted mt-2">{% t "не сдано" %} · 0/{{ task_max }}</div>
+            </div>
+        </a>
+    </div>
+    {% empty %}
+    <div class="col-12"><div class="alert alert-secondary">Задач пока нет.{% if exam.is_olympiad %} <a href="{% url 'olympiad_tasks' exam.id %}">Загрузите задачи из JSON</a>.{% endif %}</div></div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="row g-4">
+    <div class="{% if exam.is_olympiad %}col-12{% else %}col-lg-6{% endif %}">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-3" style="color: #1a1a4b;">{{ task.display_title }}</h4>
+            <p class="lh-lg">{{ task.display_description|linebreaksbr }}</p>
+            {% include 'task_examples.html' %}
+        </div>
+        {% include 'ide_links.html' with ide_class='mt-4' %}
+    </div>
+    <div class="{% if exam.is_olympiad %}col-12{% else %}col-lg-6{% endif %}">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            {% if check %}
+            <div class="alert {% if check.score == task_max %}alert-success{% elif check.compile_error %}alert-danger{% else %}alert-warning{% endif %} rounded-3">
+                <div class="d-flex justify-content-between"><strong>Проверка (не сохраняется)</strong><span class="badge bg-dark">{{ check.score }}/{{ task_max }}</span></div>
+                <div class="small mt-1">{% t "пройдено тестов" %} {{ check.passed }}/{{ check.total }}</div>
+                {% if check.groups %}
+                <table class="table table-sm small mb-1 mt-2 bg-transparent">
+                    <tr><th>{% t "Группа" %}</th><th>{% t "Тесты" %}</th><th class="text-end">{% t "Баллы" %}</th></tr>
+                    {% for g in check.groups %}<tr class="{% if g.got %}text-success{% else %}text-danger{% endif %}"><td>{{ g.n }}</td><td>{{ g.passed }}/{{ g.total }}</td><td class="text-end fw-bold">{{ g.got }}/{{ g.points }}</td></tr>{% endfor %}
+                </table>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    {% for r in check.results %}
+                        {% if r.ok %}<span class="badge bg-success">{{ forloop.counter }} ✓</span>
+                        {% elif r.error == 'timeout' %}<span class="badge bg-warning text-dark" title="{% t "Превышено время" %}">{{ forloop.counter }} ⏱</span>
+                        {% else %}<span class="badge bg-danger">{{ forloop.counter }} ✗</span>{% endif %}
+                    {% endfor %}
+                </div>
+                {% if check.compile_error %}<pre class="bg-dark text-light p-2 rounded-3 small mb-0 mt-2" style="white-space: pre-wrap; max-height: 220px; overflow: auto;">{{ check.compile_error }}</pre>{% endif %}
+            </div>
+            {% endif %}
+            <div class="alert alert-info small rounded-3">⚠️ {% t "Решение по задаче можно отправить максимум" %} <strong>{{ max_subs }} {% if max_subs >= 5 %}{% t "раз" %}{% else %}{% t "раза" %}{% endif %}</strong>.</div>
+            <form method="post">
+                {% csrf_token %}
+                {% if languages %}
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="form-label small text-muted fw-semibold mb-0" for="lang-select">{% t "Язык" %}:</label>
+                    <select name="language" id="lang-select" class="form-select form-select-sm w-auto">
+                        {% for key, label in languages.items %}<option value="{{ key }}" {% if key == language %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                {% if exam.is_olympiad %}
+                <textarea name="code" class="form-control rounded-3 font-monospace p-3 mb-3" rows="16" wrap="off" spellcheck="false"
+                          placeholder="{% t "Вставьте сюда код решения" %}" style="font-size: 14px; white-space: pre;">{{ code }}</textarea>
+                {% else %}
+                <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
+                <textarea name="code" class="form-control rounded-3 font-monospace p-3 mb-3 code-editor" data-height="340" data-stdin="{{ task.display_input_example }}" data-expect="{{ task.display_output_example }}" style="min-height: 300px; background-color: #272822; color: #f8f8f2;">{{ code }}</textarea>
+                {% endif %}
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small text-muted">Учитель: проверка без сохранения</span>
+                    <button class="btn btn-pifagor-green px-4 rounded-pill">Проверить решение</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% if not exam.is_olympiad %}{% include 'code_editor.html' %}{% endif %}
+{% endif %}
+
+<style>
+    .pv-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-radius: 12px; background: #111827; color: #e5e7eb; }
+    .pv-ttl { font-weight: 700; }
+    .pv-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pv-tabs a { min-width: 38px; height: 32px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center;
+                 border-radius: 8px; background: #1f2937; color: #e5e7eb; text-decoration: none; font-weight: 700; }
+    .pv-tabs a:hover { background: #374151; }
+    .pv-tabs a.on { background: #fbbf24; color: #111827; }
+    .pv-tabs a.all { font-weight: 600; font-size: 13px; }
+    .pv-letter { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; align-items: center; justify-content: center;
+                 background: #fbbf24; color: #111827; font-weight: 800; }
+</style>
+{% endblock %}

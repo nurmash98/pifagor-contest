@@ -24,6 +24,7 @@
                     участников: {{ o.participant_count }}{% if not o.participant_count %} <span class="text-danger">(добавьте учеников)</span>{% endif %}</div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'exam_preview' o.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Как увидит ученик">👁 Предпросмотр</a>
                 <a href="{% url 'olympiad_tasks' o.id %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📋 Задачи</a>
                 <a href="{% url 'olympiad_participants' o.id %}" class="btn btn-outline-warning btn-sm rounded-pill px-3">👥 Участники</a>
                 <a href="{% url 'exam_results' o.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>

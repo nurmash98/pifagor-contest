@@ -1023,3 +1023,77 @@ def run_cpp(request):
     if not cache.add(f'cpp_run:{request.user.id}', 1, CPP_RUN_THROTTLE_SECONDS):
         return JsonResponse({'wait': CPP_RUN_THROTTLE_SECONDS})
     return JsonResponse(run_cpp_once(code, stdin, time_limit=2))
+
+
+# ---------------------------------------------------------------- предпросмотр для учителя
+
+PREVIEW_THROTTLE_SECONDS = 5
+
+
+def _preview_task_ids(request, exam, reshuffle=False):
+    """Задачи, как их увидит ученик. У случайных СОР у каждого свой набор — показываем один пример
+    (запоминаем в сессии, чтобы вкладки не менялись; «Другой вариант» — новый набор)."""
+    key = f'exam_preview:{exam.id}'
+    if exam.random_slots or exam.is_random:
+        ids = request.session.get(key)
+        if reshuffle or not ids:
+            if exam.random_slots:
+                ids = [t for t in _random_match([_slot_candidates(sl) for sl in exam.random_slots]) if t is not None]
+            else:
+                pool = list(exam.tasks.values_list('id', flat=True))
+                ids = random.sample(pool, min(exam.random_count, len(pool)))
+            request.session[key] = ids
+        by_id = {t.id: t for t in Task.objects.defer('test_cases').filter(id__in=ids)}
+        return [by_id[i] for i in ids if i in by_id]
+    return list(exam.tasks.defer('test_cases'))
+
+
+@staff_member_required
+def exam_preview(request, exam_id, task_id=None):
+    """Учитель смотрит СОР/СОЧ или олимпиаду глазами ученика: вкладки задач, условия, поле для кода.
+    Решение можно проверить тестами — результат только показывается, ничего не сохраняется."""
+    from .views import _apply_task_language, _get_content_lang
+    exam = get_object_or_404(Exam, id=exam_id)
+    if not _can_manage(request.user, exam):
+        messages.error(request, 'Это СОР/СОЧ не вашего класса.')
+        return redirect('exam_list')
+    tasks = _preview_task_ids(request, exam, reshuffle=request.GET.get('shuffle') == '1')
+    if request.GET.get('shuffle') == '1':
+        return redirect('exam_preview', exam_id=exam.id)
+    letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    for i, t in enumerate(tasks):
+        t.letter = letters[i] if i < len(letters) else str(i + 1)
+    lang = _get_content_lang(request)
+    _apply_task_language(tasks, lang)
+    task = next((t for t in tasks if t.id == task_id), None) if task_id else None
+    if task_id and task is None:
+        return redirect('exam_preview', exam_id=exam.id)
+
+    check, code, language = None, '', 'python'
+    if task is not None and request.method == 'POST':
+        code = (request.POST.get('code') or '').replace('\r\n', '\n')
+        language = request.POST.get('language', 'python') if exam.is_olympiad else 'python'
+        if language not in LANGUAGES:
+            language = 'python'
+        if not code.strip():
+            messages.warning(request, 'Код пустой.')
+        elif not cache.add(f'exam_preview_run:{request.user.id}', 1, PREVIEW_THROTTLE_SECONDS):
+            messages.warning(request, f'Проверять можно не чаще раза в {PREVIEW_THROTTLE_SECONDS} секунд.')
+        elif language == 'cpp' and not cpp_available():
+            messages.error(request, 'C++ на сервере недоступен.')
+        else:
+            full = Task.objects.get(id=task.id)
+            result = run_autotests(full, code, language)
+            if not result.get('available'):
+                messages.error(request, 'У задачи нет тестов — проверить нельзя.')
+            else:
+                score = olympiad_points(full, result) if exam.is_olympiad else _score(result['passed'], result['total'])
+                check = {'score': score, 'passed': result['passed'], 'total': result['total'],
+                         'results': result['results'], 'compile_error': result.get('compile_error', ''),
+                         'groups': group_summary(full, result['results'])[0] if full.test_groups else None}
+    return render(request, 'exam_preview.html', {
+        'exam': exam, 'tasks': tasks, 'task': task, 'check': check, 'code': code, 'language': language,
+        'task_max': task_max(exam), 'max_subs': max_submissions(exam),
+        'languages': (LANGUAGES if cpp_available() else {'python': LANGUAGES['python']}) if exam.is_olympiad else None,
+        'randomized': bool(exam.random_slots or exam.is_random),
+    })

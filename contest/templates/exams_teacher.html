@@ -24,6 +24,7 @@
                 <div class="text-muted small">{{ exam.start_at|date:"d.m.Y H:i" }} · {{ exam.duration_minutes }} мин · {% if exam.is_random %}🎲 случайных задач: {{ exam.random_count }}{% else %}задач: {{ exam.tasks.all|length }}{% endif %}</div>
             </div>
             <div class="d-flex gap-2">
+                <a href="{% url 'exam_preview' exam.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Как увидит ученик">👁 Предпросмотр</a>
                 <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
                 {% if exam.is_olympiad %}<a href="{% url 'olympiad_participants' exam.id %}" class="btn btn-outline-warning btn-sm rounded-pill px-3">👥 Участники</a>{% endif %}
                 {% if exam.state == 'finished' and not exam.is_olympiad %}
