@@ -2648,22 +2648,23 @@ class CodeGameTests(TestCase):
         run = self._win(self._start())
         r = self.client.get(reverse('codegame_play', args=[run.id]))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, '+2')
+        self.assertContains(r, '+1')
         run2 = self._start()
         self.client.post(reverse('codegame_forfeit', args=[run2.id]))
         self.assertEqual(self.client.get(reverse('codegame_play', args=[run2.id])).status_code, 200)
 
-    def test_entry_one_coin_win_two(self):
+    def test_free_entry_win_one(self):
         from .coins import balance
-        run = self._start(stake=3)                              # выбора ставки нет — всегда 1
-        self.assertEqual(run.stake, 1)
-        self.assertEqual(balance(self.st), 4)                   # 5 − 1
+        run = self._start(stake=3)                              # ставки нет, вход бесплатный
+        self.assertEqual(run.stake, 0)
+        self.assertEqual(balance(self.st), 5)                   # ничего не списано
         run = self._win(run)
-        self.assertEqual((run.status, run.coins), ('won', 2))
-        self.assertEqual(balance(self.st), 6)                   # +2
+        self.assertEqual((run.status, run.coins), ('won', 1))
+        self.assertEqual(balance(self.st), 6)                   # +1
         page = self.client.get(reverse('codegames')).content.decode()
-        self.assertIn('−1', page)
-        self.assertIn('+2', page)
+        self.assertNotIn('−1', page)
+        self.assertIn('+1', page)
+        self.assertIn('Вход бесплатный', page)
         self.assertNotIn('name="stake"', page)
         self.assertNotIn('no-fs', page.split('</title>')[0])    # блок «нет полного экрана» не в заголовке страницы
 
@@ -2681,13 +2682,18 @@ class CodeGameTests(TestCase):
         self.assertEqual(run.penalty, 60)
         self.assertTrue(self._ans(run, i, ','.join(map(str, right)))['ok'])
 
-    def test_no_coins_no_game(self):
+    def test_can_play_without_coins(self):
         from .models import CodeGameRun, CoinTransaction
         CoinTransaction.objects.filter(student=self.st).delete()
         self.client.login(username='cg_s', password='p')
-        r = self.client.post(reverse('codegame_start', args=[self.game.id]), follow=True)
-        self.assertContains(r, 'не хватает')
-        self.assertFalse(CodeGameRun.objects.exists())
+        self.client.post(reverse('codegame_start', args=[self.game.id]))
+        self.assertTrue(CodeGameRun.objects.filter(student=self.st, status='playing').exists())
+
+    def test_game_started_with_paid_entry_still_pays_two(self):
+        run = self._start()
+        type(run).objects.filter(pk=run.pk).update(stake=1)      # начата до отмены платы за вход
+        run = self._win(run)
+        self.assertEqual(run.coins, 2)
 
     def test_each_mistake_costs_a_minute_no_strike_limit(self):
         from .coins import balance
@@ -2700,14 +2706,14 @@ class CodeGameTests(TestCase):
         self.assertLessEqual(d['left'], 60)
         d = self._ans(run, 0, 'неправильно')                    # пятая ошибка съела последнюю минуту — взрыв
         self.assertEqual(d['state'], 'lost')
-        self.assertEqual(balance(self.st), 4)                   # вход не возвращается
+        self.assertEqual(balance(self.st), 5)                   # проигрыш монет не отнимает
 
     def test_mistakes_then_win_still_pays(self):
         run = self._start()
         self._ans(run, 0, 'неправильно')
         self._ans(run, 0, 'неправильно')
         run = self._win(run)
-        self.assertEqual((run.status, run.coins, run.penalty), ('won', 2, 120))
+        self.assertEqual((run.status, run.coins, run.penalty), ('won', 1, 120))
 
     def test_leaving_fullscreen_forfeits(self):
         run = self._start()

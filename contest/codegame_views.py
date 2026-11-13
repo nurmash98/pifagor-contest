@@ -156,7 +156,7 @@ def game_start(request, game_id):
         return redirect('codegame_play', run_id=current.id)
     from .coins import balance, spend
     stake = cg.ENTRY_FEE
-    if balance(st) < stake:
+    if stake and balance(st) < stake:
         messages.error(request, _kk(request, 'Вход в игру стоит 1 монету — у тебя не хватает. Реши задачу, чтобы заработать.'))
         return redirect('codegames')
     questions = cg.generate(game, random.Random())
@@ -164,7 +164,7 @@ def game_start(request, game_id):
         messages.error(request, _kk(request, 'Не получилось собрать вопросы. Сообщите учителю.'))
         return redirect('codegames')
     run = CodeGameRun.objects.create(game=game, student=st, questions=questions, stake=stake, started_at=timezone.now())
-    if not spend(st, f'gamefee:{run.id}', stake, 'Вход в игру «Бомба»'):
+    if stake and not spend(st, f'gamefee:{run.id}', stake, 'Вход в игру «Бомба»'):
         run.delete()
         messages.error(request, _kk(request, 'Не хватает монет для входа в игру.'))
         return redirect('codegames')

@@ -16,9 +16,9 @@ from .autotest import _run_one, outputs_match
 
 TOPICS = [('@io', 'Ввод-вывод и переменные'), ('@cond', 'Условия if / else')]
 TOPIC_SHORT = {'@io': 'ввод-вывод', '@cond': 'if/else'}
-ENTRY_FEE = 1               # вход в игру — 1 монета
-MAX_STAKE = 1               # выбора ставки нет: всегда 1
-PAYOUT = 2                  # обезвредил — получаешь 2 монеты
+ENTRY_FEE = 0               # вход в игру бесплатный
+MAX_STAKE = 1
+PAYOUT = 1                  # обезвредил — получаешь 1 монету
 KINDS = ['keypad', 'wires', 'pairs']   # модули идут по кругу
 PAIR_COUNT = 3              # в модуле «Пары» — 3 программы и 3 вывода
 TOPIC_LABELS = dict(TOPICS)
@@ -193,7 +193,7 @@ def _finish(run, won, now):
     from .models import CoinTransaction
     run.status = 'won' if won else 'lost'
     run.finished_at = now
-    prize = run.stake * PAYOUT
+    prize = 2 if run.stake else PAYOUT     # игры, начатые ещё за плату входа (1 монета), платят по-старому — 2
     if won and prize > 0:
         tx, created = CoinTransaction.objects.get_or_create(
             student=run.student, key=f'game:{run.id}',

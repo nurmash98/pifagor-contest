@@ -26,11 +26,10 @@
             </div>
             <form method="post" action="{% url 'codegame_start' it.game.id %}" class="mt-auto">{% csrf_token %}
                 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                    <span class="game-price lose">{% t "Вход" %} −{{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></span>
-                    <span class="fs-5">→</span>
                     <span class="game-price win">{% t "Победа" %} +{{ payout }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></span>
                 </div>
-                <button class="btn btn-pifagor-green rounded-pill px-4" {% if balance < fee %}disabled{% endif %}>{% t "Играть за" %} {{ fee }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></button></form>
+                <button class="btn btn-pifagor-green rounded-pill px-4">▶ {% t "Играть" %}</button>
+                <div class="small text-muted mt-2">{% t "Вход бесплатный" %}</div></form>
         </div>
     </div>
     {% empty %}
