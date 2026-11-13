@@ -3559,3 +3559,20 @@ class OlympiadLateParticipantTests(RetakeTestBase):
         self.client.post(reverse('exam_start', args=[olymp.id]))
         self.assertTrue(ExamAttempt.objects.filter(exam=olymp, student=self.students[2]).exists())
         self.assertContains(self.client.get(reverse('exam_detail', args=[olymp.id])), 'до 100 баллов')
+
+
+class OlympiadNoPlaceForStudentTests(RetakeTestBase):
+    def test_finished_olympiad_shows_score_but_not_place(self):
+        task = make_task('Место', 'C', self.tag1)
+        olymp = Exam.objects.create(kind='OLYM', title='Прошла', school_class='', duration_minutes=60,
+                                    start_at=timezone.now() - timedelta(hours=3), created_by=self.teacher)
+        olymp.tasks.set([task]); olymp.participants.add(self.students[0])
+        a = ExamAttempt.objects.create(exam=olymp, student=self.students[0], started_at=timezone.now() - timedelta(hours=3))
+        ExamAnswer.objects.create(attempt=a, task=task, best_score=70, submissions_count=1, submitted_at=timezone.now())
+        self.client.force_login(self.students[0].user)
+        html = self.client.get(reverse('exam_detail', args=[olymp.id])).content.decode()
+        self.assertIn('70 / 100', html)
+        self.assertNotIn('место из', html)
+        self.assertNotIn('🥇', html)
+        self.client.force_login(self.teacher_user)                 # у учителя места остаются
+        self.assertContains(self.client.get(reverse('exam_results', args=[olymp.id])), '🥇')

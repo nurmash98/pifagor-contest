@@ -311,13 +311,7 @@ def exam_detail(request, exam_id, retake_id=None):
     olymp = None
     if exam.is_olympiad and attempt is not None:
         olymp = {'total': sum(a.best_score for a in answers.values()), 'max': 100 * len(tasks)}
-        if state == 'finished':          # места — когда олимпиада закончилась у всех
-            everyone = {a.student_id: a for a in exam.attempts.filter(retake__isnull=True).prefetch_related('answers')}
-            rows = _result_rows(exam, list(exam.participants.all()), everyone, now, per_student=exam.is_random)
-            _olympiad_places(rows)
-            mine = next((r for r in rows if r['student'].id == student.id), None)
-            olymp['place'] = mine['place'] if mine else None
-            olymp['count'] = sum(1 for r in rows if r['attempt'] is not None)
+        # место ученику не показываем — таблица мест только у учителя
 
     return render(request, 'exam_detail.html', {
         'exam': exam, 'retake': retake, 'window': window, 'attempt': attempt, 'state': state, 'tasks': tasks,

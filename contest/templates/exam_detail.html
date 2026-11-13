@@ -35,7 +35,7 @@
 {% elif not attempt and state == 'active' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
         <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ window.end_at|date:"H:i" }}</p>
-        <p class="text-muted small mb-1">{% if exam.is_olympiad %}{% t "По каждой задаче — максимум" %} {{ max_subs }} {% t "отправок, засчитывается лучший результат. Места — по сумме баллов." %}{% else %}{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}{% endif %}</p>
+        <p class="text-muted small mb-1">{% if exam.is_olympiad %}{% t "По каждой задаче — максимум" %} {{ max_subs }} {% t "отправок, засчитывается лучший результат." %}{% else %}{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}{% endif %}</p>
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
         <p class="text-muted small mb-3">{% if exam.is_olympiad %}{% t "После старта Курсы и Все задачи будут закрыты до конца олимпиады." %}{% else %}{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}{% endif %}</p>
@@ -83,8 +83,6 @@
                 {% if olymp %}
                 <div class="text-muted small">{% t "Сумма баллов" %}</div>
                 <div class="display-6 fw-bold text-primary">{{ olymp.total }} / {{ olymp.max }}</div>
-                {% if olymp.place %}<div class="fs-4 fw-bold mt-1">{% if olymp.place == 1 %}🥇{% elif olymp.place == 2 %}🥈{% elif olymp.place == 3 %}🥉{% else %}🏅{% endif %} {{ olymp.place }} {% t "место из" %} {{ olymp.count }}</div>
-                {% elif state != 'finished' %}<div class="text-muted small">{% t "Места появятся, когда олимпиада закончится." %}</div>{% endif %}
                 {% else %}
                 <div class="text-muted small">{% t "Оценка (средний балл по всем задачам)" %}</div>
                 <div class="display-6 fw-bold {% if grade >= 8 %}text-success{% elif grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ grade }}/10</div>
