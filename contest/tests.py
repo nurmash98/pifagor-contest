@@ -79,7 +79,7 @@ class RetakeCreateTests(RetakeTestBase):
         self.client.force_login(self.teacher_user)
         self.assertContains(self.client.get(reverse('retake_create', args=[self.exam.id])), 'Ученик 1')
         self.assertContains(self.client.get(reverse('exam_results', args=[self.exam.id])), 'Назначить пересдачу')
-        self.assertContains(self.client.get(reverse('exam_list')), 'Пересдача')
+        self.assertContains(self.client.get(reverse('exam_list') + f'?cls={self.exam.school_class}'), 'Пересдача')
 
     def test_retake_only_after_exam_finished(self):
         upcoming = Exam.objects.create(kind='SOR', title='Будущий', school_class='7F',
@@ -3583,7 +3583,7 @@ class OlympiadNoPlaceForStudentTests(RetakeTestBase):
 class ExamPreviewTests(RetakeTestBase):
     def test_teacher_previews_sor_and_checks_without_saving(self):
         self.client.force_login(self.teacher_user)
-        self.assertContains(self.client.get(reverse('exam_list')), reverse('exam_preview', args=[self.exam.id]))
+        self.assertContains(self.client.get(reverse('exam_list') + f'?cls={self.exam.school_class}'), reverse('exam_preview', args=[self.exam.id]))
         page = self.client.get(reverse('exam_preview', args=[self.exam.id]))
         self.assertContains(page, 'Предпросмотр')
         task = page.context['tasks'][0]
@@ -3637,3 +3637,42 @@ class SubmitCooldownTests(RetakeTestBase):
         Submission.objects.filter(pk=sub.pk).update(last_submitted_at=timezone.now() - timedelta(seconds=61))
         html = self.client.get(url).content.decode()               # через минуту отправка снова открыта
         self.assertNotIn('id="cooldown-box"', html)
+
+
+class ExamsByClassAndQuarterTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.teacher_user)
+
+    def test_first_page_is_classes_then_quarters(self):
+        html = self.client.get(reverse('exam_list')).content.decode()
+        self.assertIn('?cls=7F', html)
+        self.assertNotIn(self.exam.title, html)                     # сам список — внутри класса
+        r = self.client.get(reverse('exam_list') + '?cls=7F')
+        self.assertEqual([b['n'] for b in r.context['blocks']], [1, 2, 3, 4])
+        self.assertContains(r, self.exam.title)
+        self.assertContains(r, 'quarter=3&kind=SOCH')
+
+    def test_create_without_title_by_quarter_and_kind(self):
+        start = (timezone.localtime() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')
+        data = {'kind': 'SOCH', 'quarter': '3', 'school_class': '7F', 'start_at': start, 'duration_minutes': '40',
+                'tasks': [self.a_tasks[0].id]}
+        page = self.client.get(reverse('exam_create') + '?cls=7F&quarter=3&kind=SOCH')
+        self.assertNotContains(page, 'name="title"')
+        self.assertEqual((page.context['v']['quarter'], page.context['v']['kind'], page.context['v']['school_class']), (3, 'SOCH', '7F'))
+        r = self.client.post(reverse('exam_create'), data)
+        self.assertRedirects(r, reverse('exam_list') + '?cls=7F')
+        ex = Exam.objects.get(kind='SOCH', quarter=3)
+        self.assertEqual(ex.title, 'СОЧ (3 четверть)')
+        self.client.post(reverse('exam_create'), data)               # второй такой же — с номером
+        self.assertTrue(Exam.objects.filter(title='СОЧ №2 (3 четверть)').exists())
+        blocks = self.client.get(reverse('exam_list') + '?cls=7F').context['blocks']
+        self.assertEqual(len(blocks[2]['exams']), 2)
+
+    def test_old_exam_gets_quarter_by_date(self):
+        from .exam_views import exam_quarter
+        self.exam.quarter = None
+        self.exam.start_at = timezone.make_aware(timezone.datetime(2026, 10, 6, 10, 0))
+        self.assertEqual(exam_quarter(self.exam), 1)
+        self.exam.start_at = timezone.make_aware(timezone.datetime(2026, 11, 20, 10, 0))
+        self.assertEqual(exam_quarter(self.exam), 2)

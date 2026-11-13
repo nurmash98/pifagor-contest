@@ -430,6 +430,8 @@ class Exam(models.Model):
     # Необязательное "tasks": [id, ...] — учитель сам выбрал, какие именно задачи могут выпасть.
     # При старте каждому ученику для каждого условия выпадает своя случайная задача с тестами.
     random_slots = models.JSONField(default=list, blank=True, verbose_name="Условия случайных задач")
+    # Четверть (1–4): по ней СОР/СОЧ группируются у учителя; название составляется само.
+    quarter = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Четверть")
     # Олимпиада: видят только ученики, которых добавил учитель (из любых классов); класс не нужен.
     participants = models.ManyToManyField('Student', blank=True, related_name='olympiads',
                                           verbose_name="Участники олимпиады")

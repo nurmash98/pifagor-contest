@@ -26,9 +26,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from . import exam_guard
+from . import quarters
 from .names import sort_students
 from .autotest import LANGUAGES, cpp_available, group_summary, olympiad_points, run_autotests
 from .models import (Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher,
@@ -472,18 +474,56 @@ def _can_manage(user, exam):
     return exam.school_class in classes or (teacher is not None and exam.created_by_id == teacher.id)
 
 
+def exam_quarter(exam):
+    """Четверть СОР/СОЧ: заданная учителем, а у старых записей — по дате проведения."""
+    if exam.quarter:
+        return exam.quarter
+    q = quarters.current(exam.start_at) if exam.start_at else None
+    return q['n'] if q else 4
+
+
+def auto_title(kind, quarter, school_class, lang='ru', skip_id=None):
+    """Название СОР/СОЧ составляется само: «СОР (2 четверть)»; второй СОР той же четверти — «СОР №2 (…)»."""
+    same = Exam.objects.filter(kind=kind, quarter=quarter, school_class=school_class)
+    if skip_id:
+        same = same.exclude(id=skip_id)
+    n = same.count() + 1
+    if lang == 'kk':
+        name, tail = ('БЖБ' if kind == 'SOR' else 'ТЖБ'), f'({quarter} тоқсан)'
+    else:
+        name, tail = ('СОР' if kind == 'SOR' else 'СОЧ'), f'({quarter} четверть)'
+    return f'{name} №{n} {tail}' if n > 1 else f'{name} {tail}'
+
+
 def _teacher_exam_list(request):
+    """Учитель: сначала классы, внутри класса — четверти, в четверти — её СОР и СОЧ."""
     classes = _teacher_classes(request.user)
-    exams = Exam.objects.prefetch_related('tasks').exclude(kind='OLYM')   # олимпиады — в своём разделе
+    exams = list(Exam.objects.prefetch_related('tasks').exclude(kind='OLYM'))   # олимпиады — в своём разделе
     if classes is not None:
         teacher = _teacher(request.user)
-        exams = [e for e in exams if e.is_olympiad or e.school_class in classes or e.created_by_id == teacher.id]
+        exams = [e for e in exams if e.school_class in classes or e.created_by_id == teacher.id]
     now = timezone.now()
     for exam in exams:
         exam.state = exam.status(now)
-        exam.retake_count = exam.retakes.count()
-        exam.participant_count = exam.participants.count() if exam.is_olympiad else 0
-    return render(request, 'exams_teacher.html', {'exams': exams})
+        exam.q = exam_quarter(exam)
+    names = sorted(set(classes or []) | {e.school_class for e in exams}, key=lambda c: (len(c), c))
+    cls = normalize_school_class(request.GET.get('cls', ''))
+    if cls and cls in names:
+        mine = [e for e in exams if e.school_class == cls]
+        for exam in mine:
+            exam.retake_count = exam.retakes.count()
+        cur = quarters.current(now)
+        blocks = [{'n': q['n'], 'label': q['label'], 'current': bool(cur and cur['n'] == q['n']),
+                   'exams': sorted([e for e in mine if e.q == q['n']], key=lambda e: e.start_at)}
+                  for q in quarters.QUARTERS]
+        return render(request, 'exams_class.html', {'cls': cls, 'blocks': blocks})
+    cards = []
+    for name in names:
+        mine = [e for e in exams if e.school_class == name]
+        cards.append({'name': name, 'sor': sum(e.kind == 'SOR' for e in mine), 'soch': sum(e.kind == 'SOCH' for e in mine),
+                      'active': sum(e.state == 'active' for e in mine), 'upcoming': sum(e.state == 'upcoming' for e in mine),
+                      'students': Student.objects.filter(school_class=name).count()})
+    return render(request, 'exams_teacher.html', {'cards': cards})
 
 
 def _exam_form(request, exam):
@@ -506,8 +546,13 @@ def _exam_form(request, exam):
 
         if kind not in ('SOR', 'SOCH', 'OLYM'):
             errors.append('Выберите тип: СОР, СОЧ или олимпиада.')
-        if not title:
-            errors.append('Укажите название.')
+        quarter_raw = request.POST.get('quarter', '')
+        quarter = int(quarter_raw) if quarter_raw in ('1', '2', '3', '4') else None
+        if kind == 'OLYM':
+            quarter = None
+            if not title:
+                errors.append('Укажите название.')
+
         if kind == 'OLYM':
             school_class = ''          # у олимпиады нет класса — участников учитель добавляет сам
         elif not school_class:
@@ -563,7 +608,15 @@ def _exam_form(request, exam):
         random_count = len(slots)
 
         if not errors:
-            exam.kind, exam.title, exam.school_class = kind, title, school_class
+            if kind != 'OLYM':
+                from .views import _get_content_lang
+                if quarter is None:           # четверть не выбрали — берём по дате проведения
+                    quarter = (quarters.current(start_at) or {'n': 4})['n']
+                changed = is_new or (exam.kind, exam.quarter, exam.school_class) != (kind, quarter, school_class)
+                # название учитель не придумывает: оно составляется из типа и четверти
+                title = title or (auto_title(kind, quarter, school_class, _get_content_lang(request), exam.pk)
+                                  if changed else exam.title)
+            exam.kind, exam.title, exam.school_class, exam.quarter = kind, title, school_class, quarter
             exam.start_at, exam.duration_minutes = start_at, duration
             exam.random_count = random_count
             exam.random_slots = slots
@@ -579,16 +632,21 @@ def _exam_form(request, exam):
                                       f'{timezone.localtime(exam.start_at):%d.%m.%Y %H:%M}, {duration} мин.')
             if exam.is_olympiad:
                 return redirect('olympiad_tasks' if is_new else 'olympiad_list', *([exam.id] if is_new else []))
-            return redirect('exam_list')
+            return redirect(reverse('exam_list') + f'?cls={exam.school_class}')
         for e in errors:
             messages.error(request, e)
-        values = {'kind': kind, 'title': title, 'school_class': school_class, 'start_at': start_raw,
+        values = {'kind': kind, 'title': title, 'school_class': school_class, 'start_at': start_raw, 'quarter': quarter,
                   'duration_minutes': duration_raw, 'mode': mode, 'hide_tasks': bool(request.POST.get('hide_tasks'))}
         slot_values = [{'tag': sl['tag'], 'level': sl['level'], 'pool': ','.join(map(str, sl.get('tasks', [])))} for sl in slots] if mode == 'random' else None
         selected = set(task_ids)
     else:
         values = {
-            'kind': exam.kind or 'SOR', 'title': exam.title, 'school_class': exam.school_class,
+            'kind': (request.GET.get('kind') if is_new and request.GET.get('kind') in ('SOR', 'SOCH') else exam.kind) or 'SOR',
+            'title': exam.title,
+            'school_class': exam.school_class or normalize_school_class(request.GET.get('cls', '')),
+            'quarter': (exam_quarter(exam) if exam.pk else
+                        int(request.GET['quarter']) if request.GET.get('quarter') in ('1', '2', '3', '4') else
+                        (quarters.current() or {'n': 4})['n']),
             'start_at': timezone.localtime(exam.start_at).strftime('%Y-%m-%dT%H:%M') if exam.start_at else '',
             'duration_minutes': exam.duration_minutes or 40,
             'mode': 'random' if exam.random_count else 'fixed',
@@ -631,11 +689,12 @@ def exam_edit(request, exam_id):
 def exam_delete(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     if request.method == 'POST' and _can_manage(request.user, exam):
-        name, olymp = str(exam), exam.is_olympiad
+        name, olymp, cls = str(exam), exam.is_olympiad, exam.school_class
         exam.delete()
         messages.success(request, f'{name} удалён.')
         if olymp:
             return redirect('olympiad_list')
+        return redirect(reverse('exam_list') + f'?cls={cls}')
     return redirect('exam_list')
 
 

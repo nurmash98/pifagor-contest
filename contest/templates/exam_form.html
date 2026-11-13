@@ -3,7 +3,7 @@
 {% block title %}{% if is_new %}{% if v.kind == 'OLYM' %}Новая олимпиада{% else %}Новый СОР/СОЧ{% endif %}{% else %}Изменить {{ exam.get_kind_display }}{% endif %}{% endblock %}
 
 {% block content %}
-<div class="mb-3">{% if v.kind == 'OLYM' %}<a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← Олимпиада</a>{% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a>{% endif %}</div>
+<div class="mb-3">{% if v.kind == 'OLYM' %}<a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← Олимпиада</a>{% else %}<a href="{% url 'exam_list' %}{% if v.school_class %}?cls={{ v.school_class }}{% endif %}" class="text-decoration-none text-muted small">← СОР/СОЧ{% if v.school_class %} · {{ v.school_class }}{% endif %}</a>{% endif %}</div>
 <form method="post">
 {% csrf_token %}
 <div class="row g-4">
@@ -22,11 +22,23 @@
                     <div class="form-check"><input class="form-check-input" type="radio" name="kind" value="SOCH" id="k2" {% if v.kind == 'SOCH' %}checked{% endif %}><label class="form-check-label" for="k2">СОЧ (ТЖБ)</label></div>
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold small">Четверть</label>
+                <div class="btn-group w-100" role="group">
+                    {% for n in "1234" %}
+                    <input type="radio" class="btn-check" name="quarter" id="q{{ n }}" value="{{ n }}" {% if v.quarter|stringformat:"s" == n %}checked{% endif %} required>
+                    <label class="btn btn-outline-primary" for="q{{ n }}">{{ n }}</label>
+                    {% endfor %}
+                </div>
+                <div class="form-text">Название составится само, например «СОР (2 четверть)».</div>
+            </div>
             {% endif %}
+            {% if v.kind == 'OLYM' %}
             <div class="mb-3">
                 <label class="form-label fw-semibold small">Название</label>
-                <input type="text" name="title" class="form-control" value="{{ v.title }}" placeholder="например, СОР №1: Условия" maxlength="200" required>
+                <input type="text" name="title" class="form-control" value="{{ v.title }}" placeholder="например, Школьная олимпиада 7–8" maxlength="200" required>
             </div>
+            {% endif %}
             <div class="mb-3 no-olym">
                 <label class="form-label fw-semibold small">Класс</label>
                 {% if class_choices is not None %}

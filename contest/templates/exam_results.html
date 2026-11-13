@@ -6,7 +6,7 @@
 <div class="mb-3">
     {% if retake %}<a href="{% url 'exam_results' exam.id %}" class="text-decoration-none text-muted small">← Результаты экзамена</a>
     {% elif exam.is_olympiad %}<a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← Олимпиада</a>
-    {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← СОР/СОЧ</a>{% endif %}
+    {% else %}<a href="{% url 'exam_list' %}?cls={{ exam.school_class }}" class="text-decoration-none text-muted small">← СОР/СОЧ · {{ exam.school_class }}</a>{% endif %}
 </div>
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
     <h3 class="fw-bold mb-0" style="color: #1a1a4b;">{% if retake %}<span class="badge bg-warning text-dark me-2 fs-6">🔁 Пересдача</span>{% endif %}{% if exam.is_olympiad %}🏆 {% endif %}{{ exam.get_kind_display }} «{{ exam.title }}»{% if exam.school_class %} · {{ exam.school_class }}{% endif %}</h3>
