@@ -3004,11 +3004,21 @@ class ExamFullscreenTests(RetakeTestBase):
         self.assertEqual(tabs[0]['url'], reverse('exam_task', args=[self.live.id, self.a_tasks[0].id]))
         self.assertNotContains(r, 'exam_leave')
         self.assertTrue(self.arm()['ok'])
-        for _ in range(5):                                                   # обновлял страницу сколько угодно
-            self.client.get(reverse('exam_run', args=[self.live.id]))
         self.att.refresh_from_db()
-        self.assertIsNone(self.att.finished_at)
         self.assertEqual(self.att.exits, 0)
+
+    def test_reload_and_other_window_count_as_exits(self):
+        self.client.get(reverse('exam_run', args=[self.live.id]))            # первый вход в оболочку — не выход
+        self.att.refresh_from_db()
+        self.assertEqual(self.att.exits, 0)
+        self.arm()
+        d = self.client.post(reverse('exam_exit', args=[self.att.id]), {'kind': 'blur'}).json()
+        self.assertEqual((d['exits'], d['left']), (1, 1))
+        r = self.client.get(reverse('exam_run', args=[self.live.id]))        # обновил страницу — второй выход, работа завершена
+        self.assertEqual(r.status_code, 302)
+        self.att.refresh_from_db()
+        self.assertEqual((self.att.exits, self.att.finish_reason), (2, 'exits'))
+        self.assertEqual([e['kind'] for e in self.att.exit_log], ['blur', 'reload'])
 
     def test_two_exits_finish_work_automatically(self):
         url = reverse('exam_exit', args=[self.att.id])

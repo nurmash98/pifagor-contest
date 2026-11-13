@@ -133,10 +133,14 @@
     btn.addEventListener('click', resume);
     function onFs() {
         if (inFs()) { lockKeys(); if (state === 'gate' || state === 'out') { resume(); } }
-        else if (state === 'in') {                                    // вышел из полного экрана — закрываем работу заставкой
+        else { leave('fullscreen'); }
+    }
+    // Любой выход — Esc, другое окно или программа (Alt+Tab), другая вкладка — считается, как в игре «Бомба».
+    function leave(kind) {
+        if (state === 'in') {
             state = 'out';
             showGate('⚠️', TXT.out, TXT.outText, TXT.back, true);
-            var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+            var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf); fd.append('kind', kind);
             fetch(exitUrl, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
                 if (!d.active) { finish(d.detail); return; }
                 exits = d.exits;
@@ -145,6 +149,10 @@
             }).catch(function () {});
         }
     }
+    window.addEventListener('blur', function () {          // фокус ушёл в рамку с задачей — это не выход, а в другое окно — выход
+        setTimeout(function () { if (!document.hasFocus()) { leave('blur'); } }, 150);
+    });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { leave('hidden'); } });
     document.addEventListener('fullscreenchange', onFs);
     document.addEventListener('webkitfullscreenchange', onFs);
 })();
