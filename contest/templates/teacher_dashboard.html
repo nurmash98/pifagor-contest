@@ -10,6 +10,7 @@
             {% if teacher %}
                 <span class="text-muted small">Ваши классы: <strong>{{ teacher.classes|default:"не назначены" }}</strong></span>
             {% endif %}
+            {% if request.user.is_superuser %}<a href="{% url 'admin_dashboard' %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#4338ca;color:#fff;">📊 Аналитика</a>{% endif %}
             <a href="{% url 'student_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">🎓 Ученики</a>
             <a href="{% url 'task_tags_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📝 Задачи</a>
             <a href="{% url 'exam_list' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">⏱ СОР/СОЧ</a>

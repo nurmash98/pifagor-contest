@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import (Course, Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Tag, Task, Teacher)
+from .models import (Course, Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Submission, LoginEvent, Tag, Task, Teacher)
 
 
 def make_task(title, level, tag, ok=True):
@@ -3718,3 +3718,68 @@ class ExamsByClassAndQuarterTests(RetakeTestBase):
         self.assertEqual(exam_quarter(self.exam), 1)
         self.exam.start_at = timezone.make_aware(timezone.datetime(2026, 11, 20, 10, 0))
         self.assertEqual(exam_quarter(self.exam), 2)
+
+
+class AdminDashboardTests(RetakeTestBase):
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_superuser('boss', password='x')
+        now = timezone.now()
+        self.attempt(self.exam, self.students[0], 10)        # СОР: 10
+        self.attempt(self.exam, self.students[1], 6)         # СОР: 6
+        self.attempt(self.random_exam, self.students[2], 8,
+                     task_ids=[self.a_tasks[1].id, self.b_tasks[1].id])   # СОЧ: 8
+        for st, score in ((self.students[0], 10), (self.students[1], 7), (self.other_class, 10)):
+            Submission.objects.create(student=st, task=self.a_tasks[0], score=score, status='DONE', is_graded=True)
+        LoginEvent.objects.create(user=self.students[0].user)
+        LoginEvent.objects.create(user=self.students[0].user)
+        LoginEvent.objects.create(user=self.other_class.user)
+
+    def test_only_admin_sees_it(self):
+        url = reverse('admin_dashboard')
+        self.assertEqual(self.client.get(url).status_code, 302)                  # аноним
+        self.client.force_login(self.students[0].user)
+        self.assertEqual(self.client.get(url).status_code, 302)                  # ученик
+        self.client.force_login(self.teacher_user)
+        self.assertEqual(self.client.get(url).status_code, 302)                  # учитель (не админ)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_numbers_all_parallels(self):
+        from .dashboard import build
+        d = build()
+        k = d['kpi']
+        self.assertEqual((k['students'], k['active'], k['logins']), (4, 2, 3))
+        self.assertEqual(k['solved'], 2)                                         # два «10 из 10»
+        self.assertEqual(k['avg_score'], 9.0)                                    # (10+7+10)/3
+        self.assertEqual((k['sor'], k['soch'], k['grade']), (8.0, 8.0, 8.0))
+        self.assertEqual(d['parallels'], ['7', '8'])
+        rows = {r['name']: r for r in d['rows']}
+        self.assertEqual((rows['7']['students'], rows['7']['active'], rows['7']['solved']), (3, 1, 1))
+        self.assertEqual((rows['7']['sor'], rows['7']['soch']), (8.0, 8.0))
+        self.assertEqual((rows['8']['students'], rows['8']['solved'], rows['8']['sor']), (1, 1, None))
+        self.assertEqual(sum(x['count'] for x in d['dist']), 3)
+        self.assertEqual(sum(d['week_solved']), 2)
+
+    def test_parallel_filter_goes_by_classes(self):
+        from .dashboard import build
+        d = build('7')
+        self.assertEqual(d['by_group'], 'class')
+        self.assertEqual([r['name'] for r in d['rows']], ['7F'])
+        self.assertEqual(d['kpi']['students'], 3)
+        self.assertEqual(d['kpi']['solved'], 1)
+        self.assertEqual(build('99')['by_group'], 'parallel')                    # нет такой параллели — все
+
+    def test_page_renders_with_filter_and_empty_db(self):
+        self.client.force_login(self.admin)
+        r = self.client.get(reverse('admin_dashboard') + '?p=7')
+        self.assertContains(r, '7F')
+        self.assertContains(r, 'dash-data')
+        ExamAttempt.objects.all().delete(); Submission.objects.all().delete(); LoginEvent.objects.all().delete()
+        self.assertEqual(self.client.get(reverse('admin_dashboard')).status_code, 200)
+
+    def test_admin_gets_link_in_cabinet(self):
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
+        self.client.force_login(self.teacher_user)
+        self.assertNotContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))

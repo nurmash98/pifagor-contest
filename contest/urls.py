@@ -4,6 +4,7 @@ from . import exam_views
 from . import exam_guard
 from . import moderation_views
 from . import activity
+from . import dashboard
 from . import codegame_views
 from . import duel_views
 
@@ -94,6 +95,7 @@ urlpatterns = [
     path('exams/<int:exam_id>/retake/<int:retake_id>/delete/', exam_views.retake_delete, name='retake_delete'),
 
     # Кабинет преподавателя
+    path('analytics/', dashboard.admin_dashboard, name='admin_dashboard'),
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path('teacher/grade/<int:submission_id>/', views.grade_submission, name='grade_submission'),
 
