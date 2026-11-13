@@ -3010,6 +3010,38 @@ class ExamFullscreenTests(RetakeTestBase):
         self.assertIsNone(self.att.finished_at)
         self.assertEqual(self.att.exits, 0)
 
+    def test_two_exits_finish_work_automatically(self):
+        url = reverse('exam_exit', args=[self.att.id])
+        self.arm()
+        d = self.client.post(url).json()
+        self.assertTrue(d['active'])
+        self.assertEqual((d['exits'], d['left']), (1, 1))
+        d = self.client.post(url).json()
+        self.assertFalse(d['active'])
+        self.att.refresh_from_db()
+        self.assertEqual(self.att.exits, 2)
+        self.assertEqual(self.att.finish_reason, 'exits')
+        self.assertIsNotNone(self.att.finished_at)
+        self.assertEqual(self.client.post(url).json()['exits'], 2)          # после конца уже не считается
+        html = self.client.get(reverse('exam_detail', args=[self.live.id])).content.decode()
+        self.assertIn('вышли из полноэкранного режима 2 раза', html)
+
+    def test_exit_from_other_browser_not_counted_and_restore_resets(self):
+        from django.test import Client
+        self.arm()
+        other = Client(); other.force_login(self.st.user)
+        other.post(reverse('exam_exit', args=[self.att.id]))
+        self.att.refresh_from_db()
+        self.assertEqual(self.att.exits, 0)
+        for _ in range(2):
+            self.client.post(reverse('exam_exit', args=[self.att.id]))
+        t = self.teacher.user if hasattr(self.teacher, 'user') else None
+        self.client.force_login(self.teacher.user)
+        self.client.post(reverse('exam_restore', args=[self.att.id]))
+        self.att.refresh_from_db()
+        self.assertEqual(self.att.exits, 0)
+        self.assertIsNone(self.att.finished_at)
+
     def test_second_browser_is_locked(self):
         from django.test import Client
         self.arm()

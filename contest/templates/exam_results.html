@@ -93,6 +93,7 @@
                             {% else %}<span class="text-success">сдал</span>{% endif %}</div>
                         {% if row.attempt %}
                         <div class="small mt-1 d-flex flex-wrap align-items-center gap-1">
+                            {% if row.attempt.exits %}<span class="badge {% if row.attempt.finish_reason == 'exits' %}bg-danger{% else %}bg-warning text-dark{% endif %}" title="Выходов из полного экрана">⛶ {{ row.attempt.exits }}{% if row.attempt.finish_reason == 'exits' %} · завершено автоматически{% endif %}</span>{% endif %}
                             {% if row.can_restore %}
                             <form method="post" action="{% url 'exam_restore' row.attempt.id %}" class="d-inline"
                                   onsubmit="return confirm('Вернуть доступ ученику {{ row.student.full_name|escapejs }}? Работа снова откроется, можно будет продолжить на другом компьютере.');">

@@ -72,6 +72,7 @@ urlpatterns = [
     path('exams/<int:exam_id>/run/', exam_guard.exam_run, name='exam_run'),
     path('exams/<int:exam_id>/retake/<int:retake_id>/run/', exam_guard.exam_run, name='retake_run'),
     path('exams/attempt/<int:attempt_id>/arm/', exam_guard.exam_arm, name='exam_arm'),
+    path('exams/attempt/<int:attempt_id>/exit/', exam_guard.exam_exit, name='exam_exit'),
     path('exams/attempt/<int:attempt_id>/restore/', exam_guard.exam_restore, name='exam_restore'),
     path('exams/<int:exam_id>/participants/', exam_views.olympiad_participants, name='olympiad_participants'),
     path('olympiads/', exam_views.olympiad_list, name='olympiad_list'),

@@ -2,7 +2,8 @@
 
 Работа идёт на странице-«оболочке» (exam_run): она одна разворачивается на весь экран, а задачи
 (вкладки A, B, C…), отправки и переходы открываются внутри неё в рамке (iframe), поэтому полный экран
-не слетает. Вышел из полного экрана — работа закрыта заставкой, пока не вернётся (выходы не считаются).
+не слетает. Вышел из полного экрана — работа закрыта заставкой, пока не вернётся; выходов даётся MAX_EXITS,
+когда они исчерпаны, работа завершается сама.
 Попытка привязана к одному браузеру: открыть её в другом нельзя. Учитель может вернуть доступ
 (если у ученика сломался компьютер) — тогда можно продолжить на другом.
 """
@@ -17,6 +18,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import ExamAttempt, Student
+
+MAX_EXITS = 2          # столько выходов из полного экрана; на последнем работа завершается автоматически
 
 KINDS = {
     'fullscreen': 'вышел из полноэкранного режима',
@@ -98,6 +101,7 @@ def exam_run(request, exam_id, retake_id=None):
     return render(request, 'exam_run.html', {
         'exam': exam, 'retake': retake, 'attempt': attempt, 'window': retake or exam,
         'frame_url': detail_url(attempt), 'tabs': tabs,
+        'exits': attempt.exits, 'max_exits': MAX_EXITS,
     })
 
 
@@ -122,6 +126,30 @@ def exam_arm(request, attempt_id):
     return _state(attempt, ok=attempt.is_active() and attempt.client == me)
 
 
+@login_required
+@require_POST
+def exam_exit(request, attempt_id):
+    """Ученик вышел из полного экрана: считаем выход; когда выходы кончились — работа завершается."""
+    attempt = _own_attempt(request, attempt_id)
+    if attempt.is_active() and attempt.client == client_key(request):
+        with transaction.atomic():
+            attempt = ExamAttempt.objects.select_for_update().get(pk=attempt.pk)
+            if attempt.is_active():
+                attempt.exits += 1
+                _log(attempt, 'fullscreen', counted=True, n=attempt.exits)
+                fields = ['exits', 'exit_log']
+                if attempt.exits >= MAX_EXITS:
+                    attempt.finished_at = timezone.now()
+                    attempt.finish_reason = 'exits'
+                    fields += ['finished_at', 'finish_reason']
+                attempt.save(update_fields=fields)
+    resp = _state(attempt).content
+    import json
+    data = json.loads(resp)
+    data.update(exits=attempt.exits, left=max(MAX_EXITS - attempt.exits, 0))
+    return JsonResponse(data)
+
+
 @staff_member_required
 @require_POST
 def exam_restore(request, attempt_id):
@@ -142,7 +170,8 @@ def exam_restore(request, attempt_id):
     attempt.finished_at = None
     attempt.finish_reason = ''
     attempt.client = ''
-    attempt.save(update_fields=['exit_log', 'finished_at', 'finish_reason', 'client'])
+    attempt.exits = 0
+    attempt.save(update_fields=['exit_log', 'finished_at', 'finish_reason', 'client', 'exits'])
     messages.success(request, f'Доступ возвращён: {attempt.student.full_name} может продолжить '
                               f'на этом или другом компьютере.')
     return redirect(back)

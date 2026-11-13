@@ -45,10 +45,12 @@
 
 <script>
 (function () {
-    var armUrl = '{% url "exam_arm" attempt.id %}', frameUrl = '{{ frame_url }}', csrf = '{{ csrf_token }}';
+    var armUrl = '{% url "exam_arm" attempt.id %}', exitUrl = '{% url "exam_exit" attempt.id %}', maxExits = {{ max_exits }}, exits = {{ exits }}, frameUrl = '{{ frame_url }}', csrf = '{{ csrf_token }}';
     var TXT = {
         out: '{% t "Вы вышли из полноэкранного режима" %}',
         outText: '{% t "Работа скрыта. Вернитесь в полноэкранный режим, чтобы продолжить." %}',
+        left: '{% t "Осталось выходов:" %}',
+        last: '{% t "Это был последний выход — при следующем работа завершится автоматически." %}',
         back: '{% t "Вернуться в полноэкранный режим" %}',
         other: '{% t "Работа открыта в другом браузере" %}',
         noFs: '{% t "На этом устройстве нет полноэкранного режима. Откройте работу на компьютере в Chrome или Edge." %}'
@@ -134,6 +136,13 @@
         else if (state === 'in') {                                    // вышел из полного экрана — закрываем работу заставкой
             state = 'out';
             showGate('⚠️', TXT.out, TXT.outText, TXT.back, true);
+            var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+            fetch(exitUrl, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+                if (!d.active) { finish(d.detail); return; }
+                exits = d.exits;
+                var left = Math.max(maxExits - exits, 0);
+                document.getElementById('gate-text').textContent = TXT.outText + ' ' + TXT.left + ' ' + left + '. ' + (left <= 1 ? TXT.last : '');
+            }).catch(function () {});
         }
     }
     document.addEventListener('fullscreenchange', onFs);
