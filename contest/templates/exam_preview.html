@@ -55,7 +55,6 @@
             <p class="lh-lg">{{ task.display_description|linebreaksbr }}</p>
             {% include 'task_examples.html' %}
         </div>
-        {% include 'ide_links.html' with ide_class='mt-4' %}
     </div>
     <div class="{% if exam.is_olympiad %}col-12{% else %}col-lg-6{% endif %}">
         <div class="card border-0 shadow-sm rounded-4 p-4">
