@@ -27,7 +27,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 logger = logging.getLogger(__name__)
 
-SUBMISSION_COOLDOWN = timedelta(minutes=5)  # пауза между отправками одной задачи
+SUBMISSION_COOLDOWN = timedelta(minutes=1)  # пауза между отправками одной задачи
 
 
 # Вход: после стольких неверных попыток подряд логин блокируется на LOGIN_LOCKOUT_SECONDS
@@ -460,10 +460,10 @@ def task_detail(request, task_id):
 
     cooldown = _cooldown_remaining(submission)
 
-    # ОБРАБОТКА ОТПРАВКИ КОДА — не чаще одного раза в 5 минут (SUBMISSION_COOLDOWN)
+    # ОБРАБОТКА ОТПРАВКИ КОДА — не чаще одного раза в минуту (SUBMISSION_COOLDOWN)
     if request.method == 'POST':
         if cooldown:
-            messages.warning(request, f'Эту задачу можно отправлять раз в 5 минут. Попробуйте снова через {_minutes_left(cooldown)} мин.')
+            messages.warning(request, f'Эту задачу можно отправлять раз в минуту. Попробуйте снова через {int(cooldown.total_seconds()) + 1} сек.')
             return redirect(task_url_with_back)
 
         code = request.POST.get('code', '')
@@ -497,6 +497,7 @@ def task_detail(request, task_id):
         'open_help': _open_input_help(first_failed),
         'attempts': submission.attempts.all(),
         'cooldown_minutes': _minutes_left(cooldown) if cooldown else None,
+        'cooldown_seconds': int(cooldown.total_seconds()) + 1 if cooldown else 0,
         'back_url': back_url or reverse('all_tasks'),
         'readonly': False,
     }

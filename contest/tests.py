@@ -3617,3 +3617,23 @@ class ExamPreviewTests(RetakeTestBase):
     def test_students_cannot_preview(self):
         self.client.force_login(self.students[0].user)
         self.assertNotEqual(self.client.get(reverse('exam_preview', args=[self.exam.id])).status_code, 200)
+
+
+class SubmitCooldownTests(RetakeTestBase):
+    def test_minute_cooldown_keeps_editor_open(self):
+        from .models import Submission
+        from .views import SUBMISSION_COOLDOWN
+        self.assertEqual(SUBMISSION_COOLDOWN, timedelta(minutes=1))
+        st, task = self.students[0], self.a_tasks[0]
+        self.client.force_login(st.user)
+        url = reverse('task_detail', args=[task.id])
+        self.client.post(url, {'code': 'print("не то")'})
+        html = self.client.get(url).content.decode()
+        self.assertIn('id="cooldown-box"', html)
+        area = html[html.index('<textarea name="code"'):html.index('</textarea>')]
+        self.assertNotIn('disabled', area)                         # писать код можно сразу
+        self.assertIn('id="task-submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" disabled', html)
+        sub = Submission.objects.get(student=st, task=task)
+        Submission.objects.filter(pk=sub.pk).update(last_submitted_at=timezone.now() - timedelta(seconds=61))
+        html = self.client.get(url).content.decode()               # через минуту отправка снова открыта
+        self.assertNotIn('id="cooldown-box"', html)

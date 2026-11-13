@@ -123,10 +123,24 @@
                 <p class="small text-muted mb-3">🧪 {% t "Решение проверяется автоматически на тестах, балл выставляется сразу: за каждый пройденный тест — 2 балла (5 из 5 = 10)." %}</p>
             {% endif %}
 
-            {% if cooldown_minutes %}
-                <div class="alert alert-info rounded-3">
-                    {% t "Эту задачу можно отправлять не чаще одного раза в 5 минут. Повторная отправка будет доступна через" %} {{ cooldown_minutes }} {% t "мин." %}
+            {% if cooldown_seconds %}
+                {# Пауза только на отправку: писать и запускать код можно сразу #}
+                <div class="alert alert-info rounded-3 small" id="cooldown-box">
+                    {% t "Отправлять решение можно раз в минуту. Пока исправляйте код — кнопка «Отправить» включится через" %}
+                    <strong id="cooldown-sec">{{ cooldown_seconds }}</strong> {% t "сек." %}
                 </div>
+                <script>
+                (function () {
+                    var left = {{ cooldown_seconds }}, box = document.getElementById('cooldown-box'), out = document.getElementById('cooldown-sec');
+                    var timer = setInterval(function () {
+                        left -= 1; out.textContent = Math.max(left, 0);
+                        if (left <= 0) {
+                            clearInterval(timer); box.style.display = 'none';
+                            var b = document.getElementById('task-submit'); if (b) { b.disabled = false; }
+                        }
+                    }, 1000);
+                })();
+                </script>
             {% endif %}
 
             <form method="post" class="d-flex flex-column flex-grow-1" id="task-form">
@@ -138,14 +152,14 @@
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 code-editor" data-height="340" data-stdin="{{ task.display_input_example }}" data-expect="{{ task.display_output_example }}"
                               autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="{% t '# Напишите ваш код здесь...' %}" {% if cooldown_minutes %}disabled{% endif %}>{{ submission.code|default_if_none:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}">{{ submission.code|default_if_none:'' }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="small text-muted">
                         {% t "Текущий статус:" %} <strong>{% t submission.get_status_display %}</strong>
                     </span>
-                    <button type="submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_minutes %}disabled{% endif %}>
+                    <button type="submit" id="task-submit" class="btn btn-pifagor-green px-4 py-2 rounded-3" {% if cooldown_seconds %}disabled{% endif %}>
                         {% t "Отправить решение →" %}
                     </button>
                 </div>
