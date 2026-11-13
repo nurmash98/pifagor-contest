@@ -16,7 +16,7 @@
         <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
         {% if retake %}<span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>{% endif %}
         <h3 class="fw-bold d-inline" style="color: #1a1a4b;">{{ exam.title }}</h3>
-        <div class="text-muted small mt-1">{{ window.start_at|date:"d.m.Y H:i" }} – {{ window.end_at|date:"H:i" }} · {{ window.duration_minutes }} {% t "мин" %} · {% t "каждая задача — до 10 баллов" %}</div>
+        <div class="text-muted small mt-1">{{ window.start_at|date:"d.m.Y H:i" }} – {{ window.end_at|date:"H:i" }} · {{ window.duration_minutes }} {% t "мин" %} · {% if exam.is_olympiad %}{% t "каждая задача — до 100 баллов" %}{% else %}{% t "каждая задача — до 10 баллов" %}{% endif %}</div>
     </div>
     {% if in_progress %}
     <div class="text-end">
@@ -38,7 +38,7 @@
         <p class="text-muted small mb-1">{% if exam.is_olympiad %}{% t "По каждой задаче — максимум" %} {{ max_subs }} {% t "отправок, засчитывается лучший результат. Места — по сумме баллов." %}{% else %}{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}{% endif %}</p>
         {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
         {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
-        <p class="text-muted small mb-3">{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}</p>
+        <p class="text-muted small mb-3">{% if exam.is_olympiad %}{% t "После старта Курсы и Все задачи будут закрыты до конца олимпиады." %}{% else %}{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}{% endif %}</p>
 {% if not exam.is_olympiad %}
         <div class="alert alert-warning rounded-4 text-start small mx-auto mb-4" style="max-width: 640px;">
             <div class="fw-bold mb-1">🖥 {% t "СОР/СОЧ проходит в полноэкранном режиме" %}</div>

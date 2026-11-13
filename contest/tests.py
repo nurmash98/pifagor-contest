@@ -3543,3 +3543,19 @@ class NavProfileLinkTests(TestCase):
         self.assertIn('pf-avatar', nav)
         self.assertIn('nb b-fire', nav)
         self.assertNotIn('>Профиль<', nav)
+
+
+class OlympiadLateParticipantTests(RetakeTestBase):
+    def test_add_after_start_and_student_can_begin(self):
+        task = make_task('Поздняя', 'C', self.tag1)
+        olymp = Exam.objects.create(kind='OLYM', title='Уже идёт', school_class='', duration_minutes=120,
+                                    start_at=timezone.now() - timedelta(minutes=30), created_by=self.teacher)
+        olymp.tasks.set([task])
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('olympiad_participants', args=[olymp.id]), {'action': 'add', 'student': self.students[2].id})
+        self.assertTrue(olymp.participants.filter(id=self.students[2].id).exists())
+        self.client.force_login(self.students[2].user)
+        self.assertContains(self.client.get(reverse('olympiad_list')), 'Уже идёт')
+        self.client.post(reverse('exam_start', args=[olymp.id]))
+        self.assertTrue(ExamAttempt.objects.filter(exam=olymp, student=self.students[2]).exists())
+        self.assertContains(self.client.get(reverse('exam_detail', args=[olymp.id])), 'до 100 баллов')

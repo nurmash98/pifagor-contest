@@ -10,7 +10,8 @@
     <a href="{% url 'exam_results' exam.id %}" class="btn btn-outline-primary rounded-pill px-3">Результаты</a></div>
 </div>
 <p class="text-muted small mb-4">{{ exam.start_at|date:"d.m.Y H:i" }} – {{ exam.end_at|date:"H:i" }} · задач: {{ exam.tasks_per_student }} ·
-    олимпиаду видят <strong>только</strong> добавленные здесь ученики.</p>
+    олимпиаду видят <strong>только</strong> добавленные здесь ученики. Добавлять можно и во время олимпиады —
+    ученик сразу увидит её в меню «🏆 Олимпиада» и сможет начать.</p>
 
 <div class="row g-4">
     <div class="col-lg-5">
