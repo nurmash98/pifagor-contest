@@ -1,0 +1,344 @@
+{% load ui_i18n static %}<!DOCTYPE html>
+<html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% t "Битва за остров" %} — Pifagor Contest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; background: #0b1220; color: #e5e7eb; overflow: hidden; font-family: 'Montserrat', system-ui, sans-serif; }
+        * { box-sizing: border-box; }
+        button { font-family: inherit; }
+        #bar { height: 52px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: #111827; border-bottom: 1px solid #1f2937; font-size: 14px; }
+        #bar .ttl { font-weight: 800; white-space: nowrap; }
+        .chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: #1f2937; font-weight: 700; white-space: nowrap; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid #fff; }
+        #timer { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 800; }
+        #timer.low { color: #fca5a5; }
+        .sp { flex: 1; }
+        .btn { border: 0; border-radius: 999px; padding: 9px 18px; font-weight: 700; cursor: pointer; background: #22c55e; color: #052e16; font-size: 14px; }
+        .btn:hover { filter: brightness(1.08); }
+        .btn:disabled { background: #374151; color: #9ca3af; cursor: not-allowed; }
+        .btn.ghost { background: #1f2937; color: #e5e7eb; }
+        .btn.big { padding: 14px 30px; font-size: 17px; }
+        #wrap { display: flex; height: calc(100% - 52px); }
+        #map { flex: 1; min-width: 0; display: block; width: 100%; height: 100%; cursor: grab; }
+        #side { width: 270px; background: #111827; border-left: 1px solid #1f2937; padding: 14px; overflow-y: auto; font-size: 13px; }
+        #side h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; }
+        .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; margin-bottom: 4px; }
+        .row.mine { background: #1f2937; outline: 1px solid #374151; }
+        .row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+        .row .pt { font-weight: 800; font-variant-numeric: tabular-nums; }
+        .row .pl { width: 18px; color: #9ca3af; font-weight: 700; text-align: right; }
+        .legend { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 8px; align-items: center; margin-bottom: 14px; }
+        .sw { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(255,255,255,.25); }
+        .muted { color: #9ca3af; }
+        .over { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(11,18,32,.96); }
+        .over .box { max-width: 640px; width: 100%; text-align: center; }
+        .over h2 { font-weight: 800; margin: 8px 0; }
+        .warn { color: #fca5a5; font-weight: 700; }
+        .names { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+        .names span { padding: 5px 11px; border-radius: 999px; background: #1f2937; font-size: 13px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+        #modal { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(11,18,32,.72); }
+        #modal .card { background: #111827; border: 1px solid #374151; border-radius: 18px; width: min(920px, 100%); max-height: 94vh; overflow-y: auto; padding: 20px 22px; text-align: left; }
+        #modal h3 { margin: 0 0 4px; font-weight: 800; }
+        #m-code { background: #272822; color: #f8f8f2; border-radius: 12px; padding: 14px 16px; font: 15px/1.5 'SFMono-Regular', Consolas, Menlo, monospace; white-space: pre; overflow-x: auto; user-select: none; }
+        #m-text { white-space: pre-wrap; line-height: 1.55; font-size: 14px; }
+        .ex { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+        .ex div { background: #0b1220; border: 1px solid #1f2937; border-radius: 10px; padding: 8px 10px; font: 13px/1.45 'SFMono-Regular', Consolas, monospace; white-space: pre-wrap; }
+        .ex b { display: block; font: 700 11px 'Montserrat', sans-serif; color: #9ca3af; margin-bottom: 3px; text-transform: uppercase; }
+        #m-ans { width: 100%; background: #0b1220; color: #f8fafc; border: 2px solid #374151; border-radius: 12px; padding: 10px 12px; font: 16px 'SFMono-Regular', Consolas, monospace; resize: vertical; }
+        #m-ans:focus { outline: 0; border-color: #22c55e; }
+        #m-msg { min-height: 20px; font-weight: 700; margin: 8px 0; }
+        #m-msg.bad { color: #fca5a5; } #m-msg.good { color: #86efac; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #fbbf24; color: #111827; margin-left: 6px; }
+        #toast { position: fixed; left: 50%; top: 66px; transform: translateX(-50%); z-index: 30; padding: 10px 18px; border-radius: 999px; font-weight: 700;
+                 background: #111827; border: 1px solid #374151; display: none; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+        #toast.good { background: #14532d; border-color: #22c55e; } #toast.bad { background: #7f1d1d; border-color: #ef4444; }
+        #banner { position: fixed; left: 0; right: 270px; top: 52px; z-index: 5; padding: 8px 14px; background: #7f1d1d; font-weight: 700; text-align: center; display: none; }
+        table.res { width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; }
+        table.res td { padding: 7px 10px; border-bottom: 1px solid #1f2937; }
+        table.res tr.mine td { background: #1f2937; font-weight: 800; }
+        @media (max-width: 800px) { #side { display: none; } #banner { right: 0; } }
+    </style>
+</head>
+<body>
+<div id="bar">
+    <span class="ttl">🏝️ {% t "Битва за остров" %}</span>
+    <span class="chip" id="my-team" style="display:none"><span class="dot" id="my-dot"></span><span id="my-name"></span> · <span id="my-score">0</span></span>
+    <span class="chip" id="cool" style="display:none">⏳ <span id="cool-n">0</span></span>
+    <span class="sp"></span>
+    <span class="chip">{% t "Выходы" %}: <span id="exits">{{ player.exits }}</span>/{{ max_exits }}</span>
+    <span class="chip">⏱ <span id="timer">--:--</span></span>
+    <button class="btn ghost" id="center" type="button">◎ {% t "К моей точке" %}</button>
+</div>
+<div id="banner"></div>
+<div id="wrap">
+    <canvas id="map"></canvas>
+    <aside id="side">
+        <h4>{% t "Очки" %}</h4>
+        <div id="board"></div>
+        <h4 style="margin-top:16px">{% t "Клетки" %}</h4>
+        <div class="legend">
+            <span class="sw" style="background:#a5d458"></span><span>{% t "Трава" %} — {% t "что выведет код" %}</span><b>+1</b>
+            <span class="sw" style="background:#4c9a2c"></span><span>{% t "Лес" %} — {% t "написать программу" %}</span><b>+2</b>
+            <span class="sw" style="background:#b5afa8"></span><span>{% t "Крепость" %} — {% t "задача сложнее" %}</span><b>+3</b>
+        </div>
+        <div class="muted" style="line-height:1.5">{% t "Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей." %}
+            {% t "По своим клеткам можно ходить свободно. Чужую клетку можно отбить, но задача будет сложнее." %}
+            {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
+    </aside>
+</div>
+
+<div class="over" id="lobby"><div class="box">
+    <div style="font-size:56px">🏝️</div>
+    <h2>{% t "Битва за остров" %}</h2>
+    <p class="muted">{% t "Ждём, пока учитель начнёт игру" %}… {% t "В игре" %}: <b id="lobby-n">0</b></p>
+    <div class="names" id="lobby-names"></div>
+    <p class="muted" style="margin-top:18px;font-size:13px">{% t "Игра идёт в полноэкранном режиме." %} {{ max_exits }} {% t "выхода из него — и вы выбиты из игры." %}</p>
+</div></div>
+
+<div class="over" id="gate"><div class="box">
+    <div style="font-size:52px" id="gate-icon">🖥</div>
+    <h2 id="gate-title">{% t "Игра началась!" %}</h2>
+    <p id="gate-text" class="muted">{% t "Игра идёт только в полноэкранном режиме. Любой выход — Esc, другое окно, другая вкладка, обновление страницы — считается." %}</p>
+    <p class="warn" id="gate-warn"></p>
+    <button class="btn big" id="fs-btn" type="button">{% t "Начать в полноэкранном режиме" %}</button>
+</div></div>
+
+<div class="over" id="final"><div class="box">
+    <div style="font-size:56px">🏆</div>
+    <h2>{% t "Игра окончена" %}</h2>
+    <p id="final-me" style="font-size:18px;font-weight:700"></p>
+    <table class="res" id="final-table"></table>
+    <p style="margin-top:20px"><a class="btn big" style="text-decoration:none;display:inline-block" href="{% url 'codegames' %}">{% t "К играм" %}</a></p>
+</div></div>
+
+<div id="modal"><div class="card">
+    <h3><span id="m-title"></span><span class="badge" id="m-pts"></span></h3>
+    <div class="muted" id="m-sub" style="margin-bottom:10px"></div>
+    <div id="m-output">
+        <pre id="m-code"></pre>
+        <label class="muted" for="m-ans" style="display:block;margin:10px 0 4px;font-weight:700">{% t "Ответ" %}</label>
+        <textarea id="m-ans" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    </div>
+    <div id="m-task" style="display:none">
+        <div id="m-text"></div>
+        <div class="ex"><div><b>{% t "Пример ввода" %}</b><span id="m-in"></span></div><div><b>{% t "Пример вывода" %}</b><span id="m-out"></span></div></div>
+        <textarea id="ch-code" class="code-editor" data-norun data-height="260" spellcheck="false" style="width:100%;min-height:240px;background:#272822;color:#f8f8f2;border-radius:12px;padding:10px;font:14px monospace"></textarea>
+    </div>
+    <div id="m-msg"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn ghost" id="m-cancel" type="button">{% t "Отмена" %}</button>
+        <button class="btn" id="m-go" type="button">{% t "Проверить" %}</button>
+    </div>
+</div></div>
+<div id="toast"></div>
+<form id="csrf" style="display:none">{% csrf_token %}</form>
+
+{% include 'island_map_js.html' %}
+{% include 'code_editor.html' %}
+<script>
+(function () {
+    var TXT = {{ i18n|safe }}, MAX_EXITS = {{ max_exits }};
+    var U = {state: '{% url "island_state" game.id %}', arm: '{% url "island_arm" game.id %}', exit: '{% url "island_exit" game.id %}',
+             move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}'};
+    var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
+    var ver = 0, status = '{{ game.status }}', left = 0, me = null, teams = [], scores = {}, kicked = {{ player.kicked|yesno:"true,false" }};
+    var fs = 'gate', armed = false, busy = false, challenge = null, coolUntil = 0, finalShown = false;
+    var map = IslandMap($('map'), {onCell: step});
+
+    function post(url, data) {
+        var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+        for (var k in (data || {})) { fd.append(k, data[k]); }
+        return fetch(url, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); });
+    }
+    function fmt(s) { s = Math.max(0, s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+    var toastT;
+    function toast(text, cls) { var t = $('toast'); t.textContent = text; t.className = cls || ''; t.style.display = 'block';
+        clearTimeout(toastT); toastT = setTimeout(function () { t.style.display = 'none'; }, 3200); }
+
+    // ---------- полноэкранный режим: любой выход считается, MAX_EXITS — выбит ----------
+    var root = document.documentElement, canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    function inFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+    function enterFs() { try { var p = (root.requestFullscreen || root.webkitRequestFullscreen).call(root); if (p && p.catch) { p.catch(function () {}); } } catch (e) {} }
+    function exitFs() { try { if (inFs()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } } catch (e) {} }
+    function needFs() { return status === 'running' && !kicked; }
+    function showGate(icon, title, warn, btn) {
+        $('gate-icon').textContent = icon; $('gate-title').textContent = title; $('gate-warn').textContent = warn || '';
+        $('fs-btn').textContent = btn; $('gate').style.display = 'flex';
+    }
+    function syncGate() {
+        if (!needFs()) { $('gate').style.display = 'none'; return; }
+        if (!canFs) { showGate('🖥', TXT.no_fs, '', ''); $('fs-btn').style.display = 'none'; return; }
+        if (fs === 'in' && inFs()) { $('gate').style.display = 'none'; return; }
+        if (fs !== 'out') { showGate('🖥', '{% t "Игра началась!" %}', '', TXT.start_fs); }
+    }
+    function onFs() {
+        if (inFs()) {
+            if (!needFs()) { return; }
+            post(U.arm).then(function (d) {
+                if (d.ok) { armed = true; fs = 'in'; $('gate').style.display = 'none'; map.centerOnMe();
+                            try { if (navigator.keyboard && navigator.keyboard.lock) { navigator.keyboard.lock(['Escape']).catch(function () {}); } } catch (e) {} }
+                else { exitFs(); }
+            });
+        } else { leave('fullscreen'); }
+    }
+    function leave(kind) {
+        if (fs !== 'in' || !needFs()) { return; }
+        fs = 'out'; closeModal();
+        showGate('⚠️', TXT.out, '', TXT.back_fs);
+        post(U.exit, {kind: kind}).then(function (d) {
+            $('exits').textContent = d.exits;
+            if (d.kicked) { setKicked(); } else { $('gate-warn').textContent = TXT.exits_left + ' ' + d.left; }
+        }).catch(function () {});
+    }
+    function setKicked() {
+        kicked = true; fs = 'gate'; $('gate').style.display = 'none'; closeModal(); exitFs();
+        $('banner').textContent = TXT.kicked; $('banner').style.display = 'block';
+    }
+    $('fs-btn').addEventListener('click', enterFs);
+    document.addEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    window.addEventListener('blur', function () { setTimeout(function () { if (!document.hasFocus()) { leave('blur'); } }, 150); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { leave('hidden'); } });
+    document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    ['copy', 'cut', 'paste', 'dragstart', 'drop'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, true); });
+    document.addEventListener('keydown', function (e) {
+        var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+        if (k === 'f12' || (mod && e.shiftKey && 'ijc'.indexOf(k) >= 0) || (mod && k.length === 1 && 'uspfcxvtnwrl'.indexOf(k) >= 0)) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+
+    // ---------- состояние ----------
+    function poll() {
+        fetch(U.state + '?v=' + ver, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
+    }
+    function apply(d) {
+        if (d.status !== 'lobby' && !map.state.map && !d.map) { ver = 0; poll(); return; }   // игра началась — берём карту целиком
+        status = d.status; ver = d.v; left = d.left; teams = d.teams || teams; scores = d.scores || scores;
+        if (d.me) { me = d.me; if (d.me.kicked && !kicked) { setKicked(); } if (!d.me.kicked && kicked) { kicked = false; $('banner').style.display = 'none'; }
+                    $('exits').textContent = d.me.exits; if (d.me.wait) { coolUntil = Date.now() + d.me.wait * 1000; } }
+        map.setState(d);
+        if (d.challenge && !challenge) { challenge = d.challenge; }
+        $('lobby').style.display = status === 'lobby' ? 'flex' : 'none';
+        if (status === 'lobby') { lobby(d); }
+        board();
+        if (status === 'finished') { finish(d); } else { syncGate(); }
+    }
+    function lobby(d) {
+        $('lobby-n').textContent = d.players.length;
+        var col = {}; teams.forEach(function (t) { col[t.i] = t.color; });
+        $('lobby-names').innerHTML = d.players.map(function (p) {
+            return '<span>' + (p[3] >= 0 ? '<i class="dot" style="background:' + col[p[3]] + '"></i>' : '') + esc(p[5]) + '</span>'; }).join('');
+    }
+    function ranked() {
+        var rows = teams.map(function (t) { return {t: t, s: scores[t.i] || 0}; }).sort(function (a, b) { return b.s - a.s || a.t.i - b.t.i; });
+        var place = 0, prev = null;
+        rows.forEach(function (r, i) { if (r.s !== prev) { place = i + 1; prev = r.s; } r.place = place; });
+        return rows;
+    }
+    function board() {
+        var rows = ranked(), mine = me ? me.team : -1;
+        $('board').innerHTML = rows.map(function (r) {
+            return '<div class="row' + (r.t.i === mine ? ' mine' : '') + '"><span class="pl">' + r.place + '</span><span class="dot" style="background:' + r.t.color +
+                '"></span><span class="nm">' + esc(r.t.name) + '</span><span class="pt">' + r.s + '</span></div>'; }).join('');
+        var my = rows.filter(function (r) { return r.t.i === mine; })[0];
+        if (my) { $('my-team').style.display = ''; $('my-dot').style.background = my.t.color; $('my-name').textContent = my.t.name; $('my-score').textContent = my.s; }
+    }
+    function finish(d) {
+        if (finalShown) { return; }
+        finalShown = true; fs = 'gate'; closeModal(); $('gate').style.display = 'none'; exitFs();
+        var rows = ranked(), mine = me ? me.team : -1, my = rows.filter(function (r) { return r.t.i === mine; })[0];
+        $('final-me').innerHTML = my ? (esc(my.t.name) + ' — ' + my.place + ' ' + TXT.place + (me.coins ? ' · ' + TXT.coins + ': +' + me.coins : '')) : '';
+        $('final-table').innerHTML = rows.map(function (r) {
+            return '<tr class="' + (r.t.i === mine ? 'mine' : '') + '"><td style="width:40px">' + r.place + '</td><td><span class="dot" style="background:' + r.t.color +
+                '"></span> ' + esc(r.t.name) + '</td><td style="text-align:right;font-weight:800">' + r.s + '</td></tr>'; }).join('');
+        $('final').style.display = 'flex';
+    }
+    setInterval(function () {
+        if (status === 'running' && left > 0) { left--; }
+        var tm = $('timer'); tm.textContent = status === 'running' ? fmt(left) : '--:--'; tm.className = left <= 60 && status === 'running' ? 'low' : '';
+        var c = Math.ceil((coolUntil - Date.now()) / 1000);
+        $('cool').style.display = c > 0 ? '' : 'none'; $('cool-n').textContent = c;
+        if (challenge && $('modal').style.display === 'flex') { $('m-go').disabled = busy || c > 0; if (c > 0) { $('m-go').textContent = TXT.cooldown + ' ' + c; } else if (!busy) { $('m-go').textContent = TXT.check; } }
+    }, 1000);
+
+    // ---------- ход и задача ----------
+    function canPlay() { return status === 'running' && !kicked && fs === 'in' && !busy; }
+    function step(x, y) {
+        if (!canPlay() || $('modal').style.display === 'flex') { return; }
+        var c = Math.ceil((coolUntil - Date.now()) / 1000), own = map.state.cells[x + ',' + y] === me.team;
+        if (c > 0 && !own) { toast(TXT.cooldown + ': ' + c + ' ' + TXT.sec, 'bad'); return; }
+        busy = true;
+        post(U.move, {x: x, y: y}).then(function (d) {
+            busy = false;
+            if (d.moved) { me.x = d.me.x; me.y = d.me.y; map.setMe(me.x, me.y); map.follow(); }
+            else if (d.challenge) { challenge = d.challenge; openModal(); }
+            else if (d.error === 'cooldown') { coolUntil = Date.now() + d.wait * 1000; toast(TXT.cooldown + ': ' + d.wait + ' ' + TXT.sec, 'bad'); }
+            else if (d.error === 'kicked') { setKicked(); }
+            else if (d.error === 'over') { poll(); }
+            else if (d.error) { toast(TXT[d.error] || TXT.far, 'bad'); }
+        }).catch(function () { busy = false; });
+    }
+    function editor() { var el = document.querySelector('#m-task .CodeMirror'); return el ? el.CodeMirror : null; }
+    function openModal() {
+        var ch = challenge, code = ch.kind === 'code';
+        $('m-title').textContent = code ? ch.title : TXT.what_prints;
+        $('m-pts').textContent = '+' + ch.points + ' ' + TXT.points;
+        $('m-sub').textContent = (ch.enemy ? TXT.enemy + '. ' : '') + (code ? TXT.write_code + ' (Python)' : '');
+        $('m-output').style.display = code ? 'none' : ''; $('m-task').style.display = code ? '' : 'none';
+        $('m-msg').textContent = ''; $('m-msg').className = '';
+        $('modal').style.display = 'flex';
+        if (code) {
+            $('m-text').textContent = ch.text; $('m-in').textContent = ch.input; $('m-out').textContent = ch.output;
+            var cm = editor();
+            if (cm) { if (cm._cell !== ch.x + ',' + ch.y + ',' + ch.title) { cm.setValue(''); cm._cell = ch.x + ',' + ch.y + ',' + ch.title; } setTimeout(function () { cm.refresh(); cm.focus(); }, 30); }
+            else { $('ch-code').focus(); }
+        } else { $('m-code').textContent = ch.code; $('m-ans').value = ''; setTimeout(function () { $('m-ans').focus(); }, 30); }
+        $('m-go').textContent = TXT.check; $('m-go').disabled = false;
+    }
+    function closeModal() { $('modal').style.display = 'none'; }
+    function send() {
+        if (!challenge || busy) { return; }
+        var cm = editor(), value = challenge.kind === 'code' ? (cm ? cm.getValue() : $('ch-code').value) : $('m-ans').value;
+        if (!value.trim()) { $('m-msg').textContent = challenge.kind === 'code' ? TXT.enter_code : TXT.answer + '?'; $('m-msg').className = 'bad'; return; }
+        busy = true; $('m-go').disabled = true; $('m-go').textContent = TXT.checking;
+        post(U.answer, {value: value}).then(function (d) {
+            busy = false; $('m-go').textContent = TXT.check;
+            var tests = d.total ? ' ' + TXT.tests + ': ' + d.passed + '/' + d.total + '.' : '';
+            if (d.ok) {
+                me.x = d.me.x; me.y = d.me.y; map.setMe(me.x, me.y);
+                map.state.cells[me.x + ',' + me.y] = me.team;
+                closeModal(); challenge = null; map.follow(); toast(TXT.captured + ' +' + d.points, 'good'); poll();
+            } else if (d.ok === false) {
+                coolUntil = Date.now() + d.wait * 1000;
+                if (challenge.kind === 'output') { closeModal(); challenge = null; toast(TXT.wrong + ' ' + d.wait + ' ' + TXT.sec, 'bad'); }
+                else { $('m-msg').textContent = TXT.wrong + ' ' + d.wait + ' ' + TXT.sec + '.' + tests; $('m-msg').className = 'bad'; }
+            } else if (d.error === 'cooldown') { coolUntil = Date.now() + d.wait * 1000; }
+            else if (d.error === 'kicked') { setKicked(); }
+            else if (d.error === 'over') { closeModal(); poll(); }
+            else { $('m-msg').textContent = TXT[d.error] || TXT.unavailable; $('m-msg').className = 'bad'; $('m-go').disabled = false; }
+        }).catch(function () { busy = false; $('m-go').disabled = false; $('m-go').textContent = TXT.check; $('m-msg').textContent = TXT.unavailable; $('m-msg').className = 'bad'; });
+    }
+    $('m-go').addEventListener('click', send);
+    $('m-cancel').addEventListener('click', closeModal);
+    $('m-ans').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    $('center').addEventListener('click', function () { map.centerOnMe(); });
+    document.addEventListener('keydown', function (e) {
+        if ($('modal').style.display === 'flex') { if (e.key === 'Escape') { closeModal(); } return; }
+        var d = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[e.key];
+        if (d && me && canPlay()) {
+            e.preventDefault();
+            var x = me.x + d[0], y = me.y + d[1];
+            if (map.neighbours().some(function (n) { return n[0] === x && n[1] === y; })) { step(x, y); }
+        }
+    });
+
+    map.loop();
+    poll();
+    setInterval(poll, 4000);          // раз в 4 секунды: только изменения, сервер не нагружается
+})();
+</script>
+</body>
+</html>

@@ -3809,3 +3809,200 @@ class AdminDashboardTests(RetakeTestBase):
         self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
         self.client.force_login(self.teacher_user)
         self.assertNotContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
+
+
+class IslandGameTests(TestCase):
+    """«Битва за остров»: лобби, команды, карта, захват клеток, задачи двух видов, выходы, монеты."""
+
+    def setUp(self):
+        cache.clear()
+        from .models import IslandGame
+        self.tu = User.objects.create_user('is_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
+        self.sts = [Student.objects.create(user=User.objects.create_user(f'is_s{i}', password='p'),
+                                           full_name=f'Ученик Номер{i}', school_class='7A') for i in range(6)]
+        self.foreign = Student.objects.create(user=User.objects.create_user('is_f', password='p'), full_name='Чужой', school_class='9Z')
+        tag = Tag.objects.create(name='остров')
+        self.code_task = make_task('Код A', 'A', tag)
+        self.game = IslandGame(owner=self.tu, title='Остров', mode='teams', teams_count=3, minutes=40)
+        self.game.set_classes(['7A'])
+        self.game.save()
+        self.game.tags.add(tag)
+
+    def _run(self, n=6):
+        from . import island
+        import random
+        for st in self.sts[:n]:
+            island.join(self.game, st)
+        island.shuffle_teams(self.game, random.Random(1))
+        self.game = island.start(self.game, random.Random(2))
+        return island
+
+    def _neutral_neighbour(self, island, p, kind):
+        owned = {(c.x, c.y) for c in self.game.cells.all()}
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            c = (p.x + dx, p.y + dy)
+            if c not in owned and island.terrain(self.game, *c) == kind:
+                return c
+        return None
+
+    def _player_with(self, island, kind):
+        """Игрок, рядом с которым есть ничья клетка нужной местности (иначе местность подставляем сами)."""
+        for p in self.game.players.all():
+            c = self._neutral_neighbour(island, p, kind)
+            if c:
+                return p, c
+        p = self.game.players.first()
+        owned = {(c.x, c.y) for c in self.game.cells.all()}
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            x, y = p.x + dx, p.y + dy
+            if (x, y) not in owned and island.terrain(self.game, x, y) != island.WATER:
+                rows = [list(r) for r in self.game.map['rows']]
+                rows[y][x] = kind
+                self.game.map['rows'] = [''.join(r) for r in rows]
+                self.game.save(update_fields=['map'])
+                return p, (x, y)
+        self.fail('нет свободной соседней клетки')
+
+    def test_teacher_creates_game_and_students_see_it(self):
+        from .models import IslandGame
+        self.client.login(username='is_t', password='p')
+        r = self.client.post(reverse('island_manage'), {'classes': ['7A', '9Z'], 'mode': 'teams', 'teams_count': 9, 'minutes': 40, 'topics': ['@io']})
+        g = IslandGame.objects.latest('id')
+        self.assertRedirects(r, reverse('island_control', args=[g.id]))
+        self.assertEqual((g.class_list(), g.teams_count, g.status), (['7A'], 6, 'lobby'))      # чужой класс и лишние команды отброшены
+        self.assertContains(self.client.get(reverse('games_hub')), 'Битва за остров')
+        self.client.login(username='is_s0', password='p')
+        self.assertContains(self.client.get(reverse('codegames')), reverse('island_play', args=[g.id]))
+        self.assertEqual(self.client.get(reverse('island_play', args=[g.id])).status_code, 200)   # вошёл в лобби
+        self.assertEqual(g.players.count(), 1)
+        self.assertNotEqual(self.client.get(reverse('island_manage')).status_code, 200)
+        self.client.login(username='is_f', password='p')
+        self.assertEqual(self.client.get(reverse('island_play', args=[g.id])).status_code, 404)
+
+    def test_shuffle_is_even_and_start_builds_connected_map(self):
+        island = self._run()
+        players = list(self.game.players.all())
+        sizes = sorted([sum(1 for p in players if p.team == t) for t in range(3)])
+        self.assertEqual(sizes, [2, 2, 2])
+        self.assertEqual(self.game.status, 'running')
+        land = island._land(self.game)
+        self.assertEqual(len(island._components(land)), 1)                     # вся суша связна
+        self.assertGreaterEqual(len(land), 6 * 9)
+        cells = {(c.x, c.y): c.team for c in self.game.cells.all()}
+        self.assertEqual(len(cells), 6)                                         # у каждого своя стартовая клетка
+        for p in players:
+            self.assertEqual(cells[(p.x, p.y)], p.team)
+        self.assertEqual(sum(self.game.scores.values()), 6)
+
+    def test_output_question_captures_cell_and_wrong_answer_gives_cooldown(self):
+        island = self._run()
+        p, (x, y) = self._player_with(island, island.GRASS)
+        self.assertEqual(island.move(self.game, p, x + 5, y), {'error': 'far'})
+        self.assertEqual(island.move(self.game, p, x, y), {'challenge': True})
+        pub = island.public_challenge(p)
+        self.assertEqual(pub['kind'], 'output')
+        self.assertNotIn('answer', pub)
+        res = island.answer(self.game, p, 'совсем не то')
+        self.assertEqual((res['ok'], res['wait']), (False, island.COOLDOWN))
+        self.assertEqual(island.move(self.game, p, x, y)['error'], 'cooldown')
+        p.cooldown_until = None; p.save()
+        island.move(self.game, p, x, y)
+        before = self.game.scores[str(p.team)]
+        res = island.answer(self.game, p, p.challenge['answer'])
+        self.assertTrue(res['ok'])
+        p.refresh_from_db(); self.game.refresh_from_db()
+        self.assertEqual(((p.x, p.y), p.captured, p.points), ((x, y), 1, 1))
+        self.assertEqual(self.game.scores[str(p.team)], before + 1)
+        self.assertEqual(self.game.cells.get(x=x, y=y).team, p.team)
+        back = (x - 1, y) if (x - 1, y) in {(c.x, c.y) for c in self.game.cells.filter(team=p.team)} else None
+        if back:                                                               # по своим клеткам — без задачи
+            self.assertEqual(island.move(self.game, p, *back), {'moved': True})
+
+    def test_forest_needs_code_and_enemy_cell_is_harder(self):
+        island = self._run()
+        p, (x, y) = self._player_with(island, island.FOREST)
+        island.move(self.game, p, x, y)
+        self.assertEqual(p.challenge['kind'], 'code')
+        self.assertEqual(island.public_challenge(p)['title'], 'Код A')
+        bad = island.answer(self.game, p, 'print(2)')
+        self.assertEqual((bad['ok'], bad['passed'], bad['total']), (False, 0, 1))
+        self.assertEqual(p.challenge['kind'], 'code')                          # задача та же, можно повторить после паузы
+        p.cooldown_until = None; p.save()
+        self.assertTrue(island.answer(self.game, p, 'print(1)')['ok'])
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.cells.get(x=x, y=y).team, p.team)
+        enemy = self.game.players.exclude(team=p.team).first()
+        enemy.x, enemy.y = x + 1, y; enemy.save()                              # сосед встаёт рядом (если там суша)
+        if island.terrain(self.game, x + 1, y) != island.WATER:
+            self.assertEqual(island.cell_level(self.game, enemy, x, y, p.team), 3)
+            island.move(self.game, enemy, x, y)
+            self.assertTrue(enemy.challenge['enemy'])
+            old = self.game.scores[str(p.team)]
+            island.capture(self.game, enemy, enemy.challenge)
+            self.game.refresh_from_db()
+            self.assertEqual(self.game.scores[str(p.team)], old - 2)           # очки ушли к захватчику
+            self.assertEqual(self.game.cells.get(x=x, y=y).team, enemy.team)
+
+    def test_three_exits_kick_but_cells_stay_and_teacher_restores(self):
+        island = self._run()
+        st = self.sts[0]
+        p = self.game.players.get(student=st)
+        self.client.login(username='is_s0', password='p')
+        url = reverse('island_exit', args=[self.game.id])
+        self.assertEqual(self.client.post(url).json()['exits'], 0)             # не вошёл в полный экран — не считается
+        self.assertEqual(self.client.post(reverse('island_move', args=[self.game.id]), {'x': p.x + 1, 'y': p.y}).json()['error'], 'notarmed')
+        self.assertTrue(self.client.post(reverse('island_arm', args=[self.game.id])).json()['ok'])
+        self.assertEqual(self.client.post(url, {'kind': 'blur'}).json()['left'], 2)
+        self.client.get(reverse('island_play', args=[self.game.id]))            # обновил страницу — второй выход
+        d = self.client.post(url).json()
+        self.assertEqual((d['exits'], d['kicked']), (3, True))
+        p.refresh_from_db()
+        self.assertTrue(p.kicked)
+        self.assertEqual(self.game.cells.filter(team=p.team).count(), 2)        # клетки остались команде
+        self.assertEqual(island.move(self.game, p, p.x + 1, p.y)['error'], 'kicked')
+        self.client.login(username='is_t', password='p')
+        self.client.post(reverse('island_control_action', args=[self.game.id]), {'action': 'restore', 'player': p.id})
+        p.refresh_from_db()
+        self.assertEqual((p.kicked, p.exits), (False, 0))
+
+    def test_finish_awards_coins_and_state_sends_only_changes(self):
+        from .models import CoinTransaction
+        island = self._run()
+        p, (x, y) = self._player_with(island, island.GRASS)
+        full = island.state(self.game, 0, me=p)
+        self.assertIn('map', full)
+        self.assertEqual(len(full['cells']), 6)
+        island.move(self.game, p, x, y)
+        island.answer(self.game, p, p.challenge['answer'])
+        self.game.refresh_from_db()
+        diff = island.state(self.game, full['v'], me=p)
+        self.assertNotIn('map', diff)
+        self.assertEqual(diff['cells'], [[x, y, p.team]])
+        self.game.ends_at = timezone.now() - timedelta(seconds=1); self.game.save()
+        done = island.state(self.game, diff['v'], me=p)
+        self.assertEqual(done['status'], 'finished')
+        self.assertEqual(island.move(self.game, p, x, y)['error'], 'over')
+        tx = CoinTransaction.objects.filter(key=f'island:{self.game.id}')
+        self.assertEqual([t.student_id for t in tx], [p.student_id])            # монеты — только тем, кто захватывал, 1 место +3
+        self.assertEqual(tx[0].amount, 3)
+        island.finish_if_needed(self.game, force=True)                          # повторный финиш ничего не начисляет
+        self.assertEqual(CoinTransaction.objects.filter(key=f'island:{self.game.id}').count(), 1)
+
+    def test_solo_mode_and_late_join(self):
+        from . import island
+        import random
+        self.game.mode = 'solo'; self.game.save()
+        for st in self.sts[:4]:
+            island.join(self.game, st)
+        self.game = island.start(self.game, random.Random(3))
+        self.assertEqual(sorted(p.team for p in self.game.players.all()), [0, 1, 2, 3])
+        late = island.join(self.game, self.sts[4])
+        self.game.refresh_from_db()
+        self.assertEqual(late.team, 4)
+        self.assertEqual(self.game.cells.get(x=late.x, y=late.y).team, 4)
+        self.assertEqual(len(island.teams_info(self.game, list(self.game.players.select_related('student')))), 5)
+        self.client.login(username='is_t', password='p')
+        d = self.client.get(reverse('island_control_state', args=[self.game.id])).json()
+        self.assertEqual((d['status'], len(d['players'])), ('running', 5))
+        self.assertEqual(self.client.get(reverse('island_control', args=[self.game.id])).status_code, 200)

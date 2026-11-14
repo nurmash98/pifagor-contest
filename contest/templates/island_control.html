@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ game.title }} - Pifagor Contest{% endblock %}
+
+{% block content %}
+<style>
+    #stage { background: #0b1220; color: #e5e7eb; border-radius: 18px; overflow: hidden; }
+    #stage:fullscreen { border-radius: 0; }
+    #top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #111827; flex-wrap: wrap; }
+    #top .ttl { font-weight: 800; font-size: 17px; }
+    #timer { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #timer.low { color: #fca5a5; }
+    .chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: #1f2937; font-weight: 700; font-size: 13px; }
+    #body { display: flex; height: 70vh; min-height: 420px; }
+    #stage:fullscreen #body { height: calc(100vh - 58px); }
+    #cv { flex: 1; min-width: 0; width: 100%; height: 100%; display: block; }
+    #side { width: 300px; background: #111827; border-left: 1px solid #1f2937; padding: 14px; overflow-y: auto; font-size: 13px; }
+    #side h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; }
+    .row2 { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; margin-bottom: 4px; background: #0f172a; }
+    .row2 .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .row2 .pt { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+    .row2 .pl { width: 20px; color: #9ca3af; font-weight: 800; text-align: right; }
+    .dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; border: 2px solid #fff; flex: none; }
+    .sbtn { border: 0; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer; background: #1f2937; color: #e5e7eb; font-size: 13px; }
+    .sbtn:hover { background: #374151; }
+    .sbtn.go { background: #22c55e; color: #052e16; } .sbtn.go:hover { filter: brightness(1.08); }
+    .sbtn.stop { background: #7f1d1d; color: #fecaca; }
+    #lobby { padding: 22px; }
+    .teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+    .tcol { background: #111827; border-radius: 14px; padding: 12px; border-top: 5px solid #374151; min-height: 90px; }
+    .tcol h5 { margin: 0 0 8px; font-size: 14px; font-weight: 800; display: flex; justify-content: space-between; }
+    .pl-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
+    .pl-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pl-item select { background: #1f2937; color: #e5e7eb; border: 1px solid #374151; border-radius: 8px; font-size: 12px; padding: 2px 4px; }
+    .pl-item button { border: 0; background: transparent; color: #9ca3af; cursor: pointer; font-size: 14px; }
+    .muted2 { color: #9ca3af; }
+    #players td, #players th { padding: 6px 10px; }
+</style>
+<div class="mb-3"><a href="{% url 'island_manage' %}" class="text-decoration-none text-muted small">← Битва за остров</a></div>
+
+<div id="stage">
+    <div id="top">
+        <span class="ttl">🏝️ {{ game.title }}</span>
+        <span class="chip" id="st-chip"></span>
+        <span class="chip">👥 <span id="n-players">0</span></span>
+        <span style="flex:1"></span>
+        <span id="timer"></span>
+        <button class="sbtn" id="b-full" type="button">⛶ На весь экран</button>
+        <button class="sbtn stop" id="b-finish" type="button" style="display:none">Завершить игру</button>
+    </div>
+    <div id="lobby" style="display:none">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            {% if game.mode == 'teams' %}<button class="sbtn" id="b-shuffle" type="button">🔀 Раскидать по командам</button>{% endif %}
+            <button class="sbtn go" id="b-start" type="button">▶ Начать игру</button>
+            <span class="muted2 small">Ученики заходят в раздел «Игры» и нажимают «Войти».
+                {% if game.mode == 'teams' %}Кто не попал в команду — при старте встанет в самую маленькую.{% else %}Режим «сам за себя»: у каждого свой цвет.{% endif %}</span>
+        </div>
+        <div class="teams" id="teams"></div>
+    </div>
+    <div id="body" style="display:none">
+        <canvas id="cv"></canvas>
+        <aside id="side"><h4>Очки</h4><div id="board"></div></aside>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 bg-white mt-4" id="players-card" style="display:none">
+    <h5 class="fw-bold mb-2">Игроки</h5>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="players">
+        <thead><tr><th>Ученик</th><th>Команда</th><th>Клеток</th><th>Очков</th><th>Выходов</th><th></th></tr></thead><tbody></tbody></table></div>
+</div>
+<div class="mt-3"><button class="btn btn-outline-danger btn-sm" id="b-delete" type="button">Удалить игру</button></div>
+<form id="csrf" style="display:none">{% csrf_token %}</form>
+
+{% include 'island_map_js.html' %}
+<script>
+(function () {
+    var U = {state: '{% url "island_control_state" game.id %}', action: '{% url "island_control_action" game.id %}', back: '{% url "island_manage" %}'};
+    var MODE = '{{ game.mode }}', SLOTS = {{ team_slots|length }}, MAX_EXITS = {{ max_exits }};
+    var NAMES = {{ team_names|safe }}, COLORS = {{ team_colors|safe }};
+    var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
+    var ver = 0, status = '{{ game.status }}', left = 0, map = IslandMap($('cv'), {fit: true}), last = null;
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+    function fmt(s) { s = Math.max(0, s); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+    function act(data) {
+        var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+        for (var k in data) { fd.append(k, data[k]); }
+        return fetch(U.action, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+            if (d.redirect) { location.href = U.back; return d; }
+            if (d.error) { alert(d.error); }
+            poll(); return d;
+        });
+    }
+    function poll() {
+        fetch(U.state + '?v=' + ver, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
+    }
+    function apply(d) {
+        if (d.status !== 'lobby' && !map.state.map && !d.map) { ver = 0; poll(); return; }
+        status = d.status; ver = d.v; left = d.left; last = d;
+        $('st-chip').textContent = status === 'lobby' ? 'Сбор игроков' : status === 'running' ? 'Идёт игра' : 'Игра завершена';
+        $('n-players').textContent = d.players.length;
+        $('lobby').style.display = status === 'lobby' ? '' : 'none';
+        $('body').style.display = status === 'lobby' ? 'none' : 'flex';
+        $('b-finish').style.display = status === 'running' ? '' : 'none';
+        $('players-card').style.display = status === 'lobby' ? 'none' : '';
+        if (status === 'lobby') { lobby(d); } else { map.setState(d); map.draw(); board(d); players(d); }
+    }
+    function lobby(d) {
+        var cols = [], i;
+        if (MODE === 'teams') {
+            for (i = 0; i < SLOTS; i++) { cols.push({i: i, name: NAMES[i], color: COLORS[i], list: []}); }
+        }
+        var free = {i: -1, name: MODE === 'teams' ? 'Без команды' : 'В игре', color: '#374151', list: []};
+        d.players.forEach(function (p) { (MODE === 'teams' && p[3] >= 0 && cols[p[3]] ? cols[p[3]] : free).list.push(p); });
+        if (free.list.length || MODE !== 'teams') { cols.unshift(free); }
+        $('teams').innerHTML = cols.map(function (c) {
+            return '<div class="tcol" style="border-top-color:' + c.color + '"><h5><span>' + c.name + '</span><span class="muted2">' + c.list.length + '</span></h5>' +
+                (c.list.map(function (p) {
+                    var sel = '';
+                    if (MODE === 'teams') {
+                        sel = '<select data-p="' + p[0] + '">' + (p[3] < 0 ? '<option value="" selected>—</option>' : '');
+                        for (var k = 0; k < SLOTS; k++) { sel += '<option value="' + k + '"' + (p[3] === k ? ' selected' : '') + '>' + NAMES[k] + '</option>'; }
+                        sel += '</select>';
+                    }
+                    return '<div class="pl-item"><span class="nm">' + esc(p[5]) + '</span>' + sel + '<button title="Убрать из игры" data-rm="' + p[0] + '">✕</button></div>';
+                }).join('') || '<div class="muted2 small">пусто</div>') + '</div>';
+        }).join('');
+    }
+    $('teams').addEventListener('change', function (e) { var p = e.target.getAttribute('data-p'); if (p && e.target.value !== '') { act({action: 'team', player: p, team: e.target.value}); } });
+    $('teams').addEventListener('click', function (e) { var p = e.target.getAttribute('data-rm'); if (p) { act({action: 'remove', player: p}); } });
+    function ranked(d) {
+        var rows = d.teams.map(function (t) { return {t: t, s: d.scores[t.i] || 0}; }).sort(function (a, b) { return b.s - a.s || a.t.i - b.t.i; });
+        var place = 0, prev = null;
+        rows.forEach(function (r, i) { if (r.s !== prev) { place = i + 1; prev = r.s; } r.place = place; });
+        return rows;
+    }
+    function board(d) {
+        $('board').innerHTML = ranked(d).map(function (r) {
+            return '<div class="row2"><span class="pl">' + r.place + '</span><span class="dot" style="background:' + r.t.color + '"></span><span class="nm">' + esc(r.t.name) +
+                (MODE === 'teams' ? ' <span class="muted2">· ' + r.t.size + '</span>' : '') + '</span><span class="pt">' + r.s + '</span></div>'; }).join('');
+    }
+    function players(d) {
+        var tm = {}; d.teams.forEach(function (t) { tm[t.i] = t; });
+        var rows = d.players.slice().sort(function (a, b) { return a[3] - b[3] || b[7] - a[7]; });
+        $('players').querySelector('tbody').innerHTML = rows.map(function (p) {
+            var t = tm[p[3]] || {name: '—', color: '#9ca3af'};
+            return '<tr><td>' + esc(p[5]) + '</td><td><span class="dot" style="background:' + t.color + ';border-color:#d1d5db"></span> ' + (MODE === 'teams' ? esc(t.name) : '') + '</td><td>' + p[6] +
+                '</td><td class="fw-bold">' + p[7] + '</td><td>' + (p[4] ? '<span class="badge bg-danger">выбит · ' + p[8] + '</span>' : (p[8] ? '<span class="badge bg-warning text-dark">' + p[8] + ' из ' + MAX_EXITS + '</span>' : '0')) +
+                '</td><td class="text-end">' + ((p[4] || p[8]) && status === 'running' ? '<button class="btn btn-outline-primary btn-sm py-0" data-restore="' + p[0] + '">↩ Вернуть</button>' : '') + '</td></tr>'; }).join('');
+    }
+    $('players').addEventListener('click', function (e) { var p = e.target.getAttribute('data-restore'); if (p) { act({action: 'restore', player: p}); } });
+    if ($('b-shuffle')) { $('b-shuffle').addEventListener('click', function () { act({action: 'shuffle'}); }); }
+    $('b-start').addEventListener('click', function () { act({action: 'start'}); });
+    $('b-finish').addEventListener('click', function () { if (confirm('Завершить игру сейчас? Итоги подведутся по текущим очкам.')) { act({action: 'finish'}); } });
+    $('b-delete').addEventListener('click', function () { if (confirm('Удалить игру и все её результаты?')) { act({action: 'delete'}); } });
+    $('b-full').addEventListener('click', function () {
+        var el = $('stage');
+        if (document.fullscreenElement) { document.exitFullscreen(); } else if (el.requestFullscreen) { el.requestFullscreen(); }
+    });
+    document.addEventListener('fullscreenchange', function () { setTimeout(function () { map.draw(); }, 100); });
+    setInterval(function () {
+        if (status === 'running' && left > 0) { left--; }
+        var t = $('timer'); t.textContent = status === 'running' ? fmt(left) : ''; t.className = status === 'running' && left <= 60 ? 'low' : '';
+    }, 1000);
+    poll();
+    setInterval(poll, 3000);
+})();
+</script>
+{% endblock %}

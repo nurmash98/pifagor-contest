@@ -43,6 +43,8 @@ def _my_classes(user):
 GAME_TYPES = [
     {'key': 'bomb', 'icon': '💣', 'title': 'Бомба', 'url': 'codegames_manage',
      'about': 'Обезвредить бомбу: ученик читает код и вводит, что он выведет, или перерезает провод с верным выводом.'},
+    {'key': 'island', 'icon': '🏝️', 'title': 'Битва за остров', 'url': 'island_manage',
+     'about': 'Весь класс на одной карте: команды захватывают клетки, решая задачи. 40 минут, полноэкранный режим.'},
 ]
 
 
@@ -96,7 +98,15 @@ def games_hub(request):
     """Раздел «Игры» для учителя: карточки всех игр платформы."""
     games = CodeGame.objects.all() if request.user.is_superuser else CodeGame.objects.filter(owner=request.user)
     cards = []
+    from .models import IslandGame, IslandPlayer
+    islands = list(IslandGame.objects.all() if request.user.is_superuser else IslandGame.objects.filter(owner=request.user))
     for t in GAME_TYPES:
+        if t['key'] == 'island':
+            live = [g for g in islands if g.status != 'finished']
+            cards.append(dict(t, total=len(islands), active=len(live),
+                              classes=sorted({c for g in live for c in g.class_list()}),
+                              runs=IslandPlayer.objects.filter(game__in=islands).count() if islands else 0))
+            continue
         mine = [g for g in games if g.mode == t['key']]
         classes = sorted({c for g in mine if g.is_active for c in g.class_list()})
         runs = CodeGameRun.objects.filter(game__in=mine).count() if mine else 0
@@ -171,7 +181,9 @@ def games(request):
         won = [r.duration() for r in g.runs.filter(student=st, status='won')]
         items.append({'game': g, 'best': min(won) if won else None, 'wins': len(won),
                       'topics': [cg.TOPIC_LABELS.get(t, t) for t in g.topic_list()]})
-    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT, 'balance': balance(st)})
+    from .models import IslandGame
+    return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT, 'balance': balance(st),
+                                              'islands': IslandGame.open_for(st)})
 
 
 @login_required

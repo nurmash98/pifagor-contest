@@ -1,0 +1,248 @@
+{% comment %}Рисование карты «Битвы за остров» на canvas. Общий код для ученика и экрана учителя.
+IslandMap(canvas, {fit: true|false, onCell: fn(x, y)}) → {setState(d), centerOnMe(), draw()}{% endcomment %}
+<script>
+function IslandMap(canvas, opt) {
+    opt = opt || {};
+    var T = 64, ctx = canvas.getContext('2d'), base = null;
+    var S = {map: null, cells: {}, players: [], teams: {}, me: null};
+    var cam = {x: 0, y: 0, z: 1}, dpr = window.devicePixelRatio || 1, hover = null, t0 = Date.now();
+
+    function rnd(x, y, i) {                              // детерминированное «случайное» число 0..1 для клетки
+        var n = Math.sin(x * 127.1 + y * 311.7 + i * 74.7) * 43758.5453;
+        return n - Math.floor(n);
+    }
+    function at(x, y) { var m = S.map; return (!m || x < 0 || y < 0 || x >= m.w || y >= m.h) ? '~' : m.rows[y].charAt(x); }
+    function land(x, y) { return at(x, y) !== '~'; }
+
+    // ---------- местность рисуется один раз в отдельный холст ----------
+    function prerender() {
+        var m = S.map;
+        base = document.createElement('canvas');
+        base.width = m.w * T; base.height = m.h * T;
+        var c = base.getContext('2d'), x, y, i;
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (!land(x, y)) { water(c, x, y); } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (land(x, y)) { ground(c, x, y); } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (land(x, y)) { shore(c, x, y); } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) {
+            var k = at(x, y);
+            if (k === 'f') { forest(c, x, y); } else if (k === 'F') { fort(c, x, y); } else if (k === '.') { tufts(c, x, y); }
+        } }
+    }
+    function water(c, x, y) {
+        var near = false, dx, dy;
+        for (dy = -1; dy <= 1; dy++) { for (dx = -1; dx <= 1; dx++) { if (land(x + dx, y + dy)) { near = true; } } }
+        c.fillStyle = near ? '#58c6d2' : (rnd(x, y, 0) > .5 ? '#2fa7bc' : '#2aa0b6');
+        c.fillRect(x * T, y * T, T, T);
+        c.strokeStyle = 'rgba(255,255,255,' + (near ? .55 : .28) + ')'; c.lineWidth = 2; c.lineCap = 'round';
+        for (var i = 0; i < 2; i++) {
+            var wx = x * T + 8 + rnd(x, y, i + 1) * (T - 30), wy = y * T + 10 + rnd(x, y, i + 3) * (T - 20);
+            c.beginPath(); c.moveTo(wx, wy); c.quadraticCurveTo(wx + 7, wy - 5, wx + 14, wy); c.stroke();
+        }
+    }
+    function ground(c, x, y) {
+        var k = at(x, y), v = rnd(x, y, 5);
+        c.fillStyle = k === 'F' ? (v > .5 ? '#c9c2a6' : '#c2bb9e') : k === 'f' ? (v > .5 ? '#86bd43' : '#7fb63d') : (v > .5 ? '#a5d458' : '#9dce50');
+        c.fillRect(x * T, y * T, T, T);
+        c.strokeStyle = 'rgba(40,60,20,.10)'; c.lineWidth = 1; c.strokeRect(x * T + .5, y * T + .5, T - 1, T - 1);
+    }
+    function shore(c, x, y) {                            // песок и тёмная «чернильная» кромка у воды
+        var px = x * T, py = y * T, s = 9;
+        var sides = [[0, -1, px, py, T, s, px, py, px + T, py], [0, 1, px, py + T - s, T, s, px, py + T, px + T, py + T],
+                     [-1, 0, px, py, s, T, px, py, px, py + T], [1, 0, px + T - s, py, s, T, px + T, py, px + T, py + T]];
+        sides.forEach(function (d) {
+            if (land(x + d[0], y + d[1])) { return; }
+            c.fillStyle = '#ecdfa6'; c.fillRect(d[2], d[3], d[4], d[5]);
+            c.strokeStyle = '#4a3b22'; c.lineWidth = 3; c.lineCap = 'round';
+            c.beginPath(); c.moveTo(d[6], d[7]); c.lineTo(d[8], d[9]); c.stroke();
+        });
+    }
+    function tufts(c, x, y) {
+        c.strokeStyle = 'rgba(60,110,30,.55)'; c.lineWidth = 1.6; c.lineCap = 'round';
+        for (var i = 0; i < 3; i++) {
+            if (rnd(x, y, 20 + i) < .45) { continue; }
+            var gx = x * T + 12 + rnd(x, y, 10 + i) * (T - 24), gy = y * T + 14 + rnd(x, y, 14 + i) * (T - 24);
+            c.beginPath(); c.moveTo(gx - 4, gy); c.lineTo(gx - 2, gy - 6); c.moveTo(gx, gy); c.lineTo(gx, gy - 8);
+            c.moveTo(gx + 4, gy); c.lineTo(gx + 2, gy - 6); c.stroke();
+        }
+    }
+    function forest(c, x, y) {
+        var spots = [[.3, .34, 15], [.68, .4, 14], [.42, .7, 16], [.74, .74, 11]];
+        spots.forEach(function (s, i) {
+            var cx = x * T + s[0] * T + (rnd(x, y, 30 + i) - .5) * 8, cy = y * T + s[1] * T + (rnd(x, y, 40 + i) - .5) * 8, r = s[2];
+            c.fillStyle = 'rgba(20,50,10,.22)'; c.beginPath(); c.ellipse(cx + 4, cy + 5, r, r * .85, 0, 0, 6.3); c.fill();
+            c.fillStyle = '#4c9a2c'; c.strokeStyle = '#2c661b'; c.lineWidth = 2.2;
+            c.beginPath();
+            for (var a = 0; a < 8; a++) {                 // кудрявая крона из восьми дуг
+                var ang = a * Math.PI / 4;
+                c.arc(cx + Math.cos(ang) * r * .55, cy + Math.sin(ang) * r * .55, r * .5, ang - 1.2, ang + 1.2);
+            }
+            c.closePath(); c.fill(); c.stroke();
+            c.fillStyle = '#74c043'; c.beginPath(); c.arc(cx - r * .2, cy - r * .22, r * .45, 0, 6.3); c.fill();
+        });
+    }
+    function fort(c, x, y) {
+        var cx = x * T + T / 2, cy = y * T + T / 2, i;
+        c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(cx + 5, cy + 6, 23, 20, 0, 0, 6.3); c.fill();
+        c.fillStyle = '#8f8a84'; c.strokeStyle = '#3f3a36'; c.lineWidth = 2.4;
+        for (i = 0; i < 8; i++) {                         // зубцы башни
+            var a = i * Math.PI / 4;
+            c.save(); c.translate(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20); c.rotate(a);
+            c.fillRect(-5, -5, 10, 10); c.strokeRect(-5, -5, 10, 10); c.restore();
+        }
+        c.fillStyle = '#b5afa8'; c.beginPath(); c.arc(cx, cy, 19, 0, 6.3); c.fill(); c.stroke();
+        c.fillStyle = '#d9d4cd'; c.beginPath(); c.arc(cx, cy, 11, 0, 6.3); c.fill(); c.stroke();
+        c.fillStyle = '#3f3a36'; c.beginPath(); c.arc(cx, cy, 3, 0, 6.3); c.fill();
+    }
+
+    // ---------- кадр ----------
+    function resize() {
+        var w = canvas.clientWidth, h = canvas.clientHeight;
+        dpr = window.devicePixelRatio || 1;
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+            canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+        }
+        if (opt.fit && S.map) {
+            cam.z = Math.min(w / (S.map.w * T), h / (S.map.h * T));
+            cam.x = (S.map.w * T - w / cam.z) / 2; cam.y = (S.map.h * T - h / cam.z) / 2;
+        }
+    }
+    function clamp() {
+        if (!S.map || opt.fit) { return; }
+        var vw = canvas.clientWidth / cam.z, vh = canvas.clientHeight / cam.z, mw = S.map.w * T, mh = S.map.h * T;
+        cam.x = vw >= mw ? (mw - vw) / 2 : Math.max(0, Math.min(cam.x, mw - vw));
+        cam.y = vh >= mh ? (mh - vh) / 2 : Math.max(0, Math.min(cam.y, mh - vh));
+    }
+    function teamColor(t) { return (S.teams[t] || {}).color || '#9ca3af'; }
+    function initials(name) {
+        var p = String(name || '').trim().split(/\s+/);
+        return ((p[0] || '').charAt(0) + (p[1] || '').charAt(0)).toUpperCase();
+    }
+    function neighbours() {
+        if (!S.me || S.me.kicked) { return []; }
+        return [[1, 0], [-1, 0], [0, 1], [0, -1]].map(function (d) { return [S.me.x + d[0], S.me.y + d[1]]; })
+            .filter(function (c) { return land(c[0], c[1]); });
+    }
+    function draw() {
+        if (!S.map) { return; }
+        resize(); clamp();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#1b7f93'; ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        ctx.setTransform(dpr * cam.z, 0, 0, dpr * cam.z, -cam.x * dpr * cam.z, -cam.y * dpr * cam.z);
+        ctx.drawImage(base, 0, 0);
+        var key, c, x, y;
+        for (key in S.cells) {                           // территории: заливка цветом команды и обводка по границе
+            c = key.split(','); x = +c[0]; y = +c[1];
+            var team = S.cells[key], col = teamColor(team);
+            ctx.globalAlpha = .44; ctx.fillStyle = col; ctx.fillRect(x * T, y * T, T, T); ctx.globalAlpha = 1;
+            ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = 'square';
+            [[0, -1, 0, 0, 1, 0], [0, 1, 0, 1, 1, 1], [-1, 0, 0, 0, 0, 1], [1, 0, 1, 0, 1, 1]].forEach(function (d) {
+                if (S.cells[(x + d[0]) + ',' + (y + d[1])] === team) { return; }
+                var o = 2;
+                ctx.beginPath();
+                ctx.moveTo(x * T + d[2] * T + (d[0] === -1 ? o : d[0] === 1 ? -o : 0), y * T + d[3] * T + (d[1] === -1 ? o : d[1] === 1 ? -o : 0));
+                ctx.lineTo(x * T + d[4] * T + (d[0] === -1 ? o : d[0] === 1 ? -o : 0), y * T + d[5] * T + (d[1] === -1 ? o : d[1] === 1 ? -o : 0));
+                ctx.stroke();
+            });
+            if (at(x, y) === 'F') {                       // флаг команды на крепости
+                ctx.strokeStyle = '#3f3a36'; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.moveTo(x * T + T / 2, y * T + T / 2); ctx.lineTo(x * T + T / 2, y * T + T / 2 - 26); ctx.stroke();
+                ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x * T + T / 2, y * T + T / 2 - 26);
+                ctx.lineTo(x * T + T / 2 + 17, y * T + T / 2 - 20); ctx.lineTo(x * T + T / 2, y * T + T / 2 - 13); ctx.closePath(); ctx.fill(); ctx.stroke();
+            }
+        }
+        var pulse = (Math.sin((Date.now() - t0) / 260) + 1) / 2;
+        neighbours().forEach(function (n) {              // куда можно шагнуть
+            var own = S.cells[n[0] + ',' + n[1]] === S.me.team, hot = hover && hover[0] === n[0] && hover[1] === n[1];
+            ctx.strokeStyle = 'rgba(255,255,255,' + (hot ? 1 : .55 + pulse * .4) + ')'; ctx.lineWidth = hot ? 4 : 3;
+            ctx.setLineDash([8, 6]); ctx.strokeRect(n[0] * T + 5, n[1] * T + 5, T - 10, T - 10); ctx.setLineDash([]);
+            if (hot) { ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(n[0] * T + 5, n[1] * T + 5, T - 10, T - 10); }
+            var k = at(n[0], n[1]), pts = k === 'F' ? 3 : k === 'f' ? 2 : 1;
+            var label = own ? '→' : '+' + pts;
+            ctx.font = '800 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(17,24,39,.78)'; ctx.beginPath(); ctx.arc(n[0] * T + T - 15, n[1] * T + 15, 12, 0, 6.3); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.fillText(label, n[0] * T + T - 15, n[1] * T + 16);
+        });
+        var groups = {};
+        S.players.forEach(function (p) { if (p[3] >= 0) { (groups[p[1] + ',' + p[2]] = groups[p[1] + ',' + p[2]] || []).push(p); } });
+        for (key in groups) {                            // фишки игроков; несколько на клетке — по кругу
+            var list = groups[key], n = list.length;
+            list.forEach(function (p, i) {
+                var ang = i * 2 * Math.PI / n - Math.PI / 2, r = n > 1 ? 15 : 0;
+                var px = p[1] * T + T / 2 + Math.cos(ang) * r, py = p[2] * T + T / 2 + Math.sin(ang) * r, mine = S.me && p[0] === S.me.id;
+                var rad = n > 2 ? 11 : 14;
+                if (mine) {
+                    ctx.strokeStyle = 'rgba(253,224,71,' + (.5 + pulse * .5) + ')'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.arc(px, py, rad + 6 + pulse * 3, 0, 6.3); ctx.stroke();
+                }
+                ctx.globalAlpha = p[4] ? .45 : 1;
+                ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.arc(px + 2, py + 3, rad, 0, 6.3); ctx.fill();
+                ctx.fillStyle = teamColor(p[3]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(px, py, rad, 0, 6.3); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '800 ' + (n > 2 ? 9 : 11) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(p[4] ? '✕' : initials(p[5]), px, py + 1);
+                ctx.globalAlpha = 1;
+            });
+        }
+    }
+
+    // ---------- камера и мышь ----------
+    function cellAt(ev) {
+        var r = canvas.getBoundingClientRect();
+        return [Math.floor(((ev.clientX - r.left) / cam.z + cam.x) / T), Math.floor(((ev.clientY - r.top) / cam.z + cam.y) / T)];
+    }
+    function centerOnMe() {
+        if (!S.me || !S.map) { return; }
+        cam.x = S.me.x * T + T / 2 - canvas.clientWidth / cam.z / 2;
+        cam.y = S.me.y * T + T / 2 - canvas.clientHeight / cam.z / 2;
+        clamp();
+    }
+    if (!opt.fit) {
+        var drag = null;
+        canvas.addEventListener('mousedown', function (e) { drag = {x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false}; });
+        window.addEventListener('mousemove', function (e) {
+            if (drag) {
+                var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+                if (Math.abs(dx) + Math.abs(dy) > 6) { drag.moved = true; }
+                if (drag.moved) { cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; clamp(); }
+            } else if (e.target === canvas) {
+                var c = cellAt(e), ok = neighbours().some(function (n) { return n[0] === c[0] && n[1] === c[1]; });
+                hover = ok ? c : null; canvas.style.cursor = ok ? 'pointer' : 'grab';
+            }
+        });
+        window.addEventListener('mouseup', function (e) {
+            if (drag && !drag.moved && e.target === canvas && opt.onCell) {
+                var c = cellAt(e);
+                if (neighbours().some(function (n) { return n[0] === c[0] && n[1] === c[1]; })) { opt.onCell(c[0], c[1]); }
+            }
+            drag = null;
+        });
+        canvas.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            var r = canvas.getBoundingClientRect(), mx = (e.clientX - r.left) / cam.z + cam.x, my = (e.clientY - r.top) / cam.z + cam.y;
+            cam.z = Math.max(.45, Math.min(1.6, cam.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+            cam.x = mx - (e.clientX - r.left) / cam.z; cam.y = my - (e.clientY - r.top) / cam.z; clamp();
+        }, {passive: false});
+    }
+    window.addEventListener('resize', draw);
+
+    return {
+        setState: function (d) {                         // d — ответ сервера (может быть только изменениями)
+            var first = false;
+            if (d.map) { S.map = d.map; S.cells = {}; prerender(); first = true; }
+            (d.cells || []).forEach(function (c) { S.cells[c[0] + ',' + c[1]] = c[2]; });
+            if (d.players) { S.players = d.players; }
+            if (d.teams) { S.teams = {}; d.teams.forEach(function (t) { S.teams[t.i] = t; }); }
+            if (d.me) { S.me = d.me; }
+            if (first) { resize(); centerOnMe(); }
+        },
+        setMe: function (x, y) { if (S.me) { S.me.x = x; S.me.y = y; S.players.forEach(function (p) { if (p[0] === S.me.id) { p[1] = x; p[2] = y; } }); } },
+        follow: function () {                            // держим свою фишку в кадре
+            if (!S.me || !S.map || opt.fit) { return; }
+            var px = (S.me.x * T + T / 2 - cam.x) * cam.z, py = (S.me.y * T + T / 2 - cam.y) * cam.z, m = 150;
+            if (px < m || py < m || px > canvas.clientWidth - m || py > canvas.clientHeight - m) { centerOnMe(); }
+        },
+        centerOnMe: centerOnMe, draw: draw, neighbours: neighbours, state: S,
+        loop: function () { (function tick() { draw(); requestAnimationFrame(tick); })(); }
+    };
+}
+</script>

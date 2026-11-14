@@ -14,6 +14,18 @@
 <p class="text-muted small mb-4">{% t "Обезвредь бомбу: смотри на код и пиши, что он выведет. Числа каждый раз новые." %}
     {% t "у тебя" %}: <strong>{{ balance }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
 <div class="row g-3">
+    {% for g in islands %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4 bg-white">
+            <div class="fs-1">🏝️</div>
+            <h5 class="fw-bold mb-1">{% t "Битва за остров" %}</h5>
+            <div class="small text-muted mb-2">{% if g.mode == 'teams' %}{% t "Командная игра" %}{% else %}{% t "Каждый сам за себя" %}{% endif %} · {{ g.minutes }} {% t "мин" %}</div>
+            <div class="small mb-3">{% t "Весь класс на одной карте: решай задачи и захватывай клетки." %}<br>
+                {% if g.status == 'running' %}<span class="badge bg-success">{% t "Игра идёт" %}</span>{% else %}<span class="badge bg-warning text-dark">{% t "Сбор игроков" %}</span>{% endif %}</div>
+            <a href="{% url 'island_play' g.id %}" class="btn btn-pifagor-green rounded-pill px-4 mt-auto align-self-start">▶ {% t "Войти" %}</a>
+        </div>
+    </div>
+    {% endfor %}
     {% for it in items %}
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100 p-4 bg-white">
@@ -33,7 +45,7 @@
         </div>
     </div>
     {% empty %}
-    <div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>
+    {% if not islands %}<div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>{% endif %}
     {% endfor %}
 </div>
 <div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>

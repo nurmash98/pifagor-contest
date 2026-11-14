@@ -881,3 +881,90 @@ class CodeGameRun(models.Model):
         if not self.finished_at:
             return None
         return int((self.finished_at - self.started_at).total_seconds()) + self.penalty
+
+
+class IslandGame(models.Model):
+    """Игра «Битва за остров»: класс на общей карте захватывает клетки, решая задачи.
+    Учитель создаёт игру, ученики входят в лобби, учитель делит на команды и запускает."""
+    MODE_CHOICES = [('teams', 'Команды'), ('solo', 'Сам за себя')]
+    STATUS_CHOICES = [('lobby', 'Сбор игроков'), ('running', 'Идёт'), ('finished', 'Завершена')]
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='island_games', verbose_name='Учитель')
+    title = models.CharField(max_length=120, verbose_name='Название')
+    classes = models.CharField(max_length=300, blank=True, default='', verbose_name='Классы')      # ',7A,7B,'
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='teams', verbose_name='Режим')
+    teams_count = models.PositiveSmallIntegerField(default=4, verbose_name='Команд')
+    minutes = models.PositiveSmallIntegerField(default=40, verbose_name='Минут')
+    topics = models.CharField(max_length=100, default='@io,@cond', verbose_name='Темы «что выведет код»')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='island_games', verbose_name='Темы задач на код')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='lobby')
+    # Карта: {'w': 26, 'h': 19, 'rows': ['~~..', ...]}; символы: ~ вода, . трава, f лес, F крепость
+    map = models.JSONField(default=dict, blank=True)
+    version = models.PositiveIntegerField(default=0)            # растёт при каждом изменении карты/игроков
+    scores = models.JSONField(default=dict, blank=True)         # {'0': 12, '1': 7} — очки команд
+    started_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Игра «Битва за остров»'
+        verbose_name_plural = 'Игры «Битва за остров»'
+
+    def __str__(self):
+        return self.title
+
+    def class_list(self):
+        return [c for c in (self.classes or '').split(',') if c]
+
+    def set_classes(self, names):
+        names = sorted({c for c in names if c})
+        self.classes = (',' + ','.join(names) + ',') if names else ''
+
+    def topic_list(self):
+        return [t for t in (self.topics or '').split(',') if t]
+
+    @classmethod
+    def open_for(cls, student):
+        """Игры, которые ученик видит: открыты его классу и ещё не завершены (или он в них играл)."""
+        if not student.school_class:
+            return cls.objects.none()
+        return cls.objects.filter(classes__contains=',' + student.school_class + ',').exclude(status='finished')
+
+
+class IslandPlayer(models.Model):
+    game = models.ForeignKey(IslandGame, on_delete=models.CASCADE, related_name='players')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='island_players')
+    team = models.SmallIntegerField(default=-1)                 # номер команды; -1 — ещё не распределён
+    x = models.SmallIntegerField(default=0)
+    y = models.SmallIntegerField(default=0)
+    captured = models.PositiveIntegerField(default=0)           # сколько клеток захватил сам
+    points = models.PositiveIntegerField(default=0)             # сколько очков принёс
+    exits = models.PositiveSmallIntegerField(default=0)         # выходов из полного экрана
+    exit_log = models.JSONField(default=list, blank=True)
+    kicked = models.BooleanField(default=False)                 # выбит за выходы
+    client = models.CharField(max_length=64, blank=True, default='')   # браузер, где игра вошла в полный экран
+    cooldown_until = models.DateTimeField(null=True, blank=True)
+    # Текущая задача: {'x','y','kind':'output'|'code','answer'|'task', 'points'} — ответ в браузер не уходит
+    challenge = models.JSONField(default=dict, blank=True)
+    used_tasks = models.JSONField(default=list, blank=True)     # задачи на код, которые уже выпадали
+    coins = models.PositiveSmallIntegerField(default=0)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['game', 'student'], name='unique_island_player')]
+        ordering = ['joined_at']
+
+
+class IslandCell(models.Model):
+    """Захваченная клетка. Незахваченных клеток в базе нет."""
+    game = models.ForeignKey(IslandGame, on_delete=models.CASCADE, related_name='cells')
+    x = models.SmallIntegerField()
+    y = models.SmallIntegerField()
+    team = models.SmallIntegerField()
+    by = models.ForeignKey(IslandPlayer, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    ver = models.PositiveIntegerField(default=0)                # версия игры, на которой клетка изменилась
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['game', 'x', 'y'], name='unique_island_cell')]
+        indexes = [models.Index(fields=['game', 'ver'])]

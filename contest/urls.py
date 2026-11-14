@@ -6,6 +6,7 @@ from . import moderation_views
 from . import activity
 from . import dashboard
 from . import codegame_views
+from . import island_views
 from . import duel_views
 
 urlpatterns = [
@@ -126,6 +127,16 @@ urlpatterns = [
     path('teacher/games/bomb/', codegame_views.games_manage, name='codegames_manage'),
     path('teacher/games/<int:game_id>/', codegame_views.game_edit, name='codegame_edit'),
     path('teacher/games/<int:game_id>/delete/', codegame_views.game_delete, name='codegame_delete'),
+    path('teacher/games/island/', island_views.manage, name='island_manage'),
+    path('teacher/games/island/<int:game_id>/', island_views.control, name='island_control'),
+    path('teacher/games/island/<int:game_id>/state/', island_views.control_state, name='island_control_state'),
+    path('teacher/games/island/<int:game_id>/action/', island_views.control_action, name='island_control_action'),
+    path('games/island/<int:game_id>/', island_views.play, name='island_play'),
+    path('games/island/<int:game_id>/state/', island_views.play_state, name='island_state'),
+    path('games/island/<int:game_id>/arm/', island_views.play_arm, name='island_arm'),
+    path('games/island/<int:game_id>/exit/', island_views.play_exit, name='island_exit'),
+    path('games/island/<int:game_id>/move/', island_views.play_move, name='island_move'),
+    path('games/island/<int:game_id>/answer/', island_views.play_answer, name='island_answer'),
     path('games/', codegame_views.games, name='codegames'),
     path('games/<int:game_id>/start/', codegame_views.game_start, name='codegame_start'),
     path('games/run/<int:run_id>/', codegame_views.game_play, name='codegame_play'),
