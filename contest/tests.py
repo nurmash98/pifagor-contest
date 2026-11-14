@@ -2591,10 +2591,10 @@ class CodeGameTests(TestCase):
         self.tu = User.objects.create_user('cg_t', password='p', is_staff=True)
         Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
         self.st = Student.objects.create(user=User.objects.create_user('cg_s', password='p'), full_name='Аня', school_class='7A')
-        self.other = Student.objects.create(user=User.objects.create_user('cg_o', password='p'), full_name='Боря', school_class='7A')
+        self.other = Student.objects.create(user=User.objects.create_user('cg_o', password='p'), full_name='Боря', school_class='7B')
         self.foreign = Student.objects.create(user=User.objects.create_user('cg_f', password='p'), full_name='Чужой', school_class='9Z')
         self.game = CodeGame.objects.create(owner=self.tu, title='Бомба', mode='bomb', questions=4, time_limit=300, coins=2)
-        self.game.students.add(self.st)
+        self.game.set_classes(['7A']); self.game.save()
         CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=5, at=timezone.now())
 
     def _start(self, stake=1):
@@ -2779,17 +2779,43 @@ class CodeGameTests(TestCase):
         self.client.login(username='cg_t', password='p')
         r = self.client.post(reverse('codegames_manage'), {
             'mode': 'escape', 'topics': ['@cond'], 'questions': 6, 'minutes': 4, 'coins': 3,
-            'is_active': 'on', 'students': [self.st.id, self.foreign.id]})
+            'is_active': 'on', 'classes': ['7A', '9Z']})
         g = CodeGame.objects.latest('id')
         self.assertRedirects(r, reverse('codegame_edit', args=[g.id]))
         self.assertEqual((g.mode, g.topics, g.time_limit), ('bomb', '@cond', 240))
         self.assertEqual(g.title, 'Бомба · 7A · if/else')
-        self.assertEqual(list(g.students.all()), [self.st])
+        self.assertEqual(g.class_list(), ['7A'])                       # чужой класс 9Z отфильтрован
+        self.assertEqual(g.students.count(), 0)
         page = self.client.get(reverse('codegame_edit', args=[g.id]))
         self.assertNotContains(page, 'name="title"')
         self.assertNotContains(page, 'Escape')
         self.client.login(username='cg_s', password='p')
         self.assertNotEqual(self.client.get(reverse('codegames_manage')).status_code, 200)
+
+    def test_access_by_class_not_by_student(self):
+        from .models import CodeGame
+        late = Student.objects.create(user=User.objects.create_user('cg_late', password='p'), full_name='Новенький', school_class='7A')
+        self.client.login(username='cg_late', password='p')                # пришёл в класс позже — игра уже у него
+        self.assertContains(self.client.get(reverse('codegames')), '💣')
+        self.assertEqual(self.client.post(reverse('codegame_start', args=[self.game.id])).status_code, 302)
+        self.game.is_active = False; self.game.save()
+        self.assertEqual(self.client.post(reverse('codegame_start', args=[self.game.id])).status_code, 404)
+        self.assertEqual(list(CodeGame.open_for(self.st)), [])
+        legacy = CodeGame.objects.create(owner=self.tu, title='Старая', mode='bomb')
+        legacy.students.add(self.other)                                   # личный доступ из старых данных работает
+        self.assertEqual(list(CodeGame.open_for(self.other)), [legacy])
+
+    def test_games_hub_for_teacher_only(self):
+        self.client.login(username='cg_t', password='p')
+        page = self.client.get(reverse('games_hub'))
+        self.assertContains(page, 'Бомба')
+        self.assertContains(page, reverse('codegames_manage'))
+        self.assertContains(page, '7A')                                    # класс, которому открыта игра
+        form = self.client.get(reverse('codegames_manage'))
+        self.assertContains(form, 'name="classes"')
+        self.assertNotContains(form, 'name="students"')
+        self.client.login(username='cg_s', password='p')
+        self.assertNotEqual(self.client.get(reverse('games_hub')).status_code, 200)
 
     def test_kazakh_ui(self):
         run = self._start()

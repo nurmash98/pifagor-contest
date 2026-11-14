@@ -4,12 +4,11 @@
 {% block title %}Игры - Pifagor Contest{% endblock %}
 
 {% block content %}
-<div class="mb-3"><a href="{% if game %}{% url 'codegames_manage' %}{% else %}{% url 'teacher_dashboard' %}{% endif %}" class="text-decoration-none text-muted small">← {% if game %}Все игры{% else %}Назад в кабинет{% endif %}</a></div>
+<div class="mb-3"><a href="{% if game %}{% url 'codegames_manage' %}{% else %}{% url 'games_hub' %}{% endif %}" class="text-decoration-none text-muted small">← {% if game %}Игра «Бомба»{% else %}Все игры{% endif %}</a></div>
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">💣 {% if game %}{{ game.title }}{% else %}Игра «Бомба»{% endif %}</h3>
-<p class="text-muted small mb-4">Модули бомбы — задачи 1 тура Инфо Тартыс: ученик видит код и вводит, что он выведет («клавиатура»),
-    или перерезает провод с правильным выводом («провода»). Числа в коде у каждого ученика и в каждой игре свои, правильный ответ вычисляется запуском кода.
-    Игра идёт в полноэкранном режиме: любой выход (Esc, другое окно, вкладка) — проигрыш. Каждая ошибка отнимает 1 минуту, время кончилось — взрыв.
-    <strong>Вход — 1 монета, победа — 2 монеты.</strong> Модули идут по кругу: клавиатура, провода, пары (3 программы и 3 вывода). Название ставится само по классам и темам.</p>
+<p class="text-muted small mb-4">Ученик видит код и вводит, что он выведет («клавиатура»), или перерезает провод с правильным выводом («провода»).
+    Числа в коде у каждого ученика и в каждой игре свои. Игра идёт в полноэкранном режиме: любой выход (Esc, другое окно, вкладка) — проигрыш.
+    Ошибка отнимает 1 минуту, время кончилось — взрыв. <strong>Вход бесплатный, победа — +1 монета.</strong></p>
 
 {% if not game and games %}
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white mb-4">
@@ -19,7 +18,8 @@
             <div>
                 <a href="{% url 'codegame_edit' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">💣 {{ g.title }}</a>
                 {% if not g.is_active %}<span class="badge bg-secondary ms-1">закрыта</span>{% endif %}
-                <div class="small text-muted">{{ g.questions }} модулей · {% widthratio g.time_limit 60 1 %} мин · учеников: {{ g.students.all|length }}</div>
+                <div class="small text-muted">{{ g.questions }} модулей · {% widthratio g.time_limit 60 1 %} мин ·
+                    {% for c in g.class_list %}<span class="badge bg-primary-subtle text-primary-emphasis">{{ c }}</span> {% empty %}никому не открыта{% endfor %}</div>
             </div>
             <form method="post" action="{% url 'codegame_delete' g.id %}" onsubmit="return confirm('Удалить игру «{{ g.title|escapejs }}» и все результаты?');">{% csrf_token %}
                 <button class="btn btn-outline-danger btn-sm">Удалить</button></form>
@@ -43,22 +43,19 @@
             <input name="minutes" type="number" min="1" max="60" class="form-control" value="{% if game %}{% widthratio game.time_limit 60 1 %}{% else %}5{% endif %}"></div>
         <div class="col-12"><div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="is_active" id="active" {% if not game or game.is_active %}checked{% endif %}>
-            <label class="form-check-label" for="active">Игра открыта выбранным ученикам</label></div></div>
+            <label class="form-check-label" for="active">Игра открыта выбранным классам</label></div></div>
         <div class="col-12">
-            <label class="form-label small fw-semibold">Кому открыть</label>
-            {% regroup students by school_class as by_class %}
-            <div class="row g-3">
-            {% for grp in by_class %}
-                <div class="col-md-4 col-lg-3">
-                    <div class="border rounded-3 p-2 h-100">
-                        <label class="fw-semibold small d-block mb-1"><input type="checkbox" class="form-check-input me-1 cls-all" data-cls="{{ grp.grouper }}"> {{ grp.grouper }} — весь класс</label>
-                        {% for s in grp.list %}
-                        <label class="d-block small"><input type="checkbox" class="form-check-input me-1" name="students" value="{{ s.id }}" data-cls="{{ grp.grouper }}" {% if s.id in chosen %}checked{% endif %}> {{ s.full_name }}</label>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% empty %}<div class="text-muted small">В ваших классах нет учеников.</div>{% endfor %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label small fw-semibold mb-0">Кому открыть — выберите классы</label>
+                <button type="button" class="btn btn-link btn-sm text-decoration-none p-0" id="cls-toggle">Выбрать все / снять</button>
             </div>
+            <div class="d-flex flex-wrap gap-2">
+            {% for name, n in classes %}
+                <input type="checkbox" class="btn-check" name="classes" id="cls-{{ forloop.counter }}" value="{{ name }}" {% if name in chosen %}checked{% endif %}>
+                <label class="cls-card" for="cls-{{ forloop.counter }}"><span class="cls-name">{{ name }}</span><span class="cls-n">{{ n }} уч.</span></label>
+            {% empty %}<div class="text-muted small">У вас пока нет классов с учениками.</div>{% endfor %}
+            </div>
+            <div class="small text-muted mt-2">Игра откроется всему классу, в том числе ученикам, которые придут позже.</div>
         </div>
     </div>
     <div class="mt-3"><button class="btn btn-pifagor-blue px-4">{% if game %}Сохранить{% else %}Создать игру{% endif %}</button></div>
@@ -78,11 +75,24 @@
 </div>
 {% endif %}
 
+<style>
+    .cls-card { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 84px; padding: 10px 16px; border-radius: 14px;
+                border: 2px solid #e5e7eb; background: #fff; cursor: pointer; user-select: none; transition: .15s; }
+    .cls-card:hover { border-color: #6366f1; }
+    .cls-name { font-weight: 800; font-size: 18px; color: #1a1a4b; line-height: 1.1; }
+    .cls-n { font-size: 11px; color: #6b7280; }
+    .btn-check:checked + .cls-card { background: #1a1a4b; border-color: #1a1a4b; }
+    .btn-check:checked + .cls-card .cls-name { color: #fff; }
+    .btn-check:checked + .cls-card .cls-n { color: #c7d2fe; }
+    .btn-check:focus-visible + .cls-card { outline: 3px solid #a5b4fc; }
+</style>
 <script>
-document.querySelectorAll('.cls-all').forEach(function (box) {
-    var items = document.querySelectorAll('input[name="students"][data-cls="' + box.dataset.cls + '"]');
-    box.checked = items.length && Array.prototype.every.call(items, function (i) { return i.checked; });
-    box.addEventListener('change', function () { items.forEach(function (i) { i.checked = box.checked; }); });
-});
+(function () {
+    var boxes = document.querySelectorAll('input[name="classes"]'), t = document.getElementById('cls-toggle');
+    if (t) { t.addEventListener('click', function () {
+        var all = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+        boxes.forEach(function (b) { b.checked = !all; });
+    }); }
+})();
 </script>
 {% endblock %}

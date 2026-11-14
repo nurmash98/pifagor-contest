@@ -30,6 +30,22 @@ def _my_students(user):
     return sort_students(qs, by_class=True)
 
 
+def _my_classes(user):
+    """Классы учителя (админа — все) с числом учеников: [('7A', 14), ...]."""
+    counts = {}
+    for st in _my_students(user):
+        counts[st.school_class] = counts.get(st.school_class, 0) + 1
+    from .quarters import grade_of
+    return sorted(counts.items(), key=lambda kv: (int(grade_of(kv[0])) if str(grade_of(kv[0])).isdigit() else 99, kv[0]))
+
+
+# Игры раздела: когда появятся новые, их нужно только добавить сюда — раздел «Игры» покажет карточку.
+GAME_TYPES = [
+    {'key': 'bomb', 'icon': '💣', 'title': 'Бомба', 'url': 'codegames_manage',
+     'about': 'Обезвредить бомбу: ученик читает код и вводит, что он выведет, или перерезает провод с верным выводом.'},
+]
+
+
 def _int(raw, default, lo, hi):
     try:
         return min(hi, max(lo, int(raw)))
@@ -45,17 +61,18 @@ def _save_form(request, game):
     game.time_limit = _int(request.POST.get('minutes'), 5, 1, 60) * 60
     game.is_active = bool(request.POST.get('is_active'))
     game.title = game.title or 'Бомба'
+    mine = {c for c, _ in _my_classes(request.user)}
+    chosen = {c for c in request.POST.getlist('classes') if c in mine}
+    keep_foreign = [c for c in game.class_list() if c not in mine]              # чужие классы не трогаем
+    game.set_classes(chosen | set(keep_foreign))
     game.save()
-    allowed = {s.id for s in _my_students(request.user)}
-    chosen = {int(x) for x in request.POST.getlist('students') if x.isdigit()} & allowed
-    keep_foreign = [s.id for s in game.students.all() if s.id not in allowed]   # чужие классы не трогаем
-    game.students.set(list(chosen) + keep_foreign)
+    game.students.clear()                                                        # доступ теперь только по классам
     auto_title(game)
 
 
 def auto_title(game):
     """Название ставится само: «Бомба · 7A, 7B · if/else»."""
-    classes = sorted(set(game.students.values_list('school_class', flat=True)))
+    classes = game.class_list()
     topics = ', '.join(cg.TOPIC_SHORT.get(t, t) for t in game.topic_list())
     game.title = ' · '.join(x for x in ['Бомба', ', '.join(classes), topics] if x)[:120]
     game.save(update_fields=['title'])
@@ -70,9 +87,21 @@ def games_manage(request):
         return redirect('codegame_edit', game_id=game.id)
     games = CodeGame.objects.all() if request.user.is_superuser else CodeGame.objects.filter(owner=request.user)
     return render(request, 'codegames_manage.html', {
-        'games': games.prefetch_related('students'), 'topics': cg.TOPICS, 'students': _my_students(request.user),
-        'game': None,
+        'games': games, 'topics': cg.TOPICS, 'classes': _my_classes(request.user), 'chosen': set(), 'game': None,
     })
+
+
+@staff_member_required
+def games_hub(request):
+    """Раздел «Игры» для учителя: карточки всех игр платформы."""
+    games = CodeGame.objects.all() if request.user.is_superuser else CodeGame.objects.filter(owner=request.user)
+    cards = []
+    for t in GAME_TYPES:
+        mine = [g for g in games if g.mode == t['key']]
+        classes = sorted({c for g in mine if g.is_active for c in g.class_list()})
+        runs = CodeGameRun.objects.filter(game__in=mine).count() if mine else 0
+        cards.append(dict(t, total=len(mine), active=sum(1 for g in mine if g.is_active), classes=classes, runs=runs))
+    return render(request, 'games_hub.html', {'cards': cards})
 
 
 @staff_member_required
@@ -102,8 +131,8 @@ def game_edit(request, game_id):
         rows.append(s)
     rows.sort(key=lambda s: (s['best'] is None, s['best'] or 0))
     return render(request, 'codegames_manage.html', {
-        'game': game, 'topics': cg.TOPICS, 'students': _my_students(request.user),
-        'chosen': set(game.students.values_list('id', flat=True)), 'rows': rows,
+        'game': game, 'topics': cg.TOPICS, 'classes': _my_classes(request.user),
+        'chosen': set(game.class_list()), 'rows': rows,
     })
 
 
@@ -133,9 +162,9 @@ def _student(request):
 @login_required
 def games(request):
     if request.user.is_staff:
-        return redirect('codegames_manage')
+        return redirect('games_hub')
     st = _student(request)
-    my = CodeGame.objects.filter(is_active=True, students=st)
+    my = CodeGame.open_for(st)
     from .coins import balance
     items = []
     for g in my:
@@ -149,7 +178,7 @@ def games(request):
 @require_POST
 def game_start(request, game_id):
     st = _student(request)
-    game = get_object_or_404(CodeGame, id=game_id, is_active=True, students=st)
+    game = get_object_or_404(CodeGame.open_for(st), id=game_id)
     now = timezone.now()
     current = CodeGameRun.objects.filter(game=game, student=st, status='playing').first()
     if current and not cg.expire_if_needed(current, now):

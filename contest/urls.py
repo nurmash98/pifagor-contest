@@ -122,7 +122,8 @@ urlpatterns = [
     # Управление учениками — доступно любому учителю для всех учеников
     path('teacher/students/', views.student_list, name='student_list'),
     path('teacher/edupage-names/', activity.edupage_names, name='edupage_names'),
-    path('teacher/games/', codegame_views.games_manage, name='codegames_manage'),
+    path('teacher/games/', codegame_views.games_hub, name='games_hub'),
+    path('teacher/games/bomb/', codegame_views.games_manage, name='codegames_manage'),
     path('teacher/games/<int:game_id>/', codegame_views.game_edit, name='codegame_edit'),
     path('teacher/games/<int:game_id>/delete/', codegame_views.game_delete, name='codegame_delete'),
     path('games/', codegame_views.games, name='codegames'),

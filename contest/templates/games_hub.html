@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Игры - Pifagor Contest{% endblock %}
+
+{% block content %}
+<style>
+    .gcard { border: 0; border-radius: 22px; background: #fff; box-shadow: 0 4px 16px rgba(26,26,75,.09); padding: 22px; height: 100%; display: flex; flex-direction: column; transition: .15s; }
+    .gcard:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(26,26,75,.15); }
+    .gicon { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 30px;
+             background: linear-gradient(135deg, #eef2ff, #e0e7ff); margin-bottom: 12px; }
+    .gstat { font-size: 12px; color: #6b7280; }
+    .gstat b { color: #1a1a4b; font-size: 15px; }
+</style>
+<div class="mb-3"><a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a></div>
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 Игры</h3>
+<p class="text-muted small mb-4">Игры, в которые ученики играют на платформе. Откройте игру нужным классам — и она появится у них в меню.</p>
+
+<div class="row g-3">
+    {% for c in cards %}
+    <div class="col-md-6 col-xl-4">
+        <a href="{% url c.url %}" class="text-decoration-none">
+            <div class="gcard">
+                <div class="gicon">{{ c.icon }}</div>
+                <h5 class="fw-bold mb-1" style="color:#1a1a4b;">{{ c.title }}</h5>
+                <p class="small text-muted mb-3">{{ c.about }}</p>
+                <div class="d-flex gap-4 mb-2">
+                    <div class="gstat"><b>{{ c.active }}</b><br>открыто</div>
+                    <div class="gstat"><b>{{ c.total }}</b><br>всего игр</div>
+                    <div class="gstat"><b>{{ c.runs }}</b><br>прохождений</div>
+                </div>
+                <div class="mt-auto pt-2">
+                    {% for cl in c.classes %}<span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ cl }}</span>{% empty %}<span class="small text-muted">Пока никому не открыта</span>{% endfor %}
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

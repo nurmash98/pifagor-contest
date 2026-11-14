@@ -37,8 +37,9 @@ def code_games(request):
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated or user.is_staff:
         return {'games_visible': False}
-    from .models import CodeGame
-    return {'games_visible': CodeGame.objects.filter(is_active=True, students__user=user).exists()}
+    from .models import CodeGame, Student
+    student = Student.objects.filter(user=user).first()
+    return {'games_visible': student is not None and CodeGame.open_for(student).exists()}
 
 
 def holiday(request):

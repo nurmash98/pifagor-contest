@@ -825,7 +825,8 @@ class CodeGame(models.Model):
     time_limit = models.PositiveIntegerField(default=300, verbose_name='Время, секунд')
     coins = models.PositiveSmallIntegerField(default=2, verbose_name='Монет за победу (вход стоит 1)')
     is_active = models.BooleanField(default=True, verbose_name='Открыта')
-    students = models.ManyToManyField(Student, blank=True, related_name='code_games', verbose_name='Ученики')
+    students = models.ManyToManyField(Student, blank=True, related_name='code_games', verbose_name='Ученики (старый выбор)')
+    classes = models.CharField(max_length=300, blank=True, default='', verbose_name='Классы')   # ',7A,7B,' — игра открыта целым классам
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -838,6 +839,22 @@ class CodeGame(models.Model):
 
     def topic_list(self):
         return [t for t in (self.topics or '').split(',') if t]
+
+    def class_list(self):
+        return [c for c in (self.classes or '').split(',') if c]
+
+    def set_classes(self, names):
+        names = sorted({c for c in names if c})
+        self.classes = (',' + ','.join(names) + ',') if names else ''
+
+    @classmethod
+    def open_for(cls, student):
+        """Открытые игры, доступные ученику: его классу (или лично — так было раньше)."""
+        from django.db.models import Q
+        q = Q(students=student)
+        if student.school_class:
+            q |= Q(classes__contains=',' + student.school_class + ',')
+        return cls.objects.filter(is_active=True).filter(q).distinct()
 
 
 class CodeGameRun(models.Model):
