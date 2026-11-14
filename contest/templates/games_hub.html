@@ -10,6 +10,12 @@
              background: linear-gradient(135deg, #eef2ff, #e0e7ff); margin-bottom: 12px; }
     .gstat { font-size: 12px; color: #6b7280; }
     .gstat b { color: #1a1a4b; font-size: 15px; }
+    [data-bs-theme="dark"] .gcard { background: #1a2036; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+    [data-bs-theme="dark"] .gcard:hover { box-shadow: 0 10px 26px rgba(0,0,0,.5); border-color: #3d4566; }
+    [data-bs-theme="dark"] .gicon { background: linear-gradient(135deg, #2b3366, #1f2750); }
+    [data-bs-theme="dark"] .gstat { color: rgba(228,231,240,.65); }
+    [data-bs-theme="dark"] .gstat b { color: #c3c9ff; }
+    [data-bs-theme="dark"] .gcard .badge { background: #2b3366 !important; color: #c3c9ff !important; }
 </style>
 <div class="mb-3"><a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted small">← Назад в кабинет</a></div>
 <h3 class="fw-bold mb-1" style="color:#1a1a4b;">🎮 Игры</h3>

@@ -31,6 +31,18 @@
     .gbadge { display: inline-block; min-width: 46px; padding: 3px 10px; border-radius: 10px; font-weight: 800; text-align: center; color: #fff; }
     .g-hi { background: #16a34a; } .g-mid { background: #eab308; color: #422006; } .g-low { background: #f97316; } .g-bad { background: #dc2626; } .g-none { background: #e5e7eb; color: #9ca3af; }
     .bar-mini { height: 8px; border-radius: 6px; background: #e5e7eb; overflow: hidden; min-width: 80px; }
+    [data-bs-theme="dark"] .dash h2 { color: #c3c9ff; }
+    [data-bs-theme="dark"] .pill { background: #1a2036; color: #e4e7f0; border-color: #2d3558; }
+    [data-bs-theme="dark"] .pill:hover { border-color: #7c83ff; color: #c3c9ff; }
+    [data-bs-theme="dark"] .pill.on { background: #3b40a6; border-color: #3b40a6; color: #fff; }
+    [data-bs-theme="dark"] .kpi { box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+    [data-bs-theme="dark"] .panel { background: #1a2036; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+    [data-bs-theme="dark"] .panel h5 { color: #c3c9ff; }
+    [data-bs-theme="dark"] .panel .sub { color: rgba(228,231,240,.6); }
+    [data-bs-theme="dark"] .tbl { --bs-table-bg: transparent; --bs-table-color: #e4e7f0; --bs-table-border-color: #2d3558; }
+    [data-bs-theme="dark"] .tbl th { color: rgba(228,231,240,.6); border-bottom-color: #2d3558; }
+    [data-bs-theme="dark"] .bar-mini { background: #2d3558; }
+    [data-bs-theme="dark"] .g-none { background: #2d3558; color: #8b92b0; }
     .bar-mini > i { display: block; height: 100%; background: linear-gradient(90deg, #6366f1, #14b8a6); }
 </style>
 
@@ -146,7 +158,14 @@
 (function () {
     var d = JSON.parse(document.getElementById('dash-data').textContent);
     var NS = 'http://www.w3.org/2000/svg';
-    var C = {indigo: '#6366f1', teal: '#14b8a6', amber: '#f59e0b', grid: '#eef0f4', text: '#6b7280'};
+    var C = {indigo: '#6366f1', teal: '#14b8a6', amber: '#f59e0b'};
+    function theme() {
+        var dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        C.grid = dark ? '#2d3558' : '#eef0f4'; C.text = dark ? '#9aa1bf' : '#6b7280';
+        C.label = dark ? '#e4e7f0' : '#374151'; C.dot = dark ? '#1a2036' : '#fff'; C.big = dark ? '#c3c9ff' : '#1a1a4b';
+        C.indigo = dark ? '#818cf8' : '#6366f1'; C.teal = dark ? '#2dd4bf' : '#14b8a6'; C.amber = dark ? '#fbbf24' : '#f59e0b';
+    }
+    theme();
     function el(tag, attrs, parent, text) {
         var e = document.createElementNS(NS, tag);
         for (var k in attrs) { e.setAttribute(k, attrs[k]); }
@@ -183,7 +202,7 @@
             var lx = x0;
             legend.forEach(function (l) {
                 el('circle', {cx: lx + 5, cy: 10, r: 5, fill: l.color}, o.s);
-                el('text', {x: lx + 14, y: 14, 'font-size': 12, fill: '#374151', 'font-weight': 600}, o.s, l.name);
+                el('text', {x: lx + 14, y: 14, 'font-size': 12, fill: C.label, 'font-weight': 600}, o.s, l.name);
                 lx += 28 + l.name.length * 7;
             });
         }
@@ -205,7 +224,7 @@
                 if (labelsOn && v) {
                     var inside = hh > o.y0 - o.y1 - 14;                    // под самой верхней линией подпись — внутри столбика
                     el('text', {x: x + bw / 2, y: inside ? o.y0 - hh + 14 : o.y0 - hh - 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700,
-                                fill: inside ? '#fff' : '#374151'}, o.s, (opt.fmt || String)(v));
+                                fill: inside ? '#fff' : C.label}, o.s, (opt.fmt || String)(v));
                 }
             });
         });
@@ -219,7 +238,7 @@
         el('path', {d: path + ' L' + pts[pts.length - 1][0] + ',' + o.y0 + ' L' + pts[0][0] + ',' + o.y0 + ' Z', fill: color, opacity: .14}, o.s);
         el('path', {d: path, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, o.s);
         pts.forEach(function (p, i) {
-            var c = el('circle', {cx: p[0], cy: p[1], r: 4, fill: '#fff', stroke: color, 'stroke-width': 2.5}, o.s);
+            var c = el('circle', {cx: p[0], cy: p[1], r: 4, fill: C.dot, stroke: color, 'stroke-width': 2.5}, o.s);
             el('title', {}, c, 'Неделя с ' + labels[i] + ': ' + data[i]);
         });
     }
@@ -235,18 +254,19 @@
             el('title', {}, path, it.label + ' баллов: ' + it.count + ' (' + Math.round(it.count / total * 100) + '%)');
             a += ang;
         });
-        el('text', {x: cx, y: cy + 6, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 800, fill: '#1a1a4b'}, o.s, String(total));
+        el('text', {x: cx, y: cy + 6, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 800, fill: C.big}, o.s, String(total));
         el('text', {x: cx, y: cy + 22, 'text-anchor': 'middle', 'font-size': 11, fill: C.text}, o.s, 'работ');
         var lx = 8;
         items.forEach(function (it) {
             el('rect', {x: lx, y: o.h - 22, width: 10, height: 10, rx: 3, fill: it.color}, o.s);
             var t = it.label + ' · ' + it.count;
-            el('text', {x: lx + 14, y: o.h - 13, 'font-size': 11, fill: '#374151', 'font-weight': 600}, o.s, t);
+            el('text', {x: lx + 14, y: o.h - 13, 'font-size': 11, fill: C.label, 'font-weight': 600}, o.s, t);
             lx += 30 + t.length * 6.2;
         });
     }
     var names = d.rows.map(function (r) { return r.name; });
     function draw() {
+        theme();
         line(document.getElementById('c-active'), d.weeks, d.week_active, C.indigo);
         bars(document.getElementById('c-solved'), d.weeks, [{name: 'Решено', color: C.teal, data: d.week_solved}]);
         bars(document.getElementById('c-grades'), names, [
@@ -258,6 +278,7 @@
              {max: 100, fmt: function (v) { return v + '%'; }});
     }
     draw();
+    new MutationObserver(draw).observe(document.documentElement, {attributes: true, attributeFilter: ['data-bs-theme']});
     var t; window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(draw, 150); });
 })();
 </script>
