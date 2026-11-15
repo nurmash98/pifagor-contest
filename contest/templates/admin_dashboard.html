@@ -80,10 +80,12 @@
 
     <div class="row g-3 mb-4">
         <div class="col-lg-7"><div class="panel"><h5>Сколько учеников заходит</h5>
-            <div class="sub">Разных учеников за неделю (по понедельникам)</div>
+            <div class="sub">Разных учеников за <span class="unit-name">неделю</span> · наведите на график, чтобы увидеть число</div>
+            <div class="seg" data-for="active"><button type="button" data-u="week" class="on">По неделям</button><button type="button" data-u="day">По дням</button></div>
             <div class="chart-box"><div id="c-active" class="chart-svg"></div></div></div></div>
         <div class="col-lg-5"><div class="panel"><h5>Сколько задач решают</h5>
-            <div class="sub">Задач на 10 из 10 за неделю</div>
+            <div class="sub">Задач на 10 из 10 за <span class="unit-name">неделю</span></div>
+            <div class="seg" data-for="solved"><button type="button" data-u="week" class="on">По неделям</button><button type="button" data-u="day">По дням</button></div>
             <div class="chart-box"><div id="c-solved" class="chart-svg"></div></div></div></div>
     </div>
 
@@ -153,6 +155,16 @@
     </div>
 </div>
 
+<style>
+.seg{display:inline-flex;gap:2px;background:rgba(99,102,241,.1);border-radius:10px;padding:3px;margin:2px 0 6px}
+.seg button{border:0;background:transparent;border-radius:8px;padding:3px 12px;font-size:.8rem;font-weight:600;color:#6b7280;cursor:pointer}
+.seg button.on{background:#6366f1;color:#fff}
+.chart-box{position:relative}
+.ctip{position:absolute;pointer-events:none;z-index:5;background:#1a1a4b;color:#fff;border-radius:10px;padding:7px 11px;font-size:.82rem;line-height:1.3;box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap;display:none}
+.ctip b{font-size:1.05rem}
+[data-bs-theme=dark] .ctip{background:#e4e7f0;color:#1a1a4b}
+[data-bs-theme=dark] .seg button{color:#9aa1bf}
+</style>
 {{ d|json_script:"dash-data" }}
 <script>
 (function () {
@@ -215,12 +227,18 @@
         var o = frame(box, labels, top, opt.fmt, series.length > 1 ? series : null);
         var slot = (o.x1 - o.x0) / labels.length, gw = Math.min(slot * .72, 28 * series.length + 8), bw = gw / series.length;
         var labelsOn = labels.length * series.length <= 16;
+        if (opt.full) { o.s.querySelectorAll('title'); }
         labels.forEach(function (lab, i) {
             series.forEach(function (s, j) {
                 var v = s.data[i]; if (v == null) { return; }
                 var x = o.x0 + slot * i + (slot - gw) / 2 + bw * j, hh = (o.y0 - o.y1) * Math.min(v / o.top, 1);
                 var r = el('rect', {x: x + 1, y: o.y0 - hh, width: Math.max(bw - 2, 1), height: Math.max(hh, 0), rx: 5, fill: s.color}, o.s);
                 el('title', {}, r, lab + (series.length > 1 ? ' · ' + s.name : '') + ': ' + (opt.fmt || String)(v));
+                if (opt.full) { (function (r, i, v) {
+                    var t = tip(box);
+                    r.addEventListener('mousemove', function () { r.setAttribute('opacity', .8); showTip(box, t, x + bw / 2, o.y0 - hh, opt.full[i] + '<br><b>' + v + '</b> ' + opt.what); });
+                    r.addEventListener('mouseleave', function () { r.setAttribute('opacity', 1); t.style.display = 'none'; });
+                })(r, i, v); }
                 if (labelsOn && v) {
                     var inside = hh > o.y0 - o.y1 - 14;                    // под самой верхней линией подпись — внутри столбика
                     el('text', {x: x + bw / 2, y: inside ? o.y0 - hh + 14 : o.y0 - hh - 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 700,
@@ -229,7 +247,17 @@
             });
         });
     }
-    function line(box, labels, data, color) {
+    function tip(box) {
+        var t = box.querySelector('.ctip');
+        if (!t) { t = document.createElement('div'); t.className = 'ctip'; box.appendChild(t); }
+        return t;
+    }
+    function showTip(box, t, x, y, html) {
+        t.innerHTML = html; t.style.display = 'block';
+        var w = t.offsetWidth, left = Math.min(Math.max(x - w / 2, 0), box.clientWidth - w);
+        t.style.left = left + 'px'; t.style.top = Math.max(y - t.offsetHeight - 12, 0) + 'px';
+    }
+    function line(box, labels, data, color, full, what) {
         var top = nice(Math.max.apply(null, data.concat([1])));
         var o = frame(box, labels, top);
         var pts = data.map(function (v, i) { return [o.x0 + (o.x1 - o.x0) * (i + .5) / data.length, o.y0 - (o.y0 - o.y1) * v / top]; });
@@ -237,10 +265,22 @@
         var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
         el('path', {d: path + ' L' + pts[pts.length - 1][0] + ',' + o.y0 + ' L' + pts[0][0] + ',' + o.y0 + ' Z', fill: color, opacity: .14}, o.s);
         el('path', {d: path, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, o.s);
-        pts.forEach(function (p, i) {
-            var c = el('circle', {cx: p[0], cy: p[1], r: 4, fill: C.dot, stroke: color, 'stroke-width': 2.5}, o.s);
-            el('title', {}, c, 'Неделя с ' + labels[i] + ': ' + data[i]);
-        });
+        var small = pts.length <= 30;
+        pts.forEach(function (p) { if (small) { el('circle', {cx: p[0], cy: p[1], r: 4, fill: C.dot, stroke: color, 'stroke-width': 2.5}, o.s); } });
+        var guide = el('line', {x1: 0, x2: 0, y1: o.y1, y2: o.y0, stroke: color, 'stroke-dasharray': '4 4', opacity: 0}, o.s);
+        var hot = el('circle', {r: 6.5, fill: C.dot, stroke: color, 'stroke-width': 3, opacity: 0}, o.s);
+        var t = tip(box);
+        var area = el('rect', {x: o.x0, y: 0, width: o.x1 - o.x0, height: o.h, fill: 'transparent'}, o.s);
+        function move(ev) {
+            var r = o.s.getBoundingClientRect(), mx = ev.clientX - r.left;
+            var i = Math.max(0, Math.min(pts.length - 1, Math.round((mx - o.x0) / (o.x1 - o.x0) * pts.length - .5)));
+            guide.setAttribute('x1', pts[i][0]); guide.setAttribute('x2', pts[i][0]); guide.setAttribute('opacity', .5);
+            hot.setAttribute('cx', pts[i][0]); hot.setAttribute('cy', pts[i][1]); hot.setAttribute('opacity', 1);
+            showTip(box, t, pts[i][0], pts[i][1], full[i] + '<br><b>' + data[i] + '</b> ' + what);
+        }
+        area.addEventListener('mousemove', move); area.addEventListener('touchstart', function (e) { move(e.touches[0]); }, {passive: true});
+        area.addEventListener('touchmove', function (e) { move(e.touches[0]); }, {passive: true});
+        area.addEventListener('mouseleave', function () { t.style.display = 'none'; guide.setAttribute('opacity', 0); hot.setAttribute('opacity', 0); });
     }
     function donut(box, items) {
         var o = svg(box), total = items.reduce(function (a, x) { return a + x.count; }, 0);
@@ -265,10 +305,23 @@
         });
     }
     var names = d.rows.map(function (r) { return r.name; });
+    var unit = {active: 'week', solved: 'week'};
+    document.querySelectorAll('.seg').forEach(function (g) {
+        g.addEventListener('click', function (e) {
+            var b = e.target.closest('button'); if (!b) { return; }
+            unit[g.dataset.for] = b.dataset.u;
+            g.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+            g.parentNode.querySelector('.unit-name').textContent = b.dataset.u === 'day' ? 'день' : 'неделю';
+            draw();
+        });
+    });
     function draw() {
         theme();
-        line(document.getElementById('c-active'), d.weeks, d.week_active, C.indigo);
-        bars(document.getElementById('c-solved'), d.weeks, [{name: 'Решено', color: C.teal, data: d.week_solved}]);
+        var da = unit.active === 'day', ds = unit.solved === 'day';
+        line(document.getElementById('c-active'), da ? d.days : d.weeks, da ? d.day_active : d.week_active, C.indigo,
+             da ? d.day_full : d.week_full, 'уч. заходили');
+        bars(document.getElementById('c-solved'), ds ? d.days : d.weeks, [{name: 'Решено', color: C.teal, data: ds ? d.day_solved : d.week_solved}],
+             {full: ds ? d.day_full : d.week_full, what: 'задач на 10/10'});
         bars(document.getElementById('c-grades'), names, [
             {name: 'СОР', color: C.indigo, data: d.rows.map(function (r) { return r.sor; })},
             {name: 'СОЧ', color: C.amber, data: d.rows.map(function (r) { return r.soch; })}], {max: 10});

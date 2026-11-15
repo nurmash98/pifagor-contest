@@ -10,6 +10,7 @@ from .models import Exam, ExamAttempt, LoginEvent, Student, Submission
 from .quarters import grade_of
 
 SINCE = timezone.make_aware(datetime(2026, 9, 1))     # начало учебного года
+WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
 BANDS = [('8–10', 8, 11, '#16a34a'), ('6–7', 6, 8, '#eab308'), ('4–5', 4, 6, '#f97316'), ('0–3', 0, 4, '#dc2626')]
 
 
@@ -29,6 +30,17 @@ def _parallel_key(p):
 def _week_start(dt):
     d = timezone.localtime(dt).date()
     return d - timedelta(days=d.weekday())
+
+
+def _days(now):
+    """Все даты от начала года до сегодня."""
+    d = timezone.localtime(SINCE).date()
+    last = timezone.localtime(now).date()
+    out = []
+    while d <= last:
+        out.append(d)
+        d += timedelta(days=1)
+    return out
 
 
 def _weeks(now):
@@ -77,6 +89,9 @@ def build(parallel=None, now=None):
     weeks = _weeks(now)
     week_idx = {w: i for i, w in enumerate(weeks)}
     uniq_week = [set() for _ in weeks]
+    days = _days(now)
+    day_idx = {x: i for i, x in enumerate(days)}
+    uniq_day = [set() for _ in days]
     active = set()
     first_event = None
     for user_id, at in LoginEvent.objects.filter(at__gte=SINCE, user_id__in=list(by_user)).values_list('user_id', 'at'):
@@ -84,6 +99,7 @@ def build(parallel=None, now=None):
         active.add(s.id)
         stat[group(s)]['logins'] += 1
         uniq_week[week_idx[_week_start(at)]].add(s.id)
+        uniq_day[day_idx[timezone.localtime(at).date()]].add(s.id)
         first_event = at if first_event is None or at < first_event else first_event
     total_logins = sum(g['logins'] for g in stat.values())
     for s in students:        # кто заходил до появления журнала входов — считаем по последнему входу
@@ -96,6 +112,7 @@ def build(parallel=None, now=None):
     subs = Submission.objects.filter(is_graded=True, updated_at__gte=SINCE, student_id__in=list(by_id)) \
         .values('student_id', 'score', 'updated_at')
     solved_week = [0] * len(weeks)
+    solved_day = [0] * len(days)
     all_scores = []
     for sub in subs:
         g = stat[group(by_id[sub['student_id']])]
@@ -105,6 +122,7 @@ def build(parallel=None, now=None):
         if sub['score'] == 10:
             g['solved'] += 1
             solved_week[week_idx[_week_start(sub['updated_at'])]] += 1
+            solved_day[day_idx[timezone.localtime(sub['updated_at']).date()]] += 1
 
     # ---- СОР/СОЧ ----
     from .models import ExamAnswer
@@ -170,6 +188,9 @@ def build(parallel=None, now=None):
         rows=rows, exams=exam_list, dist=dist, quarters=quarters,
         weeks=[w.strftime('%d.%m') for w in weeks],
         week_active=[len(u) for u in uniq_week], week_solved=solved_week,
+        days=[x.strftime('%d.%m') for x in days], day_full=[x.strftime('%d.%m.%Y') + ', ' + WEEKDAYS[x.weekday()] for x in days],
+        day_active=[len(u) for u in uniq_day], day_solved=solved_day,
+        week_full=[w.strftime('%d.%m') + ' – ' + (w + timedelta(days=6)).strftime('%d.%m.%Y') for w in weeks],
     )
 
 
