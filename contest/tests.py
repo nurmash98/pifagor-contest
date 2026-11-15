@@ -3767,10 +3767,26 @@ class AdminDashboardTests(RetakeTestBase):
         self.assertEqual(self.client.get(url).status_code, 302)                  # аноним
         self.client.force_login(self.students[0].user)
         self.assertEqual(self.client.get(url).status_code, 302)                  # ученик
-        self.client.force_login(self.teacher_user)
-        self.assertEqual(self.client.get(url).status_code, 302)                  # учитель (не админ)
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_teacher_sees_only_own_classes(self):
+        from .dashboard import build
+        url = reverse('admin_dashboard')
+        self.client.force_login(self.teacher_user)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        classes = {s.school_class for s in self.students}
+        mine = sorted(classes)[0]
+        d = build(classes={mine})
+        self.assertEqual(d['mode'], 'class')
+        self.assertTrue(d['scoped'])
+        self.assertEqual([r['name'] for r in d['rows']], [mine])
+        self.assertLess(d['kpi']['students'], build()['kpi']['students'])
+        one = build(classes={mine}, cls=mine)
+        self.assertEqual(one['mode'], 'student')
+        self.assertEqual(sum(r['students'] for r in one['rows']), one['kpi']['students'])
+        other = build(classes={mine}, cls='8Z')                                  # чужой класс игнорируется
+        self.assertEqual(other['mode'], 'class')
 
     def test_numbers_all_parallels(self):
         from .dashboard import build
@@ -3791,11 +3807,11 @@ class AdminDashboardTests(RetakeTestBase):
     def test_parallel_filter_goes_by_classes(self):
         from .dashboard import build
         d = build('7')
-        self.assertEqual(d['by_group'], 'class')
+        self.assertEqual(d['mode'], 'class')
         self.assertEqual([r['name'] for r in d['rows']], ['7F'])
         self.assertEqual(d['kpi']['students'], 3)
         self.assertEqual(d['kpi']['solved'], 1)
-        self.assertEqual(build('99')['by_group'], 'parallel')                    # нет такой параллели — все
+        self.assertEqual(build('99')['mode'], 'parallel')                    # нет такой параллели — все
 
     def test_page_renders_with_filter_and_empty_db(self):
         self.client.force_login(self.admin)
@@ -3805,11 +3821,11 @@ class AdminDashboardTests(RetakeTestBase):
         ExamAttempt.objects.all().delete(); Submission.objects.all().delete(); LoginEvent.objects.all().delete()
         self.assertEqual(self.client.get(reverse('admin_dashboard')).status_code, 200)
 
-    def test_admin_gets_link_in_cabinet(self):
+    def test_everyone_gets_link_in_cabinet(self):
         self.client.force_login(self.admin)
         self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
         self.client.force_login(self.teacher_user)
-        self.assertNotContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
+        self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('admin_dashboard'))
 
 
 class IslandGameTests(TestCase):

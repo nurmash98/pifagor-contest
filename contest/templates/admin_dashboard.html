@@ -50,15 +50,26 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
             <h2 class="fw-bold mb-0">📊 Аналитика</h2>
-            <div class="text-muted small">С {{ d.since|date:"d.m.Y" }} · {% if d.parallel %}{{ d.parallel }} параллель, по классам{% else %}все параллели{% endif %}</div>
+            <div class="text-muted small">С {{ d.since|date:"d.m.Y" }} · {% if d.mode == 'student' %}класс {{ d.cls }}, по ученикам{% elif d.parallel %}{{ d.parallel }} параллель, по классам{% elif d.scoped %}ваши классы{% else %}все параллели{% endif %}</div>
         </div>
         <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Кабинет преподавателя</a>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
-        <a href="{% url 'admin_dashboard' %}" class="pill {% if not d.parallel %}on{% endif %}">Все параллели</a>
-        {% for p in d.parallels %}<a href="?p={{ p|urlencode }}" class="pill {% if p == d.parallel %}on{% endif %}">{{ p }}</a>{% endfor %}
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        {% if d.scoped %}
+            <a href="{% url 'admin_dashboard' %}" class="pill {% if d.mode != 'student' %}on{% endif %}">Все мои классы</a>
+            {% for c in d.classes %}<a href="?c={{ c|urlencode }}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
+        {% else %}
+            <a href="{% url 'admin_dashboard' %}" class="pill {% if not d.parallel %}on{% endif %}">Все параллели</a>
+            {% for p in d.parallels %}<a href="?p={{ p|urlencode }}" class="pill {% if p == d.parallel %}on{% endif %}">{{ p }}</a>{% endfor %}
+        {% endif %}
     </div>
+    {% if not d.scoped and d.parallel %}
+    <div class="d-flex flex-wrap gap-2 mb-4 align-items-center"><span class="text-muted small">Класс:</span>
+        <a href="?p={{ d.parallel|urlencode }}" class="pill {% if not d.cls %}on{% endif %}">Все классы {{ d.parallel }}</a>
+        {% for c in d.classes %}<a href="?c={{ c|urlencode }}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
+    </div>
+    {% else %}<div class="mb-4"></div>{% endif %}
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4 col-xl-2"><div class="kpi k1"><span class="ic">🎓</span>
@@ -90,7 +101,7 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-lg-7"><div class="panel"><h5>Средний балл СОР и СОЧ — {% if d.parallel %}по классам{% else %}по параллелям{% endif %}</h5>
+        <div class="col-lg-7"><div class="panel"><h5>Средний балл СОР и СОЧ — {% if d.mode == 'student' %}по ученикам{% elif d.mode == 'class' %}по классам{% else %}по параллелям{% endif %}</h5>
             <div class="sub">Оценка за работу из 10, средняя по ученикам</div>
             <div class="chart-box"><div id="c-grades" class="chart-svg"></div></div></div></div>
         <div class="col-lg-5"><div class="panel"><h5>Как написали</h5>
@@ -99,27 +110,27 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-lg-6"><div class="panel"><h5>Решено задач — {% if d.parallel %}по классам{% else %}по параллелям{% endif %}</h5>
+        <div class="col-lg-6"><div class="panel"><h5>Решено задач — {% if d.mode == 'student' %}по ученикам{% elif d.mode == 'class' %}по классам{% else %}по параллелям{% endif %}</h5>
             <div class="sub">Задач на 10 из 10 за всё время</div>
             <div class="chart-box"><div id="c-gsolved" class="chart-svg"></div></div></div></div>
-        <div class="col-lg-6"><div class="panel"><h5>Доля учеников, которые заходили</h5>
-            <div class="sub">Процент от всех учеников группы</div>
+        <div class="col-lg-6"><div class="panel"><h5>{% if d.mode == 'student' %}Сколько раз заходили{% else %}Доля учеников, которые заходили{% endif %}</h5>
+            <div class="sub">{% if d.mode == 'student' %}Входов на сайт с начала года{% else %}Процент от всех учеников группы{% endif %}</div>
             <div class="chart-box"><div id="c-gactive" class="chart-svg"></div></div></div></div>
     </div>
 
     <div class="panel mb-4">
-        <h5>{% if d.parallel %}Классы {{ d.parallel }} параллели{% else %}Сравнение параллелей{% endif %}</h5>
+        <h5>{% if d.mode == 'student' %}Ученики {{ d.cls }} класса{% elif d.mode == 'class' %}{% if d.parallel %}Классы {{ d.parallel }} параллели{% else %}Мои классы{% endif %}{% else %}Сравнение параллелей{% endif %}</h5>
         <div class="sub">Всё в одной таблице</div>
         <div class="table-responsive">
         <table class="table tbl align-middle mb-0">
-            <thead><tr><th>{% if d.parallel %}Класс{% else %}Параллель{% endif %}</th><th>Учеников</th><th>Заходили</th><th>Входов</th>
+            <thead><tr><th>{% if d.mode == 'student' %}Ученик{% elif d.mode == 'class' %}Класс{% else %}Параллель{% endif %}</th>{% if d.mode != 'student' %}<th>Учеников</th>{% endif %}<th>Заходили</th><th>Входов</th>
                 <th>Решено</th><th>Ср. балл задач</th><th class="text-center">СОР</th><th class="text-center">СОЧ</th></tr></thead>
             <tbody>
             {% for r in d.rows %}
             <tr>
-                <td class="fw-bold">{% if not d.parallel %}<a href="?p={{ r.name|urlencode }}" class="text-decoration-none">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
-                <td>{{ r.students }}</td>
-                <td style="min-width: 150px;"><div class="d-flex align-items-center gap-2"><div class="bar-mini flex-grow-1"><i style="width: {{ r.active_pct }}%"></i></div><span class="small fw-bold">{{ r.active }} · {{ r.active_pct }}%</span></div></td>
+                <td class="fw-bold">{% if d.mode == 'parallel' %}<a href="?p={{ r.name|urlencode }}" class="text-decoration-none">{{ r.name }}</a>{% elif d.mode == 'class' %}<a href="?c={{ r.name|urlencode }}" class="text-decoration-none">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
+                {% if d.mode != 'student' %}<td>{{ r.students }}</td>{% endif %}
+                <td style="min-width: 150px;">{% if d.mode == 'student' %}{% if r.active %}<span class="fw-bold text-success">✓ заходил</span>{% else %}<span class="text-muted">не заходил</span>{% endif %}{% else %}<div class="d-flex align-items-center gap-2"><div class="bar-mini flex-grow-1"><i style="width: {{ r.active_pct }}%"></i></div><span class="small fw-bold">{{ r.active }} · {{ r.active_pct }}%</span></div>{% endif %}</td>
                 <td>{{ r.logins }}</td>
                 <td class="fw-bold">{{ r.solved }}</td>
                 <td>{{ r.avg_score|default_if_none:"—" }}</td>
@@ -304,7 +315,7 @@
             lx += 30 + t.length * 6.2;
         });
     }
-    var names = d.rows.map(function (r) { return r.name; });
+    var names = d.rows.map(function (r) { return r.short || r.name; });
     var unit = {active: 'week', solved: 'week'};
     document.querySelectorAll('.seg').forEach(function (g) {
         g.addEventListener('click', function (e) {
@@ -327,8 +338,12 @@
             {name: 'СОЧ', color: C.amber, data: d.rows.map(function (r) { return r.soch; })}], {max: 10});
         donut(document.getElementById('c-dist'), d.dist);
         bars(document.getElementById('c-gsolved'), names, [{name: 'Решено', color: C.teal, data: d.rows.map(function (r) { return r.solved; })}]);
-        bars(document.getElementById('c-gactive'), names, [{name: '% учеников', color: C.indigo, data: d.rows.map(function (r) { return r.active_pct; })}],
-             {max: 100, fmt: function (v) { return v + '%'; }});
+        if (d.mode === 'student') {
+            bars(document.getElementById('c-gactive'), names, [{name: 'Входов', color: C.indigo, data: d.rows.map(function (r) { return r.logins; })}]);
+        } else {
+            bars(document.getElementById('c-gactive'), names, [{name: '% учеников', color: C.indigo, data: d.rows.map(function (r) { return r.active_pct; })}],
+                 {max: 100, fmt: function (v) { return v + '%'; }});
+        }
     }
     draw();
     new MutationObserver(draw).observe(document.documentElement, {attributes: true, attributeFilter: ['data-bs-theme']});

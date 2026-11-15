@@ -62,24 +62,50 @@ def attempt_grade(attempt, answers_by_attempt, tasks_n):
     return round(total / tasks_n, 1)
 
 
-def build(parallel=None, now=None):
-    """Все цифры дашборда. parallel — '7' (тогда группы = классы параллели) или None (группы = параллели)."""
+def _short(name):
+    parts = (name or '').split()
+    return parts[0] + (' ' + parts[1][0] + '.' if len(parts) > 1 else '') if parts else '—'
+
+
+def _class_key(c):
+    g = grade_of(c)
+    return (int(g) if str(g).isdigit() else 99, str(c))
+
+
+def build(parallel=None, now=None, classes=None, cls=None):
+    """Все цифры дашборда.
+    classes — множество классов учителя (None = все, для админа). cls — один класс: тогда строки = ученики.
+    parallel — '7': строки = классы параллели. Иначе: у админа строки = параллели, у учителя — его классы."""
     now = now or timezone.now()
     students = list(Student.objects.select_related('user'))
+    if classes is not None:
+        students = [s for s in students if s.school_class in classes]
     for s in students:
         s.par = grade_of(s.school_class)
+    scope_classes = sorted({s.school_class for s in students if s.school_class}, key=_class_key)
     pars = sorted({s.par for s in students if s.par}, key=_parallel_key)
+    if cls not in scope_classes:
+        cls = None
     if parallel not in pars:
         parallel = None
-    if parallel:
+    if cls:
+        parallel = grade_of(cls)
+        students = [s for s in students if s.school_class == cls]
+    elif parallel:
         students = [s for s in students if s.par == parallel]
     by_id = {s.id: s for s in students}
     by_user = {s.user_id: s for s in students}
+    mode = 'student' if cls else ('class' if (parallel or classes is not None) else 'parallel')
+    labels = {}
 
     def group(s):
-        return s.school_class if parallel else s.par
+        if mode == 'student':
+            labels[s.id] = s.full_name
+            return s.id
+        return s.school_class if mode == 'class' else s.par
 
-    groups = sorted({group(s) for s in students}, key=_parallel_key if not parallel else str)
+    groups = sorted({group(s) for s in students},
+                    key=(lambda g: labels[g]) if mode == 'student' else (_class_key if mode == 'class' else _parallel_key))
     stat = {g: dict(name=g, students=0, active=0, logins=0, solved=0, graded=0, scores=[], sor=[], soch=[], wrote=0)
             for g in groups}
     for s in students:
@@ -152,7 +178,11 @@ def build(parallel=None, now=None):
         class_size[s.school_class] += 1
     exam_list = []
     for e in sorted(exams.values(), key=lambda x: x.start_at, reverse=True):
+        if cls and e.school_class != cls:
+            continue
         if parallel and grade_of(e.school_class) != parallel:
+            continue
+        if classes is not None and e.school_class not in classes:
             continue
         g = exam_rows.get(e.id, {}).get('grades', [])
         exam_list.append(dict(id=e.id, title=e.title, kind=e.kind, school_class=e.school_class,
@@ -165,10 +195,18 @@ def build(parallel=None, now=None):
     rows = []
     for g in groups:
         s = stat[g]
-        rows.append(dict(name=g, students=s['students'], active=s['active'],
+        rows.append(dict(name=labels[g] if mode == 'student' else g, short=_short(labels[g]) if mode == 'student' else g,
+                         students=s['students'], active=s['active'],
                          active_pct=round(100 * s['active'] / s['students']) if s['students'] else 0,
                          logins=s['logins'], solved=s['solved'], graded=s['graded'], avg_score=_avg(s['scores']),
                          sor=_avg(s['sor']), soch=_avg(s['soch']), sor_n=len(s['sor']), soch_n=len(s['soch'])))
+
+    if mode == 'student':          # одинаковые сокращения («Иванов А.») — оставляем полное имя
+        from collections import Counter
+        cnt = Counter(r['short'] for r in rows)
+        for r in rows:
+            if cnt[r['short']] > 1:
+                r['short'] = r['name']
 
     dist = []
     for label, lo, hi, color in BANDS:
@@ -177,8 +215,7 @@ def build(parallel=None, now=None):
                 for q, v in sorted(quarter.items()) if q]
 
     return dict(
-        parallel=parallel, parallels=pars, since=timezone.localtime(SINCE).date(),
-        by_group='class' if parallel else 'parallel',
+        parallel=parallel, parallels=pars, mode=mode, cls=cls, classes=[c for c in scope_classes if classes is not None or not parallel or grade_of(c) == parallel], scoped=classes is not None, since=timezone.localtime(SINCE).date(),
         first_event=timezone.localtime(first_event).date() if first_event else None,
         kpi=dict(students=len(students), active=len(active),
                  active_pct=round(100 * len(active) / len(students)) if students else 0,
@@ -194,13 +231,17 @@ def build(parallel=None, now=None):
     )
 
 
-def _is_admin(user):
-    return user.is_active and user.is_superuser
+def _can_view(user):
+    return user.is_active and (user.is_superuser or user.is_staff)
 
 
 @login_required
-@user_passes_test(_is_admin, login_url='/')
+@user_passes_test(_can_view, login_url='/')
 def admin_dashboard(request):
+    """Админ видит всю школу, учитель — только свои классы (и по каждому классу отдельно)."""
+    from .views import _managed_classes
+    classes = _managed_classes(request.user)
     parallel = (request.GET.get('p') or '').strip() or None
-    data = build(parallel)
+    cls = (request.GET.get('c') or '').strip() or None
+    data = build(parallel, classes=classes, cls=cls)
     return render(request, 'admin_dashboard.html', {'d': data})
