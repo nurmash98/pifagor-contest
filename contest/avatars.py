@@ -33,6 +33,7 @@ CATALOG = [
     dict(key='av28', file='avatars/av-28.webp', kind='paid', price=300, ru='Корги-пилот', kk='Ұшқыш корги'),
     dict(key='av29', file='avatars/av-29.webp', kind='paid', price=400, ru='Неоновый кот', kk='Неон мысық'),
     dict(key='nurmash', file='avatars/nurmash-agai.webp', kind='paid', price=1000, ru='Нұрмаш ағай', kk='Нұрмаш ағай'),
+    dict(key='ernar', file='avatars/ernar-agai.webp', kind='paid', price=1000, ru='Ернар ағай', kk='Ернар ағай'),
 ]
 BY_KEY = {a['key']: a for a in CATALOG}
 
