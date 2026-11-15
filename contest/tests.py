@@ -2852,7 +2852,8 @@ class AvatarShopTests(TestCase):
         from django.conf import settings
         from . import avatars
         paid = [a for a in avatars.CATALOG if a['kind'] == 'paid']
-        self.assertEqual(len(paid), 29)
+        self.assertEqual(len(paid), 30)
+        self.assertEqual(avatars.BY_KEY['nurmash']['price'], 1000)
         base = os.path.join(settings.BASE_DIR, 'contest', 'static')
         for a in avatars.CATALOG:
             self.assertTrue(os.path.exists(os.path.join(base, a['file'])), a['file'])
