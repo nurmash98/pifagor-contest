@@ -11,9 +11,9 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
             <span class="badge bg-danger me-2">{% t "идёт" %}</span><strong class="fs-5" style="color: #1a1a4b;">{{ o.title }}</strong>
-            <div class="text-muted small">{{ o.start_at|date:"H:i" }}–{{ o.end_at|date:"H:i" }} · {% t "задач" %}: {{ o.tasks.all|length }}</div>
+            <div class="text-muted small">{{ o.window.start_at|date:"H:i" }}–{{ o.window.end_at|date:"H:i" }} · {% t "задач" %}: {{ o.tasks.all|length }}</div>
         </div>
-        <a href="{% url 'exam_detail' o.id %}" class="btn btn-warning rounded-pill px-4 fw-semibold">{% if o.my_attempt %}{% t "Продолжить" %}{% else %}{% t "Начать" %}{% endif %} →</a>
+        <a href="{% if o.extra %}{% url 'retake_detail' o.id o.extra.id %}{% else %}{% url 'exam_detail' o.id %}{% endif %}" class="btn btn-warning rounded-pill px-4 fw-semibold">{% if o.my_attempt %}{% t "Продолжить" %}{% else %}{% t "Начать" %}{% endif %} →</a>
     </div>
 </div>
 {% endfor %}
@@ -23,7 +23,7 @@
 {% for o in upcoming %}
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-2">
     <strong style="color: #1a1a4b;">{{ o.title }}</strong>
-    <div class="text-muted small">{{ o.start_at|date:"d.m.Y H:i" }} · {{ o.duration_minutes }} {% t "мин" %}</div>
+    <div class="text-muted small">{{ o.window.start_at|date:"d.m.Y H:i" }} · {{ o.window.duration_minutes }} {% t "мин" %}</div>
 </div>
 {% endfor %}
 {% endif %}
@@ -31,10 +31,10 @@
 {% if finished %}
 <h6 class="fw-bold text-muted mt-4">{% t "Завершённые" %}</h6>
 {% for o in finished %}
-<a href="{% url 'exam_detail' o.id %}" class="text-decoration-none">
+<a href="{% if o.extra %}{% url 'retake_detail' o.id o.extra.id %}{% else %}{% url 'exam_detail' o.id %}{% endif %}" class="text-decoration-none">
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-2 d-flex flex-row justify-content-between align-items-center">
     <div><strong style="color: #1a1a4b;">{{ o.title }}</strong>
-        <div class="text-muted small">{{ o.start_at|date:"d.m.Y" }}{% if not o.my_attempt %} · {% t "не участвовал" %}{% endif %}</div></div>
+        <div class="text-muted small">{{ o.window.start_at|date:"d.m.Y" }}{% if not o.my_attempt %} · {% t "не участвовал" %}{% endif %}</div></div>
     <span class="badge bg-warning text-dark fs-6">{{ o.my_total }} / {{ o.max_total }}</span>
 </div>
 </a>

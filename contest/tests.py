@@ -4006,3 +4006,98 @@ class IslandGameTests(TestCase):
         d = self.client.get(reverse('island_control_state', args=[self.game.id])).json()
         self.assertEqual((d['status'], len(d['players'])), ('running', 5))
         self.assertEqual(self.client.get(reverse('island_control', args=[self.game.id])).status_code, 200)
+
+
+class OlympiadExtraTimeTests(RetakeTestBase):
+    """Олимпиада: тем, кто не писал, учитель назначает своё время на ту же олимпиаду."""
+
+    def setUp(self):
+        super().setUp()
+        self.t1 = make_task('Олимп-1', 'C', self.tag1); self.t2 = make_task('Олимп-2', 'C', self.tag1)
+        self.olymp = Exam.objects.create(kind='OLYM', title='Осенняя олимпиада', school_class='',
+                                         start_at=timezone.now() - timedelta(hours=3), duration_minutes=60, created_by=self.teacher)
+        self.olymp.tasks.set([self.t1, self.t2])
+        self.wrote, self.missed, self.missed2 = self.students[0], self.students[1], self.students[2]
+        self.olymp.participants.add(self.wrote, self.missed, self.missed2)
+        a = ExamAttempt.objects.create(exam=self.olymp, student=self.wrote, started_at=self.olymp.start_at)
+        ExamAnswer.objects.create(attempt=a, task=self.t1, best_score=70, submissions_count=1, submitted_at=self.olymp.start_at)
+        self.url = reverse('retake_create', args=[self.olymp.id])
+
+    def _assign(self, students, minutes_from_now=-5, duration=60):
+        start = timezone.localtime(timezone.now() + timedelta(minutes=minutes_from_now))
+        return self.client.post(self.url, {'students': [s.id for s in students],
+                                           'start_at': start.strftime('%Y-%m-%dT%H:%M'), 'duration_minutes': duration})
+
+    def test_form_lists_only_those_who_did_not_write(self):
+        self.client.force_login(self.teacher_user)
+        page = self.client.get(self.url)
+        self.assertContains(page, self.missed.full_name)
+        self.assertContains(page, self.missed2.full_name)
+        self.assertNotContains(page, self.wrote.full_name)
+        self.assertContains(self.client.get(reverse('exam_results', args=[self.olymp.id])), 'Дать время несдавшим')
+        self.assertContains(self.client.get(reverse('olympiad_list')), self.url)
+        r = self._assign([self.wrote])                                    # писавшего назначить нельзя
+        self.assertEqual(ExamRetake.objects.filter(exam=self.olymp).count(), 0)
+        self._assign([self.missed], minutes_from_now=-200, duration=30)   # время в прошлом — нельзя
+        self.assertEqual(ExamRetake.objects.filter(exam=self.olymp).count(), 0)
+
+    def test_not_allowed_while_olympiad_is_running(self):
+        self.olymp.start_at = timezone.now() - timedelta(minutes=5); self.olymp.save()
+        self.client.force_login(self.teacher_user)
+        self.assertRedirects(self.client.get(self.url), reverse('exam_results', args=[self.olymp.id]))
+
+    def test_student_writes_same_olympiad_in_extra_time(self):
+        self.client.force_login(self.teacher_user)
+        self.assertRedirects(self._assign([self.missed]), reverse('exam_results', args=[self.olymp.id]))
+        rt = ExamRetake.objects.get(exam=self.olymp)
+        self.assertEqual(list(rt.students.all()), [self.missed])
+        self.assertContains(self.client.get(self.url), 'уже назначено')   # второй раз, пока идёт, — нельзя
+
+        self.client.force_login(self.missed.user)
+        page = self.client.get(reverse('olympiad_list'))
+        self.assertContains(page, reverse('retake_detail', args=[self.olymp.id, rt.id]))
+        self.assertContains(page, 'идёт')
+        r = self.client.get(reverse('exam_detail', args=[self.olymp.id]))  # старая ссылка ведёт на назначенное время
+        self.assertRedirects(r, reverse('retake_detail', args=[self.olymp.id, rt.id]))
+        detail = self.client.get(reverse('retake_detail', args=[self.olymp.id, rt.id]))
+        self.assertNotContains(detail, 'Пересдача')
+        self.assertNotContains(detail, 'другие задачи')
+        self.client.post(reverse('retake_start', args=[self.olymp.id, rt.id]))
+        att = ExamAttempt.objects.get(exam=self.olymp, student=self.missed)
+        self.assertEqual((att.retake_id, att.task_ids), (rt.id, [self.t1.id, self.t2.id]))     # те же задачи
+        detail = self.client.get(reverse('retake_detail', args=[self.olymp.id, rt.id]))
+        self.assertContains(detail, 'Олимп-1'); self.assertContains(detail, 'Олимп-2')
+        self.assertEqual(self.client.get(reverse('retake_task', args=[self.olymp.id, rt.id, self.t1.id])).status_code, 200)
+        ExamAnswer.objects.create(attempt=att, task=self.t1, best_score=100, submissions_count=1, submitted_at=timezone.now())
+        ExamAnswer.objects.create(attempt=att, task=self.t2, best_score=20, submissions_count=1, submitted_at=timezone.now())
+
+        self.client.force_login(self.missed2.user)                         # не назначен — для него олимпиада закончилась
+        self.assertNotContains(self.client.get(reverse('olympiad_list')), 'retake')
+        self.assertEqual(self.client.get(reverse('retake_detail', args=[self.olymp.id, rt.id])).status_code, 302)
+
+        self.client.force_login(self.teacher_user)                         # результат — в общей таблице мест
+        page = self.client.get(reverse('exam_results', args=[self.olymp.id]))
+        rows = {r['student'].id: r for r in page.context['rows']}
+        self.assertEqual((rows[self.missed.id]['total'], rows[self.missed.id]['place']), (120, 1))
+        self.assertEqual((rows[self.wrote.id]['total'], rows[self.wrote.id]['place']), (70, 2))
+        self.assertEqual(rows[self.missed.id]['extra'], rt)
+        self.assertIsNone(rows[self.missed2.id]['place'])
+        self.assertContains(page, 'Дополнительное время для несдавших')
+        self.assertNotContains(self.client.get(self.url), self.missed.full_name + '</strong>')   # он уже писал
+        self.client.post(reverse('retake_delete', args=[self.olymp.id, rt.id]))
+        self.assertTrue(ExamRetake.objects.filter(id=rt.id).exists())      # уже писали — удалить нельзя
+
+    def test_pending_window_shown_and_can_be_deleted(self):
+        self.client.force_login(self.teacher_user)
+        self._assign([self.missed, self.missed2], minutes_from_now=60)
+        rt = ExamRetake.objects.get(exam=self.olymp)
+        page = self.client.get(reverse('exam_results', args=[self.olymp.id]))
+        self.assertContains(page, 'назначено на')
+        self.client.force_login(self.missed.user)
+        lst = self.client.get(reverse('olympiad_list'))
+        self.assertContains(lst, 'Скоро')
+        self.client.post(reverse('retake_start', args=[self.olymp.id, rt.id]))       # ещё не началось
+        self.assertFalse(ExamAttempt.objects.filter(exam=self.olymp, student=self.missed).exists())
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('retake_delete', args=[self.olymp.id, rt.id]))
+        self.assertFalse(ExamRetake.objects.filter(id=rt.id).exists())

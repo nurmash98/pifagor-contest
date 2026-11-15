@@ -178,6 +178,20 @@ def _to_detail(exam, retake=None):
     return redirect('exam_detail', exam_id=exam.id)
 
 
+def olympiad_extra(exam, student):
+    """Дополнительное время ученика на олимпиаде: (окно, попытка). Берём то, где он уже писал,
+    иначе — последнее назначенное. Нет назначений — (None, None)."""
+    windows = list(ExamRetake.objects.filter(exam=exam, students=student).order_by('start_at'))
+    if not windows:
+        return None, None
+    attempts = {a.retake_id: a for a in ExamAttempt.objects.filter(exam=exam, student=student, retake__in=windows)
+                .prefetch_related('answers')}
+    for w in windows:
+        if w.id in attempts:
+            return w, attempts[w.id]
+    return windows[-1], None
+
+
 def _attempt_state(window, attempt, now):
     """'upcoming' / 'active' / 'finished' для экзамена или пересдачи с учётом досрочного завершения."""
     state = window.status(now)
@@ -272,6 +286,10 @@ def exam_detail(request, exam_id, retake_id=None):
     student, exam, retake, attempt = _student_exam_or_redirect(request, exam_id, retake_id)
     if exam is None:
         return redirect('exam_list')
+    if exam.is_olympiad and retake is None and attempt is None:
+        extra, _ = olympiad_extra(exam, student)
+        if extra is not None:
+            return redirect('retake_detail', exam_id=exam.id, retake_id=extra.id)
     blocked = exam_guard.guard(request, attempt)
     if blocked is not None:
         return blocked
@@ -310,13 +328,16 @@ def exam_detail(request, exam_id, retake_id=None):
             done, g = _grade_info(rt, ra, now)
             earlier_retakes.append({'retake': rt, 'done': done, 'grade': g})
     my_retake_state = _attempt_state(my_retake, retake_attempt, now) if my_retake else None
+    if exam.is_olympiad:          # у олимпиады нет «двух оценок»: доп. время — это она же
+        my_retake, earlier_retakes = None, []
     olymp = None
     if exam.is_olympiad and attempt is not None:
         olymp = {'total': sum(a.best_score for a in answers.values()), 'max': 100 * len(tasks)}
         # место ученику не показываем — таблица мест только у учителя
 
     return render(request, 'exam_detail.html', {
-        'exam': exam, 'retake': retake, 'window': window, 'attempt': attempt, 'state': state, 'tasks': tasks,
+        'exam': exam, 'retake': retake, 'extra': bool(retake and exam.is_olympiad),
+        'window': window, 'attempt': attempt, 'state': state, 'tasks': tasks,
         'in_progress': in_progress, 'finished': finished, 'task_count': exam.tasks_per_student(),
         'grade': (attempt.grade() if attempt else 0) if finished else None,
         'my_retake': my_retake, 'my_retake_state': my_retake_state,
@@ -336,10 +357,13 @@ def exam_start(request, exam_id, retake_id=None):
     if exam is None:
         return redirect('exam_list')
     if (retake or exam).status() != 'active':
-        messages.warning(request, 'Сейчас эта пересдача не идёт.' if retake else 'Сейчас этот СОР/СОЧ не идёт.')
+        messages.warning(request, 'Сейчас олимпиада для вас не идёт.' if exam.is_olympiad else
+                         'Сейчас эта пересдача не идёт.' if retake else 'Сейчас этот СОР/СОЧ не идёт.')
     elif attempt is None:
         task_ids = []
-        if retake is not None:
+        if retake is not None and exam.is_olympiad:      # доп. время олимпиады — та же олимпиада, те же задачи
+            task_ids = list(exam.tasks.values_list('id', flat=True))
+        elif retake is not None:
             task_ids = _retake_task_ids(exam, student)
         elif exam.random_slots:
             picked = _random_match([_slot_candidates(sl) for sl in exam.random_slots])
@@ -362,7 +386,8 @@ def exam_finish(request, exam_id, retake_id=None):
     if attempt is not None and attempt.is_active():
         attempt.finished_at = timezone.now()
         attempt.save(update_fields=['finished_at'])
-        messages.success(request, 'Вы завершили пересдачу.' if retake else 'Вы завершили СОР/СОЧ.')
+        messages.success(request, 'Вы завершили олимпиаду.' if exam.is_olympiad else
+                         'Вы завершили пересдачу.' if retake else 'Вы завершили СОР/СОЧ.')
     return _to_detail(exam, retake)
 
 
@@ -774,7 +799,21 @@ def exam_results(request, exam_id, retake_id=None):
         per_student = True
     elif exam.is_olympiad:
         students = sort_students(exam.participants.select_related('user'))
-        rows = _result_rows(exam, students, exam_attempts, now, per_student=exam.is_random)
+        merged, extra_of, pending = dict(exam_attempts), {}, {}
+        for rt in exam.retakes.prefetch_related('students', 'attempts__answers'):
+            by_student = {a.student_id: a for a in rt.attempts.all()}
+            for st in rt.students.all():
+                if st.id in exam_attempts:
+                    continue
+                if st.id in by_student:
+                    merged.setdefault(st.id, by_student[st.id])
+                    extra_of.setdefault(st.id, rt)
+                elif rt.status(now) != 'finished':
+                    pending[st.id] = rt
+        rows = _result_rows(exam, students, merged, now, per_student=False)
+        for row in rows:
+            row['extra'] = extra_of.get(row['student'].id)
+            row['extra_pending'] = None if row['attempt'] else pending.get(row['student'].id)
         _olympiad_places(rows)
         state = exam.status(now)
         per_student = exam.is_random
@@ -784,7 +823,7 @@ def exam_results(request, exam_id, retake_id=None):
         per_student = exam.is_random
 
     retakes = list(exam.retakes.prefetch_related('students').all())
-    if retake is None and retakes:
+    if retake is None and retakes and not exam.is_olympiad:
         # Ученикам, назначенным на пересдачу, — вторая оценка (после окончания пересдачи).
         retake_attempts = {(a.retake_id, a.student_id): a
                            for a in ExamAttempt.objects.filter(exam=exam, retake__in=retakes)}
@@ -813,7 +852,7 @@ def exam_results(request, exam_id, retake_id=None):
     return render(request, 'exam_results.html', {
         'exam': exam, 'tasks': tasks, 'rows': rows, 'state': state, 'columns': columns,
         'slot_labels': labels, 'retake': retake, 'retakes': retakes,
-        'has_retakes': bool(retakes), 'per_student': per_student,
+        'has_retakes': bool(retakes) and not exam.is_olympiad, 'per_student': per_student,
         'max_total': task_max(exam) * exam.tasks_per_student(), 'task_max': task_max(exam),
         'exam_finished': exam.status(now) == 'finished',
     })
@@ -826,6 +865,8 @@ def retake_create(request, exam_id):
         messages.error(request, 'Это СОР/СОЧ не вашего класса.')
         return redirect('exam_list')
     now = timezone.now()
+    if exam.is_olympiad:
+        return _olympiad_extra_create(request, exam, now)
     if exam.status(now) != 'finished':
         messages.warning(request, 'Пересдачу можно назначить только после окончания СОР/СОЧ.')
         return redirect('exam_results', exam_id=exam.id)
@@ -891,16 +932,72 @@ def retake_create(request, exam_id):
     })
 
 
+def _olympiad_extra_create(request, exam, now):
+    """Олимпиада: участникам, которые её не писали, назначается своё время на ту же олимпиаду
+    (те же задачи, результат идёт в общую таблицу)."""
+    if exam.status(now) != 'finished':
+        messages.warning(request, 'Дополнительное время можно назначить после окончания олимпиады.')
+        return redirect('exam_results', exam_id=exam.id)
+    wrote = set(exam.attempts.values_list('student_id', flat=True))        # писали — в своё время или в дополнительное
+    waiting = {}
+    for rt in exam.retakes.prefetch_related('students'):
+        if rt.status(now) != 'finished':
+            for st in rt.students.all():
+                waiting[st.id] = rt
+    students = [st for st in sort_students(exam.participants.all()) if st.id not in wrote]
+    for st in students:
+        st.waiting = waiting.get(st.id)
+    allowed = {st.id for st in students if not st.waiting}
+    if request.method == 'POST':
+        errors = []
+        chosen_ids = {int(x) for x in request.POST.getlist('students') if x.isdigit()} & allowed
+        start_raw, duration_raw = request.POST.get('start_at', ''), request.POST.get('duration_minutes', '')
+        if not chosen_ids:
+            errors.append('Выберите хотя бы одного ученика.')
+        start_at = duration = None
+        try:
+            start_at = timezone.make_aware(datetime.strptime(start_raw, '%Y-%m-%dT%H:%M'))
+        except (ValueError, TypeError):
+            errors.append('Укажите дату и время начала.')
+        try:
+            duration = int(duration_raw)
+            if not 1 <= duration <= EXAM_MAX_DURATION:
+                raise ValueError
+        except (ValueError, TypeError):
+            duration = None
+            errors.append(f'Длительность — от 1 до {EXAM_MAX_DURATION} минут.')
+        if start_at and duration and start_at + timedelta(minutes=duration) <= now:
+            errors.append('Это время уже прошло — укажите время в будущем.')
+        if not errors:
+            rt = ExamRetake.objects.create(exam=exam, start_at=start_at, duration_minutes=duration,
+                                           created_by=_teacher(request.user))
+            rt.students.set(Student.objects.filter(id__in=chosen_ids))
+            messages.success(request, f'Назначено: {len(chosen_ids)} уч., {timezone.localtime(start_at):%d.%m.%Y %H:%M}, '
+                                      f'{duration} мин. Они увидят олимпиаду в своём разделе «Олимпиада».')
+            return redirect('exam_results', exam_id=exam.id)
+        for e in errors:
+            messages.error(request, e)
+        values, selected = {'start_at': start_raw, 'duration_minutes': duration_raw}, chosen_ids
+    else:
+        soon = timezone.localtime(now + timedelta(minutes=30)).replace(second=0, microsecond=0)
+        soon = soon.replace(minute=soon.minute - soon.minute % 5)
+        values, selected = {'start_at': soon.strftime('%Y-%m-%dT%H:%M'), 'duration_minutes': exam.duration_minutes}, set()
+    return render(request, 'olympiad_extra_form.html', {
+        'exam': exam, 'students': students, 'selected': selected, 'v': values, 'max_duration': EXAM_MAX_DURATION,
+        'task_count': exam.tasks.count(),
+    })
+
+
 @staff_member_required
 def retake_delete(request, exam_id, retake_id):
     exam = get_object_or_404(Exam, id=exam_id)
     retake = get_object_or_404(ExamRetake, id=retake_id, exam=exam)
     if request.method == 'POST' and _can_manage(request.user, exam):
         if retake.attempts.exists():
-            messages.warning(request, 'Ученики уже начали эту пересдачу — удалить её нельзя, чтобы не потерять оценки.')
+            messages.warning(request, 'Ученики уже начали писать — удалить нельзя, чтобы не потерять результаты.')
         else:
             retake.delete()
-            messages.success(request, 'Пересдача удалена.')
+            messages.success(request, 'Дополнительное время удалено.' if exam.is_olympiad else 'Пересдача удалена.')
     return redirect('exam_results', exam_id=exam.id)
 
 
@@ -967,11 +1064,17 @@ def olympiad_list(request):
     active, upcoming, finished = [], [], []
     for o in olymps:
         o.my_attempt = attempts.get(o.id)
-        o.state = _attempt_state(o, o.my_attempt, now)
+        o.extra = None
+        o.window = o
+        if o.my_attempt is None:              # не писал в общее время — смотрим назначенное дополнительное
+            o.extra, extra_attempt = olympiad_extra(o, student)
+            if o.extra is not None:
+                o.window, o.my_attempt = o.extra, extra_attempt
+        o.state = _attempt_state(o.window, o.my_attempt, now)
         o.my_total = sum(a.best_score for a in o.my_attempt.answers.all()) if o.my_attempt else 0
         o.max_total = 100 * len(o.tasks.all())
         {'active': active, 'upcoming': upcoming}.get(o.state, finished).append(o)
-    upcoming.sort(key=lambda e: e.start_at)
+    upcoming.sort(key=lambda e: e.window.start_at)
     return render(request, 'olympiads_student.html', {'active': active, 'upcoming': upcoming, 'finished': finished})
 
 

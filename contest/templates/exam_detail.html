@@ -6,7 +6,7 @@
 {% block content %}
 {% include 'exam_frame_mark.html' with active=in_progress %}
 <div class="mb-3 exam-back">
-    {% if retake %}<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
+    {% if retake and not extra %}<a href="{% url 'exam_detail' exam.id %}" class="text-decoration-none text-muted small">← {{ exam.title }}</a>
     {% elif exam.is_olympiad %}<a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← {% t "Олимпиада" %}</a>
     {% else %}<a href="{% url 'exam_list' %}" class="text-decoration-none text-muted small">← {% t "СОР/СОЧ" %}</a>{% endif %}
 </div>
@@ -14,7 +14,7 @@
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
         <span class="badge {% if in_progress %}bg-danger{% else %}bg-secondary{% endif %} me-2">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %}</span>
-        {% if retake %}<span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>{% endif %}
+        {% if retake and not extra %}<span class="badge bg-warning text-dark me-2">🔁 {% t "Пересдача" %}</span>{% endif %}
         <h3 class="fw-bold d-inline" style="color: #1a1a4b;">{{ exam.title }}</h3>
         <div class="text-muted small mt-1">{{ window.start_at|date:"d.m.Y H:i" }} – {{ window.end_at|date:"H:i" }} · {{ window.duration_minutes }} {% t "мин" %} · {% if exam.is_olympiad %}{% t "каждая задача — до 100 баллов" %}{% else %}{% t "каждая задача — до 10 баллов" %}{% endif %}</div>
     </div>
@@ -28,7 +28,7 @@
 
 {% if state == 'upcoming' %}
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
-        <p class="mb-2">{% if retake %}{% t "Пересдача начнётся" %}{% else %}{% t "Начнётся" %}{% endif %} <strong>{{ window.start_at|date:"d.m.Y H:i" }}</strong></p>
+        <p class="mb-2">{% if retake and not extra %}{% t "Пересдача начнётся" %}{% else %}{% t "Начнётся" %}{% endif %} <strong>{{ window.start_at|date:"d.m.Y H:i" }}</strong></p>
         <button class="btn btn-secondary px-4" disabled>{% t "Начать" %}</button>
     </div>
 
@@ -36,8 +36,8 @@
     <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
         <p class="mb-1">{% t "Задач" %}: <strong>{{ task_count }}</strong> · {% t "до" %} {{ window.end_at|date:"H:i" }}</p>
         <p class="text-muted small mb-1">{% if exam.is_olympiad %}{% t "По каждой задаче — максимум" %} {{ max_subs }} {% t "отправок, засчитывается лучший результат." %}{% else %}{% t "По каждой задаче — максимум 3 отправки, засчитывается лучший результат." %}{% endif %}</p>
-        {% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}
-        {% if retake %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
+        {% if not extra %}{% if exam.is_random or retake %}<p class="text-muted small mb-1">{% t "Задачи выпадут случайно после нажатия «Начать»." %}</p>{% endif %}{% endif %}
+        {% if retake and not extra %}<p class="text-muted small mb-1">{% t "На пересдаче будут другие задачи, не те, что были на экзамене." %}</p>{% endif %}
         <p class="text-muted small mb-3">{% if exam.is_olympiad %}{% t "После старта Курсы и Все задачи будут закрыты до конца олимпиады." %}{% else %}{% t "После старта Курсы и Все задачи будут закрыты до конца СОР/СОЧ." %}{% endif %}</p>
 {% if not exam.is_olympiad %}
         <div class="alert alert-warning rounded-4 text-start small mx-auto mb-4" style="max-width: 640px;">
@@ -125,7 +125,7 @@
     <div class="text-end mb-3"><a href="{% url 'retake_detail' exam.id my_retake.id %}" class="small text-decoration-none">{% t "Задачи и ответы пересдачи" %} →</a></div>
     {% endif %}
 
-    {% if retake and exam_done %}
+    {% if retake and exam_done and not extra %}
     <div class="small text-muted mb-2">{% t "Оценка за экзамен" %}: <strong>{{ exam_grade }}/10</strong> · <a href="{% url 'exam_detail' exam.id %}">{% t "открыть экзамен" %}</a></div>
     {% endif %}
 

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Дополнительное время: {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3"><a href="{% url 'exam_results' exam.id %}" class="text-decoration-none text-muted small">← Результаты олимпиады</a></div>
+<h3 class="fw-bold mb-1" style="color: #1a1a4b;">⏱ Дать время несдавшим: 🏆 «{{ exam.title }}»</h3>
+<p class="text-muted small mb-4">Здесь — участники, которые не писали олимпиаду. Выберите учеников, дату, время и длительность:
+    им откроется <strong>та же олимпиада с теми же задачами</strong> ({{ task_count }} шт.), а результат попадёт в общую таблицу мест.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong>Кто не сдал ({{ students|length }})</strong>
+                    <span class="small"><a href="#" id="sel-all" class="text-decoration-none">Все</a> · <a href="#" id="sel-none" class="text-decoration-none">Снять</a></span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for st in students %}
+                    <li class="list-group-item">
+                        <label class="d-flex justify-content-between align-items-center w-100 mb-0" style="cursor: {% if st.waiting %}not-allowed{% else %}pointer{% endif %};">
+                            <span>
+                                <input type="checkbox" class="form-check-input me-2 extra-cb" name="students" value="{{ st.id }}"
+                                       {% if st.id in selected %}checked{% endif %}{% if st.waiting %} disabled{% endif %}>
+                                <strong style="color: #1a1a4b;">{{ st.full_name }}</strong>
+                                <span class="badge bg-light text-dark border">{{ st.school_class }}</span>
+                            </span>
+                            {% if st.waiting %}<span class="badge bg-warning text-dark">уже назначено на {{ st.waiting.start_at|date:"d.m H:i" }}</span>{% endif %}
+                        </label>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item p-4 text-center text-muted">Все участники уже писали олимпиаду.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small text-muted">Дата и время начала</label>
+                    <input type="datetime-local" name="start_at" class="form-control" value="{{ v.start_at }}" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-semibold small text-muted">Длительность (минут, до {{ max_duration }})</label>
+                    <input type="number" name="duration_minutes" class="form-control" min="1" max="{{ max_duration }}" value="{{ v.duration_minutes }}" required>
+                </div>
+                <button class="btn btn-warning rounded-pill px-4 fw-semibold" {% if not students %}disabled{% endif %}>Назначить олимпиаду</button>
+            </div>
+        </div>
+    </div>
+</form>
+<script>
+(function () {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.extra-cb'));
+    function set(v) { boxes.forEach(function (b) { if (!b.disabled) { b.checked = v; } }); }
+    document.getElementById('sel-all').onclick = function (e) { e.preventDefault(); set(true); };
+    document.getElementById('sel-none').onclick = function (e) { e.preventDefault(); set(false); };
+})();
+</script>
+{% endblock %}
