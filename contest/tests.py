@@ -2853,7 +2853,7 @@ class AvatarShopTests(TestCase):
         from . import avatars
         paid = [a for a in avatars.CATALOG if a['kind'] == 'paid']
         self.assertEqual(len(paid), 31)
-        self.assertEqual(avatars.BY_KEY['nurmash']['price'], 1000)
+        self.assertEqual(avatars.BY_KEY['nurmash']['price'], 2500)
         base = os.path.join(settings.BASE_DIR, 'contest', 'static')
         for a in avatars.CATALOG:
             self.assertTrue(os.path.exists(os.path.join(base, a['file'])), a['file'])
