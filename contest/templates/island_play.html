@@ -257,7 +257,8 @@
         var mv = d.mvp;
         if (mv && mv.ids.length) {
             var iam = me && mv.ids.indexOf(me.id) >= 0;
-            $('final-mvp').innerHTML = '⭐ ' + (iam ? TXT.mvp_you : TXT.mvp + ' — ' + mv.names.map(esc).join(', ')) +
+            $('final-mvp').innerHTML = '⭐ ' + TXT.mvp + ' — <span style="font-size:20px;color:#fff">' + mv.names.map(esc).join(', ') + '</span>' +
+                (iam ? '<br>' + TXT.mvp_you : '') +
                 '<br><span style="font-weight:600">' + TXT.pts_n + ' ' + mv.points + ' · +' + mv.bonus + ' ' + TXT.coins_w + '</span>';
             $('final-mvp').style.display = 'block';
         }
