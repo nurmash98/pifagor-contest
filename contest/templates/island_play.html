@@ -198,7 +198,9 @@
         kicked = true; fs = 'gate'; $('gate').style.display = 'none'; closeModal(); exitFs();
         $('banner').textContent = TXT.kicked; $('banner').style.display = 'block';
     }
-    $('fs-btn').addEventListener('click', enterFs);
+    // Выход бывает и без выхода из полного экрана (другое окно, вкладка): тогда браузер не пришлёт fullscreenchange,
+    // поэтому «вернуться» при уже включённом полном экране сразу перепривязывает игру, а не ждёт события.
+    $('fs-btn').addEventListener('click', function () { if (inFs()) { onFs(); } else { enterFs(); } });
     document.addEventListener('fullscreenchange', onFs);
     document.addEventListener('webkitfullscreenchange', onFs);
     window.addEventListener('blur', function () { setTimeout(function () { if (!document.hasFocus()) { leave('blur'); } }, 150); });
