@@ -4212,3 +4212,95 @@ class OwnAvatarTests(TestCase):
         self.assertEqual(st.avatar, '')
         self.assertFalse(hasattr(st, 'custom_avatar'))
         self.assertIn('own', st.owned_avatars)                                      # покупка осталась
+
+
+class ShopAdminTests(TestCase):
+    """Админ управляет аватарами и баннерами: цены, названия, скрытие, свои аватары."""
+
+    def setUp(self):
+        from .models import CoinTransaction
+        from . import shop_items
+        shop_items.invalidate()
+        self.admin = User.objects.create_superuser('sa', password='p')
+        self.teacher = User.objects.create_user('st', password='p', is_staff=True)
+        self.st = Student.objects.create(user=User.objects.create_user('ss', password='p'), full_name='Аня', school_class='7A')
+        CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=5000, at=timezone.now())
+        self.url = reverse('shop_admin')
+
+    def post(self, **kw):
+        from . import shop_items
+        r = self.client.post(self.url, kw)
+        shop_items.invalidate()
+        return r
+
+    def png(self):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        b = BytesIO(); Image.new('RGB', (300, 300), (10, 120, 200)).save(b, 'PNG')
+        return SimpleUploadedFile('a.png', b.getvalue(), content_type='image/png')
+
+    def test_only_superuser(self):
+        self.client.login(username='st', password='p')
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.client.login(username='sa', password='p')
+        self.assertContains(self.client.get(self.url), 'Управление магазином')
+
+    def test_price_name_hide_reset_for_base_avatar(self):
+        from . import avatars
+        self.client.login(username='sa', password='p')
+        self.post(action='save', kind='avatar', key='av21', price='50', ru='Дракончик', kk='Айдаһар', hidden='')
+        a = avatars.by_key()['av21']
+        self.assertEqual((a['price'], a['ru']), (50, 'Дракончик'))
+        self.client.login(username='ss', password='p')
+        self.assertContains(self.client.get(reverse('shop')), 'Дракончик')
+        self.client.post(reverse('shop_buy'), {'avatar': 'av21'})
+        from .coins import balance
+        self.assertEqual(balance(Student.objects.get(id=self.st.id)), 4950)             # куплен по новой цене
+        self.client.login(username='sa', password='p')
+        self.post(action='save', kind='avatar', key='av22', price='200', ru='Панда', kk='Панда', hidden='on')
+        self.assertTrue(avatars.by_key()['av22']['hidden'])
+        self.client.login(username='ss', password='p')
+        self.assertNotContains(self.client.get(reverse('shop')), 'value="av22"')         # скрытый не продаётся
+        self.client.post(reverse('shop_buy'), {'avatar': 'av22'})
+        self.assertNotIn('av22', avatars.owned(Student.objects.get(id=self.st.id)))
+        self.client.login(username='sa', password='p')
+        self.post(action='reset', kind='avatar', key='av21')
+        self.assertEqual(avatars.by_key()['av21']['price'], 500)
+
+    def test_banner_price_and_hide(self):
+        from . import banners
+        self.client.login(username='sa', password='p')
+        self.post(action='save', kind='banner', key='neon', price='123', ru='Неон', kk='Неон', hidden='on')
+        b = banners.catalog()['neon']
+        self.assertEqual((b['price'], b['hidden']), (123, True))
+        self.client.login(username='ss', password='p')
+        self.client.post(reverse('shop_buy'), {'banner': 'neon'})
+        self.assertNotIn('neon', banners.owned(Student.objects.get(id=self.st.id)))
+
+    def test_add_and_delete_own_avatar(self):
+        from . import avatars
+        from .models import ShopItem
+        self.client.login(username='sa', password='p')
+        self.post(action='add_avatar', ru='Новый', kk='Жаңа', price='700', photo=self.png())
+        it = ShopItem.objects.get(ru='Новый')
+        self.assertEqual(it.key, f'x{it.id}')
+        self.assertEqual(avatars.by_key()[it.key]['price'], 700)
+        self.client.login(username='ss', password='p')
+        img = self.client.get(avatars.img_url(avatars.by_key()[it.key]))
+        self.assertEqual((img.status_code, img['Content-Type']), (200, 'image/webp'))
+        self.client.post(reverse('shop_buy'), {'avatar': it.key})
+        st = Student.objects.get(id=self.st.id)
+        self.assertEqual((st.avatar, avatars.get(st.avatar)['ru']), (it.key, 'Новый'))
+        self.assertContains(self.client.get(reverse('profile')), avatars.img_url(avatars.by_key()[it.key]))
+        self.client.login(username='sa', password='p')
+        self.post(action='delete', kind='avatar', key=it.key)
+        self.assertIsNone(avatars.get(it.key))
+
+    def test_own_avatar_price(self):
+        from . import avatars
+        self.client.login(username='sa', password='p')
+        self.post(action='save', kind='avatar', key='own', price='900')
+        self.assertEqual(avatars.own_price(), 900)
+        self.post(action='save', kind='avatar', key='own', price=str(avatars.OWN_PRICE))
+        self.assertEqual(avatars.own_price(), avatars.OWN_PRICE)

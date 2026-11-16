@@ -49,6 +49,8 @@ urlpatterns = [
     path('shop/buy/', views.shop_buy, name='shop_buy'),
     path('shop/custom/', views.shop_custom, name='shop_custom'),
     path('shop/avatar/', views.avatar_upload, name='avatar_upload'),
+    path('shop/item/<str:key>/<int:ver>.webp', views.shop_item_img, name='shop_item_img'),
+    path('teacher/shop/', views.shop_admin, name='shop_admin'),
     path('avatar/<int:sid>/<int:ver>.webp', views.custom_avatar_img, name='custom_avatar_img'),
 
     # Курсы

@@ -65,6 +65,12 @@ def custom_style(data):
 FREE = [k for k, b in CATALOG.items() if b['kind'] == 'free']
 
 
+def catalog():
+    """Каталог баннеров с правками админа (цена, названия, скрыт)."""
+    from . import shop_items
+    return {k: shop_items.merged(b, 'banner', k) for k, b in CATALOG.items()}
+
+
 def owned(student):
     """Баннеры ученика: бесплатные + полученные/купленные."""
     extra = [k for k in (getattr(student, 'owned_banners', '') or '').split(',') if k in CATALOG]

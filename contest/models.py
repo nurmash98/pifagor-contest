@@ -979,3 +979,23 @@ class CustomAvatar(models.Model):
 
     def __str__(self):
         return f'Свой аватар: {self.student}'
+
+
+class ShopItem(models.Model):
+    """Правки магазина от админа. Для аватаров/баннеров из кода — переопределение цены, названий и «скрыт»;
+    для аватаров, добавленных админом (key 'x<id>'), — ещё и сама картинка (круг 256×256, webp)."""
+    KINDS = [('avatar', 'Аватар'), ('banner', 'Баннер')]
+    kind = models.CharField(max_length=10, choices=KINDS)
+    key = models.CharField(max_length=40)
+    price = models.PositiveIntegerField(null=True, blank=True)
+    hidden = models.BooleanField(default=False)
+    ru = models.CharField(max_length=60, blank=True)
+    kk = models.CharField(max_length=60, blank=True)
+    image = models.BinaryField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['kind', 'key'], name='unique_shop_item')]
+
+    def __str__(self):
+        return f'{self.kind}:{self.key}'

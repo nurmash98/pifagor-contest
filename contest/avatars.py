@@ -45,10 +45,42 @@ def owned(student):
     return {k for k in (getattr(student, 'owned_avatars', '') or '').split(',') if k}
 
 
+def catalog():
+    """Весь каталог с правками админа: аватары из кода + добавленные админом (key 'x<id>')."""
+    from . import shop_items
+    out = [shop_items.merged(a, 'avatar', a['key']) for a in CATALOG]
+    for key, r in shop_items.rows('avatar').items():
+        if key.startswith('x') and key != 'own':
+            out.append(dict(key=key, file=None, kind='paid', price=r.price or 0, ru=r.ru or key, kk=r.kk or r.ru or key,
+                            hidden=r.hidden, ver=r.version, added=True))
+    return out
+
+
+def by_key():
+    return {a['key']: a for a in catalog()}
+
+
+def img_url(a):
+    """Адрес картинки аватара: статический файл или (для добавленных админом) из базы."""
+    from django.templatetags.static import static
+    from django.urls import reverse
+    if a.get('file'):
+        return static(a['file'])
+    if a.get('added'):
+        return reverse('shop_item_img', args=[a['key'], a.get('ver', 1)])
+    return ''
+
+
+def own_price():
+    from . import shop_items
+    r = shop_items.rows('avatar').get(OWN)
+    return r.price if r and r.price is not None else OWN_PRICE
+
+
 def available_for(student):
     """Аватары, которые ученик может выбрать: бесплатные и купленные."""
     mine = owned(student) if student else set()
-    return [a for a in CATALOG if a['kind'] == 'free' or a['key'] in mine]
+    return [a for a in catalog() if a['kind'] == 'free' or a['key'] in mine]
 
 
 def give(student, key):
@@ -58,8 +90,8 @@ def give(student, key):
 
 
 def get(key):
-    a = BY_KEY.get(key or '')
-    return a if a and a['file'] else None
+    a = by_key().get(key or '')
+    return a if a and (a.get('file') or a.get('added')) else None
 
 
 # «Свой аватар»: покупается один раз (токен OWN в owned_avatars), потом ученик загружает своё фото.

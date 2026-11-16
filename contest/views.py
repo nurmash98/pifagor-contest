@@ -539,7 +539,7 @@ def profile_view(request):
     avatar_options = [{'key': '', 'img': '', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
                        'on': not student.avatar}]
     for a in avatar_module.available_for(student):
-        avatar_options.append({'key': a['key'], 'img': static(a['file']), 'title': a['kk'] if lang == 'kk' else a['ru'],
+        avatar_options.append({'key': a['key'], 'img': avatar_module.img_url(a), 'title': a['kk'] if lang == 'kk' else a['ru'],
                                'on': student.avatar == a['key']})
     if avatar_module.has_own(student) and avatar_module.custom_key(student):
         ck = avatar_module.custom_key(student)
@@ -553,7 +553,7 @@ def profile_view(request):
     owned_banners = banner_module.owned(student)
     banner_options = [{'key': '', 'title': 'Жоқ' if lang == 'kk' else 'Без баннера', 'on': not student.name_banner, 'owned': True}]
     for key in owned_banners:
-        b = banner_module.CATALOG[key]
+        b = banner_module.catalog()[key]
         banner_options.append({'key': key, 'title': b['kk'] if lang == 'kk' else b['ru'], 'owned': True,
                                'on': student.name_banner == key})
 
@@ -618,7 +618,9 @@ def shop(request):
     mine = banner_module.owned(student) if student else banner_module.FREE
     bal = coin_module.balance(student)
     banners = []
-    for key, b in banner_module.CATALOG.items():
+    for key, b in banner_module.catalog().items():
+        if b['hidden'] and key not in mine:
+            continue
         banners.append({'key': key, 'kind': b['kind'], 'price': b.get('price', 0), 'title': b['kk'] if lang == 'kk' else b['ru'],
                         'custom_style': banner_module.custom_style(student.custom_banner if student else {}) if key == 'custom' else '',
                         'custom': banner_module.clean_custom(student.custom_banner if student else {}) if key == 'custom' else None,
@@ -627,13 +629,15 @@ def shop(request):
     avatar_list = [{'key': '', 'img': '', 'kind': 'free', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
                     'on': bool(student and not student.avatar)}]
     my_avatars = avatar_module.owned(student) if student else set()
-    for a in avatar_module.CATALOG:
-        avatar_list.append({'key': a['key'], 'img': static(a['file']) if a['file'] else '', 'kind': a['kind'],
+    for a in avatar_module.catalog():
+        if a['hidden'] and a['key'] not in my_avatars:
+            continue
+        avatar_list.append({'key': a['key'], 'img': avatar_module.img_url(a), 'kind': a['kind'],
                             'price': a.get('price', 0), 'owned': a['kind'] == 'free' or a['key'] in my_avatars,
                             'short': max(a.get('price', 0) - bal, 0),
                             'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key'])})
     own_ck = avatar_module.custom_key(student) if student else ''
-    own = {'price': avatar_module.OWN_PRICE, 'owned': avatar_module.has_own(student), 'short': max(avatar_module.OWN_PRICE - bal, 0),
+    own = {'price': avatar_module.own_price(), 'owned': avatar_module.has_own(student), 'short': max(avatar_module.own_price() - bal, 0),
            'img': avatar_module.custom_url(own_ck) or '', 'key': own_ck, 'on': bool(student and own_ck and student.avatar == own_ck),
            'title': avatar_module.OWN_TITLE['kk' if lang == 'kk' else 'ru']}
     history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
@@ -657,14 +661,14 @@ def shop_buy(request):
         if key == avatar_module.OWN:
             if avatar_module.has_own(student):
                 return redirect('avatar_upload')
-            if coin_module.spend(student, 'buy:avatar:own', avatar_module.OWN_PRICE, 'Свой аватар'):
+            if coin_module.spend(student, 'buy:avatar:own', avatar_module.own_price(), 'Свой аватар'):
                 avatar_module.give(student, avatar_module.OWN)
                 messages.success(request, 'Енді өз суретіңді жүкте!' if kk else 'Куплено! Теперь загрузите своё фото.')
                 return redirect('avatar_upload')
             messages.warning(request, 'Тиын жетпейді.' if kk else 'Не хватает монет.')
             return redirect('shop')
-        item = avatar_module.BY_KEY.get(key)
-        if item is None or item['kind'] != 'paid':
+        item = avatar_module.by_key().get(key)
+        if item is None or item['kind'] != 'paid' or (item['hidden'] and key not in avatar_module.owned(student)):
             messages.error(request, 'Бұл аватарды сатып алуға болмайды.' if kk else 'Этот аватар нельзя купить.')
         elif key in avatar_module.owned(student):
             messages.info(request, 'Бұл аватар сізде бар.' if kk else 'Этот аватар у вас уже есть.')
@@ -678,8 +682,8 @@ def shop_buy(request):
         return redirect('shop')
     if request.method == 'POST':
         key = request.POST.get('banner', '')
-        item = banner_module.CATALOG.get(key)
-        if item is None or item['kind'] != 'paid':
+        item = banner_module.catalog().get(key)
+        if item is None or item['kind'] != 'paid' or (item['hidden'] and key not in banner_module.owned(student)):
             messages.error(request, 'Бұл баннерді сатып алуға болмайды.' if kk else 'Этот баннер нельзя купить.')
         elif key in banner_module.owned(student):
             messages.info(request, 'Бұл баннер сізде бар.' if kk else 'Этот баннер у вас уже есть.')
@@ -2357,5 +2361,99 @@ def custom_avatar_img(request, sid, ver):
     if ca is None:
         raise Http404
     r = HttpResponse(bytes(ca.data), content_type='image/webp')
+    r['Cache-Control'] = 'private, max-age=31536000, immutable'
+    return r
+
+
+# ---------------------------------------------------------------- управление магазином (админ)
+def _super_required(view):
+    from django.contrib.auth.decorators import user_passes_test
+    return login_required(user_passes_test(lambda u: u.is_active and u.is_superuser, login_url='/')(view))
+
+
+@_super_required
+def shop_admin(request):
+    """Админ: цены, названия, скрытие аватаров и баннеров; добавление и удаление своих аватаров."""
+    from . import avatars as avatar_module, banners as banner_module, shop_items
+    from .models import ShopItem
+
+    def price_of(v, default=None):
+        try:
+            n = int(str(v).strip())
+        except (TypeError, ValueError):
+            return default
+        return n if 0 <= n <= 100000 else default
+
+    if request.method == 'POST':
+        act = request.POST.get('action')
+        kind, key = request.POST.get('kind', ''), request.POST.get('key', '').strip()
+        if act == 'add_avatar':
+            ru = request.POST.get('ru', '').strip()[:60]
+            price = price_of(request.POST.get('price'))
+            f = request.FILES.get('photo')
+            if not ru or price is None or f is None:
+                messages.error(request, 'Укажите название, цену и выберите картинку.')
+                return redirect('shop_admin')
+            try:
+                data = avatar_module.process_upload(f)
+            except ValueError:
+                messages.error(request, 'Не получилось открыть картинку (JPG, PNG или WEBP до 6 МБ).')
+                return redirect('shop_admin')
+            it = ShopItem.objects.create(kind='avatar', key='x_tmp', price=price, ru=ru, kk=request.POST.get('kk', '').strip()[:60] or ru, image=data)
+            it.key = f'x{it.id}'
+            it.save(update_fields=['key'])
+            messages.success(request, f'Аватар «{ru}» добавлен в магазин за {price} монет.')
+        elif act == 'save' and kind in ('avatar', 'banner') and key:
+            base = (avatar_module.BY_KEY.get(key) if kind == 'avatar' else banner_module.CATALOG.get(key))
+            added = kind == 'avatar' and key.startswith('x') and ShopItem.objects.filter(kind='avatar', key=key).exists()
+            if base is None and not added and key != avatar_module.OWN:
+                messages.error(request, 'Такого товара нет.')
+                return redirect('shop_admin')
+            paid = key == avatar_module.OWN or added or (base or {}).get('kind') == 'paid'
+            it, _ = ShopItem.objects.get_or_create(kind=kind, key=key)
+            if paid:
+                it.price = price_of(request.POST.get('price'), it.price)
+                it.hidden = bool(request.POST.get('hidden')) and key != avatar_module.OWN
+            ru, kk = request.POST.get('ru', '').strip()[:60], request.POST.get('kk', '').strip()[:60]
+            it.ru = '' if key == avatar_module.OWN or (base and ru == base.get('ru')) else ru
+            it.kk = '' if key == avatar_module.OWN or (base and kk == base.get('kk')) else kk
+            if paid and it.price == (base.get('price') if base else avatar_module.OWN_PRICE):
+                it.price = None
+            if not added and it.price is None and not it.hidden and not it.ru and not it.kk:
+                it.delete()
+            else:
+                it.save()
+            messages.success(request, 'Сохранено.')
+        elif act == 'reset' and kind in ('avatar', 'banner'):
+            ShopItem.objects.filter(kind=kind, key=key).exclude(key__startswith='x').delete()
+            messages.info(request, 'Возвращены стандартные значения.')
+        elif act == 'delete' and kind == 'avatar' and key.startswith('x'):
+            ShopItem.objects.filter(kind='avatar', key=key).delete()
+            messages.info(request, 'Аватар удалён из магазина. У тех, кто его купил, он заменится на стандартный.')
+        shop_items.invalidate()
+        return redirect('shop_admin')
+
+    over = shop_items.rows('avatar')
+    avatars_rows = []
+    for a in avatar_module.catalog():
+        avatars_rows.append(dict(a, img=avatar_module.img_url(a), base=avatar_module.BY_KEY.get(a['key']),
+                                 over=a['key'] in over and not a.get('added'), can_edit_price=a['kind'] == 'paid'))
+    own = dict(key=avatar_module.OWN, kind='paid', price=avatar_module.own_price(), ru='Свой аватар (загрузка своего фото)', kk='',
+               img='', hidden=False, own=True, base=dict(price=avatar_module.OWN_PRICE), over=avatar_module.OWN in over, can_edit_price=True)
+    bover = shop_items.rows('banner')
+    banner_rows = []
+    for key, b in banner_module.catalog().items():
+        banner_rows.append(dict(b, key=key, base=banner_module.CATALOG[key], over=key in bover, can_edit_price=b['kind'] == 'paid'))
+    return render(request, 'shop_admin.html', {'avatars': [own] + avatars_rows, 'banners': banner_rows})
+
+
+@login_required
+def shop_item_img(request, key, ver):
+    """Картинка аватара, добавленного админом."""
+    from .models import ShopItem
+    it = ShopItem.objects.filter(kind='avatar', key=key).only('image').first()
+    if it is None or not it.image:
+        raise Http404
+    r = HttpResponse(bytes(it.image), content_type='image/webp')
     r['Cache-Control'] = 'private, max-age=31536000, immutable'
     return r

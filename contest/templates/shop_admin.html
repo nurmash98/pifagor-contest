@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Управление магазином{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 flex-wrap mt-3 mb-3">
+  <h3 class="fw-bold mb-0">🛍 Управление магазином</h3>
+  <a href="{% url 'shop' %}" class="small fw-semibold">Открыть магазин →</a>
+</div>
+<p class="text-muted small">Цены, названия и «скрыть» действуют сразу (до 15 секунд на обновление у учеников). Скрытый товар исчезает из магазина, но у тех, кто уже купил, остаётся. Бесплатные аватары и баннеры можно только переименовать.</p>
+
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+  <h5 class="fw-bold mb-3">➕ Добавить новый аватар</h5>
+  <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">{% csrf_token %}
+    <input type="hidden" name="action" value="add_avatar">
+    <div class="col-md-3"><label class="small fw-semibold">Картинка (обрежется по центру в круг)</label><input type="file" name="photo" accept="image/*" class="form-control" required></div>
+    <div class="col-md-3"><label class="small fw-semibold">Название (рус.)</label><input name="ru" class="form-control" maxlength="60" required></div>
+    <div class="col-md-3"><label class="small fw-semibold">Название (қаз.)</label><input name="kk" class="form-control" maxlength="60" placeholder="если пусто — как русское"></div>
+    <div class="col-md-1"><label class="small fw-semibold">Цена</label><input name="price" type="number" min="0" max="100000" value="1000" class="form-control" required></div>
+    <div class="col-md-2"><button class="btn btn-primary fw-bold rounded-pill w-100">Добавить</button></div>
+  </form>
+</div>
+
+
+<h5 class="fw-bold mt-4">Аватары</h5>
+<div class="card border-0 shadow-sm rounded-4 p-2 mb-4"><div class="table-responsive"><table class="table align-middle mb-0">
+  <thead><tr><th></th><th>Рус.</th><th>Қаз.</th><th style="width:110px">Цена</th><th>Скрыт</th><th></th></tr></thead><tbody>
+  {% for a in avatars %}
+  <tr>
+    <td style="width:56px"><form id="f-a-{{ a.key }}" method="post">{% csrf_token %}<input type="hidden" name="action" value="save"><input type="hidden" name="kind" value="avatar"><input type="hidden" name="key" value="{{ a.key }}"></form>{% if a.img %}<img src="{{ a.img }}" alt="" style="width:44px;height:44px;border-radius:50%">{% else %}<span class="fs-3">📸</span>{% endif %}</td>
+    <td>{% if a.own %}<span class="fw-semibold">{{ a.ru }}</span>{% else %}<input form="f-a-{{ a.key }}" name="ru" value="{{ a.ru }}" class="form-control form-control-sm" maxlength="60">{% endif %}</td>
+    <td>{% if a.own %}—{% else %}<input form="f-a-{{ a.key }}" name="kk" value="{{ a.kk }}" class="form-control form-control-sm" maxlength="60">{% endif %}</td>
+    <td>{% if a.can_edit_price %}<input form="f-a-{{ a.key }}" name="price" type="number" min="0" max="100000" value="{{ a.price }}" class="form-control form-control-sm">{% else %}<span class="badge bg-success">бесплатный</span>{% endif %}</td>
+    <td>{% if a.can_edit_price and not a.own %}<input form="f-a-{{ a.key }}" type="checkbox" name="hidden" {% if a.hidden %}checked{% endif %} class="form-check-input">{% else %}—{% endif %}</td>
+    <td class="text-end text-nowrap"><button form="f-a-{{ a.key }}" class="btn btn-sm btn-primary rounded-pill px-3">Сохранить</button>
+      {% if a.added %}<form method="post" class="d-inline" onsubmit="return confirm('Удалить аватар «{{ a.ru|escapejs }}» из магазина?');">{% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="kind" value="avatar"><input type="hidden" name="key" value="{{ a.key }}"><button class="btn btn-sm btn-outline-danger rounded-pill px-3">Удалить</button></form>
+      {% elif a.over %}<form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="reset"><input type="hidden" name="kind" value="avatar"><input type="hidden" name="key" value="{{ a.key }}"><button class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Вернуть стандартные значения">↺</button></form>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</tbody></table></div></div>
+
+<h5 class="fw-bold">Баннеры</h5>
+<p class="text-muted small">Новые баннеры — это оформление в коде, поэтому здесь можно менять цену, названия и скрывать. Показ баннеров в магазине смотрите на странице магазина.</p>
+<div class="card border-0 shadow-sm rounded-4 p-2 mb-5"><div class="table-responsive"><table class="table align-middle mb-0">
+  <thead><tr><th>Код</th><th>Рус.</th><th>Қаз.</th><th style="width:110px">Цена</th><th>Скрыт</th><th></th></tr></thead><tbody>
+  {% for b in banners %}
+  <tr>
+    <td class="text-muted small"><form id="f-b-{{ b.key }}" method="post">{% csrf_token %}<input type="hidden" name="action" value="save"><input type="hidden" name="kind" value="banner"><input type="hidden" name="key" value="{{ b.key }}"></form>{{ b.key }}{% if b.kind != 'paid' and b.kind != 'free' %}<br><span class="badge bg-info text-dark">{% if b.kind == 'gift' %}за задачи{% else %}награда{% endif %}</span>{% endif %}</td>
+    <td><input form="f-b-{{ b.key }}" name="ru" value="{{ b.ru }}" class="form-control form-control-sm" maxlength="60"></td>
+    <td><input form="f-b-{{ b.key }}" name="kk" value="{{ b.kk }}" class="form-control form-control-sm" maxlength="60"></td>
+    <td>{% if b.can_edit_price %}<input form="f-b-{{ b.key }}" name="price" type="number" min="0" max="100000" value="{{ b.price }}" class="form-control form-control-sm">{% else %}<span class="badge bg-success">{% if b.kind == 'free' %}бесплатный{% else %}не продаётся{% endif %}</span>{% endif %}</td>
+    <td>{% if b.can_edit_price %}<input form="f-b-{{ b.key }}" type="checkbox" name="hidden" {% if b.hidden %}checked{% endif %} class="form-check-input">{% else %}—{% endif %}</td>
+    <td class="text-end text-nowrap"><button form="f-b-{{ b.key }}" class="btn btn-sm btn-primary rounded-pill px-3">Сохранить</button>
+      {% if b.over %}<form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="reset"><input type="hidden" name="kind" value="banner"><input type="hidden" name="key" value="{{ b.key }}"><button class="btn btn-sm btn-outline-secondary rounded-pill px-3" title="Вернуть стандартные значения">↺</button></form>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</tbody></table></div></div>
+{% endblock %}
