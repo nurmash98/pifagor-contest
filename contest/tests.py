@@ -4001,10 +4001,31 @@ class IslandGameTests(TestCase):
         self.assertEqual(done['status'], 'finished')
         self.assertEqual(island.move(self.game, p, x, y)['error'], 'over')
         tx = CoinTransaction.objects.filter(key=f'island:{self.game.id}')
-        self.assertEqual([t.student_id for t in tx], [p.student_id])            # монеты — только тем, кто захватывал, 1 место +3
-        self.assertEqual(tx[0].amount, 3)
+        self.assertEqual([t.student_id for t in tx], [p.student_id])            # монеты — только тем, кто захватывал, 1 место +10
+        self.assertEqual(tx[0].amount, 10)
+        self.assertEqual(island.PRIZES, [10, 7, 5])
+        mvp = CoinTransaction.objects.filter(key=f'island-mvp:{self.game.id}')   # MVP — больше всех очков, ещё +5
+        self.assertEqual([(t.student_id, t.amount) for t in mvp], [(p.student_id, 5)])
+        p.refresh_from_db()
+        self.assertEqual(p.coins, 15)
+        self.assertEqual(done['mvp'], {'ids': [p.id], 'names': [p.student.full_name], 'points': p.points, 'bonus': 5})
+        self.assertGreater(p.points, 0)
         island.finish_if_needed(self.game, force=True)                          # повторный финиш ничего не начисляет
         self.assertEqual(CoinTransaction.objects.filter(key=f'island:{self.game.id}').count(), 1)
+        self.assertEqual(CoinTransaction.objects.filter(key=f'island-mvp:{self.game.id}').count(), 1)
+
+    def test_mvp_is_top_scorer_not_kicked(self):
+        island = self._run()
+        ps = list(self.game.players.all())
+        ps[0].points, ps[0].captured = 9, 4
+        ps[1].points, ps[1].captured = 9, 5
+        ps[2].points, ps[2].captured, ps[2].kicked = 20, 9, True              # выбитый MVP не становится
+        self.assertEqual(island.mvp_players(ps), [ps[1]])                        # при равных очках — у кого больше клеток
+        ps[0].captured = 5
+        self.assertEqual(island.mvp_players(ps), [ps[0], ps[1]])                 # полное равенство — оба
+        for q in ps:
+            q.points = 0
+        self.assertEqual(island.mvp_players(ps), [])
 
     def test_solo_mode_and_late_join(self):
         from . import island

@@ -110,6 +110,7 @@
     <div style="font-size:56px">🏆</div>
     <h2>{% t "Игра окончена" %}</h2>
     <p id="final-me" style="font-size:18px;font-weight:700"></p>
+    <p id="final-mvp" style="display:none;margin:10px 0 14px;padding:10px 14px;border-radius:14px;background:#422006;border:1px solid #f59e0b;color:#fde68a;font-weight:700"></p>
     <table class="res" id="final-table"></table>
     <p style="margin-top:20px"><a class="btn big" style="text-decoration:none;display:inline-block" href="{% url 'codegames' %}">{% t "К играм" %}</a></p>
 </div></div>
@@ -253,6 +254,13 @@
         finalShown = true; fs = 'gate'; closeModal(); $('gate').style.display = 'none'; exitFs();
         var rows = ranked(), mine = me ? me.team : -1, my = rows.filter(function (r) { return r.t.i === mine; })[0];
         $('final-me').innerHTML = my ? (esc(my.t.name) + ' — ' + my.place + ' ' + TXT.place + (me.coins ? ' · ' + TXT.coins + ': +' + me.coins : '')) : '';
+        var mv = d.mvp;
+        if (mv && mv.ids.length) {
+            var iam = me && mv.ids.indexOf(me.id) >= 0;
+            $('final-mvp').innerHTML = '⭐ ' + (iam ? TXT.mvp_you : TXT.mvp + ' — ' + mv.names.map(esc).join(', ')) +
+                '<br><span style="font-weight:600">' + TXT.pts_n + ' ' + mv.points + ' · +' + mv.bonus + ' ' + TXT.coins_w + '</span>';
+            $('final-mvp').style.display = 'block';
+        }
         $('final-table').innerHTML = rows.map(function (r) {
             return '<tr class="' + (r.t.i === mine ? 'mine' : '') + '"><td style="width:40px">' + r.place + '</td><td><span class="dot" style="background:' + r.t.color +
                 '"></span> ' + esc(r.t.name) + '</td><td style="text-align:right;font-weight:800">' + r.s + '</td></tr>'; }).join('');

@@ -63,6 +63,7 @@
     </div>
 </div>
 
+<div class="rounded-4 p-3 mt-4 fw-bold" id="mvp-card" style="display:none;background:#fef3c7;border:1px solid #f59e0b;color:#78350f;font-size:1.1rem"></div>
 <div class="card border-0 shadow-sm rounded-4 p-3 bg-white mt-4" id="players-card" style="display:none">
     <h5 class="fw-bold mb-2">Игроки</h5>
     <div class="table-responsive"><table class="table table-sm align-middle mb-0" id="players">
@@ -103,6 +104,11 @@
         $('b-finish').style.display = status === 'running' ? '' : 'none';
         $('players-card').style.display = status === 'lobby' ? 'none' : '';
         if (status === 'lobby') { lobby(d); } else { map.setState(d); map.draw(); board(d); players(d); }
+        var mv = d.mvp, mc = $('mvp-card');
+        if (status === 'finished' && mv && mv.ids.length) {
+            mc.innerHTML = '⭐ MVP игры — ' + mv.names.map(esc).join(', ') + ' · очков: ' + mv.points + ' · +' + mv.bonus + ' монет';
+            mc.style.display = '';
+        } else { mc.style.display = 'none'; }
     }
     function lobby(d) {
         var cols = [], i;
@@ -143,7 +149,7 @@
         var rows = d.players.slice().sort(function (a, b) { return a[3] - b[3] || b[7] - a[7]; });
         $('players').querySelector('tbody').innerHTML = rows.map(function (p) {
             var t = tm[p[3]] || {name: '—', color: '#9ca3af'};
-            return '<tr><td>' + esc(p[5]) + '</td><td><span class="dot" style="background:' + t.color + ';border-color:#d1d5db"></span> ' + (MODE === 'teams' ? esc(t.name) : '') + '</td><td>' + p[6] +
+            return '<tr><td>' + (d.mvp && d.mvp.ids.indexOf(p[0]) >= 0 ? '⭐ ' : '') + esc(p[5]) + '</td><td><span class="dot" style="background:' + t.color + ';border-color:#d1d5db"></span> ' + (MODE === 'teams' ? esc(t.name) : '') + '</td><td>' + p[6] +
                 '</td><td class="fw-bold">' + p[7] + '</td><td>' + (p[4] ? '<span class="badge bg-danger">выбит · ' + p[8] + '</span>' : (p[8] ? '<span class="badge bg-warning text-dark">' + p[8] + ' из ' + MAX_EXITS + '</span>' : '0')) +
                 '</td><td class="text-end">' + ((p[4] || p[8]) && status === 'running' ? '<button class="btn btn-outline-primary btn-sm py-0" data-restore="' + p[0] + '">↩ Вернуть</button>' : '') + '</td></tr>'; }).join('');
     }

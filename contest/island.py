@@ -18,7 +18,8 @@ WATER, GRASS, FOREST, FORT = '~', '.', 'f', 'F'
 POINTS = {GRASS: 1, FOREST: 2, FORT: 3}
 MAX_EXITS = 3                 # столько выходов из полного экрана — и ученик выбит
 COOLDOWN = 30                 # секунд паузы после неверного ответа
-PRIZES = [3, 2, 1]            # монеты за 1, 2 и 3 место
+PRIZES = [10, 7, 5]           # монеты за 1, 2 и 3 место
+MVP_BONUS = 5                 # дополнительно лучшему игроку (больше всех очков)
 MAX_TEAMS = 6
 TEAM_NAMES = ['Красные', 'Синие', 'Розовые', 'Жёлтые', 'Фиолетовые', 'Оранжевые']
 TEAM_NAMES_KK = ['Қызылдар', 'Көктер', 'Қызғылттар', 'Сарылар', 'Күлгіндер', 'Қызғылт сарылар']
@@ -302,6 +303,15 @@ def ranking(game):
     return out
 
 
+def mvp_players(players):
+    """MVP — кто сам заработал больше всех очков (выбитые не в счёт). При полном равенстве MVP несколько."""
+    cand = [p for p in players if not p.kicked and p.points > 0]
+    if not cand:
+        return []
+    best = max((p.points, p.captured) for p in cand)
+    return [p for p in cand if (p.points, p.captured) == best]
+
+
 def finish_if_needed(game, now=None, force=False):
     """Время вышло (или учитель завершил): игра закрывается, призёрам — монеты. Вызывать можно сколько угодно раз."""
     from .models import CoinTransaction, IslandGame
@@ -316,7 +326,8 @@ def finish_if_needed(game, now=None, force=False):
         game.version += 1
         game.save(update_fields=['status', 'finished_at', 'version'])
         prize = {t: PRIZES[place - 1] for place, t, s in ranking(game) if place <= len(PRIZES) and s > 0}
-        for p in game.players.select_related('student'):
+        players = list(game.players.select_related('student'))
+        for p in players:
             coins = prize.get(p.team, 0)
             if coins and not p.kicked and p.captured:
                 tx, created = CoinTransaction.objects.get_or_create(
@@ -325,6 +336,13 @@ def finish_if_needed(game, now=None, force=False):
                 if created:
                     p.coins = coins
                     p.save(update_fields=['coins'])
+        for p in mvp_players(players):
+            tx, created = CoinTransaction.objects.get_or_create(
+                student=p.student, key=f'island-mvp:{game.id}',
+                defaults=dict(kind='game', amount=MVP_BONUS, at=now, note='Битва за остров — MVP'))
+            if created:
+                p.coins += MVP_BONUS
+                p.save(update_fields=['coins'])
     return game
 
 
@@ -533,6 +551,10 @@ def state(game, since=0, me=None, lang='ru', now=None):
                     for p in players],
         'scores': game.scores or {}, 'teams': teams_info(game, players, lang),
     }
+    if game.status == 'finished':
+        best = mvp_players(players)
+        out['mvp'] = {'ids': [p.id for p in best], 'names': [p.student.full_name for p in best],
+                      'points': best[0].points if best else 0, 'bonus': MVP_BONUS}
     if game.status != 'lobby':
         cells = game.cells.filter(ver__gt=since) if since else game.cells.all()
         out['cells'] = [[c.x, c.y, c.team] for c in cells]

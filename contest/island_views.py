@@ -57,7 +57,7 @@ def manage(request):
     return render(request, 'island_manage.html', {
         'games': _my_games(request.user).prefetch_related('players'), 'topics': cg.TOPICS,
         'classes': _my_classes(request.user), 'tags': Tag.visible(), 'max_teams': island.MAX_TEAMS,
-        'max_exits': island.MAX_EXITS, 'prizes': island.PRIZES,
+        'max_exits': island.MAX_EXITS, 'prizes': island.PRIZES, 'mvp_bonus': island.MVP_BONUS,
     })
 
 
@@ -236,6 +236,7 @@ def _texts(lang):
         'far': 'Можно шагнуть только на соседнюю клетку суши.', 'me_btn': 'К моей точке', 'score': 'Очки',
         'grass': 'Трава', 'forest': 'Лес', 'fort': 'Крепость', 'own': 'Своя клетка — проход свободный',
         'help': 'Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей.',
+        'mvp': 'Лучший игрок (MVP)', 'mvp_you': 'Вы — лучший игрок (MVP)!', 'pts_n': 'очков:', 'coins_w': 'монет',
         'enter_code': 'Введите код решения', 'time_up': 'Время вышло', 'results': 'Итоги',
     }
     if lang != 'kk':
