@@ -2853,7 +2853,7 @@ class AvatarShopTests(TestCase):
         from . import avatars
         paid = [a for a in avatars.CATALOG if a['kind'] == 'paid']
         self.assertEqual(len(paid), 31)
-        self.assertEqual(avatars.BY_KEY['nurmash']['price'], 2500)
+        self.assertEqual(avatars.BY_KEY['nurmash']['price'], 1000)
         base = os.path.join(settings.BASE_DIR, 'contest', 'static')
         for a in avatars.CATALOG:
             self.assertTrue(os.path.exists(os.path.join(base, a['file'])), a['file'])
@@ -4118,3 +4118,76 @@ class OlympiadExtraTimeTests(RetakeTestBase):
         self.client.force_login(self.teacher_user)
         self.client.post(reverse('retake_delete', args=[self.olymp.id, rt.id]))
         self.assertFalse(ExamRetake.objects.filter(id=rt.id).exists())
+
+
+class OwnAvatarTests(TestCase):
+    """«Свой аватар»: покупка за 2500 монет, загрузка фото, показ, удаление учителем."""
+
+    def setUp(self):
+        from .models import CoinTransaction
+        self.st = Student.objects.create(user=User.objects.create_user('own_s', password='p'), full_name='Аня', school_class='7A')
+        CoinTransaction.objects.create(student=self.st, key='seed', kind='task', amount=3000, at=timezone.now())
+        self.client.login(username='own_s', password='p')
+
+    def png(self, size=(300, 200), name='me.png'):
+        from io import BytesIO
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        b = BytesIO(); Image.new('RGB', size, (200, 30, 30)).save(b, 'PNG')
+        return SimpleUploadedFile(name, b.getvalue(), content_type='image/png')
+
+    def test_prices(self):
+        from . import avatars
+        self.assertEqual(avatars.OWN_PRICE, 2500)
+        self.assertEqual((avatars.BY_KEY['nurmash']['price'], avatars.BY_KEY['ernar']['price']), (1000, 1000))
+
+    def test_upload_requires_purchase(self):
+        r = self.client.post(reverse('avatar_upload'), {'photo': self.png()})
+        self.assertRedirects(r, reverse('shop'))
+        self.assertFalse(hasattr(Student.objects.get(id=self.st.id), 'custom_avatar'))
+
+    def test_buy_upload_and_show(self):
+        from . import coins
+        self.assertRedirects(self.client.post(reverse('shop_buy'), {'avatar': 'own'}), reverse('avatar_upload'))
+        self.assertEqual(coins.balance(Student.objects.get(id=self.st.id)), 500)
+        self.client.post(reverse('shop_buy'), {'avatar': 'own'})                      # повторно не списывает
+        self.assertEqual(coins.balance(Student.objects.get(id=self.st.id)), 500)
+        r = self.client.post(reverse('avatar_upload'), {'photo': self.png()})
+        self.assertRedirects(r, reverse('profile'), fetch_redirect_response=False)
+        st = Student.objects.get(id=self.st.id)
+        self.assertEqual(st.avatar, f'u{st.id}.1')
+        img = self.client.get(reverse('custom_avatar_img', args=[st.id, 1]))
+        self.assertEqual((img.status_code, img['Content-Type']), (200, 'image/webp'))
+        from io import BytesIO
+        from PIL import Image
+        im = Image.open(BytesIO(img.content))
+        self.assertEqual(im.size, (256, 256))
+        self.assertEqual(im.convert('RGBA').getpixel((0, 0))[3], 0)                  # углы прозрачные — круг
+        self.assertContains(self.client.get(reverse('profile')), f'/avatar/{st.id}/1.webp')
+        self.client.post(reverse('avatar_upload'), {'photo': self.png()})            # замена увеличивает версию
+        self.assertEqual(Student.objects.get(id=self.st.id).avatar, f'u{st.id}.2')
+
+    def test_not_enough_coins(self):
+        from .models import CoinTransaction
+        CoinTransaction.objects.create(student=self.st, key='spend', kind='spend', amount=-1000, at=timezone.now())
+        self.client.post(reverse('shop_buy'), {'avatar': 'own'})
+        from . import avatars
+        self.assertFalse(avatars.has_own(Student.objects.get(id=self.st.id)))
+
+    def test_bad_file_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.post(reverse('shop_buy'), {'avatar': 'own'})
+        self.client.post(reverse('avatar_upload'), {'photo': SimpleUploadedFile('x.png', b'not an image')})
+        self.assertFalse(hasattr(Student.objects.get(id=self.st.id), 'custom_avatar'))
+
+    def test_teacher_removes_photo(self):
+        self.client.post(reverse('shop_buy'), {'avatar': 'own'})
+        self.client.post(reverse('avatar_upload'), {'photo': self.png()})
+        t = User.objects.create_user('own_t', password='p', is_staff=True)
+        Teacher.objects.create(user=t, full_name='Учитель', classes='7A')
+        self.client.login(username='own_t', password='p')
+        self.client.post(reverse('student_avatar_remove', args=[self.st.id]))
+        st = Student.objects.get(id=self.st.id)
+        self.assertEqual(st.avatar, '')
+        self.assertFalse(hasattr(st, 'custom_avatar'))
+        self.assertIn('own', st.owned_avatars)                                      # покупка осталась

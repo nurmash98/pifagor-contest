@@ -25,7 +25,8 @@ def student_avatar(context, solved=0, size=90, mini=False, uid='a', avatar=''):
     data = None
     if tier is not None:
         data = dict(tier, title=tier['kk'] if lang == 'kk' else tier['ru'])
-    return {'tier': data, 'size': size, 'img': static(pic['file']) if pic else '', 'mini': mini and data is not None, 'uid': uid,
+    img = static(pic['file']) if pic else (avatars.custom_url(avatar) or '')
+    return {'tier': data, 'size': size, 'img': img, 'mini': mini and data is not None, 'uid': uid,
             'emoji_size': int(size * 0.42), 'mini_w': int(size * 0.42), 'mini_h': int(size * 0.47)}
 
 

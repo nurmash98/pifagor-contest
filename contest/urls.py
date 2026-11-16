@@ -48,6 +48,8 @@ urlpatterns = [
     path('shop/', views.shop, name='shop'),
     path('shop/buy/', views.shop_buy, name='shop_buy'),
     path('shop/custom/', views.shop_custom, name='shop_custom'),
+    path('shop/avatar/', views.avatar_upload, name='avatar_upload'),
+    path('avatar/<int:sid>/<int:ver>.webp', views.custom_avatar_img, name='custom_avatar_img'),
 
     # Курсы
     path('courses/', views.courses_view, name='courses'),
@@ -150,4 +152,5 @@ urlpatterns = [
     path('teacher/students/create/', views.student_create, name='student_create'),
     path('teacher/students/<int:student_id>/edit/', views.student_edit, name='student_edit'),
     path('teacher/students/<int:student_id>/delete/', views.student_delete, name='student_delete'),
+    path('teacher/students/<int:student_id>/avatar/remove/', views.student_avatar_remove, name='student_avatar_remove'),
 ]

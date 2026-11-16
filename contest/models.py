@@ -968,3 +968,14 @@ class IslandCell(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['game', 'x', 'y'], name='unique_island_cell')]
         indexes = [models.Index(fields=['game', 'ver'])]
+
+
+class CustomAvatar(models.Model):
+    """«Свой аватар»: фото ученика, уже обрезанное до круга 256×256 (webp). Хранится в базе — на Render файлы не живут."""
+    student = models.OneToOneField(Student, on_delete=models.CASCADE, related_name='custom_avatar')
+    data = models.BinaryField()
+    version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Свой аватар: {self.student}'

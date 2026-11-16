@@ -32,7 +32,7 @@ CATALOG = [
     dict(key='av27', file='avatars/av-27.webp', kind='paid', price=350, ru='Аниме-геймер', kk='Аниме геймер'),
     dict(key='av28', file='avatars/av-28.webp', kind='paid', price=300, ru='Корги-пилот', kk='Ұшқыш корги'),
     dict(key='av29', file='avatars/av-29.webp', kind='paid', price=400, ru='Неоновый кот', kk='Неон мысық'),
-    dict(key='nurmash', file='avatars/nurmash-agai.webp', kind='paid', price=2500, ru='Нұрмаш ағай', kk='Нұрмаш ағай'),
+    dict(key='nurmash', file='avatars/nurmash-agai.webp', kind='paid', price=1000, ru='Нұрмаш ағай', kk='Нұрмаш ағай'),
     dict(key='ernar', file='avatars/ernar-agai.webp', kind='paid', price=1000, ru='Ернар ағай', kk='Ернар ағай'),
 ]
 BY_KEY = {a['key']: a for a in CATALOG}
@@ -58,3 +58,55 @@ def give(student, key):
 def get(key):
     a = BY_KEY.get(key or '')
     return a if a and a['file'] else None
+
+
+# «Свой аватар»: покупается один раз (токен OWN в owned_avatars), потом ученик загружает своё фото.
+# Выбранный свой аватар хранится в Student.avatar как «u<id ученика>.<версия>» — версия сбрасывает кеш браузера.
+OWN = 'own'
+OWN_PRICE = 2500
+OWN_TITLE = dict(ru='Свой аватар', kk='Өз аватарың')
+
+
+def has_own(student):
+    return bool(student) and OWN in owned(student)
+
+
+def custom_key(student):
+    """Ключ загруженного аватара ('u12.3') или '' если фото ещё не загружено."""
+    ca = getattr(student, 'custom_avatar', None) if student else None
+    return f'u{student.id}.{ca.version}' if ca else ''
+
+
+def custom_url(key):
+    """URL картинки по ключу 'u12.3' (или None, если это не свой аватар)."""
+    import re
+    from django.urls import reverse
+    m = re.fullmatch(r'u(\d+)\.(\d+)', key or '')
+    return reverse('custom_avatar_img', args=[int(m.group(1)), int(m.group(2))]) if m else None
+
+
+def process_upload(f):
+    """Фото -> круг 256×256 RGBA webp (байты). ValueError с понятным текстом, если файл не подходит."""
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
+    if f.size > 6 * 1024 * 1024:
+        raise ValueError('big')
+    try:
+        im = Image.open(f)
+        im.load()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ValueError('bad')
+    im = ImageOps.exif_transpose(im).convert('RGBA')
+    w, h = im.size
+    if min(w, h) < 64:
+        raise ValueError('small')
+    side = min(w, h)
+    im = im.crop(((w - side) // 2, (h - side) // 2, (w - side) // 2 + side, (h - side) // 2 + side))
+    big = im.resize((1024, 1024), Image.LANCZOS)
+    mask = Image.new('L', (1024, 1024), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, 1023, 1023), fill=255)
+    out = big.resize((256, 256), Image.LANCZOS)
+    out.putalpha(mask.resize((256, 256), Image.LANCZOS))
+    buf = BytesIO()
+    out.save(buf, 'WEBP', quality=88)
+    return buf.getvalue()

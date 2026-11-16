@@ -541,6 +541,10 @@ def profile_view(request):
     for a in avatar_module.available_for(student):
         avatar_options.append({'key': a['key'], 'img': static(a['file']), 'title': a['kk'] if lang == 'kk' else a['ru'],
                                'on': student.avatar == a['key']})
+    if avatar_module.has_own(student) and avatar_module.custom_key(student):
+        ck = avatar_module.custom_key(student)
+        avatar_options.append({'key': ck, 'img': avatar_module.custom_url(ck), 'title': 'Өз аватарың' if lang == 'kk' else 'Свой аватар',
+                               'on': student.avatar == ck})
 
     from . import banners as banner_module
     from . import coins as coin_module
@@ -576,6 +580,8 @@ def profile_avatar(request):
     if request.method == 'POST':
         key = request.POST.get('avatar', '')
         allowed = {a['key'] for a in avatar_module.available_for(student)}
+        if avatar_module.has_own(student) and avatar_module.custom_key(student):
+            allowed.add(avatar_module.custom_key(student))
         if key == '' or key in allowed:
             student.avatar = key
             student.save(update_fields=['avatar'])
@@ -626,8 +632,12 @@ def shop(request):
                             'price': a.get('price', 0), 'owned': a['kind'] == 'free' or a['key'] in my_avatars,
                             'short': max(a.get('price', 0) - bal, 0),
                             'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key'])})
+    own_ck = avatar_module.custom_key(student) if student else ''
+    own = {'price': avatar_module.OWN_PRICE, 'owned': avatar_module.has_own(student), 'short': max(avatar_module.OWN_PRICE - bal, 0),
+           'img': avatar_module.custom_url(own_ck) or '', 'key': own_ck, 'on': bool(student and own_ck and student.avatar == own_ck),
+           'title': avatar_module.OWN_TITLE['kk' if lang == 'kk' else 'ru']}
     history = list(CoinTransaction.objects.filter(student=student)[:15]) if student else []
-    return render(request, 'shop.html', {
+    return render(request, 'shop.html', {'own_avatar': own,
         'student': student, 'balance': bal, 'banners': banners, 'avatars': avatar_list, 'history': history,
         'rules': coin_module, 'awards': quarters.AWARD_COINS, 'award_rest': quarters.AWARD_COINS_REST, 'award_tail': quarters.AWARD_COINS_TAIL, 'republic_progress': min(banner_module.holiday_progress(student), banner_module.REPUBLIC_NEED),
         'republic_need': banner_module.REPUBLIC_NEED,
@@ -644,6 +654,15 @@ def shop_buy(request):
     if request.method == 'POST' and request.POST.get('avatar'):
         from . import avatars as avatar_module
         key = request.POST.get('avatar', '')
+        if key == avatar_module.OWN:
+            if avatar_module.has_own(student):
+                return redirect('avatar_upload')
+            if coin_module.spend(student, 'buy:avatar:own', avatar_module.OWN_PRICE, 'Свой аватар'):
+                avatar_module.give(student, avatar_module.OWN)
+                messages.success(request, 'Енді өз суретіңді жүкте!' if kk else 'Куплено! Теперь загрузите своё фото.')
+                return redirect('avatar_upload')
+            messages.warning(request, 'Тиын жетпейді.' if kk else 'Не хватает монет.')
+            return redirect('shop')
         item = avatar_module.BY_KEY.get(key)
         if item is None or item['kind'] != 'paid':
             messages.error(request, 'Бұл аватарды сатып алуға болмайды.' if kk else 'Этот аватар нельзя купить.')
@@ -1971,7 +1990,7 @@ def student_list(request):
     if restored:
         return restored
     classes = _managed_classes(request.user)
-    students = Student.objects.select_related('user')
+    students = Student.objects.select_related('user', 'custom_avatar')
     if classes is not None:
         students = students.filter(school_class__in=classes)
 
@@ -2071,6 +2090,23 @@ def student_delete(request, student_id):
         student.user.delete()  # каскадом удаляет Student и его Submission
         messages.success(request, f'Ученик «{name}» удалён.')
     return redirect('student_list')
+
+
+@staff_member_required
+def student_avatar_remove(request, student_id):
+    """Учитель убирает чужое неподходящее фото из «своего аватара» ученика (покупка остаётся — загрузит другое)."""
+    from .models import CustomAvatar
+    student = _managed_student_or_none(request, student_id)
+    if student is None:
+        messages.error(request, 'Это ученик не вашего класса.')
+        return redirect('student_list')
+    if request.method == 'POST':
+        CustomAvatar.objects.filter(student=student).delete()
+        if student.avatar.startswith('u'):
+            student.avatar = ''
+            student.save(update_fields=['avatar'])
+        messages.success(request, f'Фото аватара «{student.full_name}» убрано.')
+    return redirect(request.META.get('HTTP_REFERER') or 'student_list')
 
 
 @login_required
@@ -2268,3 +2304,58 @@ def student_coins(request, student_id):
     return render(request, 'student_coins.html', {
         'student': student, 'balance': coin_module.balance(student), 'grants': grants, 'max': GRANT_MAX,
     })
+
+
+@login_required
+def avatar_upload(request):
+    """«Свой аватар»: ученик (после покупки за 2500 монет) загружает своё фото — оно обрезается до круга."""
+    from . import avatars as avatar_module
+    from .models import CustomAvatar
+    student = get_object_or_404(Student, user=request.user)
+    kk = _get_content_lang(request) == 'kk'
+    if not avatar_module.has_own(student):
+        return redirect('shop')
+    if request.method == 'POST':
+        f = request.FILES.get('photo')
+        if request.POST.get('remove'):
+            CustomAvatar.objects.filter(student=student).delete()
+            if student.avatar.startswith('u'):
+                student.avatar = ''
+                student.save(update_fields=['avatar'])
+            messages.info(request, 'Сурет өшірілді.' if kk else 'Фото удалено.')
+            return redirect('avatar_upload')
+        if f is None:
+            messages.error(request, 'Файлды таңдаңыз.' if kk else 'Выберите файл с фото.')
+            return redirect('avatar_upload')
+        try:
+            data = avatar_module.process_upload(f)
+        except ValueError as e:
+            msg = {'big': ('Файл тым үлкен (6 МБ-қа дейін).', 'Файл слишком большой (до 6 МБ).'),
+                   'small': ('Сурет тым кішкентай.', 'Фото слишком маленькое.')}.get(
+                str(e), ('Бұл сурет емес немесе ашылмады. JPG/PNG/WEBP жүктеңіз.', 'Не получилось открыть фото. Загрузите JPG, PNG или WEBP.'))
+            messages.error(request, msg[0] if kk else msg[1])
+            return redirect('avatar_upload')
+        ca, created = CustomAvatar.objects.get_or_create(student=student, defaults={'data': data})
+        if not created:
+            ca.data = data
+            ca.version += 1
+            ca.save()
+        student.refresh_from_db()
+        student.avatar = f'u{student.id}.{ca.version}'
+        student.save(update_fields=['avatar'])
+        messages.success(request, 'Аватар жаңартылды!' if kk else 'Аватар обновлён и уже стоит в профиле!')
+        return redirect('profile')
+    key = avatar_module.custom_key(student)
+    return render(request, 'avatar_upload.html', {'student': student, 'img': avatar_module.custom_url(key) or '', 'on': student.avatar == key and bool(key)})
+
+
+@login_required
+def custom_avatar_img(request, sid, ver):
+    """Картинка своего аватара. Версия в адресе — для кеша браузера."""
+    from .models import CustomAvatar
+    ca = CustomAvatar.objects.filter(student_id=sid).only('data').first()
+    if ca is None:
+        raise Http404
+    r = HttpResponse(bytes(ca.data), content_type='image/webp')
+    r['Cache-Control'] = 'private, max-age=31536000, immutable'
+    return r

@@ -45,6 +45,12 @@
             <div class="d-flex gap-2">
                 <a href="{% url 'student_edit' student.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Изменить</a>
                 <a href="{% url 'student_coins' student.id %}" class="btn btn-outline-warning btn-sm rounded-pill px-3" title="Дать монеты"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> Монеты</a>
+                {% if student.custom_avatar %}
+                <form method="post" action="{% url 'student_avatar_remove' student.id %}" onsubmit="return confirm('Убрать загруженное фото аватара у «{{ student.full_name|escapejs }}»?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Убрать фото своего аватара">📸 Убрать фото</button>
+                </form>
+                {% endif %}
                 {% if not student.user.is_active %}
                 <form method="post" action="{% url 'student_toggle_block' student.id %}">
                     {% csrf_token %}
