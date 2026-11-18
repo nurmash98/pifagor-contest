@@ -45,6 +45,28 @@ HABITS = {
 _EN_COMMENT = re.compile(r"^[A-Za-z][A-Za-z0-9 ,.'()-]{8,}$")
 
 
+_BUILTINS = set(dir(__import__('builtins')))
+_TYPE_NAMES = {'int', 'float', 'str', 'bool', 'list', 'dict', 'set', 'tuple', 'None', 'Optional', 'List', 'Dict', 'Set',
+               'Tuple', 'Any', 'Union', 'Iterable', 'Sequence', 'bytes', 'complex'}
+
+
+def _is_type(node):
+    """Похоже ли выражение на тип: int, list[int], Optional[str], typing.List, None."""
+    if node is None:
+        return False
+    if isinstance(node, ast.Name):
+        return node.id in _TYPE_NAMES or node.id[:1].isupper()
+    if isinstance(node, ast.Constant):
+        return node.value is None
+    if isinstance(node, ast.Attribute):
+        return True
+    if isinstance(node, ast.Subscript):
+        return _is_type(node.value)
+    if isinstance(node, ast.BinOp):                     # int | None
+        return _is_type(node.left) and _is_type(node.right)
+    return False
+
+
 def _tree(code):
     try:
         return ast.parse(code or '')
@@ -85,10 +107,12 @@ def features(code):
         elif t == 'JoinedStr':
             out.add('fstring')
         elif t == 'AnnAssign':
-            out.add('annotations')
+            # настоящая аннотация: x: int = 5 / items: list[int]; опечатка вроде print:("lag") — не считается
+            if _is_type(node.annotation) and not (isinstance(node.target, ast.Name) and node.target.id in _BUILTINS):
+                out.add('annotations')
         elif t in ('FunctionDef', 'AsyncFunctionDef'):
             out.add('def')
-            if node.returns is not None or any(a.annotation is not None for a in node.args.args):
+            if _is_type(node.returns) or any(_is_type(a.annotation) for a in node.args.args):
                 out.add('annotations')
             if node.decorator_list:
                 out.add('decorator')

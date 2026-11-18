@@ -4849,6 +4849,10 @@ class AiSignalsTests(TestCase):
         keys = {k for k, _ in a.advanced_for(self.AI, '7A')}
         self.assertTrue({'main_guard', 'annotations', 'docstring', 'english_comments'} <= keys)
         self.assertEqual(a.advanced_for(self.KID, '7A'), [])
+        typo = 'ping = int(input())\nif ping < 50:\n    print("perfect")\nelse:\n    print:("lag")\n'
+        self.assertEqual(a.advanced_for(typo, '6N'), [])                               # опечатка print:(...) — не аннотация
+        self.assertIn('annotations', a.features('x: int = 5\n'))
+        self.assertIn('annotations', a.features('def f(a: list[int]) -> None:\n    pass\n'))
         self.assertEqual(a.advanced_for('print([x for x in range(3)])', '7A'), [])      # списковые включения — норма
         comp = 'a = [int(x) for x in input().split()]\nprint(sum(a))\n'
         self.assertEqual(a.new_habits('print(sum([int(x) for x in input().split()]))\n# сумма\n# ответ\n', [comp] * 5),
