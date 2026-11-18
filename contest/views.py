@@ -2237,7 +2237,9 @@ def grade_submission(request, submission_id):
     if submission.task.test_cases and _autotest_is_stale(submission):
         _refresh_autotests(submission)
 
+    from .ai_signals import for_submission
     return render(request, 'grade_submission.html', {
+        'ai_reasons': for_submission(submission) if submission.code else [],
         'submission': submission,
         'grading_attempt': grading_attempt,
         'attempts': submission.attempts.all(),

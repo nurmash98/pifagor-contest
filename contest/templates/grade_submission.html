@@ -72,6 +72,14 @@
                 </div>
                 {% endif %}
 
+                {% if ai_reasons %}
+                <div class="mt-4 p-3 rounded-3" style="background:#fff7ed;border:1px solid #fdba74;color:#7c2d12">
+                    <h6 class="fw-bold mb-1">🤖 Признаки ИИ — только подсказка</h6>
+                    <ul class="small mb-1 ps-3">{% for r in ai_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+                    <div class="small">Попросите ученика объяснить код своими словами — это надёжнее любой автоматической проверки.</div>
+                </div>
+                {% endif %}
+
                 {% if submission.autotest_checked_at and submission.autotest_total %}
                 <div class="mt-4">
                     <h6 class="fw-bold d-flex align-items-center gap-2">

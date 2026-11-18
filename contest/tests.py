@@ -4833,3 +4833,53 @@ class TeacherMyClassesTests(TestCase):
     def test_students_cannot_open(self):
         self.client.login(username='mc_s', password='p')
         self.assertNotEqual(self.client.get(reverse('teacher_my_classes')).status_code, 200)
+
+
+class AiSignalsTests(TestCase):
+    """Признаки ИИ: приёмы не по уровню, новые привычки, одинаковые решения у разных учеников."""
+    AI = ('import sys\n\ndef main() -> None:\n    """Read two numbers and print their sum."""\n    # Read input values\n'
+          '    a, b = map(int, sys.stdin.readline().split())\n    # Print the result\n    print(f"{a + b}")\n\n'
+          'if __name__ == "__main__":\n    main()\n')
+    KID = 'a = int(input())\nb = int(input())\nprint(a + b)\n'
+    LOOP = ('n = int(input())\ns = 0\nfor i in range(n):\n    x = int(input())\n    if x % 2 == 0:\n        s = s + x\n'
+            '    else:\n        s = s - x\nprint(s)\nif s > 10:\n    print("big")\nelse:\n    print("small")\n')
+
+    def test_features(self):
+        from . import ai_signals as a
+        keys = {k for k, _ in a.advanced_for(self.AI, '7A')}
+        self.assertTrue({'main_guard', 'annotations', 'docstring', 'english_comments'} <= keys)
+        self.assertEqual(a.advanced_for(self.KID, '7A'), [])
+        self.assertEqual(a.advanced_for('print([x for x in range(3)])', '7A'), [])      # списковые включения — норма
+        comp = 'a = [int(x) for x in input().split()]\nprint(sum(a))\n'
+        self.assertEqual(a.new_habits('print(sum([int(x) for x in input().split()]))\n# сумма\n# ответ\n', [comp] * 5),
+                         [('comments', 'комментарии')])                                   # кто уже писал так — не новость
+        self.assertEqual(a.new_habits(self.AI, [self.KID] * 3), [])                    # мало истории — не судим
+        self.assertGreaterEqual(len(a.new_habits(self.AI, [self.KID] * 5)), 2)
+
+    def test_twins_ignore_names_and_comments(self):
+        from . import ai_signals as a
+        renamed = self.LOOP.replace('s = ', 'total = ').replace('s + x', 'total + x').replace('s - x', 'total - x') \
+            .replace('print(s)', 'print(total)').replace('if s >', 'if total >') + '# готово\n'
+        self.assertEqual(a.twins([(1, 9, self.LOOP), (2, 9, renamed), (3, 9, self.KID)]), {(1, 9): [2], (2, 9): [1]})
+        self.assertEqual(a.twins([(1, 9, self.KID), (2, 9, self.KID)]), {})              # короткие решения не сравниваем
+
+    def test_suspicious_page_and_grade_page(self):
+        from .models import Submission
+        tu = User.objects.create_user('ai_t', password='p', is_staff=True)
+        Teacher.objects.create(user=tu, full_name='Уч', classes='7A')
+        s1 = Student.objects.create(user=User.objects.create_user('ai_1', password='p'), full_name='Первый', school_class='7A')
+        s2 = Student.objects.create(user=User.objects.create_user('ai_2', password='p'), full_name='Второй', school_class='7A')
+        tag = Tag.objects.create(name='ии')
+        task = make_task('Сумма чётных', 'A', tag)
+        sub = Submission.objects.create(student=s1, task=task, code=self.LOOP, score=10)
+        Submission.objects.create(student=s2, task=task, code=self.LOOP.replace('x', 'y'), score=10)
+        own = Submission.objects.create(student=s1, task=make_task('Сумма', 'A', tag), code=self.AI, score=10)
+        self.client.login(username='ai_t', password='p')
+        r = self.client.get(reverse('suspicious_students'))
+        self.assertContains(r, 'Возможен ИИ')
+        self.assertContains(r, 'Почти такой же код у: Второй')
+        r = self.client.get(reverse('grade_submission', args=[own.id]))
+        self.assertContains(r, 'Признаки ИИ')
+        self.assertContains(r, 'аннотации типов')
+        r = self.client.get(reverse('grade_submission', args=[sub.id]))
+        self.assertContains(r, 'Почти такой же код у: Второй (7A)')

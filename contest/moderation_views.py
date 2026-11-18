@@ -85,9 +85,15 @@ def suspicious_students(request):
     if classes is not None:
         students = students.filter(school_class__in=classes)
     reasons = _reasons(students)
+    from .ai_signals import analyse_cached
+    ai = analyse_cached(students)
+    # ИИ: в список попадает тот, у кого 2+ решения с признаками или чьё решение почти совпало с чужим
+    ai = {sid: items for sid, items in ai.items()
+          if len(items) >= 2 or any(r.startswith('Почти такой же') for it in items for r in it['reasons'])}
     rows = []
-    for st in students.filter(id__in=list(reasons)).order_by('school_class', 'full_name'):
-        rows.append({'student': st, 'reasons': reasons[st.id], 'count': len(reasons[st.id]),
+    for st in students.filter(id__in=list(set(reasons) | set(ai))).order_by('school_class', 'full_name'):
+        own = reasons.get(st.id, [])
+        rows.append({'student': st, 'reasons': own, 'ai': ai.get(st.id, []), 'count': len(own) + (1 if st.id in ai else 0),
                      'blocked': not st.user.is_active, 'until': st.blocked_until})
     rows.sort(key=lambda r: -r['count'])
     return render(request, 'suspicious_students.html', {'rows': rows})
