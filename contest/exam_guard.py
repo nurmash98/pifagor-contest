@@ -79,6 +79,25 @@ def _student_attempt(request, exam_id, retake_id=None):
     return exam, retake, attempt
 
 
+SHELL_TEXTS = {
+    'out': 'Вы вышли из полноэкранного режима',
+    'outText': 'Работа скрыта. Вернитесь в полноэкранный режим, чтобы продолжить.',
+    'left': 'Осталось выходов:',
+    'last': 'Это был последний выход — при следующем работа завершится автоматически.',
+    'back': 'Вернуться в полноэкранный режим',
+    'other': 'Работа открыта в другом браузере',
+    'noFs': 'На этом устройстве нет полноэкранного режима. Откройте работу на компьютере в Chrome или Edge.',
+    'all': 'Все',
+    'allTitle': 'Все задачи и итог',
+}
+
+
+def _shell_texts():
+    """Тексты оболочки на обоих языках — чтобы переключать RU/KZ без перезагрузки страницы (она считалась бы выходом)."""
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    return {'ru': dict(SHELL_TEXTS), 'kk': {k: UI_TRANSLATIONS.get(v, v) for k, v in SHELL_TEXTS.items()}}
+
+
 @login_required
 def exam_run(request, exam_id, retake_id=None):
     if request.user.is_staff:
@@ -108,8 +127,19 @@ def exam_run(request, exam_id, retake_id=None):
     return render(request, 'exam_run.html', {
         'exam': exam, 'retake': retake, 'attempt': attempt, 'window': retake or exam,
         'frame_url': detail_url(attempt), 'tabs': tabs,
-        'exits': attempt.exits, 'max_exits': MAX_EXITS,
+        'exits': attempt.exits, 'max_exits': MAX_EXITS, 'i18n_json': json.dumps(_shell_texts()),
     })
+
+
+@login_required
+@require_POST
+def exam_lang(request, attempt_id):
+    """RU/KZ внутри работы: только запоминаем язык условий в сессии, страница и полный экран не перезагружаются."""
+    _own_attempt(request, attempt_id)
+    lang = request.POST.get('lang')
+    if lang in ('ru', 'kk'):
+        request.session['content_lang'] = lang
+    return JsonResponse({'ok': lang in ('ru', 'kk'), 'lang': lang})
 
 
 def _own_attempt(request, attempt_id):

@@ -3023,6 +3023,27 @@ class ExamFullscreenTests(RetakeTestBase):
         self.assertContains(r, 'data-active="1"')
         self.assertNotEqual(r.headers.get('X-Frame-Options'), 'DENY')
 
+    def test_language_switch_inside_work(self):
+        r = self.client.get(reverse('exam_run', args=[self.live.id]))
+        self.assertContains(r, 'data-l="ru"')
+        self.assertContains(r, 'data-l="kk"')
+        import json
+        tx = json.loads(r.context['i18n_json'])                              # тексты оболочки есть на обоих языках
+        self.assertEqual(tx['ru']['back'], 'Вернуться в полноэкранный режим')
+        self.assertNotEqual(tx['kk']['back'], tx['ru']['back'])
+        self.assertEqual(set(tx['ru']), set(tx['kk']))
+        url = reverse('exam_lang', args=[self.att.id])
+        self.assertEqual(self.client.post(url, {'lang': 'kk'}).json(), {'ok': True, 'lang': 'kk'})
+        self.assertEqual(self.client.session['content_lang'], 'kk')
+        self.assertFalse(self.client.post(url, {'lang': 'zz'}).json()['ok'])
+        self.assertEqual(self.client.session['content_lang'], 'kk')
+        self.att.refresh_from_db()
+        self.assertEqual(self.att.exits, 0)                                  # смена языка — не выход
+        self.assertEqual(self.client.get(url).status_code, 405)
+        other = Student.objects.exclude(id=self.st.id).first()
+        self.client.force_login(other.user)
+        self.assertEqual(self.client.post(url, {'lang': 'ru'}).status_code, 404)   # чужую попытку трогать нельзя
+
     def test_shell_has_task_tabs_and_no_exit_counting(self):
         r = self.client.get(reverse('exam_run', args=[self.live.id]))
         self.assertContains(r, 'Войти в полноэкранный режим')

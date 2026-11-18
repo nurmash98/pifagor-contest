@@ -16,6 +16,10 @@
         #tabs a:hover { background: #374151; }
         #tabs a.on { background: #fbbf24; color: #111827; }
         #tabs a.all { font-weight: 600; font-size: 13px; }
+        #lang { display: flex; gap: 2px; background: #1f2937; border-radius: 8px; padding: 2px; flex: 0 0 auto; }
+        #lang button { border: 0; background: transparent; color: #cbd5e1; font-weight: 700; font-size: 13px; padding: 4px 11px; border-radius: 6px; cursor: pointer; }
+        #lang button.on { background: #fbbf24; color: #111827; }
+        #lang button:disabled { opacity: .6; cursor: wait; }
         #frame { display: block; width: 100%; height: calc(100% - 46px); border: 0; background: #fff; }
         #gate { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px;
                 background: rgba(15, 23, 42, .97); color: #f8fafc; }
@@ -31,6 +35,7 @@
         <a href="{{ frame_url }}" class="all" data-url="{{ frame_url }}" title="{% t "Все задачи и итог" %}">≡ {% t "Все" %}</a>
         {% for tab in tabs %}<a href="{{ tab.url }}" data-url="{{ tab.url }}" title="{{ tab.title }}">{{ tab.letter }}</a>{% endfor %}
     </nav>
+    <div id="lang" title="{% t "Язык условий задач" %}"><button type="button" data-l="ru" class="{% if content_lang != 'kk' %}on{% endif %}">RU</button><button type="button" data-l="kk" class="{% if content_lang == 'kk' %}on{% endif %}">KZ</button></div>
 </div>
 <iframe id="frame" title="{{ exam.title }}"></iframe>
 
@@ -46,15 +51,7 @@
 <script>
 (function () {
     var armUrl = '{% url "exam_arm" attempt.id %}', exitUrl = '{% url "exam_exit" attempt.id %}', maxExits = {{ max_exits }}, exits = {{ exits }}, frameUrl = '{{ frame_url }}', csrf = '{{ csrf_token }}';
-    var TXT = {
-        out: '{% t "Вы вышли из полноэкранного режима" %}',
-        outText: '{% t "Работа скрыта. Вернитесь в полноэкранный режим, чтобы продолжить." %}',
-        left: '{% t "Осталось выходов:" %}',
-        last: '{% t "Это был последний выход — при следующем работа завершится автоматически." %}',
-        back: '{% t "Вернуться в полноэкранный режим" %}',
-        other: '{% t "Работа открыта в другом браузере" %}',
-        noFs: '{% t "На этом устройстве нет полноэкранного режима. Откройте работу на компьютере в Chrome или Edge." %}'
-    };
+    var I18N = {{ i18n_json|safe }}, lang = '{% if content_lang == "kk" %}kk{% else %}ru{% endif %}', TXT = I18N[lang];
     var gate = document.getElementById('gate'), btn = document.getElementById('gate-btn'), frame = document.getElementById('frame');
     var tabs = document.querySelectorAll('#tabs a');
     var root = document.documentElement, canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
@@ -92,6 +89,49 @@
         state = 'in'; gate.style.display = 'none';
         try { frame.focus(); } catch (e) {}
     }
+
+    // ---- Язык условий RU/KZ: без перезагрузки страницы (перезагрузка считалась бы выходом) ----
+    var langBtns = document.querySelectorAll('#lang button'), langUrl = '{% url "exam_lang" attempt.id %}';
+    function savedCode(doc) {
+        try {
+            var cm = doc.querySelector('.CodeMirror');
+            if (cm && cm.CodeMirror) { return cm.CodeMirror.getValue(); }
+            var ta = doc.querySelector('textarea[name=code]');
+            return ta ? ta.value : null;
+        } catch (e) { return null; }
+    }
+    function restoreCode(doc, code) {
+        try {
+            var cm = doc.querySelector('.CodeMirror');
+            if (cm && cm.CodeMirror) { cm.CodeMirror.setValue(code); return; }
+            var ta = doc.querySelector('textarea[name=code]');
+            if (ta) { ta.value = code; ta.dispatchEvent(new Event('input', {bubbles: true})); }
+        } catch (e) {}
+    }
+    langBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+            var l = b.getAttribute('data-l');
+            if (l === lang || state !== 'in') { return; }
+            langBtns.forEach(function (x) { x.disabled = true; });
+            var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf); fd.append('lang', l);
+            fetch(langUrl, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+                if (!d.ok) { return; }
+                lang = l; TXT = I18N[l]; document.documentElement.lang = l;
+                langBtns.forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-l') === l); });
+                var all = document.querySelector('#tabs a.all');
+                if (all) { all.textContent = '≡ ' + TXT.all; all.title = TXT.allTitle; }
+                var doc, win, code = null, href = frameUrl;
+                try { win = frame.contentWindow; doc = frame.contentDocument; code = savedCode(doc); href = win.location.pathname + win.location.search; } catch (e) {}
+                if (code !== null) {      // набранный код не теряем: после обновления условия вернём его в редактор
+                    frame.addEventListener('load', function once() {
+                        frame.removeEventListener('load', once);
+                        setTimeout(function () { try { restoreCode(frame.contentDocument, code); } catch (e) {} }, 400);
+                    });
+                }
+                frame.src = href;
+            }).catch(function () {}).then(function () { langBtns.forEach(function (x) { x.disabled = false; }); });
+        });
+    });
 
     // ---- Вкладки задач: A, B, C… открываются внутри рамки ----
     tabs.forEach(function (a) {
