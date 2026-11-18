@@ -166,7 +166,7 @@
     var TXT = {{ i18n|safe }}, MAX_EXITS = {{ max_exits }};
     var U = {state: '{% url "island_state" game.id %}', arm: '{% url "island_arm" game.id %}', exit: '{% url "island_exit" game.id %}',
              move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}', khan: '{% url "island_khan" game.id %}'};
-    var EMPIRE = '{{ game.variant }}' === 'empire', empSig = '', seenOffers = {};
+    var EMPIRE = '{{ game.variant }}' === 'empire', empSig = '', seenOffers = {}, lastRestarts = null;
     var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
     var ver = 0, status = '{{ game.status }}', left = 0, me = null, teams = [], scores = {}, kicked = {{ player.kicked|yesno:"true,false" }};
     var fs = 'gate', armed = false, busy = false, challenge = null, coolUntil = 0, finalShown = false;
@@ -298,19 +298,35 @@
         var E = map.state.empire;
         if (!E || !me || status === 'lobby') { $('emp').style.display = 'none'; return; }
         var my = E.teams[me.team] || {}, isKhan = my.khan === me.id, rows = [];
+        // столицы нет: хан выбирает клетку на карте, остальные ждут
+        if (!my.capital && status === 'running' && !kicked) {
+            var own = [], k;
+            for (k in map.state.cells) { if (map.state.cells[k] === me.team) { own.push(k.split(',').map(Number)); } }
+            map.setPick(isKhan ? own : null);
+            $('banner').textContent = '👑 ' + (my.restarts && my.restarts !== lastRestarts ? TXT.capital_lost + ' ' : '') + (isKhan ? TXT.capital_hint : TXT.wait_khan);
+            $('banner').style.background = '#78350f'; $('banner').style.display = 'block';
+        } else if (!kicked) {
+            map.setPick(null);
+            if ($('banner').style.background) { $('banner').style.display = 'none'; $('banner').style.background = ''; }
+        }
+        if (my.restarts && my.restarts !== lastRestarts && lastRestarts !== null) { toast('⚠️ ' + TXT.capital_lost, 'bad'); }
+        lastRestarts = my.restarts || 0;
         // новые предложения союза — всплывающее уведомление
         (E.offers || []).forEach(function (o) {
             var k = o[0] + '>' + o[1];
             if (o[1] === me.team && !seenOffers[k]) { seenOffers[k] = true; toast('🤝 ' + tinfo(o[0]).name + ' ' + TXT.offer_in, 'good'); }
         });
-        var sig = JSON.stringify([E, me.team, me.id, map.state.players.map(function (p) { return [p[0], p[3], p[4]]; }), Math.floor(Date.now() / 5000)]);
+        var sig = JSON.stringify([E, me.team, me.id, me.x, me.y, map.state.players.map(function (p) { return [p[0], p[3], p[4]]; }), Math.floor(Date.now() / 5000)]);
         if (sig === empSig) { return; }
         empSig = sig;
         var h = '<h4>' + TXT.empire + '</h4>';
         h += '<div class="role' + (isKhan ? ' khan' : '') + '">' + (isKhan ? '👑 ' + TXT.you_khan : '⚔️ ' + TXT.sarbaz + ' · ' + TXT.your_khan + ': ' + esc(pname(my.khan))) + '</div>';
-        if (my.capital) { h += '<div class="hint">🏰 ' + TXT.capital + ' ✓</div>'; }
-        else if (isKhan) { h += '<div class="hint">' + (my.built ? TXT.capital_lost_hint : TXT.capital_hint) + '</div><button class="sbtn gold" data-k="capital">🏰 ' + TXT.capital_btn + '</button>'; }
-        else { h += '<div class="hint">🏰 ' + TXT.no_capital + '</div>'; }
+        if (my.capital) {
+            h += '<div class="hint">🏰 ' + TXT.capital + ' ✓</div>';
+            var onCity = map.state.map && map.state.map.rows[me.y].charAt(me.x) === 'C' && map.state.cells[me.x + ',' + me.y] === me.team &&
+                         !(my.capital[0] === me.x && my.capital[1] === me.y);
+            if (isKhan) { h += onCity ? '<button class="sbtn gold" data-k="capital">🏰 ' + TXT.capital_btn + '</button>' : '<div class="hint">' + TXT.move_hint + '</div>'; }
+        } else { h += '<div class="hint">🏰 ' + (isKhan ? TXT.pick_capital : TXT.no_capital) + '</div>'; }
         if (isKhan) {
             var mates = map.state.players.filter(function (p) { return p[3] === me.team && p[0] !== me.id && !p[4]; });
             h += '<div class="hint" style="margin-top:10px">' + TXT.changes_left + ' <b>' + my.changes_left + '</b></div>';
@@ -366,6 +382,15 @@
     function canPlay() { return status === 'running' && !kicked && fs === 'in' && !busy; }
     function step(x, y) {
         if (!canPlay() || $('modal').style.display === 'flex') { return; }
+        if (EMPIRE && map.picking()) {                    // хан выбирает, где строить столицу
+            busy = true;
+            post(U.khan, {action: 'capital', x: x, y: y}).then(function (d) {
+                busy = false;
+                if (d.ok) { toast(TXT.capital_ok, 'good'); map.setPick(null); empSig = ''; ver = 0; poll(); }
+                else { toast(TXT[d.error] || TXT.bad_target, 'bad'); }
+            }).catch(function () { busy = false; });
+            return;
+        }
         var ow = map.state.cells[x + ',' + y], own = ow === me.team || (EMPIRE && ow !== undefined && map.relation(ow, me.team) === 'ally');
         var c = Math.ceil((coolUntil - Date.now()) / 1000);
         if (c > 0 && !own) { toast(TXT.cooldown + ': ' + c + ' ' + TXT.sec, 'bad'); return; }
@@ -418,7 +443,7 @@
             } else if (d.error === 'cooldown') { coolUntil = Date.now() + d.wait * 1000; }
             else if (d.error === 'kicked') { setKicked(); }
             else if (d.error === 'over') { closeModal(); poll(); }
-            else if (d.error === 'taken' || d.error === 'truce' || d.error === 'border') { closeModal(); challenge = null; toast(TXT[d.error], 'bad'); poll(); }
+            else if (d.error === 'taken' || d.error === 'truce' || d.error === 'border' || d.error === 'wait_capital') { closeModal(); challenge = null; toast(TXT[d.error], 'bad'); poll(); }
             else { $('m-msg').textContent = TXT[d.error] || TXT.unavailable; $('m-msg').className = 'bad'; $('m-go').disabled = false; }
         }).catch(function () { busy = false; $('m-go').disabled = false; $('m-go').textContent = TXT.check; $('m-msg').textContent = TXT.unavailable; $('m-msg').className = 'bad'; });
     }

@@ -4470,6 +4470,14 @@ class EmpireGameTests(TestCase):
         self.game = island.start(self.game, random.Random(2))
         return island
 
+    def _capitals(self):
+        """Ханы всех команд строят столицы там, где стоят (без столицы команда не ходит)."""
+        from . import empire
+        for t in list(self.game.empire['teams']):
+            k = self._khan(int(t))
+            self.assertEqual(empire.build_capital(self.game, k)['ok'], True)
+        self.game.refresh_from_db()
+
     def _set(self, x, y, kind):
         rows = [list(r) for r in self.game.map['rows']]
         rows[y][x] = kind
@@ -4486,10 +4494,17 @@ class EmpireGameTests(TestCase):
         return IslandPlayer.objects.get(pk=self.game.empire['teams'][str(team)]['khan'])
 
     def _free_neighbour(self, island, p):
-        owned = {(c.x, c.y) for c in self.game.cells.all()}
-        for n in island.neighbors(self.game, p.x, p.y):
-            if n not in owned and 0 < n[0] < self.game.map['w'] - 1 and 0 < n[1] < self.game.map['h'] - 1:
-                return n
+        """Ничья клетка рядом с игроком; если рядом нет — ставим игрока на свою клетку у края земли."""
+        owned = {(c.x, c.y): c.team for c in self.game.cells.all()}
+        inside = lambda n: 0 < n[0] < self.game.map['w'] - 1 and 0 < n[1] < self.game.map['h'] - 1
+        spots = [(p.x, p.y)] + [c for c, t in owned.items() if t == p.team]
+        for spot in spots:
+            for n in island.neighbors(self.game, *spot):
+                if n not in owned and inside(n):
+                    if spot != (p.x, p.y):
+                        p.x, p.y = spot
+                        p.save(update_fields=['x', 'y'])
+                    return n
         return None
 
     def test_start_gives_hex_map_khans_and_seven_cells(self):
@@ -4513,6 +4528,10 @@ class EmpireGameTests(TestCase):
         from . import empire
         island = self._run()
         p = self.game.players.filter(team=0).first()
+        land = [n for n in island.neighbors(self.game, p.x, p.y) if island.terrain(self.game, *n) != island.WATER]
+        self.assertEqual(island.move(self.game, p, *land[0]), {'error': 'wait_capital'})
+        self._capitals()
+        p.refresh_from_db()
         n = self._free_neighbour(island, p)
         self._set(*n, '.')
         res = island.move(self.game, p, *n)
@@ -4521,7 +4540,7 @@ class EmpireGameTests(TestCase):
         self.assertEqual(p.challenge['kind'], 'output')
         self.assertEqual(island.answer(self.game, p, p.challenge['answer'])['ok'], True)
         self.game.refresh_from_db()
-        self.assertEqual(self.game.scores['0'], 8)
+        self.assertEqual(self.game.scores['0'], 8 + empire.CAPITAL_PTS)
         # вражеская клетка рядом: со своей земли — можно (задача сложнее), с ничьей — нельзя
         p.refresh_from_db()
         m = self._free_neighbour(island, p)
@@ -4535,6 +4554,7 @@ class EmpireGameTests(TestCase):
     def test_alliance_walk_break_and_truce(self):
         from . import empire
         island = self._run()
+        self._capitals()
         k0, k1 = self._khan(0), self._khan(1)
         sarbaz = self.game.players.filter(team=0).exclude(pk=k0.pk).first()
         self.assertEqual(empire.diplomacy(self.game, sarbaz, 'propose', 1), {'error': 'notkhan'})
@@ -4560,6 +4580,7 @@ class EmpireGameTests(TestCase):
     def test_city_takes_seven_cells_but_not_allied(self):
         from . import empire
         island = self._run()
+        self._capitals()
         p = self.game.players.filter(team=0).first()
         n = self._free_neighbour(island, p)
         self._set(*n, empire.CITY)
@@ -4584,32 +4605,70 @@ class EmpireGameTests(TestCase):
         self.assertEqual(owner[n], 0)
         self.assertEqual(owner[enemy_cell], 0)                               # враг потерял клетку
         self.assertEqual(owner[ally_cell], 1)                                # союзника не трогаем
-        self.assertEqual(self.game.scores['0'], sum(5 if c == n else 1 for c, t in owner.items() if t == 0))
+        self.assertEqual(self.game.scores['0'], sum(5 if c == n else 1 for c, t in owner.items() if t == 0) + empire.CAPITAL_PTS)
 
-    def test_capital_build_lose_and_rebuild_only_in_city(self):
+    def test_capital_first_then_move_only_to_city(self):
         from . import empire
         island = self._run()
         k0 = self._khan(0)
         sarbaz = self.game.players.filter(team=0).exclude(pk=k0.pk).first()
         self.assertEqual(empire.build_capital(self.game, sarbaz), {'error': 'notkhan'})
-        self.assertEqual(empire.build_capital(self.game, k0), {'ok': True})
+        foreign = self.game.cells.filter(team=1).first()
+        self.assertEqual(empire.build_capital(self.game, k0, foreign.x, foreign.y), {'error': 'not_own'})
+        spot = self.game.cells.filter(team=0).exclude(x=k0.x, y=k0.y).first()
+        self.assertEqual(empire.build_capital(self.game, k0, spot.x, spot.y), {'ok': True, 'first': True})
         self.game.refresh_from_db()
         self.assertEqual(self.game.scores['0'], 7 + empire.CAPITAL_PTS)
-        self.assertEqual(empire.build_capital(self.game, k0), {'error': 'has_capital'})
+        for p in self.game.players.filter(team=0):                            # вся команда встала в столицу
+            self.assertEqual((p.x, p.y), (spot.x, spot.y))
+        other = self.game.cells.filter(team=0).exclude(x=spot.x, y=spot.y).first()
+        self.assertEqual(empire.build_capital(self.game, k0, other.x, other.y), {'error': 'need_city'})
+        self._set(other.x, other.y, empire.CITY)
+        self.assertEqual(empire.build_capital(self.game, k0, other.x, other.y), {'ok': True, 'first': False})
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.empire['teams']['0']['capital'], [other.x, other.y])
+
+    def test_capturing_capital_takes_whole_empire_and_victim_restarts(self):
+        from . import empire
+        island = self._run()
+        self._capitals()
         cap = tuple(self.game.empire['teams']['0']['capital'])
-        # враг берёт столицу «городской» задачей; фишки команды 0 на ней уходят на свои клетки
+        before0 = {(c.x, c.y) for c in self.game.cells.filter(team=0)}
+        self.assertEqual(len(before0), 7)
         enemy = self.game.players.filter(team=1).first()
-        self.assertTrue(empire.move_rule(self.game, enemy, cap[0], cap[1], 0).get('city') or
-                        empire.move_rule(self.game, enemy, cap[0], cap[1], 0).get('error') == 'border')
         empire.capture(self.game, enemy, {'x': cap[0], 'y': cap[1], 'city': True, 'points': 5})
         self.game.refresh_from_db()
+        owner = {(c.x, c.y): c.team for c in self.game.cells.all()}
+        self.assertTrue(all(owner[c] == 1 for c in before0))                  # вся бывшая земля — захватчику
+        new0 = [c for c, t in owner.items() if t == 0]
+        self.assertEqual(len(new0), empire.START_CELLS)                       # и сразу 7 новых клеток
+        self.assertFalse(set(new0) & before0)
         self.assertIsNone(self.game.empire['teams']['0']['capital'])
-        k0.refresh_from_db()
-        self.assertNotEqual((k0.x, k0.y), cap)
-        if self.game.cells.filter(team=0, x=k0.x, y=k0.y).exists():
-            self.assertEqual(empire.build_capital(self.game, k0), {'error': 'need_city'})
-            self._set(k0.x, k0.y, empire.CITY)
-            self.assertEqual(empire.build_capital(self.game, k0), {'ok': True})
+        self.assertEqual(self.game.empire['teams']['0']['restarts'], 1)
+        for p in self.game.players.filter(team=0):
+            self.assertIn((p.x, p.y), new0)
+            self.assertEqual(empire.move_rule(self.game, p, p.x, p.y, 0), {'error': 'wait_capital'})
+        k0 = self._khan(0)
+        self.assertEqual(empire.build_capital(self.game, k0, *new0[0])['ok'], True)   # снова любая своя клетка
+
+    def test_restart_takes_cells_from_captor_when_no_free_land(self):
+        from . import empire
+        from .models import IslandCell
+        island = self._run()
+        self._capitals()
+        # вся ничья суша — у команды 1: свободных клеток нет
+        for y, row in enumerate(self.game.map['rows']):
+            for x, ch in enumerate(row):
+                if ch != island.WATER and not IslandCell.objects.filter(game=self.game, x=x, y=y).exists():
+                    IslandCell.objects.create(game=self.game, x=x, y=y, team=1, ver=1)
+        cap = tuple(self.game.empire['teams']['0']['capital'])
+        enemy = self.game.players.filter(team=1).first()
+        empire.capture(self.game, enemy, {'x': cap[0], 'y': cap[1], 'city': True, 'points': 5})
+        self.game.refresh_from_db()
+        mine = self.game.cells.filter(team=0)
+        self.assertEqual(mine.count(), empire.START_CELLS)
+        cap1 = tuple(self.game.empire['teams']['1']['capital'])
+        self.assertFalse(mine.filter(x=cap1[0], y=cap1[1]).exists())          # столицу захватчика не отдают
 
     def test_khan_changes_limited_and_kicked_khan_passes_crown(self):
         from . import empire

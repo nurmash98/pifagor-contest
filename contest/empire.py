@@ -3,12 +3,18 @@
 из истории Казахстана. В каждой команде один хан 👑 (остальные — сарбазы): он строит столицу, назначает
 нового хана (не больше MAX_KHAN_CHANGES раз за игру) и решает с другими ханами — союз или война.
 
+Начало: хан выбирает одну из своих 7 клеток под столицу — пока столицы нет, команда не ходит;
+когда столица построена, вся команда встаёт в неё. Позже хан может перенести столицу в свой город.
+
 Правила захвата:
   • ничья клетка — задача, как в «Острове» (трава — «что выведет код», лес — программа уровня A);
   • вражеская клетка — на уровень сложнее и только с края своей земли; во время перемирия — нельзя;
   • по своей и союзной земле ходят свободно, союзную землю захватить нельзя;
-  • город (особая клетка) и вражеская столица — сложная задача уровня C: клетка и 6 клеток вокруг
-    становятся вашими (кроме союзных клеток и чужих столиц).
+  • город (особая клетка) — сложная задача уровня C: клетка и 6 клеток вокруг становятся вашими
+    (кроме союзных клеток и чужих столиц);
+  • вражеская столица — тоже задача уровня C, но забирает ВСЮ землю той империи. Она начинает с нуля:
+    ей сразу даются 7 ничьих клеток (если ничьих не хватает — недостающие забираются у захватчика),
+    и её хан снова выбирает столицу.
 Очки: клетка 1, город 5, своя столица ещё +5."""
 import random
 from datetime import timedelta
@@ -149,6 +155,8 @@ def recount(game, cells=None):
 def move_rule(game, player, x, y, owner, now=None):
     """Что будет при шаге на (x, y): {'walk': True} | {'error': ...} | {'level', 'points', 'enemy', 'city'}."""
     from .island import POINTS, terrain, _owner
+    if not capital(game, player.team):
+        return {'error': 'wait_capital'}          # пока хан не выбрал столицу, команда стоит
     if owner == player.team or (owner is not None and relation(game, owner, player.team) == 'ally'):
         return {'walk': True}
     if owner is not None:
@@ -175,8 +183,14 @@ def capture(game, player, ch):
         cells = {(c.x, c.y): c for c in IslandCell.objects.filter(game=game)}
         caps = capitals(game)
         before = recount(game, list(cells.values())).get(str(player.team), 0)
-        targets = [(x, y)]
-        if ch.get('city'):
+        victim = caps.get((x, y))
+        if victim is not None and victim != player.team:          # взяли столицу — вся земля той империи наша
+            targets = [p for p, c in cells.items() if c.team == victim]
+            if (x, y) not in targets:
+                targets.append((x, y))
+        else:
+            targets = [(x, y)]
+        if victim is None and ch.get('city'):
             for n in hex_neighbors(x, y):
                 if terrain(game, *n) == WATER or n in caps:
                     continue
@@ -195,15 +209,16 @@ def capture(game, player, ch):
                 c.team, c.by, c.ver = player.team, player, game.version
                 c.save(update_fields=['team', 'by', 'ver'])
                 gained.append(pos)
-        lost_cap = caps.get((x, y))
-        if lost_cap is not None and lost_cap != player.team:          # столицу взяли — у той империи её больше нет
-            game.empire['teams'][str(lost_cap)]['capital'] = None
+        if victim is not None and victim != player.team:
+            _restart(game, victim, player.team, cells)
         scores = recount(game, list(cells.values()))
         game.scores = scores
         game.save(update_fields=['version', 'scores', 'empire'])
         # фишки чужих империй на отнятых клетках — в свою столицу (или на любую свою клетку)
         lost = set(gained)
         for other in IslandPlayer.objects.filter(game=game).exclude(team=player.team):
+            if victim is not None and other.team == victim:
+                continue                                         # их уже расставили на новые клетки
             if (other.x, other.y) in lost:
                 home = capital(game, other.team)
                 if not home or cells.get(home) is None or cells[home].team != other.team:
@@ -224,14 +239,48 @@ def capture(game, player, ch):
     return len(gained)
 
 
+def _restart(game, victim, captor, cells):
+    """Империя потеряла столицу: начинает с нуля на 7 ничьих клетках (не хватает — берём у захватчика).
+    Хан снова выбирает столицу; игроки команды встают на новые клетки."""
+    from .models import IslandCell, IslandPlayer
+    from .island import _start_zones
+    rng = random.Random()
+    t = game.empire['teams'][str(victim)]
+    t['capital'] = None
+    t['restarts'] = t.get('restarts', 0) + 1
+    zone = _start_zones(game, [START_CELLS], rng, taken=tuple(cells))[0]
+    if len(zone) < START_CELLS:                                 # ничьих мало — недостающие у захватчика
+        cap = capital(game, captor)
+        pool = [p for p, c in cells.items() if c.team == captor and p != cap and p not in zone]
+        anchor = zone[0] if zone else (max(pool, key=lambda p: hex_dist(p, cap)) if pool and cap else (pool[0] if pool else None))
+        pool.sort(key=lambda p: hex_dist(p, anchor) if anchor else 0)
+        zone += pool[:START_CELLS - len(zone)]
+    for pos in zone:
+        c = cells.get(pos)
+        if c is None:
+            cells[pos] = IslandCell.objects.create(game=game, x=pos[0], y=pos[1], team=victim, ver=game.version)
+        else:
+            c.team, c.by, c.ver = victim, None, game.version
+            c.save(update_fields=['team', 'by', 'ver'])
+    members = list(IslandPlayer.objects.filter(game=game, team=victim))
+    for i, m in enumerate(members):
+        if zone:
+            m.x, m.y = zone[i % len(zone)]
+        m.challenge = {}
+        m.save(update_fields=['x', 'y', 'challenge'])
+
+
 # ------------------------------------------------------------------ действия хана
 def _locked(game):
     from .models import IslandGame
     return IslandGame.objects.select_for_update().get(pk=game.pk)
 
 
-def build_capital(game, player):
-    """Хан ставит столицу на клетке, где стоит. Первая — на любой своей клетке, новая (после потери) — только в своём городе."""
+def build_capital(game, player, x=None, y=None):
+    """Хан ставит столицу на своей клетке (x, y), по умолчанию — где стоит.
+    Столицы ещё нет (начало игры или империю захватили) — любая своя клетка, и вся команда встаёт туда.
+    Столица есть — её можно перенести только в свой город."""
+    from .models import IslandPlayer
     from .island import _owner, terrain
     with transaction.atomic():
         game = _locked(game)
@@ -240,17 +289,23 @@ def build_capital(game, player):
         t = game.empire['teams'].get(str(player.team))
         if not t or t.get('khan') != player.id:
             return {'error': 'notkhan'}
-        if t.get('capital'):
-            return {'error': 'has_capital'}
-        if _owner(game, player.x, player.y) != player.team:
+        x = player.x if x is None else x
+        y = player.y if y is None else y
+        if _owner(game, x, y) != player.team:
             return {'error': 'not_own'}
-        if t.get('built') and terrain(game, player.x, player.y) != CITY:
-            return {'error': 'need_city'}
-        t['capital'], t['built'] = [player.x, player.y], True
+        first = not t.get('capital')
+        if not first:
+            if [x, y] == t['capital']:
+                return {'error': 'has_capital'}
+            if terrain(game, x, y) != CITY:
+                return {'error': 'need_city'}
+        t['capital'], t['built'] = [x, y], True
         game.scores = recount(game)
         game.version += 1
         game.save(update_fields=['empire', 'scores', 'version'])
-    return {'ok': True}
+        if first:                                             # вся команда начинает из столицы
+            IslandPlayer.objects.filter(game=game, team=player.team).update(x=x, y=y, challenge={})
+    return {'ok': True, 'first': first}
 
 
 def appoint(game, player, target_id):

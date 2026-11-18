@@ -246,7 +246,8 @@ def play_khan(request, game_id):
         return JsonResponse({'error': 'kicked'})
     act = request.POST.get('action')
     if act == 'capital':
-        res = emp.build_capital(game, player)
+        x, y = request.POST.get('x'), request.POST.get('y')
+        res = emp.build_capital(game, player, *((int(x), int(y)) if (x or '').isdigit() and (y or '').isdigit() else (None, None)))
     elif act == 'appoint':
         res = emp.appoint(game, player, _int(request.POST.get('player'), 0, 0, 10 ** 9))
     elif act in ('propose', 'accept', 'decline', 'cancel', 'break'):
@@ -278,9 +279,12 @@ def _texts(lang):
         'enter_code': 'Введите код решения', 'time_up': 'Время вышло', 'results': 'Итоги',
         # «Империя»
         'khan': 'Хан', 'sarbaz': 'Сарбаз', 'you_khan': 'Вы — хан', 'your_khan': 'Ваш хан',
-        'capital_btn': 'Построить столицу здесь', 'capital_ok': 'Столица построена!', 'no_capital': 'Столицы нет',
-        'capital_hint': 'Встаньте на свою клетку и постройте столицу (+5 очков, сюда возвращаются сарбазы).',
-        'capital_lost_hint': 'Столица потеряна. Новую можно построить только в своём городе.',
+        'capital_btn': 'Перенести столицу сюда', 'capital_ok': 'Столица построена!', 'no_capital': 'Столицы нет',
+        'capital_hint': 'Нажмите на одну из своих клеток (они подсвечены) — там будет столица. Пока её нет, команда не может ходить.',
+        'wait_khan': 'Ждём, пока хан выберет, где построить столицу. Без столицы ходить нельзя.',
+        'capital_lost': 'Вашу столицу захватили! Империя начинает заново на 7 новых клетках — хан выбирает новую столицу.',
+        'move_hint': 'Столицу можно перенести в свой город: встаньте на него и нажмите кнопку.',
+        'wait_capital': 'Сначала хан должен выбрать столицу.', 'pick_capital': 'Выберите клетку для столицы',
         'appoint_btn': 'Сделать ханом', 'changes_left': 'Смен хана осталось:', 'appointed': 'Новый хан назначен',
         'diplomacy': 'Дипломатия', 'ally': 'союз', 'enemy': 'враг', 'truce_s': 'перемирие',
         'propose': 'Предложить союз', 'accept': 'Принять', 'decline': 'Отклонить', 'cancel_offer': 'Отменить',

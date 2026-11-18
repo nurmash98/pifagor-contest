@@ -42,6 +42,8 @@ function IslandMap(canvas, opt) {
         if (e) { e.rel.forEach(function (r) { if ((r[0] === a && r[1] === b) || (r[0] === b && r[1] === a)) { out = r[2]; } }); }
         return out;
     }
+    var pick = null;                                          // режим выбора клетки (хан выбирает столицу)
+    function clickable() { return pick || neighbours(); }
     var cam = {x: 0, y: 0, z: 1}, dpr = window.devicePixelRatio || 1, hover = null, t0 = Date.now();
 
     function rnd(x, y, i) {                              // детерминированное «случайное» число 0..1 для клетки
@@ -307,7 +309,14 @@ function IslandMap(canvas, opt) {
             }
         }
         var pulse = (Math.sin((Date.now() - t0) / 260) + 1) / 2;
-        neighbours().forEach(function (n) {              // куда можно шагнуть
+        (pick || []).forEach(function (n) {              // хан выбирает столицу: свои клетки мигают
+            var hot = hover && hover[0] === n[0] && hover[1] === n[1], p = center(n[0], n[1]);
+            ctx.strokeStyle = 'rgba(251,191,36,' + (hot ? 1 : .55 + pulse * .45) + ')'; ctx.lineWidth = hot ? 5 : 3.5;
+            hexPath(ctx, n[0], n[1], R - 6); ctx.stroke();
+            if (hot) { ctx.fillStyle = 'rgba(251,191,36,.25)'; hexPath(ctx, n[0], n[1], R - 6); ctx.fill(); }
+            crown(ctx, p[0], p[1] - 20, hot ? 9 : 7);
+        });
+        (pick ? [] : neighbours()).forEach(function (n) {  // куда можно шагнуть
             var k = n[0] + ',' + n[1], owner = S.cells[k], hot = hover && hover[0] === n[0] && hover[1] === n[1];
             var walk = owner === S.me.team || (owner !== undefined && relation(owner, S.me.team) === 'ally');
             ctx.strokeStyle = 'rgba(255,255,255,' + (hot ? 1 : .55 + pulse * .4) + ')'; ctx.lineWidth = hot ? 4 : 3;
@@ -369,14 +378,14 @@ function IslandMap(canvas, opt) {
                 if (Math.abs(dx) + Math.abs(dy) > 6) { drag.moved = true; }
                 if (drag.moved) { cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; clamp(); }
             } else if (e.target === canvas) {
-                var c = cellAt(e), ok = neighbours().some(function (n) { return n[0] === c[0] && n[1] === c[1]; });
+                var c = cellAt(e), ok = clickable().some(function (n) { return n[0] === c[0] && n[1] === c[1]; });
                 hover = ok ? c : null; canvas.style.cursor = ok ? 'pointer' : 'grab';
             }
         });
         window.addEventListener('mouseup', function (e) {
             if (drag && !drag.moved && e.target === canvas && opt.onCell) {
                 var c = cellAt(e);
-                if (neighbours().some(function (n) { return n[0] === c[0] && n[1] === c[1]; })) { opt.onCell(c[0], c[1]); }
+                if (clickable().some(function (n) { return n[0] === c[0] && n[1] === c[1]; })) { opt.onCell(c[0], c[1]); }
             }
             drag = null;
         });
@@ -406,6 +415,8 @@ function IslandMap(canvas, opt) {
             var cc = center(S.me.x, S.me.y), px = (cc[0] - cam.x) * cam.z, py = (cc[1] - cam.y) * cam.z, m = 150;
             if (px < m || py < m || px > canvas.clientWidth - m || py > canvas.clientHeight - m) { centerOnMe(); }
         },
+        setPick: function (cells) { pick = cells && cells.length ? cells : null; },
+        picking: function () { return !!pick; },
         centerOnMe: centerOnMe, draw: draw, neighbours: neighbours, state: S, relation: relation, capitals: capitals, isHex: hex,
         loop: function () { (function tick() { draw(); requestAnimationFrame(tick); })(); }
     };

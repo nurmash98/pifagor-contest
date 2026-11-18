@@ -321,6 +321,8 @@ def join(game, student, rng=None):
                 mine = [c for c, t in owned.items() if t == player.team]
                 mate = next((p for p in others if p.team == player.team), None)
                 player.x, player.y = rng.choice(mine) if mine else ((mate.x, mate.y) if mate else (0, 0))
+                if emp.is_empire(game) and emp.capital(game, player.team):
+                    player.x, player.y = emp.capital(game, player.team)
             player.save()
         game.save(update_fields=['version', 'scores', 'map'])
     return player
