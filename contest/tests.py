@@ -3791,24 +3791,21 @@ class AdminDashboardTests(RetakeTestBase):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(url).status_code, 200)
 
-    def test_quarter_filter_for_sor_soch(self):
+    def test_quarters_chart_data_for_class_and_school(self):
         from .dashboard import build
         Exam.objects.filter(id=self.exam.id).update(quarter=1)
         Exam.objects.filter(id=self.random_exam.id).update(quarter=2)
         d = build()
-        self.assertEqual(d['quarters_avail'], [1, 2])
-        self.assertEqual((d['kpi']['sor'], d['kpi']['soch']), (8.0, 8.0))
-        q1 = build(quarter=1)
-        self.assertEqual((q1['quarter'], q1['kpi']['attempts'], q1['kpi']['soch']), (1, 2, None))   # только СОР 1-й четверти
-        self.assertEqual(q1['kpi']['sor'], 8.0)
-        q2 = build(quarter=2)
-        self.assertEqual((q2['kpi']['attempts'], q2['kpi']['sor'], q2['kpi']['soch']), (1, None, 8.0))
-        self.assertEqual([e['id'] for e in q2['exams']], [self.random_exam.id])
-        self.assertIsNone(build(quarter=4)['quarter'])                                           # нет такой четверти — весь год
+        self.assertEqual([(q['n'], q['sor'], q['soch']) for q in d['quarters']], [(1, 8.0, None), (2, None, 8.0)])
+        self.assertEqual((d['kpi']['sor'], d['kpi']['soch']), (8.0, 8.0))            # итого по году не фильтруется
+        cls = self.students[0].school_class
+        one = build(cls=cls)                                                         # выбран класс — те же данные только по нему
+        self.assertEqual(one['mode'], 'student')
+        self.assertEqual([q['n'] for q in one['quarters']], [1, 2])
         self.client.force_login(self.admin)
-        r = self.client.get(reverse('admin_dashboard') + '?q=2')
-        self.assertContains(r, '2 четверть')
-        self.assertContains(r, 'class="pill on">2 четверть')
+        r = self.client.get(reverse('admin_dashboard'))
+        self.assertContains(r, 'Средний балл СОР и СОЧ — по четвертям')
+        self.assertNotContains(r, 'СОР/СОЧ за:')                                     # фильтра по четвертям нет
 
     def test_teacher_sees_only_own_classes(self):
         from .dashboard import build

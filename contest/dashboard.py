@@ -72,7 +72,7 @@ def _class_key(c):
     return (int(g) if str(g).isdigit() else 99, str(c))
 
 
-def build(parallel=None, now=None, classes=None, cls=None, quarter=None):
+def build(parallel=None, now=None, classes=None, cls=None):
     """Все цифры дашборда.
     classes — множество классов учителя (None = все, для админа). cls — один класс: тогда строки = ученики.
     parallel — '7': строки = классы параллели. Иначе: у админа строки = параллели, у учителя — его классы."""
@@ -152,12 +152,7 @@ def build(parallel=None, now=None, classes=None, cls=None, quarter=None):
 
     # ---- СОР/СОЧ ----
     from .models import ExamAnswer
-    all_exams = list(Exam.objects.filter(kind__in=['SOR', 'SOCH'], start_at__gte=SINCE).prefetch_related('tasks'))
-    # какие четверти вообще есть у СОР/СОЧ в этой области — для кнопок-фильтров
-    quarters_avail = sorted({e.quarter for e in all_exams if e.quarter and e.school_class in scope_classes})
-    if quarter not in quarters_avail:
-        quarter = None
-    exams = {e.id: e for e in all_exams if not quarter or e.quarter == quarter}
+    exams = {e.id: e for e in Exam.objects.filter(kind__in=['SOR', 'SOCH'], start_at__gte=SINCE).prefetch_related('tasks')}
     attempts = [a for a in ExamAttempt.objects.filter(exam_id__in=list(exams), retake__isnull=True, student_id__in=list(by_id))
                 if not a.is_active(now)]
     ans = defaultdict(list)
@@ -220,7 +215,7 @@ def build(parallel=None, now=None, classes=None, cls=None, quarter=None):
                 for q, v in sorted(by_quarter.items()) if q]
 
     return dict(
-        parallel=parallel, parallels=pars, quarter=quarter, quarters_avail=quarters_avail, mode=mode, cls=cls, classes=[c for c in scope_classes if classes is not None or not parallel or grade_of(c) == parallel], scoped=classes is not None, since=timezone.localtime(SINCE).date(),
+        parallel=parallel, parallels=pars, mode=mode, cls=cls, classes=[c for c in scope_classes if classes is not None or not parallel or grade_of(c) == parallel], scoped=classes is not None, since=timezone.localtime(SINCE).date(),
         first_event=timezone.localtime(first_event).date() if first_event else None,
         kpi=dict(students=len(students), active=len(active),
                  active_pct=round(100 * len(active) / len(students)) if students else 0,
@@ -248,6 +243,5 @@ def admin_dashboard(request):
     classes = _managed_classes(request.user)
     parallel = (request.GET.get('p') or '').strip() or None
     cls = (request.GET.get('c') or '').strip() or None
-    q = (request.GET.get('q') or '').strip()
-    data = build(parallel, classes=classes, cls=cls, quarter=int(q) if q.isdigit() else None)
+    data = build(parallel, classes=classes, cls=cls)
     return render(request, 'admin_dashboard.html', {'d': data})
