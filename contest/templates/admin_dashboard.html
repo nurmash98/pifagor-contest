@@ -57,19 +57,26 @@
 
     <div class="d-flex flex-wrap gap-2 mb-2">
         {% if d.scoped %}
-            <a href="{% url 'admin_dashboard' %}" class="pill {% if d.mode != 'student' %}on{% endif %}">Все мои классы</a>
-            {% for c in d.classes %}<a href="?c={{ c|urlencode }}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
+            <a href="{% url 'admin_dashboard' %}{% if d.quarter %}?q={{ d.quarter }}{% endif %}" class="pill {% if d.mode != 'student' %}on{% endif %}">Все мои классы</a>
+            {% for c in d.classes %}<a href="?c={{ c|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
         {% else %}
-            <a href="{% url 'admin_dashboard' %}" class="pill {% if not d.parallel %}on{% endif %}">Все параллели</a>
-            {% for p in d.parallels %}<a href="?p={{ p|urlencode }}" class="pill {% if p == d.parallel %}on{% endif %}">{{ p }}</a>{% endfor %}
+            <a href="{% url 'admin_dashboard' %}{% if d.quarter %}?q={{ d.quarter }}{% endif %}" class="pill {% if not d.parallel %}on{% endif %}">Все параллели</a>
+            {% for p in d.parallels %}<a href="?p={{ p|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="pill {% if p == d.parallel %}on{% endif %}">{{ p }}</a>{% endfor %}
         {% endif %}
     </div>
     {% if not d.scoped and d.parallel %}
     <div class="d-flex flex-wrap gap-2 mb-4 align-items-center"><span class="text-muted small">Класс:</span>
-        <a href="?p={{ d.parallel|urlencode }}" class="pill {% if not d.cls %}on{% endif %}">Все классы {{ d.parallel }}</a>
-        {% for c in d.classes %}<a href="?c={{ c|urlencode }}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
+        <a href="?p={{ d.parallel|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="pill {% if not d.cls %}on{% endif %}">Все классы {{ d.parallel }}</a>
+        {% for c in d.classes %}<a href="?c={{ c|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="pill {% if c == d.cls %}on{% endif %}">{{ c }}</a>{% endfor %}
     </div>
-    {% else %}<div class="mb-4"></div>{% endif %}
+    {% else %}<div class="mb-2"></div>{% endif %}
+    {% if d.quarters_avail %}
+    <div class="d-flex flex-wrap gap-2 mb-4 align-items-center"><span class="text-muted small">СОР/СОЧ за:</span>
+        <a href="?{% if d.cls %}c={{ d.cls|urlencode }}{% elif d.parallel and not d.scoped %}p={{ d.parallel|urlencode }}{% endif %}" class="pill {% if not d.quarter %}on{% endif %}">Весь год</a>
+        {% for n in d.quarters_avail %}<a href="?{% if d.cls %}c={{ d.cls|urlencode }}&{% elif d.parallel and not d.scoped %}p={{ d.parallel|urlencode }}&{% endif %}q={{ n }}" class="pill {% if n == d.quarter %}on{% endif %}">{{ n }} четверть</a>{% endfor %}
+        <span class="text-muted small">— фильтр действует на оценки и списки СОР/СОЧ</span>
+    </div>
+    {% else %}<div class="mb-2"></div>{% endif %}
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4 col-xl-2"><div class="kpi k1"><span class="ic">🎓</span>
@@ -101,7 +108,7 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-lg-7"><div class="panel"><h5>Средний балл СОР и СОЧ — {% if d.mode == 'student' %}по ученикам{% elif d.mode == 'class' %}по классам{% else %}по параллелям{% endif %}</h5>
+        <div class="col-lg-7"><div class="panel"><h5>Средний балл СОР и СОЧ — {% if d.mode == 'student' %}по ученикам{% elif d.mode == 'class' %}по классам{% else %}по параллелям{% endif %}{% if d.quarter %} · {{ d.quarter }} четверть{% endif %}</h5>
             <div class="sub">Оценка за работу из 10, средняя по ученикам</div>
             <div class="chart-box"><div id="c-grades" class="chart-svg"></div></div></div></div>
         <div class="col-lg-5"><div class="panel"><h5>Как написали</h5>
@@ -128,7 +135,7 @@
             <tbody>
             {% for r in d.rows %}
             <tr>
-                <td class="fw-bold">{% if d.mode == 'parallel' %}<a href="?p={{ r.name|urlencode }}" class="text-decoration-none">{{ r.name }}</a>{% elif d.mode == 'class' %}<a href="?c={{ r.name|urlencode }}" class="text-decoration-none">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
+                <td class="fw-bold">{% if d.mode == 'parallel' %}<a href="?p={{ r.name|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="text-decoration-none">{{ r.name }}</a>{% elif d.mode == 'class' %}<a href="?c={{ r.name|urlencode }}{% if d.quarter %}&q={{ d.quarter }}{% endif %}" class="text-decoration-none">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
                 {% if d.mode != 'student' %}<td>{{ r.students }}</td>{% endif %}
                 <td style="min-width: 150px;">{% if d.mode == 'student' %}{% if r.active %}<span class="fw-bold text-success">✓ заходил</span>{% else %}<span class="text-muted">не заходил</span>{% endif %}{% else %}<div class="d-flex align-items-center gap-2"><div class="bar-mini flex-grow-1"><i style="width: {{ r.active_pct }}%"></i></div><span class="small fw-bold">{{ r.active }} · {{ r.active_pct }}%</span></div>{% endif %}</td>
                 <td>{{ r.logins }}</td>
