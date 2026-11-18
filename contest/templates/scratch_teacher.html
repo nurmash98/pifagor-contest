@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Scratch — прогресс классов{% endblock %}
+{% block content %}
+<style>
+    .st-tbl td, .st-tbl th { padding: 4px 6px; font-size: 13px; white-space: nowrap; }
+    .st-cell { display: inline-block; width: 22px; height: 22px; border-radius: 6px; text-align: center; line-height: 22px; font-size: 11px; font-weight: 800; color: #fff; }
+    .s0 { background: #e5e7eb; color: #9ca3af; } .s1 { background: #fbbf24; } .s2 { background: #84cc16; } .s3 { background: #16a34a; }
+    .pill { display: inline-block; padding: 6px 16px; border-radius: 999px; border: 2px solid #e2e5f0; font-weight: 700; text-decoration: none; color: inherit; }
+    .pill.on { background: #1a1a4b; border-color: #1a1a4b; color: #fff; }
+</style>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div><h3 class="fw-bold mb-1">🐱 Scratch-тренажёр — прогресс</h3>
+        <div class="text-muted small">Тренажёр видят только ученики 1–4 классов (задачи на Python у них скрыты). {{ n_levels }} уровней: лабиринт и рисование.</div></div>
+    <div class="d-flex gap-2"><a href="{% url 'scratch_home' %}" class="btn btn-primary btn-sm rounded-pill px-3">Открыть уровни</a>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Кабинет</a></div>
+</div>
+<div class="d-flex flex-wrap gap-2 mb-3">
+    {% for c in classes %}<a class="pill {% if c == cls %}on{% endif %}" href="?c={{ c|urlencode }}">{{ c }}</a>
+    {% empty %}<div class="text-muted">У вас нет классов 1–4.</div>{% endfor %}
+</div>
+{% if cls %}
+<div class="card border-0 shadow-sm rounded-4 p-2">
+<div class="table-responsive"><table class="table table-sm align-middle mb-0 st-tbl">
+    <thead><tr><th>Ученик</th><th>Пройдено</th><th>⭐</th>
+        {% for k in keys %}<th class="text-center text-muted">{{ k }}</th>{% endfor %}<th>Был</th></tr></thead>
+    <tbody>
+    {% for r in rows %}<tr>
+        <td class="fw-semibold">{{ r.name }}</td><td>{{ r.solved }} / {{ n_levels }}</td><td class="fw-bold">{{ r.stars }}</td>
+        {% for s in r.cells %}<td class="text-center"><span class="st-cell s{{ s|default:0 }}">{% if s %}{{ s }}{% elif s == 0 %}·{% endif %}</span></td>{% endfor %}
+        <td class="text-muted">{{ r.last|date:"d.m H:i"|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="40" class="text-muted">В классе нет учеников.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="small text-muted p-2">m — лабиринт, p — рисование. Цифра — звёзды за уровень; «·» — пробовал, но ещё не прошёл; серый — не открывал.</div>
+</div>
+{% endif %}
+{% endblock %}

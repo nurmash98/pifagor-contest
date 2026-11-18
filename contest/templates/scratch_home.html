@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}Scratch — Pifagor Contest{% endblock %}
+{% block content %}
+<style>
+    .sh-hero { background: linear-gradient(135deg, #4c97ff, #855cd6); color: #fff; border-radius: 24px; padding: 24px 28px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .sh-hero h2 { font-weight: 900; margin: 0; }
+    .sh-total { margin-left: auto; background: rgba(255,255,255,.2); border-radius: 18px; padding: 10px 18px; font-weight: 800; font-size: 22px; }
+    .sh-track { margin-top: 26px; }
+    .sh-track h4 { font-weight: 900; display: flex; align-items: center; gap: 10px; }
+    .sh-track h4 .s { font-size: 15px; color: #6b7280; font-weight: 700; }
+    .sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+    .lv { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 14px 8px; border-radius: 20px; text-decoration: none;
+          background: #fff; border: 3px solid #e5e7eb; color: #111827; min-height: 120px; transition: transform .1s; }
+    .lv:hover { transform: translateY(-3px); border-color: #4c97ff; }
+    .lv .n { font-size: 30px; font-weight: 900; line-height: 1; }
+    .lv .t { font-size: 12px; text-align: center; color: #4b5563; font-weight: 600; }
+    .lv .st { font-size: 18px; letter-spacing: 1px; color: #d1d5db; }
+    .lv .st .on { color: #fbbf24; }
+    .lv.done { border-color: #86efac; background: #f0fdf4; }
+    .lv.lock { opacity: .45; pointer-events: none; }
+    [data-bs-theme="dark"] .lv { background: #161b2e; border-color: #262d47; color: #e5e7eb; }
+    [data-bs-theme="dark"] .lv .t { color: #9ca3af; }
+    [data-bs-theme="dark"] .lv.done { background: #052e16; border-color: #166534; }
+</style>
+<div class="sh-hero">
+    <div style="font-size:56px">🐱</div>
+    <div><h2>Scratch</h2><div class="fw-semibold">{% t "Собирай программы из блоков — котик и карандаш выполнят их." %}</div></div>
+    <div class="sh-total">⭐ {{ total }} / {{ total_max }}</div>
+</div>
+{% if preview %}<div class="alert alert-info mt-3 mb-0">{% t "Вы смотрите как учитель: все уровни открыты, результаты не сохраняются." %}
+    <a href="{% url 'scratch_teacher' %}" class="fw-bold">{% t "Прогресс классов" %} →</a></div>{% endif %}
+{% for tr in tracks %}
+<div class="sh-track">
+    <h4>{{ tr.title }} <span class="s">⭐ {{ tr.stars }} / {{ tr.max }}</span></h4>
+    <div class="sh-grid">
+        {% for lv in tr.levels %}
+        <a class="lv{% if lv.stars %} done{% endif %}{% if not lv.open %} lock{% endif %}" href="{% url 'scratch_level' lv.key %}">
+            <span class="n">{% if lv.open %}{{ lv.n }}{% else %}🔒{% endif %}</span>
+            <span class="t">{{ lv.title }}</span>
+            <span class="st">{% for i in "123" %}<span class="{% if forloop.counter <= lv.stars %}on{% endif %}">★</span>{% endfor %}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

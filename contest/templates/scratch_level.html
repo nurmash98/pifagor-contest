@@ -1,0 +1,464 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}{{ title }} — Scratch{% endblock %}
+{% block content %}
+<style>
+    .sc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .sc-top h3 { margin: 0; font-weight: 800; }
+    .sc-stars { font-size: 26px; letter-spacing: 2px; color: #d1d5db; }
+    .sc-stars .on { color: #fbbf24; }
+    .sc-wrap { display: grid; grid-template-columns: 250px minmax(260px, 1fr) minmax(300px, 440px); gap: 14px; align-items: start; }
+    @media (max-width: 991px) { .sc-wrap { grid-template-columns: 1fr; } }
+    .sc-panel { background: #fff; border-radius: 18px; box-shadow: 0 2px 12px rgba(15, 23, 42, .08); padding: 12px; }
+    [data-bs-theme="dark"] .sc-panel { background: #161b2e; box-shadow: none; border: 1px solid #262d47; }
+    .sc-panel h6 { font-weight: 800; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 10px; }
+    #palette { display: flex; flex-direction: column; gap: 10px; min-height: 200px; }
+    #palette.trash { outline: 3px dashed #ef4444; outline-offset: 4px; border-radius: 12px; }
+    #script-area { min-height: 380px; position: relative; padding-bottom: 60px; }
+    /* ----- блоки в стиле Scratch ----- */
+    .blk { position: relative; display: inline-flex; flex-direction: column; min-width: 150px; border-radius: 8px; color: #fff; font-weight: 700;
+           font-size: 15px; user-select: none; touch-action: none; cursor: grab; box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+    .blk > .hd { display: flex; align-items: center; gap: 6px; padding: 9px 12px 9px 12px; min-height: 42px; white-space: nowrap; }
+    .blk .ic { font-size: 18px; }
+    .blk select { border: 0; border-radius: 999px; padding: 2px 6px; font-weight: 800; font-size: 14px; color: #1f2937; background: #fff; cursor: pointer; }
+    .blk.motion { background: #4c97ff; } .blk.control { background: #ffab19; } .blk.pen { background: #0fbd8c; } .blk.event { background: #ffbf00; color: #fff; }
+    .blk .mouth { margin-left: 16px; min-height: 30px; background: transparent; border-left: 14px solid; border-color: inherit; padding: 4px 0 4px 6px; }
+    .blk.control .mouth { border-left-color: #ffab19; background: rgba(255, 171, 25, .08); }
+    .blk .ft { height: 16px; border-radius: 0 0 8px 8px; }
+    .blk .else { padding: 6px 12px; }
+    .blk .x { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0,0,0,.18); color: #fff; font-weight: 900; line-height: 1; cursor: pointer; }
+    .blk.run { filter: brightness(1.15); box-shadow: 0 0 0 4px #fde047; }
+    .blk.ghost { position: fixed; z-index: 2000; pointer-events: none; opacity: .92; transform: rotate(2deg); }
+    .blk.moving { opacity: .35; }
+    #palette .blk { cursor: grab; }
+    .list { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 30px; }
+    .mouth .list { min-height: 34px; min-width: 120px; }
+    .hat { border-radius: 20px 20px 8px 8px; margin-bottom: 3px; cursor: default; }
+    #drop-line { position: fixed; height: 6px; background: #22c55e; border-radius: 3px; z-index: 1999; display: none; pointer-events: none; box-shadow: 0 0 0 2px #fff; }
+    .empty-tip { color: #9ca3af; font-size: 14px; padding: 10px 4px; }
+    /* ----- сцена ----- */
+    #stage { width: 100%; aspect-ratio: 1 / 1; display: block; border-radius: 14px; background: #f8fafc; border: 2px solid #e5e7eb; }
+    .sc-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .flag { border: 0; border-radius: 999px; padding: 10px 22px; font-weight: 800; font-size: 17px; background: #22c55e; color: #fff; }
+    .flag:disabled { opacity: .5; }
+    .stopb { border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 800; background: #ef4444; color: #fff; }
+    .softb { border: 0; border-radius: 999px; padding: 10px 14px; font-weight: 700; background: #eef2ff; color: #3730a3; }
+    [data-bs-theme="dark"] .softb { background: #262b63; color: #c7d2fe; }
+    .hint { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.45; margin-top: 12px; }
+    .speak { border: 0; border-radius: 50%; width: 40px; height: 40px; flex: none; font-size: 20px; background: #fef3c7; }
+    #result { position: fixed; inset: 0; background: rgba(15, 23, 42, .55); display: none; align-items: center; justify-content: center; z-index: 3000; }
+    #result .box { background: #fff; color: #111827; border-radius: 24px; padding: 28px 32px; text-align: center; max-width: 420px; width: 92%; }
+    #result .big { font-size: 54px; letter-spacing: 6px; color: #d1d5db; }
+    #result .big .on { color: #fbbf24; }
+    #result h4 { font-weight: 800; }
+</style>
+
+<div class="sc-top">
+    <a href="{% url 'scratch_home' %}" class="softb text-decoration-none">← {% t "Уровни" %}</a>
+    <h3>{% if level.kind == 'maze' %}🐱{% else %}✏️{% endif %} {{ track_n }}. {{ title }}</h3>
+    <span class="sc-stars" id="top-stars">{% for i in "123" %}<span class="{% if forloop.counter <= stars %}on{% endif %}">★</span>{% endfor %}</span>
+    {% if preview %}<span class="badge bg-secondary">{% t "просмотр учителя — результат не сохраняется" %}</span>{% endif %}
+</div>
+
+<div class="sc-wrap">
+    <div class="sc-panel"><h6>{% t "Блоки" %}</h6><div id="palette"></div>
+        <div class="text-muted small mt-3">{% t "Перетащи блок в программу или просто нажми на него. Лишний блок — утащи обратно сюда." %}</div></div>
+    <div class="sc-panel"><div class="d-flex align-items-center mb-2"><h6 class="mb-0 flex-grow-1">{% t "Программа" %}</h6>
+        <span class="small text-muted me-2" id="count"></span>
+        <button class="softb py-1 px-3" id="clear" type="button">🗑 {% t "Очистить" %}</button></div>
+        <div id="script-area"></div></div>
+    <div class="sc-panel">
+        <canvas id="stage" width="440" height="440"></canvas>
+        <div class="sc-btns">
+            <button class="flag" id="go" type="button">⚑ {% t "Старт" %}</button>
+            <button class="stopb" id="stop" type="button">■</button>
+            {% if next_key %}<a class="softb text-decoration-none ms-auto" href="{% url 'scratch_level' next_key %}" id="next-link" style="{% if not stars %}display:none{% endif %}">{% t "Дальше" %} →</a>{% endif %}
+        </div>
+        <div class="hint"><button class="speak" id="speak" type="button" title="{% t "Прочитать вслух" %}">🔊</button><div id="hint"></div></div>
+    </div>
+</div>
+<div id="drop-line"></div>
+<div id="result"><div class="box">
+    <div class="big" id="r-stars"></div>
+    <h4 id="r-title"></h4>
+    <div id="r-text" class="mb-3"></div>
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <button class="softb" id="r-again" type="button">↺ {% t "Ещё раз" %}</button>
+        {% if next_key %}<a class="flag text-decoration-none" id="r-next" href="{% url 'scratch_level' next_key %}">{% t "Дальше" %} →</a>{% else %}<a class="flag text-decoration-none" id="r-next" href="{% url 'scratch_home' %}">{% t "К уровням" %}</a>{% endif %}
+    </div>
+</div></div>
+{{ data|json_script:"lv-raw" }}
+<script>
+(function () {
+    var LV = JSON.parse(JSON.parse(document.getElementById('lv-raw').textContent));
+    var SAVED = {{ saved|safe }};
+    var KK = '{{ content_lang }}' === 'kk';
+    var CHECK = '{% url "scratch_check" level.key %}', CSRF = '{{ csrf_token }}';
+    var L = KK ? {
+        up: 'жоғары', down: 'төмен', left: 'солға', right: 'оңға', fwd: 'алға жүр', turn_left: 'солға бұрыл', turn_right: 'оңға бұрыл',
+        repeat1: 'қайтала', repeat2: 'рет', until: 'балыққа дейін қайтала', if1: 'егер', if2: 'жол болса', else_: 'әйтпесе',
+        ahead: 'алда', lft: 'солда', rgt: 'оңда', move1: 'жүр', move2: 'қадам', turn1: 'бұрыл', penup: 'қарындашты көтер', pendown: 'қарындашты түсір',
+        hat: 'жасыл ту басылғанда', empty: 'Блоктарды осында сүйре', blocks: 'блок',
+        win: 'Жарайсың!', coins: 'тиын', shorter: 'Қысқарақ болады: ең жақсы шешім — ', fail: 'Тағы байқап көр!',
+        wall: 'Ой! Мысық қабырғаға соқтығысты.', short: 'Мысық балыққа жетпеді.', steps: 'Бағдарлама ешқашан бітпейді.',
+        extra: 'Сурет үлгіге сәйкес емес — артық сызық бар.', missing: 'Сурет толық емес.', empty_p: 'Алдымен бағдарлама құрастыр.', bad_program: 'Бағдарламада қате бар.'
+    } : {
+        up: 'вверх', down: 'вниз', left: 'влево', right: 'вправо', fwd: 'иди вперёд', turn_left: 'повернись налево', turn_right: 'повернись направо',
+        repeat1: 'повторить', repeat2: 'раз', until: 'повторять, пока не рыбка', if1: 'если', if2: 'есть путь', else_: 'иначе',
+        ahead: 'впереди', lft: 'слева', rgt: 'справа', move1: 'иди', move2: 'шаг.', turn1: 'повернись', penup: 'подними карандаш', pendown: 'опусти карандаш',
+        hat: 'когда нажат зелёный флажок', empty: 'Перетащи блоки сюда', blocks: 'блоков',
+        win: 'Молодец!', coins: 'монет', shorter: 'Можно короче: лучшее решение — ', fail: 'Попробуй ещё!',
+        wall: 'Ой! Котик упёрся в стену.', short: 'Котик не дошёл до рыбки.', steps: 'Программа никогда не заканчивается.',
+        extra: 'Рисунок не совпадает с образцом — есть лишняя линия.', missing: 'Рисунок не закончен.', empty_p: 'Сначала собери программу.', bad_program: 'В программе ошибка.'
+    };
+    var CAT = {up: 'motion', down: 'motion', left: 'motion', right: 'motion', fwd: 'motion', turn_left: 'motion', turn_right: 'motion',
+               move: 'motion', turn: 'motion', repeat: 'control', until: 'control', 'if': 'control', penup: 'pen', pendown: 'pen'};
+    var $ = function (id) { return document.getElementById(id); };
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ---------------------------------------------------------------- модель программы
+    var program = sanitize(SAVED);
+    function sanitize(list) {
+        return (list || []).filter(function (b) { return LV.blocks.indexOf(b.op) >= 0; }).map(function (b) {
+            var c = {op: b.op};
+            if (b.n !== undefined) { c.n = b.n; } if (b.deg !== undefined) { c.deg = b.deg; } if (b.dir) { c.dir = b.dir; } if (b.cond) { c.cond = b.cond; }
+            if (b.body) { c.body = sanitize(b.body); } if (b['else']) { c['else'] = sanitize(b['else']); }
+            return c;
+        });
+    }
+    function fresh(op) {
+        var b = {op: op};
+        if (op === 'repeat') { b.n = 4; b.body = []; }
+        if (op === 'until') { b.body = []; }
+        if (op === 'if') { b.cond = 'ahead'; b.body = []; b['else'] = []; }
+        if (op === 'move') { b.n = 1; }
+        if (op === 'turn') { b.dir = 'r'; b.deg = 90; }
+        return b;
+    }
+    function count(list) { var n = 0; (list || []).forEach(function (b) { n += 1 + count(b.body) + count(b['else']); }); return n; }
+    function contains(blk, list) {           // list лежит внутри blk?
+        if (!blk) { return false; }
+        return blk.body === list || blk['else'] === list || (blk.body || []).concat(blk['else'] || []).some(function (c) { return contains(c, list); });
+    }
+
+    // ---------------------------------------------------------------- отрисовка блоков
+    function sel(opts, val, field) {
+        return '<select data-f="' + field + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>';
+    }
+    function headHtml(b) {
+        switch (b.op) {
+            case 'up': return '<span class="ic">⬆️</span>' + L.up;
+            case 'down': return '<span class="ic">⬇️</span>' + L.down;
+            case 'left': return '<span class="ic">⬅️</span>' + L.left;
+            case 'right': return '<span class="ic">➡️</span>' + L.right;
+            case 'fwd': return '<span class="ic">🐾</span>' + L.fwd;
+            case 'turn_left': return '<span class="ic">↺</span>' + L.turn_left;
+            case 'turn_right': return '<span class="ic">↻</span>' + L.turn_right;
+            case 'move': return '<span class="ic">🐾</span>' + L.move1 + ' ' + sel(LV.move_n.map(function (n) { return [n, n]; }), b.n, 'n') + ' ' + L.move2;
+            case 'turn': return '<span class="ic">' + (b.dir === 'l' ? '↺' : '↻') + '</span>' + L.turn1 + ' ' + sel([['r', '↻'], ['l', '↺']], b.dir, 'dir') + ' ' +
+                sel(LV.degrees.map(function (d) { return [d, d + '°']; }), b.deg, 'deg');
+            case 'repeat': return '<span class="ic">🔁</span>' + L.repeat1 + ' ' + sel(LV.repeat_n.map(function (n) { return [n, n]; }), b.n, 'n') + ' ' + L.repeat2;
+            case 'until': return '<span class="ic">🔁</span>' + L.until + ' 🐟';
+            case 'if': return '<span class="ic">❓</span>' + L.if1 + ' ' + sel([['ahead', L.ahead], ['left', L.lft], ['right', L.rgt]], b.cond, 'cond') + ' ' + L.if2;
+            case 'penup': return '<span class="ic">✏️</span>' + L.penup;
+            case 'pendown': return '<span class="ic">✏️</span>' + L.pendown;
+        }
+        return b.op;
+    }
+    var lists = [], elOf = new Map();
+    function renderBlock(b, inScript) {
+        var el = document.createElement('div');
+        el.className = 'blk ' + (CAT[b.op] || 'motion');
+        el.innerHTML = '<div class="hd">' + headHtml(b) + (inScript ? '<button class="x" type="button" title="✕">×</button>' : '') + '</div>';
+        el._blk = b;
+        if (inScript) {
+            elOf.set(b, el);
+            if (b.body) {
+                var m = document.createElement('div'); m.className = 'mouth';
+                m.appendChild(renderList(b.body)); el.appendChild(m);
+            }
+            if (b['else']) {
+                var e = document.createElement('div'); e.className = 'else'; e.textContent = L.else_; el.appendChild(e);
+                var m2 = document.createElement('div'); m2.className = 'mouth'; m2.appendChild(renderList(b['else'])); el.appendChild(m2);
+            }
+            if (b.body) { var f = document.createElement('div'); f.className = 'ft'; el.appendChild(f); }
+        }
+        return el;
+    }
+    function renderList(arr) {
+        var box = document.createElement('div');
+        box.className = 'list'; box._list = arr; lists.push(box);
+        arr.forEach(function (b) { box.appendChild(renderBlock(b, true)); });
+        return box;
+    }
+    function render() {
+        lists = []; elOf = new Map();
+        var area = $('script-area'); area.innerHTML = '';
+        var hat = document.createElement('div'); hat.className = 'blk event hat'; hat.innerHTML = '<div class="hd"><span class="ic">⚑</span>' + L.hat + '</div>';
+        area.appendChild(hat);
+        var root = renderList(program); root.style.minHeight = '300px';
+        area.appendChild(root);
+        if (!program.length) { var t = document.createElement('div'); t.className = 'empty-tip'; t.textContent = '↓ ' + L.empty; root.appendChild(t); }
+        var n = count(program);
+        $('count').textContent = n + ' ' + L.blocks + (LV.best ? ' · ★★★ ≤ ' + LV.best : '');
+    }
+    function renderPalette() {
+        var p = $('palette'); p.innerHTML = '';
+        LV.blocks.forEach(function (op) { var el = renderBlock(fresh(op), false); el._op = op; p.appendChild(el); });
+    }
+
+    // правка параметров и удаление
+    $('script-area').addEventListener('change', function (e) {
+        var s = e.target.closest('select'); if (!s) { return; }
+        var b = s.closest('.blk')._blk, f = s.getAttribute('data-f');
+        b[f] = (f === 'n' || f === 'deg') ? +s.value : s.value;
+        if (f === 'dir') { render(); }
+    });
+    $('script-area').addEventListener('click', function (e) {
+        var x = e.target.closest('.x'); if (!x) { return; }
+        var b = x.closest('.blk')._blk, list = x.closest('.list')._list;
+        list.splice(list.indexOf(b), 1); render();
+    });
+    $('clear').addEventListener('click', function () { program.length = 0; render(); reset(); });
+
+    // ---------------------------------------------------------------- перетаскивание (мышь и палец)
+    var drag = null, line = $('drop-line');
+    function startDrag(e, blk, fromList) {
+        var src = e.target.closest('.blk');
+        var ghost = src.cloneNode(true); ghost.classList.add('ghost');
+        ghost.querySelectorAll('.x').forEach(function (x) { x.remove(); });
+        var r = src.getBoundingClientRect();
+        ghost.style.width = r.width + 'px';
+        document.body.appendChild(ghost);
+        drag = {blk: blk, from: fromList, src: src, ghost: ghost, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false, target: null};
+        moveGhost(e);
+    }
+    function moveGhost(e) {
+        drag.ghost.style.left = (e.clientX - drag.dx) + 'px'; drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
+    }
+    function findDrop(x, y) {
+        var el = document.elementFromPoint(x, y);
+        if (!el) { return null; }
+        if (el.closest('#palette')) { return {trash: true}; }
+        var box = el.closest('.list'), mouth = el.closest('.mouth');
+        if (mouth && (!box || box.contains(mouth))) { box = mouth.querySelector('.list'); }   // в «рот» C-блока, даже мимо его списка
+        if (!box) { if (el.closest('#script-area')) { box = lists[0]; } else { return null; } }
+        var arr = box._list, kids = Array.prototype.filter.call(box.children, function (c) { return c._blk; }), idx = kids.length;
+        for (var i = 0; i < kids.length; i++) {
+            var r = kids[i].querySelector('.hd').getBoundingClientRect();
+            if (y < r.top + r.height / 2) { idx = i; break; }
+        }
+        if (drag.from && contains(drag.blk, arr)) { return null; }      // нельзя положить блок внутрь самого себя
+        var br = box.getBoundingClientRect(), ly;
+        if (!kids.length) { ly = br.top + 6; } else if (idx < kids.length) { ly = kids[idx].getBoundingClientRect().top - 3; } else { ly = kids[kids.length - 1].getBoundingClientRect().bottom; }
+        return {list: arr, index: idx, lx: br.left, ly: ly};
+    }
+    document.addEventListener('pointerdown', function (e) {
+        if (e.button > 0 || e.target.closest('select') || e.target.closest('.x') || running) { return; }
+        var pb = e.target.closest('#palette .blk');
+        if (pb) { e.preventDefault(); startDrag(e, fresh(pb._op), null); return; }
+        var sb = e.target.closest('#script-area .blk');
+        if (sb && sb._blk) {
+            e.preventDefault();
+            var list = sb.parentNode._list;
+            startDrag(e, sb._blk, list);
+            sb.classList.add('moving');
+        }
+    });
+    document.addEventListener('pointermove', function (e) {
+        if (!drag) { return; }
+        if (Math.abs(e.clientX - drag.x0) + Math.abs(e.clientY - drag.y0) > 6) { drag.moved = true; }
+        moveGhost(e);
+        var t = findDrop(e.clientX, e.clientY);
+        drag.target = t;
+        $('palette').classList.toggle('trash', !!(t && t.trash && drag.from));
+        if (t && !t.trash) { line.style.display = 'block'; line.style.left = t.lx + 'px'; line.style.top = t.ly + 'px'; line.style.width = '160px'; }
+        else { line.style.display = 'none'; }
+    });
+    document.addEventListener('pointerup', function () {
+        if (!drag) { return; }
+        var d = drag; drag = null;
+        d.ghost.remove(); line.style.display = 'none'; $('palette').classList.remove('trash');
+        var t = d.target;
+        if (!d.moved && !d.from) { program.push(d.blk); }                                  // просто нажали на блок — в конец программы
+        else if (t && t.trash && d.from) { d.from.splice(d.from.indexOf(d.blk), 1); }        // утащили обратно — удалить
+        else if (t && !t.trash) {
+            var idx = t.index;
+            if (d.from) {
+                var old = d.from.indexOf(d.blk);
+                d.from.splice(old, 1);
+                if (d.from === t.list && old < idx) { idx--; }
+            }
+            t.list.splice(idx, 0, d.blk);
+        }
+        render();
+    });
+
+    // ---------------------------------------------------------------- сцена
+    var cv = $('stage'), ctx = cv.getContext('2d'), W = cv.width;
+    var DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]], ABS = {up: 0, right: 1, down: 2, left: 3};
+    var S = null, running = false, timer = null, steps = [], crashed = false;
+    function find(ch) { for (var y = 0; y < LV.grid.length; y++) { var x = LV.grid[y].indexOf(ch); if (x >= 0) { return [x, y]; } } return null; }
+    function reset() {
+        clearTimeout(timer); running = false; crashed = false; $('go').disabled = false;
+        document.querySelectorAll('.blk.run').forEach(function (b) { b.classList.remove('run'); });
+        if (LV.kind === 'maze') { var s = find('S'); S = {x: s[0], y: s[1], d: LV.start_dir, done: false}; }
+        else { S = {x: 0, y: 0, h: 0, down: true, lines: []}; }
+        draw();
+    }
+    // --- лабиринт
+    function drawMaze() {
+        var g = LV.grid, rows = g.length, cols = g[0].length, t = Math.floor(W / Math.max(rows, cols)), ox = (W - cols * t) / 2, oy = (W - rows * t) / 2;
+        ctx.fillStyle = '#bfe3a5'; ctx.fillRect(0, 0, W, W);
+        for (var y = 0; y < rows; y++) { for (var x = 0; x < cols; x++) {
+            var c = g[y][x], px = ox + x * t, py = oy + y * t;
+            if (c === '#') {
+                ctx.fillStyle = '#4d8b31'; roundRect(px + 2, py + 2, t - 4, t - 4, 10); ctx.fill();
+                ctx.fillStyle = '#5fa63d'; ctx.beginPath(); ctx.arc(px + t * .35, py + t * .4, t * .18, 0, 7); ctx.arc(px + t * .62, py + t * .55, t * .2, 0, 7); ctx.fill();
+            } else {
+                ctx.fillStyle = '#fff7df'; roundRect(px + 1, py + 1, t - 2, t - 2, 6); ctx.fill();
+            }
+        } }
+        var f = find('F'); emoji('🐟', ox + f[0] * t + t / 2, oy + f[1] * t + t / 2, t * .6);
+        var cx = ox + S.x * t + t / 2, cy = oy + S.y * t + t / 2;
+        if (LV.blocks.indexOf('fwd') >= 0) {                     // куда смотрит котик
+            var d = DIRS[S.d]; ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.moveTo(cx + d[0] * t * .48, cy + d[1] * t * .48);
+            ctx.lineTo(cx + d[0] * t * .3 - d[1] * t * .14, cy + d[1] * t * .3 + d[0] * t * .14);
+            ctx.lineTo(cx + d[0] * t * .3 + d[1] * t * .14, cy + d[1] * t * .3 - d[0] * t * .14); ctx.fill();
+        }
+        emoji(crashed ? '🙀' : (S.done ? '😻' : '🐱'), cx, cy, t * .66);
+    }
+    function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+    function emoji(ch, x, y, size) { ctx.font = size + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, x, y + size * .05); }
+    // --- рисование
+    var view = null;
+    function penView() {
+        var xs = [0], ys = [0];
+        LV.target.forEach(function (s) { xs.push(s[0][0], s[1][0]); ys.push(s[0][1], s[1][1]); });
+        var minx = Math.min.apply(null, xs), maxx = Math.max.apply(null, xs), miny = Math.min.apply(null, ys), maxy = Math.max.apply(null, ys);
+        var span = Math.max(maxx - minx, maxy - miny, 3) + 2, k = W / span;
+        view = {k: k, ox: (W - (maxx - minx) * k) / 2 - minx * k, oy: (W - (maxy - miny) * k) / 2 - miny * k};
+    }
+    function P(x, y) { return [view.ox + x * view.k, view.oy + y * view.k]; }
+    function drawPen() {
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, W);
+        ctx.fillStyle = '#e5e7eb';
+        for (var gx = -20; gx <= 20; gx++) { for (var gy = -20; gy <= 20; gy++) { var q = P(gx, gy); if (q[0] > 0 && q[0] < W && q[1] > 0 && q[1] < W) { ctx.fillRect(q[0] - 1.5, q[1] - 1.5, 3, 3); } } }
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 10;                       // образец
+        LV.target.forEach(function (s) { var a = P(s[0][0], s[0][1]), b = P(s[1][0], s[1][1]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); });
+        ctx.strokeStyle = crashed ? '#ef4444' : '#7c3aed'; ctx.lineWidth = 5;     // что нарисовал ученик
+        S.lines.forEach(function (s) { var a = P(s[0], s[1]), b = P(s[2], s[3]); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); });
+        var c = P(S.x, S.y), h = S.h * Math.PI / 180, r = 14;                     // карандаш-стрелка
+        ctx.fillStyle = S.down ? '#f59e0b' : '#9ca3af'; ctx.strokeStyle = '#78350f'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(c[0] + Math.cos(h) * r, c[1] + Math.sin(h) * r);
+        ctx.lineTo(c[0] + Math.cos(h + 2.5) * r, c[1] + Math.sin(h + 2.5) * r); ctx.lineTo(c[0] + Math.cos(h - 2.5) * r, c[1] + Math.sin(h - 2.5) * r); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    function draw() { if (LV.kind === 'maze') { drawMaze(); } else { drawPen(); } }
+
+    // ---------------------------------------------------------------- выполнение (шаги для анимации)
+    function plan(prog) {
+        var out = [], st = LV.kind === 'maze' ? {x: S.x, y: S.y, d: S.d} : {x: 0, y: 0, h: 0, down: true}, n = 0, g = LV.grid, goal = LV.kind === 'maze' ? find('F') : null;
+        function free(x, y) { return y >= 0 && y < g.length && x >= 0 && x < g[y].length && g[y][x] !== '#'; }
+        function stop(why) { throw {why: why}; }
+        function tick() { if (++n > 2000) { stop('steps'); } }
+        function go(b, d) {
+            var nx = st.x + DIRS[d][0], ny = st.y + DIRS[d][1];
+            if (!free(nx, ny)) { out.push({b: b, crash: true}); stop('wall'); }
+            st.x = nx; st.y = ny; out.push({b: b, x: nx, y: ny, d: st.d});
+            if (nx === goal[0] && ny === goal[1]) { stop('goal'); }
+        }
+        function cond(c) { var d = c === 'ahead' ? st.d : c === 'left' ? (st.d + 3) % 4 : (st.d + 1) % 4; return free(st.x + DIRS[d][0], st.y + DIRS[d][1]); }
+        function run(list) {
+            list.forEach(function (b) {
+                tick();
+                if (ABS[b.op] !== undefined) { st.d = ABS[b.op]; go(b, st.d); }
+                else if (b.op === 'fwd') { go(b, st.d); }
+                else if (b.op === 'turn_left' || b.op === 'turn_right') { st.d = (st.d + (b.op === 'turn_left' ? 3 : 1)) % 4; out.push({b: b, x: st.x, y: st.y, d: st.d}); }
+                else if (b.op === 'repeat') { for (var i = 0; i < b.n; i++) { run(b.body); } }
+                else if (b.op === 'until') { for (;;) { tick(); out.push({b: b, mark: true}); run(b.body); } }
+                else if (b.op === 'if') { out.push({b: b, mark: true}); run(cond(b.cond) ? b.body : b['else']); }
+                else if (b.op === 'move') {
+                    for (var k = 0; k < b.n; k++) {
+                        var nx = st.x + Math.cos(st.h * Math.PI / 180), ny = st.y + Math.sin(st.h * Math.PI / 180);
+                        out.push({b: b, line: st.down ? [st.x, st.y, nx, ny] : null, x: nx, y: ny, h: st.h, down: st.down});
+                        st.x = nx; st.y = ny;
+                    }
+                }
+                else if (b.op === 'turn') { st.h = (st.h + (b.dir === 'l' ? -b.deg : b.deg) + 360) % 360; out.push({b: b, x: st.x, y: st.y, h: st.h, down: st.down}); }
+                else if (b.op === 'penup' || b.op === 'pendown') { st.down = b.op === 'pendown'; out.push({b: b, x: st.x, y: st.y, h: st.h, down: st.down}); }
+            });
+        }
+        try { run(prog); } catch (e) { if (!e.why) { throw e; } }
+        return out;
+    }
+    function play(list, done) {
+        var i = 0, delay = LV.kind === 'maze' ? 380 : 170;
+        (function next() {
+            document.querySelectorAll('.blk.run').forEach(function (b) { b.classList.remove('run'); });
+            if (i >= list.length || !running) { done(); return; }
+            var s = list[i++], el = elOf.get(s.b);
+            if (el) { el.classList.add('run'); }
+            if (!s.mark) {
+                if (s.crash) { crashed = true; }
+                else if (LV.kind === 'maze') { S.x = s.x; S.y = s.y; S.d = s.d; }
+                else { if (s.line) { S.lines.push(s.line); } S.x = s.x; S.y = s.y; S.h = s.h; S.down = s.down; }
+                draw();
+            }
+            timer = setTimeout(next, s.mark ? delay / 3 : delay);
+        })();
+    }
+    $('go').addEventListener('click', function () {
+        if (running) { return; }
+        reset();
+        running = true; $('go').disabled = true;
+        var steps = plan(program), answer = null, animDone = false;
+        fetch(CHECK, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+                      body: JSON.stringify({program: program})})
+            .then(function (r) { return r.json(); }).then(function (d) { answer = d; if (animDone) { finish(); } })
+            .catch(function () { answer = {error: 'net'}; if (animDone) { finish(); } });
+        play(steps, function () {
+            animDone = true;
+            if (LV.kind === 'maze' && !crashed) { var f = find('F'); S.done = S.x === f[0] && S.y === f[1]; draw(); }
+            if (answer) { finish(); }
+        });
+        function finish() {
+            running = false; $('go').disabled = false;
+            if (!answer || answer.error) { if (answer && answer.error === 'bad_program') { showResult(0, L.fail, L.bad_program); } return; }
+            if (answer.ok) {
+                var txt = answer.coins ? '+' + answer.coins + ' ' + L.coins + ' 🪙' : '';
+                if (answer.stars < 3) { txt += (txt ? '<br>' : '') + L.shorter + answer.best + ' ' + L.blocks + '.'; }
+                showResult(answer.stars, L.win, txt);
+                setStars(answer.best_stars);
+                if ($('next-link')) { $('next-link').style.display = ''; }
+            } else {
+                showResult(0, L.fail, L[answer.reason === 'empty' ? 'empty_p' : answer.reason] || L.fail);
+            }
+        }
+    });
+    $('stop').addEventListener('click', reset);
+    function stars(n) { var h = ''; for (var i = 1; i <= 3; i++) { h += '<span class="' + (i <= n ? 'on' : '') + '">★</span>'; } return h; }
+    function setStars(n) { $('top-stars').innerHTML = stars(n); }
+    function showResult(n, title, text) {
+        $('r-stars').innerHTML = n ? stars(n) : '🙈'; $('r-title').textContent = title; $('r-text').innerHTML = text;
+        $('r-next').style.display = n ? '' : 'none';
+        $('result').style.display = 'flex';
+    }
+    $('r-again').addEventListener('click', function () { $('result').style.display = 'none'; reset(); });
+    $('result').addEventListener('click', function (e) { if (e.target === $('result')) { $('result').style.display = 'none'; } });
+
+    // ---------------------------------------------------------------- подсказка вслух
+    $('hint').textContent = LV.hint;
+    $('speak').addEventListener('click', function () {
+        if (!window.speechSynthesis) { return; }
+        speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(LV.title + '. ' + LV.hint); u.lang = KK ? 'kk-KZ' : 'ru-RU'; u.rate = .9;
+        speechSynthesis.speak(u);
+    });
+
+    if (LV.kind === 'pen') { penView(); }
+    renderPalette(); render(); reset();
+})();
+</script>
+{% endblock %}

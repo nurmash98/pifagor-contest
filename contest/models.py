@@ -720,7 +720,7 @@ class CoinTransaction(models.Model):
     key уникален для ученика — одно и то же начисление не может прийти дважды
     (например, 'task:15', 'day:2026-10-23', 'm:50', 'exam:7', 'buy:banner:gold')."""
     KIND_CHOICES = [('task', 'Задача 10/10'), ('day', 'Первая задача дня'), ('milestone', 'Каждые 50 задач'),
-                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('game', 'Игра'), ('grant', 'От учителя'), ('buy', 'Покупка')]
+                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('game', 'Игра'), ('scratch', 'Scratch-тренажёр'), ('grant', 'От учителя'), ('buy', 'Покупка')]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='coin_transactions')
     key = models.CharField(max_length=60)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)
@@ -1005,3 +1005,21 @@ class ShopItem(models.Model):
 
     def __str__(self):
         return f'{self.kind}:{self.key}'
+
+
+class ScratchProgress(models.Model):
+    """Scratch-тренажёр (1–4 классы): лучший результат ученика на уровне (ключ уровня из contest/scratch_levels.py)."""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='scratch_progress')
+    level = models.CharField(max_length=10)
+    stars = models.PositiveSmallIntegerField(default=0)            # 0 — ещё не прошёл
+    blocks = models.PositiveSmallIntegerField(default=0)           # блоков в лучшем решении
+    attempts = models.PositiveIntegerField(default=0)
+    program = models.JSONField(default=list, blank=True)           # лучшее решение — чтобы открыть уровень снова
+    solved_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['student', 'level'], name='unique_scratch_progress')]
+
+    def __str__(self):
+        return f'{self.student} · {self.level} · {self.stars}★'

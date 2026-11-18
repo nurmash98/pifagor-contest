@@ -4713,3 +4713,97 @@ class EmpireGameTests(TestCase):
         st = self.client.get(reverse('island_state', args=[self.game.id])).json()
         self.assertIn('empire', st)
         self.assertTrue(st['map']['hex'])
+
+
+class ScratchTrainerTests(TestCase):
+    """Scratch-тренажёр: только 1–4 классы, задачи на Python у них скрыты; проверка решений на сервере, звёзды, монеты."""
+
+    def setUp(self):
+        self.junior = Student.objects.create(user=User.objects.create_user('sc_j', password='p'), full_name='Малыш', school_class='2A')
+        self.senior = Student.objects.create(user=User.objects.create_user('sc_s', password='p'), full_name='Старший', school_class='7A')
+        self.tu = User.objects.create_user('sc_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='2A,7A')
+
+    def post(self, key, program):
+        import json
+        return self.client.post(reverse('scratch_check', args=[key]), data=json.dumps({'program': program}), content_type='application/json').json()
+
+    def test_every_level_is_solvable_by_its_solution(self):
+        from . import scratch_levels as sl
+        self.assertGreaterEqual(len(sl.LEVELS), 30)
+        for lv in sl.LEVELS:
+            res = sl.check(lv, sl.clean(lv['solution'], set(lv['blocks'])))
+            self.assertTrue(res['ok'], lv['key'])
+            self.assertEqual(res['stars'], 3, lv['key'])
+            if lv['kind'] == 'maze':
+                self.assertEqual(len({len(r) for r in lv['grid']}), 1, lv['key'])
+
+    def test_is_junior(self):
+        from .scratch_levels import is_junior
+        for cls, want in (('1A', True), ('4Б', True), ('5A', False), ('10A', False), ('', False), ('Подготовка', False)):
+            self.assertEqual(is_junior(Student(school_class=cls)), want, cls)
+
+    def test_junior_sees_scratch_not_python(self):
+        self.client.login(username='sc_j', password='p')
+        self.assertRedirects(self.client.get(reverse('all_tasks')), reverse('scratch_home'))
+        self.assertRedirects(self.client.get(reverse('courses')), reverse('scratch_home'))
+        self.assertRedirects(self.client.get(reverse('leaderboard')), reverse('scratch_home'))
+        r = self.client.get(reverse('scratch_home'))
+        self.assertContains(r, '🐱 Scratch')
+        self.assertNotContains(r, 'Все задачи')
+        self.assertContains(r, reverse('scratch_level', args=['m1']))
+
+    def test_senior_does_not_see_scratch(self):
+        self.client.login(username='sc_s', password='p')
+        self.assertRedirects(self.client.get(reverse('scratch_home')), reverse('all_tasks'), fetch_redirect_response=False)
+        r = self.client.get(reverse('all_tasks'))
+        self.assertNotContains(r, '🐱 Scratch')
+        self.assertEqual(self.client.post(reverse('scratch_check', args=['m1']), data='{}', content_type='application/json').status_code, 403)
+
+    def test_check_saves_stars_coins_and_unlocks_next(self):
+        from .models import ScratchProgress, CoinTransaction
+        from . import coins
+        self.client.login(username='sc_j', password='p')
+        self.assertRedirects(self.client.get(reverse('scratch_level', args=['m2'])), reverse('scratch_home'))   # закрыт
+        bad = self.post('m1', [{'op': 'right'}])
+        self.assertEqual((bad['ok'], bad['reason']), (False, 'short'))
+        long = self.post('m1', [{'op': 'right'}, {'op': 'right'}, {'op': 'left'}])
+        self.assertEqual(long['ok'], True)                                   # дошёл до рыбки раньше, чем кончились блоки
+        self.assertEqual(long['stars'], 2)
+        ok = self.post('m1', [{'op': 'right'}, {'op': 'right'}])
+        self.assertEqual((ok['ok'], ok['stars'], ok['next']), (True, 3, 'm2'))
+        p = ScratchProgress.objects.get(student=self.junior, level='m1')
+        self.assertEqual((p.stars, p.blocks, p.attempts), (3, 2, 3))
+        self.assertEqual(coins.balance(self.junior), 3)                       # 2 за прохождение + 1 за три звезды
+        self.post('m1', [{'op': 'right'}, {'op': 'right'}])
+        self.assertEqual(coins.balance(self.junior), 3)                       # повторно не начисляется
+        self.assertEqual(self.client.get(reverse('scratch_level', args=['m2'])).status_code, 200)
+        self.assertEqual(self.post('m1', [{'op': 'fwd'}]), {'error': 'bad_program'})     # блок не из этого уровня
+
+    def test_pen_drawing_compared_with_sample(self):
+        self.client.login(username='sc_j', password='p')
+        sq = [{'op': 'repeat', 'n': 4, 'body': [{'op': 'move', 'n': 3}, {'op': 'turn', 'dir': 'r', 'deg': 90}]}]
+        for k in ('p1', 'p2', 'p3'):                                          # открываем по очереди
+            from . import scratch_levels as sl
+            self.assertTrue(self.post(k, sl.BY_KEY[k]['solution'])['ok'])
+        self.assertEqual(self.post('p4', sq)['stars'], 3)
+        wrong = [{'op': 'repeat', 'n': 4, 'body': [{'op': 'move', 'n': 2}, {'op': 'turn', 'dir': 'r', 'deg': 90}]}]
+        self.assertEqual(self.post('p4', wrong)['ok'], False)
+        other_way = [{'op': 'move', 'n': 3}, {'op': 'turn', 'dir': 'r', 'deg': 90}, {'op': 'move', 'n': 3}, {'op': 'turn', 'dir': 'r', 'deg': 90},
+                     {'op': 'move', 'n': 3}, {'op': 'turn', 'dir': 'r', 'deg': 90}, {'op': 'move', 'n': 1}, {'op': 'move', 'n': 2}]
+        res = self.post('p4', other_way)
+        self.assertEqual((res['ok'], res['stars']), (True, 1))                # тот же квадрат, но длинно — 1 звезда
+
+    def test_teacher_preview_and_progress_page(self):
+        self.client.login(username='sc_t', password='p')
+        r = self.client.get(reverse('scratch_home'))
+        self.assertContains(r, 'все уровни открыты')
+        self.assertEqual(self.client.get(reverse('scratch_level', args=['p14'])).status_code, 200)
+        from . import scratch_levels as sl
+        self.assertTrue(self.post('m21', sl.BY_KEY['m21']['solution'])['ok'])
+        from .models import ScratchProgress
+        self.assertFalse(ScratchProgress.objects.exists())                    # у учителя ничего не сохраняется
+        r = self.client.get(reverse('scratch_teacher'))
+        self.assertContains(r, 'Малыш')
+        self.assertNotContains(r, 'Старший')
+        self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('scratch_teacher'))

@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from . import exam_views, exam_report
+from . import exam_views, exam_report, scratch_views
 from . import exam_guard
 from . import moderation_views
 from . import activity
@@ -35,6 +35,10 @@ urlpatterns = [
 
     # Рейтинг и профиль
     path('leaderboard/', views.leaderboard, name='leaderboard'),
+    path('scratch/', scratch_views.scratch_home, name='scratch_home'),
+    path('scratch/<str:key>/', scratch_views.scratch_level, name='scratch_level'),
+    path('scratch/<str:key>/check/', scratch_views.scratch_check, name='scratch_check'),
+    path('teacher/scratch/', scratch_views.scratch_teacher, name='scratch_teacher'),
     path('hall-of-fame/', views.hall_of_fame, name='hall_of_fame'),
     path('hall-of-fame/reconcile/', views.hall_reconcile, name='hall_reconcile'),
     path('hall-of-fame/disqualify/', views.hall_disqualify, name='hall_disqualify'),

@@ -108,3 +108,13 @@ def olympiads_visible(request):
         return {'olympiads_visible': True}
     from .models import Exam
     return {'olympiads_visible': Exam.objects.filter(kind='OLYM', participants__user=user).exists()}
+
+
+def junior(request):
+    """Ученик 1–4 класса: в меню Scratch вместо задач на Python."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'is_junior': False}
+    from .models import Student
+    from .scratch_levels import is_junior
+    return {'is_junior': is_junior(Student.objects.filter(user=user).first())}

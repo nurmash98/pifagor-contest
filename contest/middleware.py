@@ -9,6 +9,13 @@ EXAM_LOCKED_VIEWS = {
 }
 
 
+# Страницы с задачами на Python — ученикам 1–4 классов вместо них Scratch-тренажёр.
+JUNIOR_BLOCKED_VIEWS = {
+    'all_tasks', 'task_detail', 'courses', 'course_detail', 'topic_video', 'topic_theory', 'subtopic_theory',
+    'leaderboard', 'duels', 'olympiad_list',
+}
+
+
 class RealIPMiddleware:
     """За nginx на своём сервере адрес клиента приходит в заголовке X-Real-IP (nginx его перезаписывает,
     подделать нельзя). Берём его, только если запрос пришёл с самого сервера (127.0.0.1) и включено
@@ -43,6 +50,13 @@ class ExamLockMiddleware:
         return self.get_response(request)
 
     def process_view(self, request, view_func, view_args, view_kwargs):
+        match = getattr(request, 'resolver_match', None)
+        user = getattr(request, 'user', None)
+        if match is not None and match.url_name in JUNIOR_BLOCKED_VIEWS and user is not None and user.is_authenticated and not user.is_staff:
+            from .models import Student
+            from .scratch_levels import is_junior
+            if is_junior(Student.objects.filter(user=user).first()):
+                return redirect('scratch_home')
         attempt = getattr(request, 'active_exam_attempt', None)
         match = getattr(request, 'resolver_match', None)
         if attempt is not None and match is not None and match.url_name in EXAM_LOCKED_VIEWS:
