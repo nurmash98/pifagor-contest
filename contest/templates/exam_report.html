@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Анализ СОР/СОЧ{% endblock %}
+{% block content %}
+<style>
+    .rp-card { background: var(--bs-body-bg); border-radius: 20px; box-shadow: 0 2px 14px rgba(15, 23, 42, .07); padding: 22px; }
+    .rp-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+    .rp-tile { position: relative; display: block; cursor: pointer; margin: 0; }
+    .rp-tile input { position: absolute; opacity: 0; }
+    .rp-tile .box { border: 2px solid #e2e5f0; border-radius: 14px; padding: 12px 8px; text-align: center; transition: .15s; }
+    .rp-tile .nm { font-weight: 800; font-size: 20px; }
+    .rp-tile .ht { font-size: 12px; color: #6b7280; min-height: 16px; }
+    .rp-tile input:checked + .box { border-color: #4338ca; background: #eef0ff; }
+    .rp-tile input:focus-visible + .box { outline: 3px solid #a5b4fc; }
+    .rp-tile .box.empty .ht { color: #c2c7d6; }
+    .rp-seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .rp-seg label { margin: 0; cursor: pointer; }
+    .rp-seg input { position: absolute; opacity: 0; }
+    .rp-seg span { display: inline-block; padding: 8px 18px; border-radius: 999px; border: 2px solid #e2e5f0; font-weight: 700; }
+    .rp-seg input:checked + span { background: #1a1a4b; border-color: #1a1a4b; color: #fff; }
+    [data-bs-theme="dark"] .rp-card { background: #161b2e; box-shadow: none; border: 1px solid #262d47; }
+    [data-bs-theme="dark"] .rp-tile .box, [data-bs-theme="dark"] .rp-seg span { border-color: #2d3558; }
+    [data-bs-theme="dark"] .rp-tile input:checked + .box { background: #262b63; border-color: #7c83ff; }
+    [data-bs-theme="dark"] .rp-seg input:checked + span { background: #3b40a6; border-color: #3b40a6; }
+    [data-bs-theme="dark"] .rp-tile .ht { color: #9aa1bf; }
+</style>
+<div class="container py-4" style="max-width: 960px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h3 class="fw-bold mb-1">📝 Анализ СОР/СОЧ</h3>
+            <div class="text-muted small">Отчёт в Word по образцу «ЕСЕП»: общая информация, результаты и уровни, затруднения, выводы и рекомендации — с цифрами с платформы.</div>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Аналитика</a>
+    </div>
+    {{ hints|json_script:"rp-hints" }}
+    <form method="post" class="rp-card">{% csrf_token %}
+        <div class="mb-4">
+            <div class="fw-bold mb-2">1. Четверть</div>
+            <div class="rp-seg">{% for n in "1234" %}<label><input type="radio" name="quarter" value="{{ n }}" {% if n|add:0 == quarter %}checked{% endif %}><span>{{ n }} четверть</span></label>{% endfor %}</div>
+        </div>
+        <div class="mb-4">
+            <div class="d-flex align-items-center gap-3 mb-2"><span class="fw-bold">2. Классы</span>
+                <button type="button" class="btn btn-link btn-sm p-0" id="rp-all">выбрать все</button>
+                <button type="button" class="btn btn-link btn-sm p-0 text-muted" id="rp-none">снять</button></div>
+            <div class="rp-tiles">
+                {% for c in classes %}<label class="rp-tile"><input type="checkbox" name="classes" value="{{ c }}"><div class="box" data-cls="{{ c }}"><div class="nm">{{ c }}</div><div class="ht"></div></div></label>
+                {% empty %}<div class="text-muted">У вас пока нет классов.</div>{% endfor %}
+            </div>
+            <div class="text-muted small mt-2">Один класс — файл Word. Несколько классов — архив .zip, внутри отдельный файл на каждый класс.</div>
+        </div>
+        <div class="row g-4 mb-4">
+            <div class="col-md-6"><div class="fw-bold mb-2">3. Какие работы</div>
+                <div class="rp-seg"><label><input type="checkbox" name="kinds" value="SOR" checked><span>СОР (БЖБ)</span></label><label><input type="checkbox" name="kinds" value="SOCH" checked><span>СОЧ (ТЖБ)</span></label></div></div>
+            <div class="col-md-6"><div class="fw-bold mb-2">4. Язык отчёта</div>
+                <div class="rp-seg"><label><input type="radio" name="lang" value="kk" {% if lang == 'kk' %}checked{% endif %}><span>Қазақша</span></label><label><input type="radio" name="lang" value="ru" {% if lang != 'kk' %}checked{% endif %}><span>Русский</span></label></div></div>
+        </div>
+        <button class="btn btn-primary btn-lg rounded-pill px-5 fw-bold" id="rp-go">⬇ Скачать анализ</button>
+        <div class="text-muted small mt-3">Каждый СОР/СОЧ — отдельный отчёт (с новой страницы). «Формативное оценивание» — средний балл задач на платформе за четверть. Строку «Бөлім / Раздел» заполните в Word сами.</div>
+    </form>
+</div>
+<script>
+(function () {
+    var hints = JSON.parse(document.getElementById('rp-hints').textContent);
+    function q() { var r = document.querySelector('input[name=quarter]:checked'); return r ? r.value : '1'; }
+    function paint() {
+        document.querySelectorAll('.rp-tile .box').forEach(function (b) {
+            var h = (hints[b.dataset.cls] || {})[q()], parts = [];
+            if (h && h.SOR) { parts.push('СОР ' + h.SOR); }
+            if (h && h.SOCH) { parts.push('СОЧ ' + h.SOCH); }
+            b.querySelector('.ht').textContent = parts.length ? parts.join(' · ') : 'нет работ';
+            b.classList.toggle('empty', !parts.length);
+        });
+    }
+    document.querySelectorAll('input[name=quarter]').forEach(function (r) { r.addEventListener('change', paint); });
+    document.getElementById('rp-all') && document.getElementById('rp-all').addEventListener('click', function () {
+        document.querySelectorAll('input[name=classes]').forEach(function (c) { c.checked = true; });
+    });
+    document.getElementById('rp-none') && document.getElementById('rp-none').addEventListener('click', function () {
+        document.querySelectorAll('input[name=classes]').forEach(function (c) { c.checked = false; });
+    });
+    paint();
+})();
+</script>
+{% endblock %}

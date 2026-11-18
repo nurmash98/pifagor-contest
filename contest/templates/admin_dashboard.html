@@ -52,7 +52,10 @@
             <h2 class="fw-bold mb-0">📊 Аналитика</h2>
             <div class="text-muted small">С {{ d.since|date:"d.m.Y" }} · {% if d.mode == 'student' %}класс {{ d.cls }}, по ученикам{% elif d.parallel %}{{ d.parallel }} параллель, по классам{% elif d.scoped %}ваши классы{% else %}все параллели{% endif %}</div>
         </div>
-        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Кабинет преподавателя</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'exam_report' %}" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold">📝 Анализ СОР/СОЧ</a>
+            <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Кабинет преподавателя</a>
+        </div>
     </div>
 
     <div class="d-flex flex-wrap gap-2 mb-2">

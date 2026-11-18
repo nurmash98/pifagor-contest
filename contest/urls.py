@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from . import exam_views
+from . import exam_views, exam_report
 from . import exam_guard
 from . import moderation_views
 from . import activity
@@ -103,6 +103,7 @@ urlpatterns = [
 
     # Кабинет преподавателя
     path('analytics/', dashboard.admin_dashboard, name='admin_dashboard'),
+    path('analytics/sor-soch/', exam_report.exam_report, name='exam_report'),
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path('teacher/grade/<int:submission_id>/', views.grade_submission, name='grade_submission'),
 

@@ -4361,3 +4361,79 @@ class ShopAdminTests(TestCase):
         self.assertEqual(avatars.own_price(), 900)
         self.post(action='save', kind='avatar', key='own', price=str(avatars.OWN_PRICE))
         self.assertEqual(avatars.own_price(), avatars.OWN_PRICE)
+
+
+class ExamReportTests(RetakeTestBase):
+    """Анализ СОР/СОЧ в Word: классы + четверть → .docx (несколько классов — .zip)."""
+
+    def setUp(self):
+        super().setUp()
+        Exam.objects.filter(id__in=[self.exam.id, self.random_exam.id]).update(quarter=2)
+        self.attempt(self.exam, self.students[0], 10)
+        self.attempt(self.exam, self.students[1], 3)
+        self.attempt(self.random_exam, self.students[2], 7, task_ids=[self.a_tasks[1].id, self.b_tasks[1].id])
+        self.url = reverse('exam_report')
+
+    def text(self, data):
+        import docx, io
+        d = docx.Document(io.BytesIO(data))
+        parts = [p.text for p in d.paragraphs]
+        for t in d.tables:
+            for row in t.rows:
+                parts.append(' | '.join(c.text for c in row.cells))
+        return '\n'.join(parts)
+
+    def test_page_and_access(self):
+        self.client.force_login(self.students[0].user)
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        self.client.force_login(self.teacher_user)
+        r = self.client.get(self.url)
+        self.assertContains(r, 'Анализ СОР/СОЧ')
+        self.assertContains(r, 'value="7F"')
+        self.assertContains(self.client.get(reverse('admin_dashboard')), reverse('exam_report'))
+
+    def test_one_class_gives_docx_kk(self):
+        self.client.force_login(self.teacher_user)
+        r = self.client.post(self.url, {'classes': ['7F'], 'quarter': '2', 'kinds': ['SOR', 'SOCH'], 'lang': 'kk'})
+        self.assertEqual(r['Content-Type'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        self.assertIn('.docx', r['Content-Disposition'])
+        txt = self.text(r.content)
+        self.assertIn('ЕСЕП', txt)
+        self.assertIn('бөлім бойынша жиынтық бағалау (БЖБ)', txt)
+        self.assertIn('тоқсан бойынша жиынтық бағалау (ТЖБ)', txt)     # СОЧ — отдельный отчёт в том же файле
+        self.assertIn('Сынып: 7F', txt)
+        self.assertIn('Тоқсан: 2', txt)
+        self.assertIn('БЖБ бойынша орташа балл: 6,5', txt)               # (10 + 3) / 2
+        self.assertIn('Ең жоғары балл: 10', txt)
+        self.assertIn('Жоғары (8,5-10) | 1', txt)
+        self.assertIn('Төмен (6,5-ке дейін) | 1', txt)
+        self.assertIn('Ученик 1', txt)                                   # низкий — в рекомендациях
+        self.assertIn('Жұмысты жазбағандар', txt)
+
+    def test_russian_and_only_sor(self):
+        self.client.force_login(self.teacher_user)
+        r = self.client.post(self.url, {'classes': ['7F'], 'quarter': '2', 'kinds': ['SOR'], 'lang': 'ru'})
+        txt = self.text(r.content)
+        self.assertIn('ОТЧЁТ', txt)
+        self.assertIn('Средний балл за СОР: 6,5', txt)
+        self.assertNotIn('СОЧ)', txt)
+
+    def test_several_classes_zip_and_empty_quarter(self):
+        import io, zipfile
+        Exam.objects.create(kind='SOR', title='СОР 8A', school_class='8A', quarter=2,
+                            start_at=timezone.now() - timedelta(hours=2), duration_minutes=40, created_by=self.teacher)
+        self.client.force_login(User.objects.create_superuser('rep_admin', password='x'))
+        r = self.client.post(self.url, {'classes': ['7F', '8A'], 'quarter': '2', 'kinds': ['SOR', 'SOCH'], 'lang': 'ru'})
+        self.assertEqual(r['Content-Type'], 'application/zip')
+        names = zipfile.ZipFile(io.BytesIO(r.content)).namelist()
+        self.assertEqual(len(names), 2)
+        self.assertTrue(all(n.endswith('.docx') for n in names))
+        r = self.client.post(self.url, {'classes': ['7F'], 'quarter': '4', 'kinds': ['SOR'], 'lang': 'ru'})
+        self.assertRedirects(r, self.url)                                # в 4 четверти работ нет
+
+    def test_teacher_cannot_get_foreign_class(self):
+        self.client.force_login(self.teacher_user)
+        classes = self.client.get(self.url).context['classes']
+        if '8A' not in classes:
+            r = self.client.post(self.url, {'classes': ['8A'], 'quarter': '2', 'kinds': ['SOR'], 'lang': 'ru'})
+            self.assertRedirects(r, self.url)
