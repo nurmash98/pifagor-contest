@@ -148,8 +148,13 @@
 
                     <div class="mb-4">
                         <label class="form-label fw-bold">Комментарий / Фидбек</label>
-                        <textarea name="comment" class="form-control" rows="4"
-                                  placeholder="Например: Отличный алгоритм, но постарайся давать переменным понятные имена.">{{ grading_attempt.teacher_comment|default:"" }}</textarea>
+                        <textarea name="comment" id="grade-comment" class="form-control" rows="4"
+                                  placeholder="Например: Отличный алгоритм, но постарайся давать переменным понятные имена.">{% if grading_attempt.teacher_comment %}{{ grading_attempt.teacher_comment }}{% elif ai_reasons %}Код скопирован из ИИ{% endif %}</textarea>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="btn btn-outline-warning btn-sm rounded-pill" id="ai-quick"
+                                    title="Поставить 0 и комментарий «Код скопирован из ИИ»">🤖 Код из ИИ → 0</button>
+                        </div>
+                        {% if ai_reasons and not grading_attempt.teacher_comment %}<div class="form-text">Комментарий подставлен, потому что у решения есть признаки ИИ. Можно стереть.</div>{% endif %}
                     </div>
 
                     <div class="d-flex gap-2">
@@ -169,4 +174,14 @@
         </div>
     </div>
 </div>
+<script>
+(function () {
+    var b = document.getElementById('ai-quick');
+    if (!b) { return; }
+    b.addEventListener('click', function () {
+        document.querySelector('input[name=score]').value = 0;
+        document.getElementById('grade-comment').value = 'Код скопирован из ИИ';
+    });
+})();
+</script>
 {% endblock %}

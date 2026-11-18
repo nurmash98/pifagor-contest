@@ -4875,4 +4875,8 @@ class AiSignalsTests(TestCase):
         r = self.client.get(reverse('grade_submission', args=[own.id]))
         self.assertContains(r, 'Признаки ИИ')
         self.assertContains(r, 'аннотации типов')
-        self.assertNotContains(self.client.get(reverse('grade_submission', args=[sub.id])), 'Признаки ИИ')
+        self.assertContains(r, '>Код скопирован из ИИ</textarea>')                      # обратная связь подставлена
+        r = self.client.get(reverse('grade_submission', args=[sub.id]))
+        self.assertNotContains(r, 'Признаки ИИ')
+        self.assertNotContains(r, '>Код скопирован из ИИ</textarea>')
+        self.assertContains(r, 'Код из ИИ → 0')                                          # быстрая кнопка есть всегда
