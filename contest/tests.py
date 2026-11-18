@@ -391,7 +391,10 @@ class FastSolveBlockTests(TestCase):
         self.client.login(username='ft', password='x')
         self.assertNotIn('Быстрый', self.client.get('/teacher/suspicious/').content.decode())
         self.solve(self.tasks[2], 14)
-        self.assertIn('Быстрый', self.client.get('/teacher/suspicious/').content.decode())
+        html = self.client.get('/teacher/suspicious/').content.decode()
+        self.assertIn('Быстрый', html)
+        self.assertIn('посмотреть код', html)                                   # код быстрых решений можно открыть
+        self.assertIn('<pre>x</pre>', html)
 
     def test_slow_or_wrong_not_counted(self):
         self.solve(self.tasks[0], 60); self.solve(self.tasks[1], 10, score=4); self.solve(self.tasks[2], 5)

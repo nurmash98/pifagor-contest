@@ -18,7 +18,7 @@ FAST_SOLVE_MIN_TASKS = 3
 
 
 def fast_solves(students_qs):
-    """{student_id: [(задача, секунд), ...]} — быстрые первые решения (10/10)."""
+    """{student_id: [(задача, секунд, попытка), ...]} — быстрые первые решения (10/10)."""
     result = {}
     attempts = (Attempt.objects.filter(number=1, score=10, submission__student__in=students_qs)
                 .select_related('submission__task', 'submission__student')
@@ -27,7 +27,7 @@ def fast_solves(students_qs):
         sub = a.submission
         seconds = (a.submitted_at - sub.created_at).total_seconds()
         if 0 <= seconds <= FAST_SOLVE_SECONDS:
-            result.setdefault(sub.student_id, []).append((sub.task, round(seconds)))
+            result.setdefault(sub.student_id, []).append((sub.task, round(seconds), a))
     return result
 
 
@@ -36,8 +36,9 @@ AUTOMATION_MARKERS = ('headless', 'selenium', 'playwright', 'puppeteer', 'phanto
 NO_ACTIVITY_MIN_ATTEMPTS = 2   # отправок, при которых страницу «никто не трогал»
 
 
-def _reasons(students_qs):
-    """{student_id: [текст причины, ...]} — всё, что показывает «заходит не сам»."""
+def _reasons(students_qs, fast_out=None):
+    """{student_id: [текст причины, ...]} — всё, что показывает «заходит не сам».
+    fast_out (dict) — сюда кладутся быстрые решения с кодом: {student_id: [(задача, секунд, попытка)]}."""
     from datetime import timedelta
     from django.utils import timezone
     reasons = {}
@@ -47,8 +48,10 @@ def _reasons(students_qs):
 
     for sid, items in fast_solves(students_qs).items():
         if len(items) >= FAST_SOLVE_MIN_TASKS:
+            if fast_out is not None:
+                fast_out[sid] = items
             add(sid, f'Быстрые решения: {len(items)} задач решены на 10/10 за {FAST_SOLVE_SECONDS} с или быстрее — ' +
-                '; '.join(f'{t.title} ({sec} с)' for t, sec in items[:5]))
+                '; '.join(f'{t.title} ({sec} с)' for t, sec, _ in items[:5]))
 
     idle = {}
     for a in (Attempt.objects.filter(key_count=0, pointer_count=0, submission__student__in=students_qs)
@@ -78,7 +81,8 @@ def suspicious_students(request):
     students = Student.objects.select_related('user')
     if classes is not None:
         students = students.filter(school_class__in=classes)
-    reasons = _reasons(students)
+    fast = {}
+    reasons = _reasons(students, fast)
     from .ai_signals import analyse_cached
     ai = analyse_cached(students)
     # ИИ: в список попадает тот, у кого 2+ решения с признаками или хотя бы одно с явной «подписью» ИИ
@@ -88,7 +92,7 @@ def suspicious_students(request):
     rows = []
     for st in students.filter(id__in=list(set(reasons) | set(ai))).order_by('school_class', 'full_name'):
         own = reasons.get(st.id, [])
-        rows.append({'student': st, 'reasons': own, 'ai': ai.get(st.id, []), 'count': len(own) + (1 if st.id in ai else 0),
+        rows.append({'student': st, 'reasons': own, 'ai': ai.get(st.id, []), 'fast': fast.get(st.id, []), 'count': len(own) + (1 if st.id in ai else 0),
                      'blocked': not st.user.is_active, 'until': st.blocked_until})
     rows.sort(key=lambda r: -r['count'])
     return render(request, 'suspicious_students.html', {'rows': rows})

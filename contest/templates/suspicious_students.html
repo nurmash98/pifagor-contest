@@ -3,6 +3,13 @@
 {% block title %}Подозрительные аккаунты - Pifagor Contest{% endblock %}
 
 {% block content %}
+<style>
+    .sus-code { margin: 4px 0; }
+    .sus-code summary { cursor: pointer; color: #4f46e5; font-weight: 600; }
+    .sus-code pre { background: #1e1e2e; color: #e5e7eb; border-radius: 10px; padding: 10px 12px; margin: 6px 0; font-size: 13px;
+                    max-height: 320px; overflow: auto; white-space: pre; }
+    [data-bs-theme="dark"] .sus-code summary { color: #a5b4fc; }
+</style>
 <div class="mb-3"><a href="{% url 'student_list' %}" class="text-decoration-none text-muted small">← Ученики</a></div>
 <h3 class="fw-bold mb-1" style="color: #1a1a4b;">⚠ Подозрительные аккаунты</h3>
 <p class="text-muted small mb-4">Признаки, что за аккаунт, возможно, работает не сам ученик: слишком быстрые решения,
@@ -21,10 +28,19 @@
                     {% if row.blocked %}<span class="badge bg-danger ms-1">Заблокирован{% if row.until %} до {{ row.until|date:"d.m H:i" }}{% else %} без срока{% endif %}</span>{% endif %}
                     <ul class="text-muted small mt-1 mb-0 ps-3">
                         {% for r in row.reasons %}<li>{{ r }}</li>{% endfor %}
+                        {% if row.fast %}<li class="list-unstyled mt-1">
+                            {% for task, sec, att in row.fast|slice:":12" %}
+                            <details class="sus-code"><summary>⚡ {{ task.title }} — {{ sec }} с · посмотреть код</summary>
+                                <pre>{{ att.code|default:"(пусто)" }}</pre>
+                                <a href="{% url 'grade_submission' att.submission_id %}" class="small">Открыть проверку →</a></details>
+                            {% endfor %}
+                            {% if row.fast|length > 12 %}<div class="small">… и ещё {{ row.fast|length|add:"-12" }}</div>{% endif %}
+                        </li>{% endif %}
                         {% if row.ai %}<li>🤖 <strong>Возможен ИИ</strong> — решений с признаками: {{ row.ai|length }}
                             <ul class="ps-3">{% for it in row.ai|slice:":6" %}
                                 <li><a href="{% url 'grade_submission' it.sub.id %}" class="text-decoration-none">{{ it.sub.task.title }}</a>:
-                                    {% for r in it.reasons %}{{ r }}{% if not forloop.last %}; {% endif %}{% endfor %}</li>{% endfor %}
+                                    {% for r in it.reasons %}{{ r }}{% if not forloop.last %}; {% endif %}{% endfor %}
+                                    <details class="sus-code"><summary>посмотреть код</summary><pre>{{ it.sub.code }}</pre></details></li>{% endfor %}
                                 {% if row.ai|length > 6 %}<li>… и ещё {{ row.ai|length|add:"-6" }}</li>{% endif %}
                             </ul></li>{% endif %}
                     </ul>
