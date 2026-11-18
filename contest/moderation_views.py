@@ -34,7 +34,6 @@ def fast_solves(students_qs):
 AUTOMATION_MARKERS = ('headless', 'selenium', 'playwright', 'puppeteer', 'phantomjs',
                       'webdriver', 'python-requests', 'curl/', 'httpx', 'aiohttp')
 NO_ACTIVITY_MIN_ATTEMPTS = 2   # отправок, при которых страницу «никто не трогал»
-MANY_DEVICES_MIN = 3           # разных устройств (User-Agent) за неделю
 
 
 def _reasons(students_qs):
@@ -61,19 +60,14 @@ def _reasons(students_qs):
 
     users = {st.user_id: st.id for st in students_qs}
     now = timezone.now()
-    devices, auto = {}, {}
+    auto = {}
     for ev in LoginEvent.objects.filter(user_id__in=list(users), at__gte=now - timedelta(days=30)):
         sid = users[ev.user_id]
         ua = ev.user_agent or ''
         if any(m in ua.lower() for m in AUTOMATION_MARKERS):
             auto[sid] = ua[:80]
-        if ev.at >= now - timedelta(days=7):
-            devices.setdefault(sid, set()).add(ua)
     for sid, ua in auto.items():
         add(sid, f'Вход из автоматизированного браузера или скрипта ({ua})')
-    for sid, uas in devices.items():
-        if len(uas) >= MANY_DEVICES_MIN:
-            add(sid, f'За неделю вход с {len(uas)} разных устройств/браузеров')
     return reasons
 
 

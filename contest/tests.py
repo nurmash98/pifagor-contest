@@ -461,11 +461,11 @@ class ActivitySignalTests(TestCase):
         self.assertEqual(LoginEvent.objects.count(), 1)
         self.assertIn('автоматизированного', self.page())
 
-    def test_many_devices(self):
+    def test_many_devices_is_not_suspicious(self):
         from .models import LoginEvent
-        for ua in ('A', 'B', 'C'):
+        for ua in ('A', 'B', 'C', 'D'):
             LoginEvent.objects.create(user=self.su, user_agent=ua)
-        self.assertIn('3 разных устройств', self.page())
+        self.assertNotIn('устройств', self.page())                       # вход с разных устройств — не признак
 
 
 class TemporaryBlockTests(TestCase):
