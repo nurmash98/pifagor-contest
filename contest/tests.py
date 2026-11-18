@@ -3031,8 +3031,10 @@ class ExamFullscreenTests(RetakeTestBase):
         ExamAnswer.objects.create(attempt=self.att, task=a, best_score=10, submissions_count=1)
         ExamAnswer.objects.create(attempt=self.att, task=b, best_score=1, submissions_count=1)
         self.assertEqual(exam_guard.task_states(self.att), {a.id: 'ok', b.id: 'bad'})
-        ExamAnswer.objects.filter(task=b).update(best_score=2)
+        ExamAnswer.objects.filter(task=b).update(best_score=3)
         ExamAnswer.objects.filter(task=a).update(best_score=7)
+        self.assertEqual(exam_guard.task_states(self.att), {a.id: 'part', b.id: 'bad'})     # 3 — ещё красная, жёлтая от 4
+        ExamAnswer.objects.filter(task=b).update(best_score=4)
         self.assertEqual(exam_guard.task_states(self.att), {a.id: 'part', b.id: 'part'})
         ExamAnswer.objects.filter(task=b).update(submissions_count=0, best_score=0)      # запись есть, но не отправлено
         self.assertEqual(exam_guard.task_states(self.att), {a.id: 'part'})

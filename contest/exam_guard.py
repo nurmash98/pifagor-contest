@@ -80,14 +80,14 @@ def _student_attempt(request, exam_id, retake_id=None):
 
 
 def task_states(attempt):
-    """Цвет вкладки задачи: ok — решено полностью, part — частично (от 2 баллов), bad — отправлено, но меньше 2; '' — не отправлял."""
+    """Цвет вкладки задачи: ok — решено полностью, part — частично (от 4 баллов), bad — отправлено, но меньше 4; '' — не отправлял."""
     from .exam_views import task_max
     top = task_max(attempt.exam)
     out = {}
     for a in attempt.answers.only('task_id', 'best_score', 'submissions_count'):
         if not a.submissions_count:
             continue
-        out[a.task_id] = 'ok' if a.best_score >= top else ('part' if a.best_score >= 2 else 'bad')
+        out[a.task_id] = 'ok' if a.best_score >= top else ('part' if a.best_score >= 4 else 'bad')
     return out
 
 
