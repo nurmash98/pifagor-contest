@@ -36,11 +36,11 @@
     .muted2 { color: #9ca3af; }
     #players td, #players th { padding: 6px 10px; }
 </style>
-<div class="mb-3"><a href="{% url 'island_manage' %}" class="text-decoration-none text-muted small">← Битва за остров</a></div>
+<div class="mb-3"><a href="{% url 'island_manage' %}" class="text-decoration-none text-muted small">← {% if game.variant == 'empire' %}Империя{% else %}Битва за остров{% endif %}</a></div>
 
 <div id="stage">
     <div id="top">
-        <span class="ttl">🏝️ {{ game.title }}</span>
+        <span class="ttl">{% if game.variant == 'empire' %}👑{% else %}🏝️{% endif %} {{ game.title }}</span>
         <span class="chip" id="st-chip"></span>
         <span class="chip">👥 <span id="n-players">0</span></span>
         <span style="flex:1"></span>
@@ -59,7 +59,7 @@
     </div>
     <div id="body" style="display:none">
         <canvas id="cv"></canvas>
-        <aside id="side"><h4>Очки</h4><div id="board"></div></aside>
+        <aside id="side"><h4>Очки</h4><div id="board"></div><div id="dip"></div></aside>
     </div>
 </div>
 
@@ -78,6 +78,7 @@
     var U = {state: '{% url "island_control_state" game.id %}', action: '{% url "island_control_action" game.id %}', back: '{% url "island_manage" %}'};
     var MODE = '{{ game.mode }}', SLOTS = {{ team_slots|length }}, MAX_EXITS = {{ max_exits }};
     var NAMES = {{ team_names|safe }}, COLORS = {{ team_colors|safe }};
+    var EMPIRE = '{{ game.variant }}' === 'empire', EMPIRES = {{ empires_json|safe }}, PRESET = {{ preset_json|safe }};
     var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
     var ver = 0, status = '{{ game.status }}', left = 0, map = IslandMap($('cv'), {fit: true}), last = null;
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
@@ -119,7 +120,12 @@
         d.players.forEach(function (p) { (MODE === 'teams' && p[3] >= 0 && cols[p[3]] ? cols[p[3]] : free).list.push(p); });
         if (free.list.length || MODE !== 'teams') { cols.unshift(free); }
         $('teams').innerHTML = cols.map(function (c) {
-            return '<div class="tcol" style="border-top-color:' + c.color + '"><h5><span>' + c.name + '</span><span class="muted2">' + c.list.length + '</span></h5>' +
+            var head = '<span>' + c.name + '</span>';
+            if (EMPIRE && c.i >= 0) {                    // империя команды: выбирает учитель, иначе — случайная при старте
+                head = '<select data-emp="' + c.i + '" style="max-width:170px"><option value="">🎲 случайная империя</option>' +
+                    EMPIRES.map(function (e) { return '<option value="' + e[0] + '"' + (PRESET[c.i] === e[0] ? ' selected' : '') + '>' + esc(e[1]) + '</option>'; }).join('') + '</select>';
+            }
+            return '<div class="tcol" style="border-top-color:' + c.color + '"><h5>' + head + '<span class="muted2">' + c.list.length + '</span></h5>' +
                 (c.list.map(function (p) {
                     var sel = '';
                     if (MODE === 'teams') {
@@ -131,7 +137,14 @@
                 }).join('') || '<div class="muted2 small">пусто</div>') + '</div>';
         }).join('');
     }
-    $('teams').addEventListener('change', function (e) { var p = e.target.getAttribute('data-p'); if (p && e.target.value !== '') { act({action: 'team', player: p, team: e.target.value}); } });
+    $('teams').addEventListener('change', function (e) {
+        var em = e.target.getAttribute('data-emp');
+        if (em !== null) {
+            for (var k in PRESET) { if (PRESET[k] === e.target.value) { delete PRESET[k]; } }
+            if (e.target.value) { PRESET[em] = e.target.value; } else { delete PRESET[em]; }
+            act({action: 'empire_name', team: em, name: e.target.value}); return;
+        }
+        var p = e.target.getAttribute('data-p'); if (p && e.target.value !== '') { act({action: 'team', player: p, team: e.target.value}); } });
     $('teams').addEventListener('click', function (e) { var p = e.target.getAttribute('data-rm'); if (p) { act({action: 'remove', player: p}); } });
     function ranked(d) {
         var rows = d.teams.map(function (t) { return {t: t, s: d.scores[t.i] || 0}; }).sort(function (a, b) { return b.s - a.s || a.t.i - b.t.i; });
@@ -139,10 +152,19 @@
         rows.forEach(function (r, i) { if (r.s !== prev) { place = i + 1; prev = r.s; } r.place = place; });
         return rows;
     }
+    function pname(d, id) { var p = d.players.filter(function (q) { return q[0] === id; })[0]; return p ? p[5] : '—'; }
     function board(d) {
+        var E = d.empire;
         $('board').innerHTML = ranked(d).map(function (r) {
+            var et = E && E.teams[r.t.i], khan = et ? '<div class="muted2" style="font-weight:600;font-size:12px">👑 ' + esc(pname(d, et.khan)) + (et.capital ? ' · 🏰' : '') + '</div>' : '';
             return '<div class="row2"><span class="pl">' + r.place + '</span><span class="dot" style="background:' + r.t.color + '"></span><span class="nm">' + esc(r.t.name) +
-                (MODE === 'teams' ? ' <span class="muted2">· ' + r.t.size + '</span>' : '') + '</span><span class="pt">' + r.s + '</span></div>'; }).join('');
+                (MODE === 'teams' ? ' <span class="muted2">· ' + r.t.size + '</span>' : '') + khan + '</span><span class="pt">' + r.s + '</span></div>'; }).join('');
+        if (!E) { $('dip').innerHTML = ''; return; }
+        var tm = {}; d.teams.forEach(function (t) { tm[t.i] = t; });
+        var allies = E.rel.filter(function (r) { return r[2] === 'ally'; });
+        $('dip').innerHTML = '<h4 style="margin-top:14px">Союзы</h4>' + (allies.length ? allies.map(function (r) {
+            return '<div class="row2" style="font-size:12px">🤝 ' + esc((tm[r[0]] || {}).name) + ' + ' + esc((tm[r[1]] || {}).name) + '</div>'; }).join('')
+            : '<div class="muted2 small">Пока все воюют друг с другом.</div>');
     }
     function players(d) {
         var tm = {}; d.teams.forEach(function (t) { tm[t.i] = t; });

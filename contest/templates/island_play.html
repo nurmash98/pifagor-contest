@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% t "Битва за остров" %} — Pifagor Contest</title>
+    <title>{% if game.variant == 'empire' %}{% t "Империя" %}{% else %}{% t "Битва за остров" %}{% endif %} — Pifagor Contest</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         html, body { height: 100%; margin: 0; background: #0b1220; color: #e5e7eb; overflow: hidden; font-family: 'Montserrat', system-ui, sans-serif; }
@@ -59,12 +59,22 @@
         table.res { width: 100%; border-collapse: collapse; margin-top: 12px; text-align: left; }
         table.res td { padding: 7px 10px; border-bottom: 1px solid #1f2937; }
         table.res tr.mine td { background: #1f2937; font-weight: 800; }
+        #emp .role { padding: 8px 10px; border-radius: 10px; background: #1f2937; font-weight: 700; margin-bottom: 8px; }
+        #emp .role.khan { background: #422006; color: #fde68a; border: 1px solid #f59e0b; }
+        #emp .sbtn { border: 0; border-radius: 999px; padding: 6px 12px; font-weight: 700; cursor: pointer; background: #374151; color: #e5e7eb; font-size: 12px; }
+        #emp .sbtn.go { background: #22c55e; color: #052e16; } #emp .sbtn.warn { background: #7f1d1d; color: #fecaca; } #emp .sbtn.gold { background: #f59e0b; color: #111827; }
+        #emp select { background: #0b1220; color: #e5e7eb; border: 1px solid #374151; border-radius: 8px; padding: 5px; font-size: 12px; max-width: 150px; }
+        #emp .dip { padding: 7px 8px; border-radius: 10px; background: #0f172a; margin-bottom: 6px; }
+        #emp .st { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+        #emp .st.ally { background: #14532d; color: #86efac; } #emp .st.enemy { background: #7f1d1d; color: #fecaca; } #emp .st.truce { background: #1e3a8a; color: #bfdbfe; }
+        #emp .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+        #emp .hint { font-size: 12px; color: #9ca3af; margin: 6px 0; line-height: 1.4; }
         @media (max-width: 800px) { #side { display: none; } #banner { right: 0; } }
     </style>
 </head>
 <body>
 <div id="bar">
-    <span class="ttl">🏝️ {% t "Битва за остров" %}</span>
+    <span class="ttl">{% if game.variant == 'empire' %}👑 {% t "Империя" %}{% else %}🏝️ {% t "Битва за остров" %}{% endif %}</span>
     <span class="chip" id="my-team" style="display:none"><span class="dot" id="my-dot"></span><span id="my-name"></span> · <span id="my-score">0</span></span>
     <span class="chip" id="cool" style="display:none">⏳ <span id="cool-n">0</span></span>
     <span class="sp"></span>
@@ -76,9 +86,20 @@
 <div id="wrap">
     <canvas id="map"></canvas>
     <aside id="side">
+        <div id="emp" style="display:none;margin-bottom:14px"></div>
         <h4>{% t "Очки" %}</h4>
         <div id="board"></div>
         <h4 style="margin-top:16px">{% t "Клетки" %}</h4>
+        {% if game.variant == 'empire' %}
+        <div class="legend">
+            <span class="sw" style="background:#a5d458"></span><span>{% t "Трава" %} — {% t "что выведет код" %}</span><b>+1</b>
+            <span class="sw" style="background:#4c9a2c"></span><span>{% t "Лес" %} — {% t "написать программу" %}</span><b>+1</b>
+            <span class="sw" style="background:#d8cfa8"></span><span>{% t "Город" %} — {% t "задача уровня C, ещё 6 клеток вокруг" %}</span><b>+5</b>
+            <span class="sw" style="background:#e7e5e4"></span><span>{% t "Столица" %}</span><b>+5</b>
+        </div>
+        <div class="muted" style="line-height:1.5">{% t "По своей и союзной земле можно ходить свободно. На врага нападают только со своей земли — задача сложнее." %}
+            {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
+        {% else %}
         <div class="legend">
             <span class="sw" style="background:#a5d458"></span><span>{% t "Трава" %} — {% t "что выведет код" %}</span><b>+1</b>
             <span class="sw" style="background:#4c9a2c"></span><span>{% t "Лес" %} — {% t "написать программу" %}</span><b>+2</b>
@@ -87,12 +108,13 @@
         <div class="muted" style="line-height:1.5">{% t "Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей." %}
             {% t "По своим клеткам можно ходить свободно. Чужую клетку можно отбить, но задача будет сложнее." %}
             {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
+        {% endif %}
     </aside>
 </div>
 
 <div class="over" id="lobby"><div class="box">
-    <div style="font-size:56px">🏝️</div>
-    <h2>{% t "Битва за остров" %}</h2>
+    <div style="font-size:56px">{% if game.variant == 'empire' %}👑{% else %}🏝️{% endif %}</div>
+    <h2>{% if game.variant == 'empire' %}{% t "Империя" %}{% else %}{% t "Битва за остров" %}{% endif %}</h2>
     <p class="muted">{% t "Ждём, пока учитель начнёт игру" %}… {% t "В игре" %}: <b id="lobby-n">0</b></p>
     <div class="names" id="lobby-names"></div>
     <p class="muted" style="margin-top:18px;font-size:13px">{% t "Игра идёт в полноэкранном режиме." %} {{ max_exits }} {% t "выхода из него — и вы выбиты из игры." %}</p>
@@ -143,7 +165,8 @@
 (function () {
     var TXT = {{ i18n|safe }}, MAX_EXITS = {{ max_exits }};
     var U = {state: '{% url "island_state" game.id %}', arm: '{% url "island_arm" game.id %}', exit: '{% url "island_exit" game.id %}',
-             move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}'};
+             move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}', khan: '{% url "island_khan" game.id %}'};
+    var EMPIRE = '{{ game.variant }}' === 'empire', empSig = '', seenOffers = {};
     var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
     var ver = 0, status = '{{ game.status }}', left = 0, me = null, teams = [], scores = {}, kicked = {{ player.kicked|yesno:"true,false" }};
     var fs = 'gate', armed = false, busy = false, challenge = null, coolUntil = 0, finalShown = false;
@@ -227,6 +250,7 @@
         $('lobby').style.display = status === 'lobby' ? 'flex' : 'none';
         if (status === 'lobby') { lobby(d); }
         board();
+        if (EMPIRE) { empirePanel(); }
         if (status === 'finished') { finish(d); } else { syncGate(); }
     }
     function lobby(d) {
@@ -267,6 +291,69 @@
                 '"></span> ' + esc(r.t.name) + '</td><td style="text-align:right;font-weight:800">' + r.s + '</td></tr>'; }).join('');
         $('final').style.display = 'flex';
     }
+    // ---------- «Империя»: хан, столица, союзы ----------
+    function pname(id) { var p = map.state.players.filter(function (q) { return q[0] === id; })[0]; return p ? p[5] : '—'; }
+    function tinfo(i) { return teams.filter(function (t) { return t.i === i; })[0] || {name: '—', color: '#9ca3af'}; }
+    function empirePanel() {
+        var E = map.state.empire;
+        if (!E || !me || status === 'lobby') { $('emp').style.display = 'none'; return; }
+        var my = E.teams[me.team] || {}, isKhan = my.khan === me.id, rows = [];
+        // новые предложения союза — всплывающее уведомление
+        (E.offers || []).forEach(function (o) {
+            var k = o[0] + '>' + o[1];
+            if (o[1] === me.team && !seenOffers[k]) { seenOffers[k] = true; toast('🤝 ' + tinfo(o[0]).name + ' ' + TXT.offer_in, 'good'); }
+        });
+        var sig = JSON.stringify([E, me.team, me.id, map.state.players.map(function (p) { return [p[0], p[3], p[4]]; }), Math.floor(Date.now() / 5000)]);
+        if (sig === empSig) { return; }
+        empSig = sig;
+        var h = '<h4>' + TXT.empire + '</h4>';
+        h += '<div class="role' + (isKhan ? ' khan' : '') + '">' + (isKhan ? '👑 ' + TXT.you_khan : '⚔️ ' + TXT.sarbaz + ' · ' + TXT.your_khan + ': ' + esc(pname(my.khan))) + '</div>';
+        if (my.capital) { h += '<div class="hint">🏰 ' + TXT.capital + ' ✓</div>'; }
+        else if (isKhan) { h += '<div class="hint">' + (my.built ? TXT.capital_lost_hint : TXT.capital_hint) + '</div><button class="sbtn gold" data-k="capital">🏰 ' + TXT.capital_btn + '</button>'; }
+        else { h += '<div class="hint">🏰 ' + TXT.no_capital + '</div>'; }
+        if (isKhan) {
+            var mates = map.state.players.filter(function (p) { return p[3] === me.team && p[0] !== me.id && !p[4]; });
+            h += '<div class="hint" style="margin-top:10px">' + TXT.changes_left + ' <b>' + my.changes_left + '</b></div>';
+            if (my.changes_left > 0 && mates.length) {
+                h += '<div class="acts"><select id="emp-mate">' + mates.map(function (p) { return '<option value="' + p[0] + '">' + esc(p[5]) + '</option>'; }).join('') +
+                     '</select><button class="sbtn" data-k="appoint">👑 ' + TXT.appoint_btn + '</button></div>';
+            }
+        }
+        h += '<h4 style="margin-top:14px">' + TXT.diplomacy + '</h4>';
+        teams.forEach(function (t) {
+            if (t.i === me.team) { return; }
+            var r = (E.rel || []).filter(function (x) { return (x[0] === t.i && x[1] === me.team) || (x[1] === t.i && x[0] === me.team); })[0] || [0, 0, 'enemy', 0];
+            var inO = (E.offers || []).some(function (o) { return o[0] === t.i && o[1] === me.team; });
+            var outO = (E.offers || []).some(function (o) { return o[0] === me.team && o[1] === t.i; });
+            var st = r[2] === 'ally' ? '<span class="st ally">' + TXT.ally + '</span>' : r[3] > 0 ? '<span class="st truce">' + TXT.truce_s + ' ' + r[3] + ' ' + TXT.sec + '</span>' : '<span class="st enemy">' + TXT.enemy + '</span>';
+            h += '<div class="dip"><div style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:' + t.color + '"></span><b style="flex:1">' + esc(t.name) + '</b>' + st + '</div>';
+            if (inO) { h += '<div class="hint">🤝 ' + TXT.offer_in + '</div>'; }
+            if (outO) { h += '<div class="hint">' + TXT.offer_sent + '</div>'; }
+            if (isKhan) {
+                h += '<div class="acts">';
+                if (r[2] === 'ally') { h += '<button class="sbtn warn" data-k="break" data-t="' + t.i + '">' + TXT.break + '</button>'; }
+                else if (inO) { h += '<button class="sbtn go" data-k="accept" data-t="' + t.i + '">' + TXT.accept + '</button><button class="sbtn" data-k="decline" data-t="' + t.i + '">' + TXT.decline + '</button>'; }
+                else if (outO) { h += '<button class="sbtn" data-k="cancel" data-t="' + t.i + '">' + TXT.cancel_offer + '</button>'; }
+                else { h += '<button class="sbtn go" data-k="propose" data-t="' + t.i + '">🤝 ' + TXT.propose + '</button>'; }
+                h += '</div>';
+            }
+            h += '</div>';
+        });
+        $('emp').innerHTML = h; $('emp').style.display = '';
+    }
+    $('emp').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-k]'); if (!b || !canPlay()) { return; }
+        var k = b.getAttribute('data-k'), data = {action: k};
+        if (b.getAttribute('data-t') !== null) { data.team = b.getAttribute('data-t'); }
+        if (k === 'appoint') { data.player = $('emp-mate').value; }
+        b.disabled = true;
+        post(U.khan, data).then(function (d) {
+            if (d.ok) { if (k === 'capital') { toast(TXT.capital_ok, 'good'); } else if (k === 'appoint') { toast(TXT.appointed, 'good'); } }
+            else if (d.error) { toast(TXT[d.error] || TXT.bad_target, 'bad'); }
+            empSig = ''; poll();
+        }).catch(function () { b.disabled = false; });
+    });
+
     setInterval(function () {
         if (status === 'running' && left > 0) { left--; }
         var tm = $('timer'); tm.textContent = status === 'running' ? fmt(left) : '--:--'; tm.className = left <= 60 && status === 'running' ? 'low' : '';
@@ -279,7 +366,8 @@
     function canPlay() { return status === 'running' && !kicked && fs === 'in' && !busy; }
     function step(x, y) {
         if (!canPlay() || $('modal').style.display === 'flex') { return; }
-        var c = Math.ceil((coolUntil - Date.now()) / 1000), own = map.state.cells[x + ',' + y] === me.team;
+        var ow = map.state.cells[x + ',' + y], own = ow === me.team || (EMPIRE && ow !== undefined && map.relation(ow, me.team) === 'ally');
+        var c = Math.ceil((coolUntil - Date.now()) / 1000);
         if (c > 0 && !own) { toast(TXT.cooldown + ': ' + c + ' ' + TXT.sec, 'bad'); return; }
         busy = true;
         post(U.move, {x: x, y: y}).then(function (d) {
@@ -297,7 +385,7 @@
         var ch = challenge, code = ch.kind === 'code';
         $('m-title').textContent = code ? ch.title : TXT.what_prints;
         $('m-pts').textContent = '+' + ch.points + ' ' + TXT.points;
-        $('m-sub').textContent = (ch.enemy ? TXT.enemy + '. ' : '') + (code ? TXT.write_code + ' (Python)' : '');
+        $('m-sub').textContent = (ch.city ? '🏰 ' + TXT.city_hint + '. ' : '') + (ch.enemy ? TXT.enemy + '. ' : '') + (code ? TXT.write_code + ' (Python)' : '');
         $('m-output').style.display = code ? 'none' : ''; $('m-task').style.display = code ? '' : 'none';
         $('m-msg').textContent = ''; $('m-msg').className = '';
         $('modal').style.display = 'flex';
@@ -321,7 +409,8 @@
             if (d.ok) {
                 me.x = d.me.x; me.y = d.me.y; map.setMe(me.x, me.y);
                 map.state.cells[me.x + ',' + me.y] = me.team;
-                closeModal(); challenge = null; map.follow(); toast(TXT.captured + ' +' + d.points, 'good'); poll();
+                closeModal(); challenge = null; map.follow();
+                toast(TXT.captured + ' +' + d.points + (d.cells > 1 ? ' · ' + d.cells + ' ' + TXT.cells_n : ''), 'good'); poll();
             } else if (d.ok === false) {
                 coolUntil = Date.now() + d.wait * 1000;
                 if (challenge.kind === 'output') { closeModal(); challenge = null; toast(TXT.wrong + ' ' + d.wait + ' ' + TXT.sec, 'bad'); }
@@ -329,6 +418,7 @@
             } else if (d.error === 'cooldown') { coolUntil = Date.now() + d.wait * 1000; }
             else if (d.error === 'kicked') { setKicked(); }
             else if (d.error === 'over') { closeModal(); poll(); }
+            else if (d.error === 'taken' || d.error === 'truce' || d.error === 'border') { closeModal(); challenge = null; toast(TXT[d.error], 'bad'); poll(); }
             else { $('m-msg').textContent = TXT[d.error] || TXT.unavailable; $('m-msg').className = 'bad'; $('m-go').disabled = false; }
         }).catch(function () { busy = false; $('m-go').disabled = false; $('m-go').textContent = TXT.check; $('m-msg').textContent = TXT.unavailable; $('m-msg').className = 'bad'; });
     }
@@ -338,7 +428,7 @@
     $('center').addEventListener('click', function () { map.centerOnMe(); });
     document.addEventListener('keydown', function (e) {
         if ($('modal').style.display === 'flex') { if (e.key === 'Escape') { closeModal(); } return; }
-        var d = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]}[e.key];
+        var d = (EMPIRE ? {ArrowLeft: [-1, 0], ArrowRight: [1, 0]} : {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0]})[e.key];
         if (d && me && canPlay()) {
             e.preventDefault();
             var x = me.x + d[0], y = me.y + d[1];

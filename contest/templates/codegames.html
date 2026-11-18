@@ -17,10 +17,10 @@
     {% for g in islands %}
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100 p-4 bg-white">
-            <div class="fs-1">🏝️</div>
-            <h5 class="fw-bold mb-1">{% t "Битва за остров" %}</h5>
+            <div class="fs-1">{% if g.variant == 'empire' %}👑{% else %}🏝️{% endif %}</div>
+            <h5 class="fw-bold mb-1">{% if g.variant == 'empire' %}{% t "Империя" %}{% else %}{% t "Битва за остров" %}{% endif %}</h5>
             <div class="small text-muted mb-2">{% if g.mode == 'teams' %}{% t "Командная игра" %}{% else %}{% t "Каждый сам за себя" %}{% endif %} · {{ g.minutes }} {% t "мин" %}</div>
-            <div class="small mb-3">{% t "Весь класс на одной карте: решай задачи и захватывай клетки." %}<br>
+            <div class="small mb-3">{% if g.variant == 'empire' %}{% t "Империи на карте из шестиугольников: хан, города и союзы." %}{% else %}{% t "Весь класс на одной карте: решай задачи и захватывай клетки." %}{% endif %}<br>
                 {% if g.status == 'running' %}<span class="badge bg-success">{% t "Игра идёт" %}</span>{% else %}<span class="badge bg-warning text-dark">{% t "Сбор игроков" %}</span>{% endif %}</div>
             <a href="{% url 'island_play' g.id %}" class="btn btn-pifagor-green rounded-pill px-4 mt-auto align-self-start">▶ {% t "Войти" %}</a>
         </div>

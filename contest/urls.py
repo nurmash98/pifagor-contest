@@ -144,6 +144,7 @@ urlpatterns = [
     path('games/island/<int:game_id>/exit/', island_views.play_exit, name='island_exit'),
     path('games/island/<int:game_id>/move/', island_views.play_move, name='island_move'),
     path('games/island/<int:game_id>/answer/', island_views.play_answer, name='island_answer'),
+    path('games/island/<int:game_id>/khan/', island_views.play_khan, name='island_khan'),
     path('games/', codegame_views.games, name='codegames'),
     path('games/<int:game_id>/start/', codegame_views.game_start, name='codegame_start'),
     path('games/run/<int:run_id>/', codegame_views.game_play, name='codegame_play'),

@@ -4438,3 +4438,219 @@ class ExamReportTests(RetakeTestBase):
         if '8A' not in classes:
             r = self.client.post(self.url, {'classes': ['8A'], 'quarter': '2', 'kinds': ['SOR'], 'lang': 'ru'})
             self.assertRedirects(r, self.url)
+
+
+class EmpireGameTests(TestCase):
+    """«Империя»: шестиугольники, ханы, столица, города (+6 клеток), союзы и перемирие."""
+
+    def setUp(self):
+        cache.clear()
+        from .models import IslandGame
+        self.tu = User.objects.create_user('em_t', password='p', is_staff=True)
+        Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
+        self.sts = [Student.objects.create(user=User.objects.create_user(f'em_s{i}', password='p'),
+                                           full_name=f'Ученик Номер{i}', school_class='7A') for i in range(6)]
+        tag = Tag.objects.create(name='империя')
+        make_task('Код A', 'A', tag)
+        make_task('Код C', 'C', tag)
+        self.game = IslandGame(owner=self.tu, title='Империя', mode='teams', teams_count=2, minutes=40, variant='empire')
+        self.game.set_classes(['7A'])
+        self.game.save()
+        self.game.tags.add(tag)
+
+    def _run(self, preset=None):
+        from . import island
+        import random
+        for st in self.sts:
+            island.join(self.game, st)
+        if preset:
+            self.game.empire = {'names': preset}
+            self.game.save(update_fields=['empire'])
+        island.shuffle_teams(self.game, random.Random(1))
+        self.game = island.start(self.game, random.Random(2))
+        return island
+
+    def _set(self, x, y, kind):
+        rows = [list(r) for r in self.game.map['rows']]
+        rows[y][x] = kind
+        self.game.map['rows'] = [''.join(r) for r in rows]
+        self.game.save(update_fields=['map'])
+
+    def _own(self, x, y, team):
+        from .models import IslandCell
+        IslandCell.objects.update_or_create(game=self.game, x=x, y=y, defaults={'team': team, 'ver': 1})
+
+    def _khan(self, team):
+        from .models import IslandPlayer
+        self.game.refresh_from_db()
+        return IslandPlayer.objects.get(pk=self.game.empire['teams'][str(team)]['khan'])
+
+    def _free_neighbour(self, island, p):
+        owned = {(c.x, c.y) for c in self.game.cells.all()}
+        for n in island.neighbors(self.game, p.x, p.y):
+            if n not in owned and 0 < n[0] < self.game.map['w'] - 1 and 0 < n[1] < self.game.map['h'] - 1:
+                return n
+        return None
+
+    def test_start_gives_hex_map_khans_and_seven_cells(self):
+        from . import empire
+        island = self._run(preset={'1': 'kazakh'})
+        self.assertTrue(self.game.map.get('hex'))
+        for t in (0, 1):
+            self.assertEqual(self.game.cells.filter(team=t).count(), empire.START_CELLS)
+            khan = self._khan(t)
+            self.assertEqual(khan.team, t)
+        names = self.game.empire['names']
+        self.assertEqual(names['1'], 'kazakh')
+        self.assertNotEqual(names['0'], names['1'])
+        self.assertEqual(self.game.scores, {'0': 7, '1': 7})
+        st = island.state(self.game, lang='ru')
+        self.assertEqual(st['variant'], 'empire')
+        self.assertEqual(st['empire']['teams']['1']['name'], 'Казахское ханство')
+        self.assertIn('Казахское ханство', [t['name'] for t in st['teams']])
+
+    def test_walk_capture_and_border_rule(self):
+        from . import empire
+        island = self._run()
+        p = self.game.players.filter(team=0).first()
+        n = self._free_neighbour(island, p)
+        self._set(*n, '.')
+        res = island.move(self.game, p, *n)
+        self.assertTrue(res.get('challenge'))
+        p.refresh_from_db()
+        self.assertEqual(p.challenge['kind'], 'output')
+        self.assertEqual(island.answer(self.game, p, p.challenge['answer'])['ok'], True)
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.scores['0'], 8)
+        # вражеская клетка рядом: со своей земли — можно (задача сложнее), с ничьей — нельзя
+        p.refresh_from_db()
+        m = self._free_neighbour(island, p)
+        self._set(*m, '.')
+        self._own(*m, 1)
+        rule = empire.move_rule(self.game, p, m[0], m[1], 1)
+        self.assertEqual((rule['level'], rule['enemy']), (2, True))
+        self.game.cells.filter(x=p.x, y=p.y).delete()                         # стоит не на своей клетке
+        self.assertEqual(empire.move_rule(self.game, p, m[0], m[1], 1), {'error': 'border'})
+
+    def test_alliance_walk_break_and_truce(self):
+        from . import empire
+        island = self._run()
+        k0, k1 = self._khan(0), self._khan(1)
+        sarbaz = self.game.players.filter(team=0).exclude(pk=k0.pk).first()
+        self.assertEqual(empire.diplomacy(self.game, sarbaz, 'propose', 1), {'error': 'notkhan'})
+        self.assertEqual(empire.diplomacy(self.game, k0, 'propose', 1), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.empire['offers'], [[0, 1]])
+        self.assertEqual(empire.diplomacy(self.game, k1, 'accept', 0), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(empire.relation(self.game, 0, 1), 'ally')
+        p = self.game.players.filter(team=0).first()
+        n = self._free_neighbour(island, p)
+        self._set(*n, '.')
+        self._own(*n, 1)
+        self.assertEqual(empire.move_rule(self.game, p, n[0], n[1], 1), {'walk': True})    # по земле союзника — свободно
+        self.assertEqual(island.move(self.game, p, *n), {'moved': True})
+        self.assertEqual(empire.diplomacy(self.game, k1, 'break', 0), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(empire.relation(self.game, 0, 1), 'enemy')
+        self.assertGreater(empire.truce_left(self.game, 0, 1), 50)
+        q = self.game.players.filter(team=0).exclude(pk=p.pk).first()
+        self.assertEqual(empire.move_rule(self.game, q, n[0], n[1], 1), {'error': 'truce'})
+
+    def test_city_takes_seven_cells_but_not_allied(self):
+        from . import empire
+        island = self._run()
+        p = self.game.players.filter(team=0).first()
+        n = self._free_neighbour(island, p)
+        self._set(*n, empire.CITY)
+        around = [c for c in empire.hex_neighbors(*n) if island.terrain(self.game, *c) != island.WATER]
+        for c in around:
+            self._set(*c, '.')
+        enemy_cell, ally_cell = around[-1], around[-2]
+        if (p.x, p.y) in (enemy_cell, ally_cell):
+            enemy_cell, ally_cell = around[0], around[1]
+        self._own(*enemy_cell, 1)
+        rule = empire.move_rule(self.game, p, n[0], n[1], None)
+        self.assertEqual((rule['level'], rule['points'], rule['city']), (empire.CITY_LEVEL, 5, True))
+        self.game.empire['rel'] = {'0-1': {'s': 'ally', 'truce': None}}
+        self.game.save(update_fields=['empire'])
+        self._own(*ally_cell, 1)
+        self._own(*enemy_cell, 2)                                            # «чужая» команда 2 — враг
+        self.game.empire['teams']['2'] = {'name': 'saka', 'khan': None, 'changes': 0, 'capital': None, 'built': False}
+        self.game.save(update_fields=['empire'])
+        empire.capture(self.game, p, dict(rule, x=n[0], y=n[1]))
+        self.game.refresh_from_db()
+        owner = {(c.x, c.y): c.team for c in self.game.cells.all()}
+        self.assertEqual(owner[n], 0)
+        self.assertEqual(owner[enemy_cell], 0)                               # враг потерял клетку
+        self.assertEqual(owner[ally_cell], 1)                                # союзника не трогаем
+        self.assertEqual(self.game.scores['0'], sum(5 if c == n else 1 for c, t in owner.items() if t == 0))
+
+    def test_capital_build_lose_and_rebuild_only_in_city(self):
+        from . import empire
+        island = self._run()
+        k0 = self._khan(0)
+        sarbaz = self.game.players.filter(team=0).exclude(pk=k0.pk).first()
+        self.assertEqual(empire.build_capital(self.game, sarbaz), {'error': 'notkhan'})
+        self.assertEqual(empire.build_capital(self.game, k0), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.scores['0'], 7 + empire.CAPITAL_PTS)
+        self.assertEqual(empire.build_capital(self.game, k0), {'error': 'has_capital'})
+        cap = tuple(self.game.empire['teams']['0']['capital'])
+        # враг берёт столицу «городской» задачей; фишки команды 0 на ней уходят на свои клетки
+        enemy = self.game.players.filter(team=1).first()
+        self.assertTrue(empire.move_rule(self.game, enemy, cap[0], cap[1], 0).get('city') or
+                        empire.move_rule(self.game, enemy, cap[0], cap[1], 0).get('error') == 'border')
+        empire.capture(self.game, enemy, {'x': cap[0], 'y': cap[1], 'city': True, 'points': 5})
+        self.game.refresh_from_db()
+        self.assertIsNone(self.game.empire['teams']['0']['capital'])
+        k0.refresh_from_db()
+        self.assertNotEqual((k0.x, k0.y), cap)
+        if self.game.cells.filter(team=0, x=k0.x, y=k0.y).exists():
+            self.assertEqual(empire.build_capital(self.game, k0), {'error': 'need_city'})
+            self._set(k0.x, k0.y, empire.CITY)
+            self.assertEqual(empire.build_capital(self.game, k0), {'ok': True})
+
+    def test_khan_changes_limited_and_kicked_khan_passes_crown(self):
+        from . import empire
+        island = self._run()
+        k = self._khan(0)
+        mates = list(self.game.players.filter(team=0).exclude(pk=k.pk))
+        foreign = self.game.players.filter(team=1).first()
+        self.assertEqual(empire.appoint(self.game, k, foreign.id), {'error': 'bad_target'})
+        cur = k
+        for i in range(empire.MAX_KHAN_CHANGES):
+            nxt = mates[i % len(mates)] if mates[i % len(mates)].pk != cur.pk else k
+            self.assertEqual(empire.appoint(self.game, cur, nxt.id), {'ok': True})
+            cur = self._khan(0)
+        other = next(p for p in self.game.players.filter(team=0) if p.pk != cur.pk)
+        self.assertEqual(empire.appoint(self.game, cur, other.id), {'error': 'no_changes'})
+        for _ in range(island.MAX_EXITS):                                    # хана выбило — корона переходит сама
+            island.count_exit(cur, 'blur')
+        new = self._khan(0)
+        self.assertNotEqual(new.pk, cur.pk)
+        self.assertEqual(new.team, 0)
+        self.assertEqual(self.game.empire['teams']['0']['changes'], empire.MAX_KHAN_CHANGES)
+
+    def test_views_create_state_and_khan_endpoint(self):
+        from .models import IslandGame
+        self.client.force_login(self.tu)
+        r = self.client.post(reverse('island_manage'), {'classes': ['7A'], 'mode': 'solo', 'variant': 'empire', 'teams_count': 3, 'minutes': 30})
+        g = IslandGame.objects.exclude(pk=self.game.pk).get()
+        self.assertEqual((g.variant, g.mode), ('empire', 'teams'))                    # «Империя» — только команды
+        self.assertContains(self.client.get(reverse('island_control', args=[g.id])), 'случайная империя')
+        self.client.post(reverse('island_control_action', args=[g.id]), {'action': 'empire_name', 'team': 0, 'name': 'golden'})
+        g.refresh_from_db()
+        self.assertEqual(g.empire['names'], {'0': 'golden'})
+        island = self._run()
+        p = self.game.players.first()
+        self.client.force_login(p.student.user)
+        self.assertContains(self.client.get(reverse('island_play', args=[self.game.id])), 'Империя')
+        self.assertEqual(self.client.post(reverse('island_khan', args=[self.game.id]), {'action': 'capital'}).json(), {'error': 'notarmed'})
+        self.client.post(reverse('island_arm', args=[self.game.id]))
+        r = self.client.post(reverse('island_khan', args=[self.game.id]), {'action': 'propose', 'team': 1 - p.team}).json()
+        khan = self._khan(p.team)
+        self.assertEqual(r, {'ok': True} if khan.pk == p.pk else {'error': 'notkhan'})
+        st = self.client.get(reverse('island_state', args=[self.game.id])).json()
+        self.assertIn('empire', st)
+        self.assertTrue(st['map']['hex'])

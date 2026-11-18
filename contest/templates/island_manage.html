@@ -20,15 +20,22 @@
     .rule .ic { font-size: 22px; line-height: 1; }
 </style>
 <div class="mb-3"><a href="{% url 'games_hub' %}" class="text-decoration-none text-muted small">← Все игры</a></div>
-<h3 class="fw-bold mb-1" style="color:#1a1a4b;">🏝️ Битва за остров</h3>
+<h3 class="fw-bold mb-1" style="color:#1a1a4b;">🏝️ Битва за остров · 👑 Империя</h3>
 <p class="text-muted small mb-3">Весь класс играет на одной карте. Чтобы шагнуть на соседнюю клетку, ученик решает её задачу — и клетка красится в цвет его команды.
-    Побеждает команда с наибольшим числом очков.</p>
+    Побеждает команда с наибольшим числом очков. Два варианта: упрощённый «Остров» и сложная «Империя».</p>
 
 <div class="card border-0 shadow-sm rounded-4 p-3 bg-white mb-4">
     <div class="row g-3 small">
         <div class="col-md-4 rule"><span class="ic">🌿</span><div><strong>Трава, +1</strong><br><span class="text-muted">«Что выведет код?» — числа у каждого свои.</span></div></div>
         <div class="col-md-4 rule"><span class="ic">🌲</span><div><strong>Лес, +2 · Крепость, +3</strong><br><span class="text-muted">Написать программу, проверка автотестами. Чужая клетка — на уровень сложнее.</span></div></div>
         <div class="col-md-4 rule"><span class="ic">🖥</span><div><strong>Полноэкранный режим</strong><br><span class="text-muted">{{ max_exits }} выхода — ученик выбит, его клетки остаются команде. Ошибка — пауза 30 секунд.</span></div></div>
+    </div>
+    <hr>
+    <div class="row g-3 small">
+        <div class="col-12"><strong>👑 Сложный вариант «Империя»</strong> <span class="text-muted">— шестиугольники, команды — империи из истории Казахстана.</span></div>
+        <div class="col-md-4 rule"><span class="ic">👑</span><div><strong>Хан и сарбазы</strong><br><span class="text-muted">В каждой команде случайный хан. Он строит столицу (+5) и может передать корону — не больше {{ empire.MAX_KHAN_CHANGES }} раз за игру.</span></div></div>
+        <div class="col-md-4 rule"><span class="ic">🏰</span><div><strong>Города, +5</strong><br><span class="text-muted">Сложная задача (уровень C) — город и 6 клеток вокруг становятся вашими. Вражеская столица берётся так же.</span></div></div>
+        <div class="col-md-4 rule"><span class="ic">🤝</span><div><strong>Союзы</strong><br><span class="text-muted">В начале все враги. Ханы заключают союз — по земле союзника можно ходить. На врага нападают только со своей земли.</span></div></div>
     </div>
 </div>
 
@@ -38,7 +45,7 @@
         {% for g in games %}
         <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <a href="{% url 'island_control' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">🏝️ {{ g.title }}</a>
+                <a href="{% url 'island_control' g.id %}" class="fw-bold text-decoration-none" style="color:#1a1a4b;">{% if g.variant == 'empire' %}👑{% else %}🏝️{% endif %} {{ g.title }}</a>
                 {% if g.status == 'lobby' %}<span class="badge bg-warning text-dark ms-1">сбор игроков</span>
                 {% elif g.status == 'running' %}<span class="badge bg-success ms-1">идёт</span>
                 {% else %}<span class="badge bg-secondary ms-1">завершена</span>{% endif %}
@@ -66,7 +73,12 @@
             {% empty %}<div class="text-muted small">У вас пока нет классов с учениками.</div>{% endfor %}
             </div>
         </div>
-        <div class="col-md-4"><label class="form-label small fw-semibold d-block">Режим</label>
+        <div class="col-12"><label class="form-label small fw-semibold d-block">Вариант игры</label>
+            <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="variant" id="v-island" value="island" checked><label class="btn btn-outline-primary" for="v-island">🏝️ Упрощённый — «Остров»</label>
+                <input type="radio" class="btn-check" name="variant" id="v-empire" value="empire"><label class="btn btn-outline-primary" for="v-empire">👑 Сложный — «Империя»</label>
+            </div></div>
+        <div class="col-md-4" id="mode-box"><label class="form-label small fw-semibold d-block">Режим</label>
             <div class="btn-group w-100" role="group">
                 <input type="radio" class="btn-check" name="mode" id="m-teams" value="teams" checked><label class="btn btn-outline-primary" for="m-teams">👥 Команды</label>
                 <input type="radio" class="btn-check" name="mode" id="m-solo" value="solo"><label class="btn btn-outline-primary" for="m-solo">🧍 Сам за себя</label>
@@ -100,8 +112,13 @@
         var all = Array.prototype.every.call(boxes, function (b) { return b.checked; });
         boxes.forEach(function (b) { b.checked = !all; });
     });
-    function sync() { document.getElementById('teams-box').style.visibility = document.getElementById('m-solo').checked ? 'hidden' : 'visible'; }
-    document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', sync); });
+    function sync() {
+        var emp = document.getElementById('v-empire').checked;
+        document.getElementById('mode-box').style.display = emp ? 'none' : '';       // «Империя» — только команды
+        if (emp) { document.getElementById('m-teams').checked = true; }
+        document.getElementById('teams-box').style.visibility = document.getElementById('m-solo').checked ? 'hidden' : 'visible';
+    }
+    document.querySelectorAll('input[name="mode"], input[name="variant"]').forEach(function (r) { r.addEventListener('change', sync); });
 })();
 </script>
 {% endblock %}

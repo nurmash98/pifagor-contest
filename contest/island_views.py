@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from . import codegame as cg
+from . import empire as emp
 from . import island
 from .codegame_views import _can_edit, _int, _my_classes
 from .models import IslandGame, IslandPlayer, Student, Tag
@@ -31,14 +32,16 @@ def _my_games(user):
 
 # ------------------------------------------------------------------ учитель
 def _save_form(request, game):
-    game.mode = 'solo' if request.POST.get('mode') == 'solo' else 'teams'
+    game.variant = 'empire' if request.POST.get('variant') == 'empire' else 'island'
+    game.mode = 'solo' if request.POST.get('mode') == 'solo' and game.variant == 'island' else 'teams'
     game.teams_count = _int(request.POST.get('teams_count'), 4, 2, island.MAX_TEAMS)
     game.minutes = _int(request.POST.get('minutes'), 40, 5, 90)
     topics = [t for t in request.POST.getlist('topics') if t in cg.TOPIC_LABELS]
     game.topics = ','.join(topics or list(cg.TOPIC_LABELS))
     mine = {c for c, _ in _my_classes(request.user)}
     game.set_classes({c for c in request.POST.getlist('classes') if c in mine})
-    game.title = ' · '.join(x for x in ['Битва за остров', ', '.join(game.class_list())] if x)[:120]
+    name = 'Империя' if game.variant == 'empire' else 'Битва за остров'
+    game.title = ' · '.join(x for x in [name, ', '.join(game.class_list())] if x)[:120]
     game.save()
     game.tags.set(Tag.visible().filter(id__in=[int(x) for x in request.POST.getlist('tags') if x.isdigit()]))
 
@@ -58,6 +61,7 @@ def manage(request):
         'games': _my_games(request.user).prefetch_related('players'), 'topics': cg.TOPICS,
         'classes': _my_classes(request.user), 'tags': Tag.visible(), 'max_teams': island.MAX_TEAMS,
         'max_exits': island.MAX_EXITS, 'prizes': island.PRIZES, 'mvp_bonus': island.MVP_BONUS,
+        'empire': emp,
     })
 
 
@@ -75,6 +79,8 @@ def control(request, game_id):
     return render(request, 'island_control.html', {
         'game': game, 'team_slots': range(min(game.teams_count, island.MAX_TEAMS)), 'max_exits': island.MAX_EXITS,
         'team_names': json.dumps(island.TEAM_NAMES, ensure_ascii=False), 'team_colors': json.dumps(island.TEAM_COLORS),
+        'empires_json': json.dumps([[k, ru] for k, kk, ru in emp.EMPIRES], ensure_ascii=False),
+        'preset_json': json.dumps((game.empire or {}).get('names', {})),
     })
 
 
@@ -97,6 +103,17 @@ def control_action(request, game_id):
         island.set_team(game, p, _int(request.POST.get('team'), 0, 0, island.MAX_TEAMS - 1))
     elif act == 'remove' and game.status == 'lobby':
         IslandPlayer.objects.filter(id=request.POST.get('player'), game=game).delete()
+        island._bump(game)
+    elif act == 'empire_name' and game.status == 'lobby' and emp.is_empire(game):
+        team, key = str(_int(request.POST.get('team'), 0, 0, island.MAX_TEAMS - 1)), request.POST.get('name', '')
+        names = dict((game.empire or {}).get('names', {}))
+        if key in emp.EMPIRE_BY_KEY:
+            names = {t: k for t, k in names.items() if k != key}       # одна империя — у одной команды
+            names[team] = key
+        else:
+            names.pop(team, None)
+        game.empire = dict(game.empire or {}, names=names)
+        game.save(update_fields=['empire'])
         island._bump(game)
     elif act == 'start' and game.status == 'lobby':
         if not game.players.exists():
@@ -218,6 +235,27 @@ def play_answer(request, game_id):
     return JsonResponse(res)
 
 
+@login_required
+@require_POST
+def play_khan(request, game_id):
+    """«Империя»: действия хана — столица, новый хан, союзы."""
+    st, game, player = _player_game(request, game_id)
+    if player is None or not _armed(request, player) or not emp.is_empire(game):
+        return JsonResponse({'error': 'notarmed'})
+    if player.kicked:
+        return JsonResponse({'error': 'kicked'})
+    act = request.POST.get('action')
+    if act == 'capital':
+        res = emp.build_capital(game, player)
+    elif act == 'appoint':
+        res = emp.appoint(game, player, _int(request.POST.get('player'), 0, 0, 10 ** 9))
+    elif act in ('propose', 'accept', 'decline', 'cancel', 'break'):
+        res = emp.diplomacy(game, player, act, _int(request.POST.get('team'), -1, -1, 99))
+    else:
+        res = {'error': 'bad_target'}
+    return JsonResponse(res)
+
+
 def _texts(lang):
     """Надписи игры для JS — на языке ученика."""
     from .templatetags.ui_i18n import UI_TRANSLATIONS
@@ -238,6 +276,22 @@ def _texts(lang):
         'help': 'Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей.',
         'mvp': 'Лучший игрок (MVP)', 'mvp_you': 'Вы — лучший игрок (MVP)!', 'pts_n': 'очков:', 'coins_w': 'монет',
         'enter_code': 'Введите код решения', 'time_up': 'Время вышло', 'results': 'Итоги',
+        # «Империя»
+        'khan': 'Хан', 'sarbaz': 'Сарбаз', 'you_khan': 'Вы — хан', 'your_khan': 'Ваш хан',
+        'capital_btn': 'Построить столицу здесь', 'capital_ok': 'Столица построена!', 'no_capital': 'Столицы нет',
+        'capital_hint': 'Встаньте на свою клетку и постройте столицу (+5 очков, сюда возвращаются сарбазы).',
+        'capital_lost_hint': 'Столица потеряна. Новую можно построить только в своём городе.',
+        'appoint_btn': 'Сделать ханом', 'changes_left': 'Смен хана осталось:', 'appointed': 'Новый хан назначен',
+        'diplomacy': 'Дипломатия', 'ally': 'союз', 'enemy': 'враг', 'truce_s': 'перемирие',
+        'propose': 'Предложить союз', 'accept': 'Принять', 'decline': 'Отклонить', 'cancel_offer': 'Отменить',
+        'break': 'Разорвать союз', 'offer_sent': 'предложение отправлено', 'offer_in': 'предлагает союз',
+        'truce': 'Перемирие: пока нельзя нападать на эту империю.', 'border': 'Напасть на чужую клетку можно только со своей земли.',
+        'taken': 'Эта клетка уже недоступна.', 'notkhan': 'Это может сделать только хан.', 'has_capital': 'Столица уже есть.',
+        'not_own': 'Встаньте на свою клетку.', 'need_city': 'Новую столицу можно построить только в своём городе.',
+        'no_changes': 'Смены хана закончились.', 'bad_target': 'Не получилось.', 'already': 'Вы уже союзники.',
+        'no_offer': 'Предложения больше нет.', 'not_ally': 'Вы не союзники.',
+        'city': 'Город', 'city_hint': 'Сложная задача — город и 6 клеток вокруг станут вашими', 'cells_n': 'клеток',
+        'capital': 'Столица', 'empire': 'Империя',
     }
     if lang != 'kk':
         return ru

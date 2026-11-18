@@ -4,7 +4,44 @@ IslandMap(canvas, {fit: true|false, onCell: fn(x, y)}) → {setState(d), centerO
 function IslandMap(canvas, opt) {
     opt = opt || {};
     var T = 64, ctx = canvas.getContext('2d'), base = null;
-    var S = {map: null, cells: {}, players: [], teams: {}, me: null};
+    var R = 38, HW = Math.sqrt(3) * R, HH = 1.5 * R;             // шестиугольник «Империи»: радиус, ширина, шаг рядов
+    var S = {map: null, cells: {}, players: [], teams: {}, me: null, empire: null};
+    function hex() { return !!(S.map && S.map.hex); }
+    function center(x, y) { return hex() ? [HW * (x + .5 + (y & 1) * .5), R + HH * y] : [x * T + T / 2, y * T + T / 2]; }
+    function mapW() { return hex() ? HW * (S.map.w + .5) : S.map.w * T; }
+    function mapH() { return hex() ? HH * (S.map.h - 1) + 2 * R : S.map.h * T; }
+    function nbs(x, y) {                                     // тот же порядок сторон, что в empire.hex_neighbors: В, ЮВ, ЮЗ, З, СЗ, СВ
+        if (!hex()) { return [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]; }
+        return y % 2 === 0 ? [[x + 1, y], [x, y + 1], [x - 1, y + 1], [x - 1, y], [x - 1, y - 1], [x, y - 1]]
+                           : [[x + 1, y], [x + 1, y + 1], [x, y + 1], [x - 1, y], [x, y - 1], [x + 1, y - 1]];
+    }
+    function corner(cx, cy, i, r) { var a = Math.PI / 180 * (60 * i - 30); return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+    function hexPath(c, x, y, r) {
+        var p = center(x, y), i, q;
+        c.beginPath();
+        for (i = 0; i < 6; i++) { q = corner(p[0], p[1], i, r); if (i) { c.lineTo(q[0], q[1]); } else { c.moveTo(q[0], q[1]); } }
+        c.closePath();
+    }
+    function edge(c, x, y, i, r) {                           // сторона i: между углами i и i+1
+        var p = center(x, y), a = corner(p[0], p[1], i, r), b = corner(p[0], p[1], (i + 1) % 6, r);
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+    function capitals() {
+        var out = {}, t, e = S.empire;
+        if (e) { for (t in e.teams) { if (e.teams[t].capital) { out[e.teams[t].capital[0] + ',' + e.teams[t].capital[1]] = +t; } } }
+        return out;
+    }
+    function khans() {
+        var out = {}, t, e = S.empire;
+        if (e) { for (t in e.teams) { if (e.teams[t].khan) { out[e.teams[t].khan] = true; } } }
+        return out;
+    }
+    function relation(a, b) {
+        if (a === b) { return 'self'; }
+        var e = S.empire, out = 'enemy';
+        if (e) { e.rel.forEach(function (r) { if ((r[0] === a && r[1] === b) || (r[0] === b && r[1] === a)) { out = r[2]; } }); }
+        return out;
+    }
     var cam = {x: 0, y: 0, z: 1}, dpr = window.devicePixelRatio || 1, hover = null, t0 = Date.now();
 
     function rnd(x, y, i) {                              // детерминированное «случайное» число 0..1 для клетки
@@ -15,7 +52,67 @@ function IslandMap(canvas, opt) {
     function land(x, y) { return at(x, y) !== '~'; }
 
     // ---------- местность рисуется один раз в отдельный холст ----------
+    function prerenderHex() {
+        var m = S.map, x, y;
+        base = document.createElement('canvas');
+        base.width = Math.ceil(mapW()); base.height = Math.ceil(mapH());
+        var c = base.getContext('2d');
+        c.fillStyle = '#2aa0b6'; c.fillRect(0, 0, base.width, base.height);
+        c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = 2; c.lineCap = 'round';
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (!land(x, y)) {      // волны
+            var p = center(x, y);
+            if (rnd(x, y, 1) > .45) { c.beginPath(); c.moveTo(p[0] - 9, p[1]); c.quadraticCurveTo(p[0] - 2, p[1] - 6, p[0] + 6, p[1]); c.stroke(); }
+        } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (land(x, y) && nbs(x, y).some(function (n) { return !land(n[0], n[1]); })) {
+            c.fillStyle = '#ecdfa6'; hexPath(c, x, y, R + 4); c.fill();                    // песок у воды
+        } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) { if (land(x, y)) {
+            var k = at(x, y), v = rnd(x, y, 5);
+            c.fillStyle = k === 'f' ? (v > .5 ? '#86bd43' : '#7fb63d') : k === 'C' ? '#d8cfa8' : (v > .5 ? '#a5d458' : '#9dce50');
+            hexPath(c, x, y, R - 1); c.fill();
+            c.strokeStyle = 'rgba(40,60,20,.16)'; c.lineWidth = 1.2; c.stroke();
+            c.strokeStyle = '#4a3b22'; c.lineWidth = 3;
+            nbs(x, y).forEach(function (n, i) { if (!land(n[0], n[1])) { edge(c, x, y, i, R + 3); } });
+        } } }
+        for (y = 0; y < m.h; y++) { for (x = 0; x < m.w; x++) {
+            var kk = at(x, y), q = center(x, y);
+            if (kk === 'f') { hexForest(c, q[0], q[1], x, y); } else if (kk === 'C') { citySite(c, q[0], q[1]); } else if (kk === '.') { hexTufts(c, q[0], q[1], x, y); }
+        } }
+    }
+    function hexTufts(c, cx, cy, x, y) {
+        c.strokeStyle = 'rgba(60,110,30,.55)'; c.lineWidth = 1.5; c.lineCap = 'round';
+        for (var i = 0; i < 3; i++) {
+            if (rnd(x, y, 20 + i) < .45) { continue; }
+            var gx = cx - 14 + rnd(x, y, 10 + i) * 28, gy = cy - 10 + rnd(x, y, 14 + i) * 22;
+            c.beginPath(); c.moveTo(gx - 4, gy); c.lineTo(gx - 2, gy - 6); c.moveTo(gx, gy); c.lineTo(gx, gy - 8); c.moveTo(gx + 4, gy); c.lineTo(gx + 2, gy - 6); c.stroke();
+        }
+    }
+    function hexForest(c, cx, cy, x, y) {
+        [[-11, -8, 11], [10, -6, 10], [-3, 10, 12]].forEach(function (s, i) {
+            var tx = cx + s[0] + (rnd(x, y, 30 + i) - .5) * 5, ty = cy + s[1] + (rnd(x, y, 40 + i) - .5) * 5, r = s[2];
+            c.fillStyle = 'rgba(20,50,10,.22)'; c.beginPath(); c.ellipse(tx + 3, ty + 4, r, r * .85, 0, 0, 6.3); c.fill();
+            c.fillStyle = '#4c9a2c'; c.strokeStyle = '#2c661b'; c.lineWidth = 2;
+            c.beginPath(); c.arc(tx, ty, r, 0, 6.3); c.fill(); c.stroke();
+            c.fillStyle = '#74c043'; c.beginPath(); c.arc(tx - r * .25, ty - r * .25, r * .45, 0, 6.3); c.fill();
+        });
+    }
+    function citySite(c, cx, cy) {                       // место для города: стены и три юрты
+        c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(cx + 3, cy + 6, 25, 16, 0, 0, 6.3); c.fill();
+        c.fillStyle = '#a8a29e'; c.strokeStyle = '#44403c'; c.lineWidth = 2;
+        c.beginPath(); c.ellipse(cx, cy + 3, 24, 15, 0, 0, 6.3); c.fill(); c.stroke();
+        [[-10, 2], [10, 2], [0, -6]].forEach(function (s) {
+            var tx = cx + s[0], ty = cy + s[1];
+            c.fillStyle = '#f5f0e1'; c.beginPath(); c.moveTo(tx - 8, ty + 6); c.lineTo(tx - 8, ty); c.quadraticCurveTo(tx, ty - 11, tx + 8, ty); c.lineTo(tx + 8, ty + 6); c.closePath(); c.fill(); c.stroke();
+            c.fillStyle = '#b45309'; c.fillRect(tx - 2, ty + 1, 4, 5);
+        });
+    }
+    function crown(c, cx, cy, s) {
+        c.fillStyle = '#fbbf24'; c.strokeStyle = '#92400e'; c.lineWidth = 1.6;
+        c.beginPath(); c.moveTo(cx - s, cy + s * .55); c.lineTo(cx - s, cy - s * .35); c.lineTo(cx - s * .5, cy + s * .1); c.lineTo(cx, cy - s * .6);
+        c.lineTo(cx + s * .5, cy + s * .1); c.lineTo(cx + s, cy - s * .35); c.lineTo(cx + s, cy + s * .55); c.closePath(); c.fill(); c.stroke();
+    }
     function prerender() {
+        if (hex()) { prerenderHex(); return; }
         var m = S.map;
         base = document.createElement('canvas');
         base.width = m.w * T; base.height = m.h * T;
@@ -102,13 +199,13 @@ function IslandMap(canvas, opt) {
             canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
         }
         if (opt.fit && S.map) {
-            cam.z = Math.min(w / (S.map.w * T), h / (S.map.h * T));
-            cam.x = (S.map.w * T - w / cam.z) / 2; cam.y = (S.map.h * T - h / cam.z) / 2;
+            cam.z = Math.min(w / mapW(), h / mapH());
+            cam.x = (mapW() - w / cam.z) / 2; cam.y = (mapH() - h / cam.z) / 2;
         }
     }
     function clamp() {
         if (!S.map || opt.fit) { return; }
-        var vw = canvas.clientWidth / cam.z, vh = canvas.clientHeight / cam.z, mw = S.map.w * T, mh = S.map.h * T;
+        var vw = canvas.clientWidth / cam.z, vh = canvas.clientHeight / cam.z, mw = mapW(), mh = mapH();
         cam.x = vw >= mw ? (mw - vw) / 2 : Math.max(0, Math.min(cam.x, mw - vw));
         cam.y = vh >= mh ? (mh - vh) / 2 : Math.max(0, Math.min(cam.y, mh - vh));
     }
@@ -119,17 +216,17 @@ function IslandMap(canvas, opt) {
     }
     function neighbours() {
         if (!S.me || S.me.kicked) { return []; }
-        return [[1, 0], [-1, 0], [0, 1], [0, -1]].map(function (d) { return [S.me.x + d[0], S.me.y + d[1]]; })
-            .filter(function (c) { return land(c[0], c[1]); });
+        return nbs(S.me.x, S.me.y).filter(function (c) { return land(c[0], c[1]); });
     }
     function draw() {
         if (!S.map) { return; }
         resize(); clamp();
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.fillStyle = '#1b7f93'; ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        ctx.fillStyle = hex() ? '#2aa0b6' : '#1b7f93'; ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
         ctx.setTransform(dpr * cam.z, 0, 0, dpr * cam.z, -cam.x * dpr * cam.z, -cam.y * dpr * cam.z);
         ctx.drawImage(base, 0, 0);
         var key, c, x, y;
+        if (hex()) { drawHexLayer(); return; }
         for (key in S.cells) {                           // территории: заливка цветом команды и обводка по границе
             c = key.split(','); x = +c[0]; y = +c[1];
             var team = S.cells[key], col = teamColor(team);
@@ -185,15 +282,82 @@ function IslandMap(canvas, opt) {
         }
     }
 
+    function drawHexLayer() {
+        var key, c, x, y, caps = capitals(), kh = khans();
+        for (key in S.cells) {                           // земля империй: заливка и граница
+            c = key.split(','); x = +c[0]; y = +c[1];
+            var team = S.cells[key], col = teamColor(team);
+            ctx.globalAlpha = .46; ctx.fillStyle = col; hexPath(ctx, x, y, R - 1); ctx.fill(); ctx.globalAlpha = 1;
+            ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineCap = 'round';
+            nbs(x, y).forEach(function (n, i) { if (S.cells[n[0] + ',' + n[1]] !== team) { edge(ctx, x, y, i, R - 3); } });
+            var p = center(x, y);
+            if (caps[key] === team) {                    // столица: башня с флагом и короной
+                ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(p[0] + 3, p[1] + 9, 20, 9, 0, 0, 6.3); ctx.fill();
+                ctx.fillStyle = '#e7e5e4'; ctx.strokeStyle = '#292524'; ctx.lineWidth = 2;
+                ctx.fillRect(p[0] - 14, p[1] - 8, 28, 18); ctx.strokeRect(p[0] - 14, p[1] - 8, 28, 18);
+                for (var b = -14; b < 14; b += 8) { ctx.fillRect(p[0] + b, p[1] - 13, 5, 6); ctx.strokeRect(p[0] + b, p[1] - 13, 5, 6); }
+                ctx.fillStyle = '#78350f'; ctx.fillRect(p[0] - 4, p[1] + 1, 8, 9);
+                ctx.strokeStyle = '#292524'; ctx.beginPath(); ctx.moveTo(p[0], p[1] - 13); ctx.lineTo(p[0], p[1] - 30); ctx.stroke();
+                ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(p[0], p[1] - 30); ctx.lineTo(p[0] + 15, p[1] - 25); ctx.lineTo(p[0], p[1] - 20); ctx.closePath(); ctx.fill(); ctx.stroke();
+                crown(ctx, p[0] - 13, p[1] - 24, 7);
+            } else if (at(x, y) === 'C') {               // город империи — флаг её цвета
+                ctx.strokeStyle = '#292524'; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.moveTo(p[0] + 12, p[1] - 4); ctx.lineTo(p[0] + 12, p[1] - 28); ctx.stroke();
+                ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(p[0] + 12, p[1] - 28); ctx.lineTo(p[0] + 28, p[1] - 22); ctx.lineTo(p[0] + 12, p[1] - 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+            }
+        }
+        var pulse = (Math.sin((Date.now() - t0) / 260) + 1) / 2;
+        neighbours().forEach(function (n) {              // куда можно шагнуть
+            var k = n[0] + ',' + n[1], owner = S.cells[k], hot = hover && hover[0] === n[0] && hover[1] === n[1];
+            var walk = owner === S.me.team || (owner !== undefined && relation(owner, S.me.team) === 'ally');
+            ctx.strokeStyle = 'rgba(255,255,255,' + (hot ? 1 : .55 + pulse * .4) + ')'; ctx.lineWidth = hot ? 4 : 3;
+            ctx.setLineDash([7, 5]); hexPath(ctx, n[0], n[1], R - 7); ctx.stroke(); ctx.setLineDash([]);
+            if (hot) { ctx.fillStyle = 'rgba(255,255,255,.22)'; hexPath(ctx, n[0], n[1], R - 7); ctx.fill(); }
+            var city = at(n[0], n[1]) === 'C' || caps[k] !== undefined, p = center(n[0], n[1]);
+            var label = walk ? '→' : (city ? '+5' : '+1');
+            ctx.font = '800 14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = city && !walk ? 'rgba(127,29,29,.9)' : 'rgba(17,24,39,.78)'; ctx.beginPath(); ctx.arc(p[0] + 17, p[1] - 17, 12, 0, 6.3); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.fillText(label, p[0] + 17, p[1] - 16);
+        });
+        var groups = {};
+        S.players.forEach(function (p) { if (p[3] >= 0) { (groups[p[1] + ',' + p[2]] = groups[p[1] + ',' + p[2]] || []).push(p); } });
+        for (key in groups) {
+            var list = groups[key], n = list.length;
+            list.forEach(function (p, i) {
+                var ang = i * 2 * Math.PI / n - Math.PI / 2, r = n > 1 ? 14 : 0, cc = center(p[1], p[2]);
+                var px = cc[0] + Math.cos(ang) * r, py = cc[1] + Math.sin(ang) * r, mine = S.me && p[0] === S.me.id, rad = n > 2 ? 10 : 13;
+                if (mine) { ctx.strokeStyle = 'rgba(253,224,71,' + (.5 + pulse * .5) + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, rad + 6 + pulse * 3, 0, 6.3); ctx.stroke(); }
+                ctx.globalAlpha = p[4] ? .45 : 1;
+                ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.arc(px + 2, py + 3, rad, 0, 6.3); ctx.fill();
+                ctx.fillStyle = teamColor(p[3]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(px, py, rad, 0, 6.3); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.font = '800 ' + (n > 2 ? 9 : 10) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(p[4] ? '✕' : initials(p[5]), px, py + 1);
+                if (kh[p[0]]) { crown(ctx, px, py - rad - 6, n > 2 ? 6 : 8); }   // корона хана над головой
+                ctx.globalAlpha = 1;
+            });
+        }
+    }
+
     // ---------- камера и мышь ----------
     function cellAt(ev) {
-        var r = canvas.getBoundingClientRect();
-        return [Math.floor(((ev.clientX - r.left) / cam.z + cam.x) / T), Math.floor(((ev.clientY - r.top) / cam.z + cam.y) / T)];
+        var r = canvas.getBoundingClientRect(), mx = (ev.clientX - r.left) / cam.z + cam.x, my = (ev.clientY - r.top) / cam.z + cam.y;
+        if (!hex()) { return [Math.floor(mx / T), Math.floor(my / T)]; }
+        var gy = Math.round((my - R) / HH), best = null, bd = 1e9;   // ближайший центр шестиугольника
+        for (var y = gy - 1; y <= gy + 1; y++) {
+            var gx = Math.round(mx / HW - .5 - (y & 1) * .5);
+            for (var x = gx - 1; x <= gx + 1; x++) {
+                var c = center(x, y), d = (c[0] - mx) * (c[0] - mx) + (c[1] - my) * (c[1] - my);
+                if (d < bd) { bd = d; best = [x, y]; }
+            }
+        }
+        return best;
     }
     function centerOnMe() {
         if (!S.me || !S.map) { return; }
-        cam.x = S.me.x * T + T / 2 - canvas.clientWidth / cam.z / 2;
-        cam.y = S.me.y * T + T / 2 - canvas.clientHeight / cam.z / 2;
+        var c = center(S.me.x, S.me.y);
+        cam.x = c[0] - canvas.clientWidth / cam.z / 2;
+        cam.y = c[1] - canvas.clientHeight / cam.z / 2;
         clamp();
     }
     if (!opt.fit) {
@@ -233,15 +397,16 @@ function IslandMap(canvas, opt) {
             if (d.players) { S.players = d.players; }
             if (d.teams) { S.teams = {}; d.teams.forEach(function (t) { S.teams[t.i] = t; }); }
             if (d.me) { S.me = d.me; }
+            if (d.empire) { S.empire = d.empire; }
             if (first) { resize(); centerOnMe(); }
         },
         setMe: function (x, y) { if (S.me) { S.me.x = x; S.me.y = y; S.players.forEach(function (p) { if (p[0] === S.me.id) { p[1] = x; p[2] = y; } }); } },
         follow: function () {                            // держим свою фишку в кадре
             if (!S.me || !S.map || opt.fit) { return; }
-            var px = (S.me.x * T + T / 2 - cam.x) * cam.z, py = (S.me.y * T + T / 2 - cam.y) * cam.z, m = 150;
+            var cc = center(S.me.x, S.me.y), px = (cc[0] - cam.x) * cam.z, py = (cc[1] - cam.y) * cam.z, m = 150;
             if (px < m || py < m || px > canvas.clientWidth - m || py > canvas.clientHeight - m) { centerOnMe(); }
         },
-        centerOnMe: centerOnMe, draw: draw, neighbours: neighbours, state: S,
+        centerOnMe: centerOnMe, draw: draw, neighbours: neighbours, state: S, relation: relation, capitals: capitals, isHex: hex,
         loop: function () { (function tick() { draw(); requestAnimationFrame(tick); })(); }
     };
 }

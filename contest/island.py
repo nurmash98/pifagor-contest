@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from . import codegame as cg
+from . import empire as emp
 from .autotest import outputs_match, run_autotests
 
 WATER, GRASS, FOREST, FORT = '~', '.', 'f', 'F'
@@ -46,15 +47,28 @@ def _noise(w, h, rng, step):
     return out
 
 
-def _components(cells):
-    """Связные области (по 4 соседям) множества клеток."""
+def square_neighbors(x, y):
+    return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+
+
+def neighbors(game, x, y):
+    """Соседние клетки: 4 в «Острове», 6 у шестиугольников «Империи»."""
+    return emp.hex_neighbors(x, y) if emp.is_empire(game) else square_neighbors(x, y)
+
+
+def _dist(game, a, b):
+    return emp.hex_dist(a, b) if emp.is_empire(game) else abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def _components(cells, nb=square_neighbors):
+    """Связные области множества клеток (соседи — по функции nb)."""
     left, out = set(cells), []
     while left:
         start = left.pop()
         comp, q = {start}, deque([start])
         while q:
             x, y = q.popleft()
-            for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            for n in nb(x, y):
                 if n in left:
                     left.discard(n)
                     comp.add(n)
@@ -63,12 +77,16 @@ def _components(cells):
     return out
 
 
-def generate_map(players, rng=None):
-    """Остров под число игроков: примерно 14 клеток суши на человека. Вся суша связна."""
+def generate_map(players, rng=None, hexes=False, teams=0):
+    """Остров под число игроков: примерно 14 клеток суши на человека. Вся суша связна.
+    hexes=True — карта «Империи»: шестиугольники, вместо крепостей — места для городов (C)."""
     rng = rng or random.Random()
-    total = max(players, 4) * 26 + 120
+    total = max(players, 4) * 26 + 120 + (teams * 14 if hexes else 0)
     w = max(14, math.ceil(math.sqrt(total * 4 / 3)))
     h = max(11, math.ceil(total / w))
+    if hexes:                                       # ряды шестиугольников ниже клеток (0.87) — рядов чуть больше
+        h = max(12, math.ceil(h * 1.12))
+    nb = emp.hex_neighbors if hexes else square_neighbors
     for _ in range(20):
         shape, lakes, woods = _noise(w, h, rng, 4), _noise(w, h, rng, 3), _noise(w, h, rng, 3)
         cx, cy = (w - 1) / 2, (h - 1) / 2
@@ -80,22 +98,31 @@ def generate_map(players, rng=None):
                     land.add((x, y))
         if not land:
             continue
-        land = max(_components(land), key=len)
+        land = max(_components(land, nb), key=len)
         if len(land) >= max(players, 4) * 9:
             break
     rows = [[WATER] * w for _ in range(h)]
     for x, y in land:
         rows[y][x] = FOREST if woods[y][x] > .6 else GRASS
-    # крепости: одна ближе к центру, остальные — подальше друг от друга
-    forts, want = [], max(3, players // 4 + 2)
+    # крепости (в «Империи» — места для городов): одна ближе к центру, остальные — подальше друг от друга
+    if hexes:
+        mark, want, gap = emp.CITY, max(4, teams * 2 + 2), 4
+        dist = emp.hex_dist
+    else:
+        mark, want, gap = FORT, max(3, players // 4 + 2), 4
+        dist = lambda a, b: abs(a[0] - b[0]) + abs(a[1] - b[1])
+    forts = []
     order = sorted(land, key=lambda c: math.hypot(c[0] - cx, c[1] - cy) + rng.random() * 2)
     for c in order[:1] + rng.sample(order, len(order)):
         if len(forts) >= want:
             break
-        if all(abs(c[0] - f[0]) + abs(c[1] - f[1]) >= 4 for f in forts):
+        if all(dist(c, f) >= gap for f in forts):
             forts.append(c)
-            rows[c[1]][c[0]] = FORT
-    return {'w': w, 'h': h, 'rows': [''.join(r) for r in rows]}
+            rows[c[1]][c[0]] = mark
+    out = {'w': w, 'h': h, 'rows': [''.join(r) for r in rows]}
+    if hexes:
+        out['hex'] = True
+    return out
 
 
 def terrain(game, x, y):
@@ -113,7 +140,7 @@ def _land(game):
 def _start_zones(game, sizes, rng, taken=()):
     """Для каждой команды — её стартовые клетки. Центры зон выбираются как можно дальше друг от друга."""
     land = _land(game)
-    free = [c for c in land if terrain(game, *c) != FORT and c not in taken]
+    free = [c for c in land if terrain(game, *c) not in (FORT, emp.CITY) and c not in taken]
     seeds = []
     busy = set(taken)
     zones = []
@@ -126,15 +153,15 @@ def _start_zones(game, sizes, rng, taken=()):
             seed = rng.choice(pool)
         else:
             anchors = seeds + list(taken)
-            seed = max(pool, key=lambda c: (min(abs(c[0] - a[0]) + abs(c[1] - a[1]) for a in anchors), rng.random()))
+            seed = max(pool, key=lambda c: (min(_dist(game, c, a) for a in anchors), rng.random()))
         seeds.append(seed)
         zone, q, seen = [], deque([seed]), {seed}
         while q and len(zone) < size:
             c = q.popleft()
-            if c not in busy and terrain(game, *c) != FORT:
+            if c not in busy and terrain(game, *c) not in (FORT, emp.CITY):
                 zone.append(c)
             x, y = c
-            for n in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            for n in neighbors(game, *c):
                 if n in land and n not in seen:
                     seen.add(n)
                     q.append(n)
@@ -145,7 +172,7 @@ def _start_zones(game, sizes, rng, taken=()):
 
 # ------------------------------------------------------------------ команды
 def team_count(game, players):
-    if game.mode == 'solo':
+    if game.mode == 'solo' and not emp.is_empire(game):
         return len(players)
     return max(1, min(game.teams_count, MAX_TEAMS, len(players)))
 
@@ -165,6 +192,10 @@ def teams_info(game, players, lang='ru'):
     for i in ids:
         members = [p for p in players if p.team == i]
         name = members[0].student.full_name if game.mode == 'solo' else names[i % len(names)]
+        if emp.is_empire(game):
+            key = (game.empire or {}).get('names', {}).get(str(i))
+            if key:
+                name = emp.name_of(key, lang)
         out.append({'i': i, 'name': name, 'color': team_color(i, total), 'size': len(members)})
     return out
 
@@ -227,9 +258,11 @@ def start(game, rng=None):
             for p in rest:
                 p.team = sizes.index(min(sizes))
                 sizes[p.team] += 1
-        game.map = generate_map(len(players), rng)
+        hexes = emp.is_empire(game)
+        game.map = generate_map(len(players), rng, hexes=hexes, teams=k)
         teams = sorted({p.team for p in players})
-        zones = _start_zones(game, [sum(1 for p in players if p.team == t) for t in teams], rng)
+        sizes = [emp.START_CELLS if hexes else sum(1 for p in players if p.team == t) for t in teams]
+        zones = _start_zones(game, sizes, rng)
         scores, cells = {}, []
         rows = [list(r) for r in game.map['rows']]
         for zone in zones:                                  # стартовые клетки — всегда трава: у всех поровну очков
@@ -238,14 +271,15 @@ def start(game, rng=None):
         game.map['rows'] = [''.join(r) for r in rows]
         for t, zone in zip(teams, zones):
             members = [p for p in players if p.team == t]
-            for p, (x, y) in zip(members, zone):
-                p.x, p.y = x, y
-                cells.append(IslandCell(game=game, x=x, y=y, team=t, by=p, ver=1))
-            for p in members[len(zone):]:               # на всякий случай: клеток не хватило — встают рядом
-                p.x, p.y = zone[0] if zone else (0, 0)
-            scores[str(t)] = sum(POINTS[terrain(game, x, y)] for x, y in zone)
+            for i, (x, y) in enumerate(zone):
+                cells.append(IslandCell(game=game, x=x, y=y, team=t, by=members[i % len(members)] if members else None, ver=1))
+            for i, p in enumerate(members):             # клеток меньше, чем игроков, — встают по кругу на свои клетки
+                p.x, p.y = zone[i % len(zone)] if zone else (0, 0)
+            scores[str(t)] = sum(POINTS[terrain(game, x, y)] for x, y in zone) if not hexes else len(zone)
         IslandPlayer.objects.bulk_update(players, ['team', 'x', 'y'])
         IslandCell.objects.bulk_create(cells)
+        if hexes:
+            game.empire = emp.setup(game, players, rng)
         now = timezone.now()
         game.scores, game.version, game.status = scores, 1, 'running'
         game.started_at, game.ends_at = now, now + timedelta(minutes=game.minutes)
@@ -269,7 +303,7 @@ def join(game, student, rng=None):
         if game.status == 'running':
             others = list(game.players.exclude(pk=player.pk))
             owned = {(c.x, c.y): c.team for c in game.cells.all()}
-            if game.mode == 'solo' or not others:
+            if (game.mode == 'solo' and not emp.is_empire(game)) or not others:
                 player.team = max([p.team for p in others] + [-1]) + 1
                 zone = _start_zones(game, [1], rng, taken=tuple(owned))[0]
                 if zone:
@@ -401,7 +435,8 @@ def public_challenge(player, lang='ru'):
     ch = player.challenge or {}
     if not ch:
         return None
-    out = {'x': ch['x'], 'y': ch['y'], 'kind': ch['kind'], 'points': ch['points'], 'enemy': ch.get('enemy', False)}
+    out = {'x': ch['x'], 'y': ch['y'], 'kind': ch['kind'], 'points': ch['points'], 'enemy': ch.get('enemy', False),
+           'city': ch.get('city', False)}
     if ch['kind'] == 'output':
         out.update(title=ch.get('title', ''), code=ch['code'])
     else:
@@ -422,9 +457,11 @@ def move(game, player, x, y, rng=None, now=None):
         return {'error': 'over'}
     if player.kicked:
         return {'error': 'kicked'}
-    if abs(x - player.x) + abs(y - player.y) != 1 or terrain(game, x, y) == WATER:
+    if (x, y) not in neighbors(game, player.x, player.y) or terrain(game, x, y) == WATER:
         return {'error': 'far'}
     owner = _owner(game, x, y)
+    if emp.is_empire(game):
+        return _move_empire(game, player, x, y, owner, rng, now)
     if owner == player.team:
         player.x, player.y, player.challenge = x, y, {}
         player.save(update_fields=['x', 'y', 'challenge'])
@@ -440,6 +477,34 @@ def move(game, player, x, y, rng=None, now=None):
         if task_id:
             ch = dict(base, kind='code', task=task_id)
         else:                                               # трава или в банке нет задач на код
+            q = _output_question(game, rng)
+            if not q:
+                return {'error': 'noquestion'}
+            ch = dict(base, kind='output', title=q['title'], code=q['code'], answer=q['answer'])
+        player.challenge = ch
+        player.save(update_fields=['challenge'])
+    return {'challenge': True}
+
+
+def _move_empire(game, player, x, y, owner, rng, now):
+    rule = emp.move_rule(game, player, x, y, owner, now)
+    if rule.get('error'):
+        return rule
+    if rule.get('walk'):
+        player.x, player.y, player.challenge = x, y, {}
+        player.save(update_fields=['x', 'y', 'challenge'])
+        return {'moved': True}
+    wait = cooldown_left(player, now)
+    if wait:
+        return {'error': 'cooldown', 'wait': wait}
+    level = rule['level']
+    ch = player.challenge or {}
+    if not (ch.get('kind') == 'code' and (ch.get('x'), ch.get('y')) == (x, y) and ch.get('level') == level):
+        base = {'x': x, 'y': y, 'points': rule['points'], 'level': level, 'enemy': rule['enemy'], 'city': rule['city']}
+        task_id = _pick_task(game, player, level, rng) if level > 1 else None
+        if task_id:
+            ch = dict(base, kind='code', task=task_id)
+        else:
             q = _output_question(game, rng)
             if not q:
                 return {'error': 'noquestion'}
@@ -481,6 +546,16 @@ def answer(game, player, value, now=None):
             fields.append('challenge')
         player.save(update_fields=fields)
         return dict(info, ok=False, wait=COOLDOWN)
+    if emp.is_empire(game):
+        # пока решал, клетку могли занять союзники или объявить перемирие — проверяем ещё раз
+        game.refresh_from_db()
+        rule = emp.move_rule(game, player, ch['x'], ch['y'], _owner(game, ch['x'], ch['y']), now)
+        if rule.get('error') or rule.get('walk'):
+            player.challenge = {}
+            player.save(update_fields=['challenge'])
+            return {'error': rule.get('error') or 'taken'}
+        n = emp.capture(game, player, ch)
+        return dict(info, ok=True, points=ch['points'], cells=n)
     capture(game, player, ch)
     return dict(info, ok=True, points=ch['points'])
 
@@ -529,6 +604,8 @@ def count_exit(player, kind, now=None):
             if player.exits >= MAX_EXITS:
                 player.kicked, player.challenge = True, {}
             player.save(update_fields=['exits', 'exit_log', 'kicked', 'challenge'])
+    if player.kicked and emp.is_empire(player.game):
+        emp.on_kicked(player.game, player)
     return player
 
 
@@ -560,6 +637,10 @@ def state(game, since=0, me=None, lang='ru', now=None):
         out['cells'] = [[c.x, c.y, c.team] for c in cells]
     if since == 0 and game.status != 'lobby':
         out['map'] = game.map
+    if emp.is_empire(game):
+        out['variant'] = 'empire'
+        if game.status != 'lobby':
+            out['empire'] = emp.public(game, players, lang, now)
     if me is not None:
         out['me'] = {'id': me.id, 'x': me.x, 'y': me.y, 'team': me.team, 'kicked': me.kicked, 'exits': me.exits,
                      'wait': cooldown_left(me, now), 'coins': me.coins}

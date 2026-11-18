@@ -887,8 +887,14 @@ class IslandGame(models.Model):
     """Игра «Битва за остров»: класс на общей карте захватывает клетки, решая задачи.
     Учитель создаёт игру, ученики входят в лобби, учитель делит на команды и запускает."""
     MODE_CHOICES = [('teams', 'Команды'), ('solo', 'Сам за себя')]
+    VARIANT_CHOICES = [('island', 'Упрощённая: «Битва за остров»'), ('empire', 'Сложная: «Империя»')]
     STATUS_CHOICES = [('lobby', 'Сбор игроков'), ('running', 'Идёт'), ('finished', 'Завершена')]
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='island_games', verbose_name='Учитель')
+    # island — квадратные клетки (как раньше); empire — шестиугольники, ханы, города, союзы (contest/empire.py)
+    variant = models.CharField(max_length=10, choices=VARIANT_CHOICES, default='island', verbose_name='Вариант')
+    # «Империя»: {'teams': {'0': {'name': 'kazakh', 'khan': id, 'changes': 0, 'capital': [x, y], 'built': True}},
+    #             'rel': {'0-1': {'s': 'ally'|'enemy', 'truce': iso}}, 'offers': [[from, to], ...], 'names': {'0': 'kazakh'}}
+    empire = models.JSONField(default=dict, blank=True)
     title = models.CharField(max_length=120, verbose_name='Название')
     classes = models.CharField(max_length=300, blank=True, default='', verbose_name='Классы')      # ',7A,7B,'
     mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='teams', verbose_name='Режим')
