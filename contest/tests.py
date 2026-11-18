@@ -1165,7 +1165,8 @@ class DuelsAdminOnlyTests(TestCase):
         self.client.login(username='boss', password='x')
         self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
-        self.assertIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())
+        self.assertNotIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())   # кнопки в кабинете больше нет
+        self.assertIn('Переключить режим', self.client.get(reverse('duels')).content.decode())        # переключатель — на странице «Дуэли»
         self.client.post(reverse('duels_toggle'))
         self.assertEqual(SiteSettings.get().duels_mode, 'all')
 

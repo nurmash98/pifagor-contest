@@ -18,11 +18,6 @@
             <a href="{% url 'games_hub' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">🎮 Игры</a>
             <a href="{% url 'student_activity' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">📈 Активность</a>
             <a href="{% url 'suspicious_students' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3">⚠ Подозрительные</a>
-            {% if duels_admin %}
-            <form method="post" action="{% url 'duels_toggle' %}" class="d-inline">{% csrf_token %}
-                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if duels_mode == 'all' %}btn-success{% elif duels_mode == 'testers' %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Нажмите, чтобы переключить: выключены → по классам → для всех">⚔️ Дуэли: {% if duels_mode == 'all' %}для всех{% elif duels_mode == 'testers' %}по классам{% else %}выключены{% endif %}</button>
-            </form>
-            {% endif %}
         </div>
     </div>
 
