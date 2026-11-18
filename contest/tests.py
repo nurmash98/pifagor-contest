@@ -4807,3 +4807,29 @@ class ScratchTrainerTests(TestCase):
         self.assertContains(r, 'Малыш')
         self.assertNotContains(r, 'Старший')
         self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('scratch_teacher'))
+
+
+class TeacherMyClassesTests(TestCase):
+    """Учитель сам меняет свои классы."""
+
+    def setUp(self):
+        self.tu = User.objects.create_user('mc_t', password='p', is_staff=True)
+        self.t = Teacher.objects.create(user=self.tu, full_name='Уч', classes='7A')
+        Student.objects.create(user=User.objects.create_user('mc_s', password='p'), full_name='Ученик', school_class='7B')
+
+    def test_teacher_changes_own_classes(self):
+        self.client.login(username='mc_t', password='p')
+        self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('teacher_my_classes'))
+        r = self.client.get(reverse('teacher_my_classes'))
+        self.assertContains(r, 'value="7A" checked')
+        self.assertContains(r, 'value="7B"')
+        r = self.client.post(reverse('teacher_my_classes'), {'classes': ['7B'], 'extra': '2 а, 3b'})
+        self.assertRedirects(r, reverse('teacher_dashboard'), fetch_redirect_response=False)
+        self.t.refresh_from_db()
+        self.assertEqual(self.t.class_list(), ['7B', '2A', '3B'])
+        from .views import _managed_classes
+        self.assertEqual(_managed_classes(self.tu), ['7B', '2A', '3B'])
+
+    def test_students_cannot_open(self):
+        self.client.login(username='mc_s', password='p')
+        self.assertNotEqual(self.client.get(reverse('teacher_my_classes')).status_code, 200)

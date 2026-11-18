@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Мои классы{% endblock %}
+{% block content %}
+<style>
+    .mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+    .mc { display: block; margin: 0; cursor: pointer; position: relative; }
+    .mc input { position: absolute; opacity: 0; }
+    .mc .b { border: 2px solid #e2e5f0; border-radius: 14px; padding: 10px 6px; text-align: center; background: #fff; transition: .15s; }
+    .mc .nm { font-weight: 800; font-size: 20px; color: #1a1a4b; }
+    .mc .n { font-size: 11px; color: #6b7280; }
+    .mc input:checked + .b { background: #1a1a4b; border-color: #1a1a4b; }
+    .mc input:checked + .b .nm { color: #fff; } .mc input:checked + .b .n { color: #c7d2fe; }
+    .mc input:focus-visible + .b { outline: 3px solid #a5b4fc; }
+    [data-bs-theme="dark"] .mc .b { background: #1a2036; border-color: #2d3558; }
+    [data-bs-theme="dark"] .mc .nm { color: #e4e7f0; }
+    [data-bs-theme="dark"] .mc input:checked + .b { background: #3b40a6; border-color: #7c83ff; }
+</style>
+<div class="container py-4" style="max-width: 860px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div><h3 class="fw-bold mb-1">🏫 Мои классы</h3>
+            <div class="text-muted small">Отметьте классы, в которых вы преподаёте. От этого зависит, каких учеников вы видите, а также аналитика, игры и СОР/СОЧ.</div></div>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">← Кабинет</a>
+    </div>
+    <form method="post" class="card border-0 shadow-sm rounded-4 p-4">{% csrf_token %}
+        <div class="mc-grid mb-4">
+            {% for c in classes %}
+            <label class="mc"><input type="checkbox" name="classes" value="{{ c.name }}" {% if c.on %}checked{% endif %}>
+                <div class="b"><div class="nm">{{ c.name }}</div><div class="n">{{ c.n }} уч.</div></div></label>
+            {% empty %}<div class="text-muted">Классов пока нет — добавьте ниже.</div>{% endfor %}
+        </div>
+        <label class="form-label small fw-semibold">Нет нужного класса? Впишите через запятую</label>
+        <input name="extra" class="form-control mb-1" placeholder="например: 2A, 3B" maxlength="120">
+        <div class="form-text mb-3">Пробелы, регистр и русские буквы исправятся сами: «2 а» → 2A.</div>
+        <button class="btn btn-primary rounded-pill px-4 fw-bold">Сохранить</button>
+    </form>
+</div>
+{% endblock %}

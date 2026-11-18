@@ -8,7 +8,8 @@
         <h2 class="fw-bold mb-0" style="color: #1a1a4b;">👨‍🏫 Кабинет преподавателя</h2>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             {% if teacher %}
-                <span class="text-muted small">Ваши классы: <strong>{{ teacher.classes|default:"не назначены" }}</strong></span>
+                <span class="text-muted small">Ваши классы: <strong>{{ teacher.classes|default:"не назначены" }}</strong>
+                    <a href="{% url 'teacher_my_classes' %}" class="ms-1 text-decoration-none" title="Изменить свои классы">✏️ изменить</a></span>
             {% endif %}
             <a href="{% url 'admin_dashboard' %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#4338ca;color:#fff;">📊 Аналитика</a>
     <a href="{% url 'scratch_teacher' %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#4c97ff;color:#fff;">🐱 Scratch 1–4</a>

@@ -2457,3 +2457,36 @@ def shop_item_img(request, key, ver):
     r = HttpResponse(bytes(it.image), content_type='image/webp')
     r['Cache-Control'] = 'private, max-age=31536000, immutable'
     return r
+
+
+@staff_member_required
+def teacher_my_classes(request):
+    """Учитель сам выбирает, каким классам преподаёт: от этого зависят его ученики, аналитика, игры, СОР/СОЧ."""
+    from .models import normalize_school_class
+    from .quarters import grade_of
+    teacher = Teacher.objects.filter(user=request.user).first()
+    if teacher is None:
+        messages.info(request, 'У вашей учётной записи нет профиля учителя — вы видите все классы.')
+        return redirect('teacher_dashboard')
+    known = {c for c in Student.objects.values_list('school_class', flat=True) if c}
+    for t in Teacher.objects.exclude(classes=''):
+        known.update(t.class_list())
+    if request.method == 'POST':
+        chosen = [normalize_school_class(c) for c in request.POST.getlist('classes')]
+        extra = [normalize_school_class(c) for c in (request.POST.get('extra') or '').replace(';', ',').split(',')]
+        picked = [c for c in dict.fromkeys(chosen + extra) if c and len(c) <= 10]
+        teacher.classes = ', '.join(picked)
+        teacher.save()
+        messages.success(request, 'Классы сохранены: ' + (teacher.classes or 'нет классов') + '.')
+        return redirect('teacher_dashboard')
+    mine = set(teacher.class_list())
+    known |= mine
+
+    def key(c):
+        g = grade_of(c)
+        return (int(g) if g.isdigit() else 99, c)
+    counts = {}
+    for c in Student.objects.values_list('school_class', flat=True):
+        counts[c] = counts.get(c, 0) + 1
+    classes = [{'name': c, 'on': c in mine, 'n': counts.get(c, 0)} for c in sorted(known, key=key)]
+    return render(request, 'teacher_my_classes.html', {'classes': classes, 'teacher': teacher})
