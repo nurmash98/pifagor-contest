@@ -87,9 +87,10 @@ def suspicious_students(request):
     reasons = _reasons(students)
     from .ai_signals import analyse_cached
     ai = analyse_cached(students)
-    # ИИ: в список попадает тот, у кого 2+ решения с признаками или чьё решение почти совпало с чужим
+    # ИИ: в список попадает тот, у кого 2+ решения с признаками или хотя бы одно с явной «подписью» ИИ
+    strong = ('__main__', 'аннотации', 'docstring', 'английском')
     ai = {sid: items for sid, items in ai.items()
-          if len(items) >= 2 or any(r.startswith('Почти такой же') for it in items for r in it['reasons'])}
+          if len(items) >= 2 or any(w in r for it in items for r in it['reasons'] for w in strong)}
     rows = []
     for st in students.filter(id__in=list(set(reasons) | set(ai))).order_by('school_class', 'full_name'):
         own = reasons.get(st.id, [])

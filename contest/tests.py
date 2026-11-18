@@ -4856,13 +4856,6 @@ class AiSignalsTests(TestCase):
         self.assertEqual(a.new_habits(self.AI, [self.KID] * 3), [])                    # мало истории — не судим
         self.assertGreaterEqual(len(a.new_habits(self.AI, [self.KID] * 5)), 2)
 
-    def test_twins_ignore_names_and_comments(self):
-        from . import ai_signals as a
-        renamed = self.LOOP.replace('s = ', 'total = ').replace('s + x', 'total + x').replace('s - x', 'total - x') \
-            .replace('print(s)', 'print(total)').replace('if s >', 'if total >') + '# готово\n'
-        self.assertEqual(a.twins([(1, 9, self.LOOP), (2, 9, renamed), (3, 9, self.KID)]), {(1, 9): [2], (2, 9): [1]})
-        self.assertEqual(a.twins([(1, 9, self.KID), (2, 9, self.KID)]), {})              # короткие решения не сравниваем
-
     def test_suspicious_page_and_grade_page(self):
         from .models import Submission
         tu = User.objects.create_user('ai_t', password='p', is_staff=True)
@@ -4872,14 +4865,14 @@ class AiSignalsTests(TestCase):
         tag = Tag.objects.create(name='ии')
         task = make_task('Сумма чётных', 'A', tag)
         sub = Submission.objects.create(student=s1, task=task, code=self.LOOP, score=10)
-        Submission.objects.create(student=s2, task=task, code=self.LOOP.replace('x', 'y'), score=10)
+        Submission.objects.create(student=s2, task=task, code=self.LOOP, score=10)       # одинаковый код — не сравниваем
         own = Submission.objects.create(student=s1, task=make_task('Сумма', 'A', tag), code=self.AI, score=10)
         self.client.login(username='ai_t', password='p')
         r = self.client.get(reverse('suspicious_students'))
         self.assertContains(r, 'Возможен ИИ')
-        self.assertContains(r, 'Почти такой же код у: Второй')
+        self.assertNotContains(r, 'Почти такой же')
+        self.assertNotContains(r, 'Второй')
         r = self.client.get(reverse('grade_submission', args=[own.id]))
         self.assertContains(r, 'Признаки ИИ')
         self.assertContains(r, 'аннотации типов')
-        r = self.client.get(reverse('grade_submission', args=[sub.id]))
-        self.assertContains(r, 'Почти такой же код у: Второй (7A)')
+        self.assertNotContains(self.client.get(reverse('grade_submission', args=[sub.id])), 'Признаки ИИ')

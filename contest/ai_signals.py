@@ -1,27 +1,20 @@
 # -*- coding: utf-8 -*-
 """Признаки того, что решение могло быть написано ИИ (только подсказки учителю, не приговор).
 
-Три проверки:
+Две проверки (сравнения кода между учениками нет — по просьбе учителя):
   2. «Не похоже на самого ученика» — в решении сразу несколько привычек, которых не было
      ни в одном из его прошлых решений (функции, f-строки, комментарии, длинные имена…).
      Кто уже пользовался, например, списковыми включениями, — для того это не новость.
   3. «Приёмы не по уровню» — то, что в этом классе обычно ещё не проходят: lambda,
      try/except (списковые включения многие ученики знают — их не считаем), if __name__ == '__main__', аннотации типов, docstring, английские комментарии.
-  4. «Одинаковые решения» — у нескольких учеников почти один и тот же код (имена переменных
-     и комментарии не учитываются), а ИИ часто выдаёт всем одно и то же.
 Сам код никуда не отправляется — всё считается на сервере."""
 import ast
-import io
 import re
-import tokenize
-from difflib import SequenceMatcher
 
 from .quarters import grade_of
 
 MIN_HISTORY = 5            # прошлых решений, чтобы сравнивать «на себя не похоже»
 NEW_HABITS_MIN = 2         # сколько новых привычек сразу — уже подозрительно
-TWIN_RATIO = 0.92          # похожесть кода у двух учеников
-TWIN_MIN_TOKENS = 40       # короткие решения у всех одинаковые — их не сравниваем
 DAYS = 60                  # на странице «Подозрительные» смотрим решения за последние 60 дней
 
 # приём → (название для учителя, с какого класса это уже нормально; 99 — для школы всегда необычно)
@@ -133,57 +126,10 @@ def new_habits(code, history):
     return [(k, HABITS[k]) for k in sorted(now - seen) if k in HABITS]
 
 
-def shape(code):
-    """Код без комментариев, пробелов и имён переменных — для сравнения «одинаковых» решений."""
-    toks, names = [], {}
-    try:
-        for t in tokenize.generate_tokens(io.StringIO(code or '').readline):
-            if t.type in (tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENDMARKER):
-                if t.type in (tokenize.INDENT, tokenize.DEDENT):
-                    toks.append(tokenize.tok_name[t.type])
-                continue
-            if t.type == tokenize.NAME and t.string not in _KEEP:
-                names.setdefault(t.string, f'v{len(names)}')
-                toks.append(names[t.string])
-            elif t.type == tokenize.STRING:
-                toks.append('S')
-            else:
-                toks.append(t.string)
-    except (tokenize.TokenError, IndentationError, SyntaxError):
-        return []
-    return toks
-
-
-_KEEP = set(__import__('keyword').kwlist) | {n for n in dir(__import__('builtins')) if not n.startswith('_')} | {
-    'print', 'input', 'int', 'str', 'float', 'range', 'len', 'map', 'list', 'split', 'append', 'sum', 'min', 'max', 'sorted',
-    'abs', 'join', 'strip', 'sys', 'stdin', 'math', 'sqrt', 'readline', 'read', 'enumerate', 'zip', 'set', 'dict', 'round'}
-
-
-def twins(subs):
-    """subs — [(student_id, task_id, code)] по одной задаче или нескольким.
-    Возвращает {(student_id, task_id): [student_id, …]} — у кого почти такой же код."""
-    by_task = {}
-    for sid, tid, code in subs:
-        sh = shape(code)
-        if len(sh) >= TWIN_MIN_TOKENS:
-            by_task.setdefault(tid, []).append((sid, sh))
-    out = {}
-    for tid, rows in by_task.items():
-        for i in range(len(rows)):
-            for j in range(i + 1, len(rows)):
-                a, b = rows[i], rows[j]
-                if a[0] == b[0]:
-                    continue
-                if a[1] == b[1] or SequenceMatcher(None, a[1], b[1], autojunk=False).ratio() >= TWIN_RATIO:
-                    out.setdefault((a[0], tid), []).append(b[0])
-                    out.setdefault((b[0], tid), []).append(a[0])
-    return out
-
-
 def analyse(students):
     """Признаки по ученикам: {student_id: [{'sub': Submission, 'reasons': [текст, …]}]}.
     Смотрим решения, которые засчитаны (7 баллов и выше)."""
-    from .models import Student, Submission
+    from .models import Submission
     students = list(students)
     by_id = {s.id: s for s in students}
     from datetime import timedelta
@@ -191,8 +137,6 @@ def analyse(students):
     since = timezone.now() - timedelta(days=DAYS)
     subs = list(Submission.objects.filter(student__in=students, score__gte=7, updated_at__gte=since).exclude(code='').exclude(code__isnull=True)
                 .select_related('task').order_by('student_id', 'created_at'))
-    tw = twins([(s.student_id, s.task_id, s.code) for s in subs])
-    names = dict(Student.objects.filter(id__in={x for v in tw.values() for x in v}).values_list('id', 'full_name'))
     out, history = {}, {}
     for s in subs:
         st = by_id[s.student_id]
@@ -203,9 +147,6 @@ def analyse(students):
         new = new_habits(s.code, history.get(s.student_id, []))
         if len(new) >= NEW_HABITS_MIN:
             reasons.append('Не похоже на прошлые решения ученика — впервые: ' + ', '.join(t for _, t in new))
-        mates = tw.get((s.student_id, s.task_id))
-        if mates:
-            reasons.append('Почти такой же код у: ' + ', '.join(names.get(m, '?') for m in sorted(set(mates))))
         if reasons:
             out.setdefault(s.student_id, []).append({'sub': s, 'reasons': reasons})
         history.setdefault(s.student_id, []).append(s.code)
@@ -225,13 +166,6 @@ def for_submission(sub):
     new = new_habits(sub.code, history)
     if new:
         reasons.append('Впервые у этого ученика: ' + ', '.join(t for _, t in new))
-    others = list(Submission.objects.filter(task=sub.task, score__gte=7).exclude(student=st).exclude(code='')
-                  .exclude(code__isnull=True).select_related('student'))
-    tw = twins([(sub.student_id, sub.task_id, sub.code)] + [(o.student_id, o.task_id, o.code) for o in others])
-    mates = tw.get((sub.student_id, sub.task_id))
-    if mates:
-        nm = {o.student_id: f'{o.student.full_name} ({o.student.school_class})' for o in others}
-        reasons.append('Почти такой же код у: ' + ', '.join(nm.get(m, '?') for m in sorted(set(mates))))
     return reasons
 
 
