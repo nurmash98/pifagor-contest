@@ -14,7 +14,11 @@
         #tabs a { flex: 0 0 auto; min-width: 38px; height: 32px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center;
                   border-radius: 8px; background: #1f2937; color: #e5e7eb; text-decoration: none; font-weight: 700; border: 2px solid transparent; }
         #tabs a:hover { background: #374151; }
-        #tabs a.on { background: #fbbf24; color: #111827; }
+        #tabs a.on { border-color: #f8fafc; }
+        #tabs a.on:not(.ok):not(.part):not(.bad) { background: #4b5563; }
+        #tabs a.ok { background: #16a34a; color: #fff; }
+        #tabs a.part { background: #facc15; color: #111827; }
+        #tabs a.bad { background: #dc2626; color: #fff; }
         #tabs a.all { font-weight: 600; font-size: 13px; }
         #lang { display: flex; gap: 2px; background: #1f2937; border-radius: 8px; padding: 2px; flex: 0 0 auto; }
         #lang button { border: 0; background: transparent; color: #cbd5e1; font-weight: 700; font-size: 13px; padding: 4px 11px; border-radius: 6px; cursor: pointer; }
@@ -33,7 +37,7 @@
     <span class="ttl">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %} · {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</span>
     <nav id="tabs">
         <a href="{{ frame_url }}" class="all" data-url="{{ frame_url }}" title="{% t "Все задачи и итог" %}">≡ {% t "Все" %}</a>
-        {% for tab in tabs %}<a href="{{ tab.url }}" data-url="{{ tab.url }}" title="{{ tab.title }}">{{ tab.letter }}</a>{% endfor %}
+        {% for tab in tabs %}<a href="{{ tab.url }}" data-url="{{ tab.url }}" data-task="{{ tab.id }}" class="{{ tab.state }}" title="{{ tab.title }}">{{ tab.letter }}</a>{% endfor %}
     </nav>
     <div id="lang" title="{% t "Язык условий задач" %}"><button type="button" data-l="ru" class="{% if content_lang != 'kk' %}on{% endif %}">RU</button><button type="button" data-l="kk" class="{% if content_lang == 'kk' %}on{% endif %}">KZ</button></div>
 </div>
@@ -140,6 +144,17 @@
             if (state === 'in') { frame.src = a.getAttribute('data-url'); }
         });
     });
+    // Цвет вкладки: зелёная — решено, жёлтая — частично, красная — меньше 2 баллов, серая — не отправлял
+    var scoresUrl = '{% url "exam_scores" attempt.id %}';
+    function paintTabs() {
+        fetch(scoresUrl, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+            tabs.forEach(function (a) {
+                var id = a.getAttribute('data-task'); if (!id) { return; }
+                a.classList.remove('ok', 'part', 'bad');
+                if (d.states[id]) { a.classList.add(d.states[id]); }
+            });
+        }).catch(function () {});
+    }
     function markTab(path) {
         tabs.forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-url') === path); });
     }
@@ -166,6 +181,7 @@
         if (!mark) { frame.src = frameUrl; return; }                    // ушли на другую страницу сайта — назад к работе
         if (mark.getAttribute('data-active') !== '1') { finish(win.location.href); return; }   // работа завершена / время вышло
         markTab(win.location.pathname);
+        paintTabs();
         protect(doc);
     });
 

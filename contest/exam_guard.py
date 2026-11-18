@@ -79,6 +79,25 @@ def _student_attempt(request, exam_id, retake_id=None):
     return exam, retake, attempt
 
 
+def task_states(attempt):
+    """Цвет вкладки задачи: ok — решено полностью, part — частично (от 2 баллов), bad — отправлено, но меньше 2; '' — не отправлял."""
+    from .exam_views import task_max
+    top = task_max(attempt.exam)
+    out = {}
+    for a in attempt.answers.only('task_id', 'best_score', 'submissions_count'):
+        if not a.submissions_count:
+            continue
+        out[a.task_id] = 'ok' if a.best_score >= top else ('part' if a.best_score >= 2 else 'bad')
+    return out
+
+
+@login_required
+def exam_scores(request, attempt_id):
+    """Состояние вкладок A, B, C… (для обновления цвета после отправки решения, без перезагрузки оболочки)."""
+    attempt = _own_attempt(request, attempt_id)
+    return JsonResponse({'states': {str(k): v for k, v in task_states(attempt).items()}})
+
+
 SHELL_TEXTS = {
     'out': 'Вы вышли из полноэкранного режима',
     'outText': 'Работа скрыта. Вернитесь в полноэкранный режим, чтобы продолжить.',
@@ -120,10 +139,12 @@ def exam_run(request, exam_id, retake_id=None):
     # Вкладки задач A, B, C… — переход по ним идёт внутри рамки, полный экран не слетает.
     letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     tabs = []
+    states = task_states(attempt)
     for i, task in enumerate(attempt.task_list()):
         url = (reverse('retake_task', args=[exam.id, retake.id, task.id]) if retake
                else reverse('exam_task', args=[exam.id, task.id]))
-        tabs.append({'letter': letters[i] if i < len(letters) else str(i + 1), 'title': task.title, 'url': url})
+        tabs.append({'id': task.id, 'letter': letters[i] if i < len(letters) else str(i + 1), 'title': task.title, 'url': url,
+                     'state': states.get(task.id, '')})
     return render(request, 'exam_run.html', {
         'exam': exam, 'retake': retake, 'attempt': attempt, 'window': retake or exam,
         'frame_url': detail_url(attempt), 'tabs': tabs,

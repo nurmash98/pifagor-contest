@@ -3023,6 +3023,24 @@ class ExamFullscreenTests(RetakeTestBase):
         self.assertContains(r, 'data-active="1"')
         self.assertNotEqual(r.headers.get('X-Frame-Options'), 'DENY')
 
+    def test_tab_colors_follow_scores(self):
+        from .models import ExamAnswer
+        from . import exam_guard
+        a, b = self.a_tasks[0], self.b_tasks[0]
+        self.assertEqual(exam_guard.task_states(self.att), {})                         # ничего не отправлял — без цвета
+        ExamAnswer.objects.create(attempt=self.att, task=a, best_score=10, submissions_count=1)
+        ExamAnswer.objects.create(attempt=self.att, task=b, best_score=1, submissions_count=1)
+        self.assertEqual(exam_guard.task_states(self.att), {a.id: 'ok', b.id: 'bad'})
+        ExamAnswer.objects.filter(task=b).update(best_score=2)
+        ExamAnswer.objects.filter(task=a).update(best_score=7)
+        self.assertEqual(exam_guard.task_states(self.att), {a.id: 'part', b.id: 'part'})
+        ExamAnswer.objects.filter(task=b).update(submissions_count=0, best_score=0)      # запись есть, но не отправлено
+        self.assertEqual(exam_guard.task_states(self.att), {a.id: 'part'})
+        html = self.client.get(reverse('exam_run', args=[self.live.id])).content.decode()
+        self.assertIn(f'data-task="{a.id}" class="part"', html)
+        self.assertIn(f'data-task="{b.id}" class=""', html)
+        self.assertEqual(self.client.get(reverse('exam_scores', args=[self.att.id])).json(), {'states': {str(a.id): 'part'}})
+
     def test_language_switch_inside_work(self):
         r = self.client.get(reverse('exam_run', args=[self.live.id]))
         self.assertContains(r, 'data-l="ru"')
