@@ -395,6 +395,16 @@ class FastSolveBlockTests(TestCase):
         self.assertIn('Быстрый', html)
         self.assertIn('посмотреть код', html)                                   # код быстрых решений можно открыть
         self.assertIn('<pre>x</pre>', html)
+        from .models import Submission
+        sub = Submission.objects.filter(student=self.student).first()
+        back = f'/teacher/suspicious/#s{self.student.id}'
+        self.assertIn(f'?back=/teacher/suspicious/%23s{self.student.id}', html)
+        page = self.client.get(f'/teacher/grade/{sub.id}/', {'back': back}).content.decode()
+        self.assertIn('Назад к подозрительным', page)
+        r = self.client.post(f'/teacher/grade/{sub.id}/', {'score': 0, 'comment': 'ИИ', 'back': back})
+        self.assertEqual(r['Location'], back)                                    # после сохранения — туда же, где были
+        r = self.client.post(f'/teacher/grade/{sub.id}/', {'score': 0, 'comment': 'x', 'back': 'https://evil.example/'})
+        self.assertEqual(r['Location'], '/teacher/')                             # чужие адреса не принимаем
 
     def test_slow_or_wrong_not_counted(self):
         self.solve(self.tasks[0], 60); self.solve(self.tasks[1], 10, score=4); self.solve(self.tasks[2], 5)

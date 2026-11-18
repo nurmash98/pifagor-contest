@@ -19,7 +19,7 @@
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
     <ul class="list-group list-group-flush">
         {% for row in rows %}
-        <li class="list-group-item p-3">
+        <li class="list-group-item p-3" id="s{{ row.student.id }}" style="scroll-margin-top: 80px">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
                     <strong style="color: #1a1a4b;">{{ row.student.full_name }}</strong>
@@ -32,13 +32,13 @@
                             {% for task, sec, att in row.fast|slice:":12" %}
                             <details class="sus-code"><summary>⚡ {{ task.title }} — {{ sec }} с · посмотреть код</summary>
                                 <pre>{{ att.code|default:"(пусто)" }}</pre>
-                                <a href="{% url 'grade_submission' att.submission_id %}" class="small">Открыть проверку →</a></details>
+                                <a href="{% url 'grade_submission' att.submission_id %}?back={{ request.path|urlencode }}%23s{{ row.student.id }}" class="small">Открыть проверку →</a></details>
                             {% endfor %}
                             {% if row.fast|length > 12 %}<div class="small">… и ещё {{ row.fast|length|add:"-12" }}</div>{% endif %}
                         </li>{% endif %}
                         {% if row.ai %}<li>🤖 <strong>Возможен ИИ</strong> — решений с признаками: {{ row.ai|length }}
                             <ul class="ps-3">{% for it in row.ai|slice:":6" %}
-                                <li><a href="{% url 'grade_submission' it.sub.id %}" class="text-decoration-none">{{ it.sub.task.title }}</a>:
+                                <li><a href="{% url 'grade_submission' it.sub.id %}?back={{ request.path|urlencode }}%23s{{ row.student.id }}" class="text-decoration-none">{{ it.sub.task.title }}</a>:
                                     {% for r in it.reasons %}{{ r }}{% if not forloop.last %}; {% endif %}{% endfor %}
                                     <details class="sus-code"><summary>посмотреть код</summary><pre>{{ it.sub.code }}</pre></details></li>{% endfor %}
                                 {% if row.ai|length > 6 %}<li>… и ещё {{ row.ai|length|add:"-6" }}</li>{% endif %}

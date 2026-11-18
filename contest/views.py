@@ -2173,6 +2173,10 @@ def teacher_dashboard(request):
 def grade_submission(request, submission_id):
     """Страница проверки конкретного решения."""
     submission = get_object_or_404(Submission, id=submission_id)
+    # Откуда пришли (например, со страницы «Подозрительные») — туда и вернёмся после сохранения.
+    back = request.POST.get('back') or request.GET.get('back') or ''
+    if not (back.startswith('/') and not back.startswith('//') and '\\' not in back):
+        back = ''
 
     # Учитель проверяет только заявки своих классов — чужие ему недоступны.
     if not request.user.is_superuser:
@@ -2193,7 +2197,8 @@ def grade_submission(request, submission_id):
             score = max(0, min(10, int(request.POST.get('score', ''))))
         except (TypeError, ValueError):
             messages.error(request, 'Оценка должна быть числом от 0 до 10.')
-            return redirect('grade_submission', submission_id=submission.id)
+            from urllib.parse import quote
+            return redirect(reverse('grade_submission', args=[submission.id]) + (f'?back={quote(back)}' if back else ''))
         comment = request.POST.get('comment', '')
 
         if grading_attempt is None:
@@ -2229,7 +2234,7 @@ def grade_submission(request, submission_id):
             if next_submission is not None:
                 return redirect('grade_submission', submission_id=next_submission.id)
             messages.info(request, 'Очередь проверки пуста — все решения проверены.')
-        return redirect('teacher_dashboard')
+        return redirect(back or 'teacher_dashboard')
 
     # Подстраховка: если автотесты ещё не бегали для этой отправки (например, решение
     # существует с тех пор, как эта функция появилась) — прогоняем прямо сейчас,
@@ -2239,7 +2244,7 @@ def grade_submission(request, submission_id):
 
     from .ai_signals import for_submission
     return render(request, 'grade_submission.html', {
-        'ai_reasons': for_submission(submission) if submission.code else [],
+        'ai_reasons': for_submission(submission) if submission.code else [], 'back': back,
         'submission': submission,
         'grading_attempt': grading_attempt,
         'attempts': submission.attempts.all(),

@@ -5,7 +5,8 @@
 
 {% block content %}
 <div class="mt-3 mb-4">
-    <a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted">← Назад в кабинет</a>
+    {% if back %}<a href="{{ back }}" class="text-decoration-none text-muted">← Назад{% if '/suspicious/' in back %} к подозрительным{% endif %}</a>
+    {% else %}<a href="{% url 'teacher_dashboard' %}" class="text-decoration-none text-muted">← Назад в кабинет</a>{% endif %}
 </div>
 
 <div class="row">
@@ -139,6 +140,7 @@
 
                 <form method="POST">
                     {% csrf_token %}
+                    {% if back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
 
                     <div class="mb-4">
                         <label class="form-label fw-bold">Балл (от 0 до 10)</label>
