@@ -4900,7 +4900,7 @@ class AiSignalsTests(TestCase):
 
 
 class Gta6ChallengeTests(TestCase):
-    """Челлендж GTA VI: 10 задач, за 6 на 10/10 — баннер «Vice City» и аватар «Закат Vice City»."""
+    """Челлендж GTA VI: 10 задач (7 на ввод/вывод и if/else), за 6 на 10/10 — баннер «Vice City» и ОДИН аватар на выбор."""
 
     def setUp(self):
         self.st = Student.objects.create(user=User.objects.create_user('gta_s', password='p'), full_name='Игрок', school_class='8A')
@@ -4910,41 +4910,54 @@ class Gta6ChallengeTests(TestCase):
         from .models import Submission
         Submission.objects.update_or_create(student=self.st, task=task, defaults={'score': score, 'is_graded': True, 'status': 'DONE', 'code': 'x'})
 
-    def test_tasks_loaded_and_examples_pass(self):
+    def test_tasks_loaded(self):
         tasks = Task.objects.filter(tags__name='GTA VI')
         self.assertEqual(tasks.count(), 10)
-        self.assertEqual(sorted(t.level for t in tasks), ['A'] * 4 + ['B'] * 3 + ['C'] * 3)
+        self.assertEqual(sorted(t.level for t in tasks), ['A'] * 5 + ['B'] * 2 + ['C'] * 3)
+        self.assertFalse(tasks.filter(title__in=['Радио в машине', 'Небоскрёбы', 'Сувениры']).exists())
         for t in tasks:
             self.assertTrue(t.title_kk and t.description_kk)
             self.assertGreaterEqual(len(t.test_cases), 5)
 
-    def test_six_solved_gives_banner_and_avatar(self):
+    def test_six_solved_gives_banner_then_one_avatar(self):
         from . import avatars, banners
         tasks = list(Task.objects.filter(tags__name='GTA VI').order_by('id'))
         r = self.client.get(reverse('challenge', args=['gta6']))
         self.assertContains(r, 'Челлендж GTA VI')
         self.assertContains(r, '0 / 6')
+        self.assertNotContains(r, reverse('challenge_pick', args=['gta6']))        # выбирать ещё нельзя
+        self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'gta01'})
+        self.st.refresh_from_db()
+        self.assertFalse(avatars.owned(self.st))
         for t in tasks[:5]:
             self.solve(t)
-        self.solve(tasks[5], score=7)                                  # не 10/10 — не считается
+        self.solve(tasks[5], score=7)
         self.client.get(reverse('challenge', args=['gta6']))
         self.st.refresh_from_db()
         self.assertNotIn('vice', banners.owned(self.st))
         self.solve(tasks[5])
         r = self.client.get(reverse('challenge', args=['gta6']))
         self.assertContains(r, 'Поздравляем')
+        self.assertContains(r, reverse('challenge_pick', args=['gta6']))
         self.st.refresh_from_db()
         self.assertIn('vice', banners.owned(self.st))
-        self.assertIn('vice_sunset', avatars.owned(self.st))
-        self.assertEqual((self.st.name_banner, self.st.avatar), ('vice', 'vice_sunset'))   # сразу надеты, если было пусто
+        self.assertEqual(self.st.name_banner, 'vice')
+        self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'gta03'})
+        self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'gta05'})   # второй — нельзя
+        self.st.refresh_from_db()
+        self.assertEqual({k for k in avatars.owned(self.st) if k.startswith('gta')}, {'gta03'})
+        self.assertEqual(self.st.avatar, 'gta03')
+        self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'av01'})    # чужой ключ — нельзя
+        self.st.refresh_from_db()
+        self.assertNotIn('av01', avatars.owned(self.st))
 
     def test_gift_not_for_sale_and_shop_links_to_challenge(self):
         from . import avatars, banners
         r = self.client.get(reverse('shop'))
         self.assertContains(r, reverse('challenge', args=['gta6']))
-        self.client.post(reverse('shop_buy'), {'avatar': 'vice_sunset'})
+        self.client.post(reverse('shop_buy'), {'avatar': 'gta01'})
         self.client.post(reverse('shop_buy'), {'banner': 'vice'})
         self.st.refresh_from_db()
-        self.assertNotIn('vice_sunset', avatars.owned(self.st))
+        self.assertNotIn('gta01', avatars.owned(self.st))
         self.assertNotIn('vice', banners.owned(self.st))
         self.assertEqual(self.client.get(reverse('challenge', args=['nope'])).status_code, 404)

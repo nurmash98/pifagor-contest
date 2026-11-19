@@ -634,6 +634,8 @@ def shop(request):
     for a in avatar_module.catalog():
         if a['hidden'] and a['key'] not in my_avatars:
             continue
+        if a.get('challenge') and a['key'] not in my_avatars and student and banner_module.picked(student, a['challenge']):
+            continue                     # аватар челленджа уже выбран — остальных персонажей не показываем
         avatar_list.append({'key': a['key'], 'img': avatar_module.img_url(a), 'kind': a['kind'],
                             'price': a.get('price', 0), 'owned': a['kind'] == 'free' or a['key'] in my_avatars,
                             'short': max(a.get('price', 0) - bal, 0),
@@ -819,14 +821,31 @@ def challenge(request, key):
         for t in tasks:
             t.user_sub = best.get(t.id)
     done = min(banner_module.progress(student, ch['tag']), ch['need']) if student else 0
-    ava = avatar_module.BY_KEY.get(ch['avatar'])
+    chosen = banner_module.picked(student, key) if student else None
+    picks = [{'key': k, 'img': avatar_module.img_url(avatar_module.BY_KEY[k]), 'on': k == chosen}
+             for k in ch['pick'] if k in avatar_module.BY_KEY]
     return render(request, f'challenge_{key}.html', {
         'tasks': tasks, 'student': student, 'done': done, 'need': ch['need'], 'total': len(tasks),
         'percent': int(100 * done / ch['need']), 'just_got': bool(new),
         'has_prize': bool(student and ch['banner'] in banner_module.owned(student)),
-        'avatar_img': avatar_module.img_url(ava) if ava else '', 'avatar_title': (ava['kk'] if lang == 'kk' else ava['ru']) if ava else '',
-        'banner_key': ch['banner'],
+        'banner_key': ch['banner'], 'picks': picks, 'chosen': chosen, 'key': key,
+        'can_pick': bool(student and done >= ch['need'] and not chosen),
     })
+
+
+@login_required
+def challenge_pick(request, key):
+    """Ученик выбирает один аватар-награду за челлендж (только один и только после нужного числа задач)."""
+    from . import banners as banner_module
+    if key not in banner_module.CHALLENGES or request.method != 'POST':
+        raise Http404
+    student = get_object_or_404(Student, user=request.user)
+    kk = _get_content_lang(request) == 'kk'
+    if banner_module.pick(student, key, request.POST.get('avatar', '')):
+        messages.success(request, 'Аватар сенікі!' if kk else 'Аватар ваш! Он уже стоит в профиле.')
+    else:
+        messages.warning(request, 'Аватарды таңдау мүмкін емес.' if kk else 'Выбрать этот аватар нельзя.')
+    return redirect('challenge', key=key)
 
 
 @login_required

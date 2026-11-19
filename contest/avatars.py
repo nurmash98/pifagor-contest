@@ -4,8 +4,18 @@ kind: 'free' — доступен всем; 'paid' — покупается в �
 CATALOG = [
     dict(key='school_girl', file='avatars/school-girl.webp', kind='free', ru='Оқушы қыз', kk='Оқушы қыз'),
     dict(key='school_boy', file='avatars/school-boy.webp', kind='free', ru='Оқушы бала', kk='Оқушы бала'),
-    # подарок за челлендж GTA VI (6 из 10 задач на 10/10) — не продаётся
-    dict(key='vice_sunset', file='avatars/vice-sunset.webp', kind='gift', ru='Закат Vice City', kk='Vice City күн батуы', challenge='gta6'),
+    # подарок за челлендж GTA VI (6 из 10 задач на 10/10): ученик выбирает ОДНОГО из 11 персонажей — не продаются
+    dict(key='gta01', file='avatars/gta-01.webp', kind='gift', ru='GTA VI · 1', kk='GTA VI · 1', challenge='gta6'),
+    dict(key='gta02', file='avatars/gta-02.webp', kind='gift', ru='GTA VI · 2', kk='GTA VI · 2', challenge='gta6'),
+    dict(key='gta03', file='avatars/gta-03.webp', kind='gift', ru='GTA VI · 3', kk='GTA VI · 3', challenge='gta6'),
+    dict(key='gta04', file='avatars/gta-04.webp', kind='gift', ru='GTA VI · 4', kk='GTA VI · 4', challenge='gta6'),
+    dict(key='gta05', file='avatars/gta-05.webp', kind='gift', ru='GTA VI · 5', kk='GTA VI · 5', challenge='gta6'),
+    dict(key='gta06', file='avatars/gta-06.webp', kind='gift', ru='GTA VI · 6', kk='GTA VI · 6', challenge='gta6'),
+    dict(key='gta07', file='avatars/gta-07.webp', kind='gift', ru='GTA VI · 7', kk='GTA VI · 7', challenge='gta6'),
+    dict(key='gta08', file='avatars/gta-08.webp', kind='gift', ru='GTA VI · 8', kk='GTA VI · 8', challenge='gta6'),
+    dict(key='gta09', file='avatars/gta-09.webp', kind='gift', ru='GTA VI · 9', kk='GTA VI · 9', challenge='gta6'),
+    dict(key='gta10', file='avatars/gta-10.webp', kind='gift', ru='GTA VI · 10', kk='GTA VI · 10', challenge='gta6'),
+    dict(key='gta11', file='avatars/gta-11.webp', kind='gift', ru='GTA VI · 11', kk='GTA VI · 11', challenge='gta6'),
     dict(key='av01', file='avatars/av-01.webp', kind='paid', price=100, ru='Мальчик в худи', kk='Худи киген бала'),
     dict(key='av02', file='avatars/av-02.webp', kind='paid', price=100, ru='Девочка в фиолетовом', kk='Күлгін киімді қыз'),
     dict(key='av03', file='avatars/av-03.webp', kind='paid', price=100, ru='Меломан', kk='Меломан'),

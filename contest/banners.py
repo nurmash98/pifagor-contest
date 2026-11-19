@@ -1,7 +1,7 @@
 """Баннеры под именем ученика.
   • free — у всех сразу;
   • gift — «Флаг Казахстана»: за 5 задач темы «Республика күні» на 10/10;
-           «Vice City»: челлендж GTA VI — 6 из 10 задач на 10/10 (вместе с аватаром «Закат Vice City»);
+           «Vice City»: челлендж GTA VI — 6 из 10 задач на 10/10 (и выбор одного аватара-персонажа);
   • paid — покупаются за монеты в магазине."""
 from .models import Submission
 
@@ -11,7 +11,8 @@ REPUBLIC_NEED = 5
 # Челленджи: решил need задач темы tag на 10/10 — получаешь баннер и аватар (страница /challenge/<ключ>/)
 GTA_TAG = 'GTA VI'
 CHALLENGES = {
-    'gta6': dict(tag=GTA_TAG, need=6, banner='vice', avatar='vice_sunset', ru='Челлендж GTA VI', kk='GTA VI челленджі'),
+    # pick — аватары на выбор: ученик берёт только один (на странице челленджа)
+    'gta6': dict(tag=GTA_TAG, need=6, banner='vice', pick=[f'gta{i:02d}' for i in range(1, 12)], ru='Челлендж GTA VI', kk='GTA VI челленджі'),
 }
 
 # порядок = порядок в магазине
@@ -117,22 +118,33 @@ def sync(student):
         if not student.name_banner:
             student.name_banner = 'kz_flag'
             student.save(update_fields=['name_banner'])
-    from . import avatars
     for ch in CHALLENGES.values():
-        if ch['banner'] in owned(student) and ch['avatar'] in avatars.owned(student):
+        if ch['banner'] in owned(student) or progress(student, ch['tag']) < ch['need']:
             continue
-        if progress(student, ch['tag']) < ch['need']:
-            continue
-        if ch['banner'] not in owned(student):
-            give(student, ch['banner'])
-            new.append(ch['banner'])
-            if not student.name_banner:
-                student.name_banner = ch['banner']
-                student.save(update_fields=['name_banner'])
-        if ch['avatar'] not in avatars.owned(student):
-            avatars.give(student, ch['avatar'])
-            new.append(ch['avatar'])
-            if not student.avatar:
-                student.avatar = ch['avatar']
-                student.save(update_fields=['avatar'])
+        give(student, ch['banner'])
+        new.append(ch['banner'])
+        if not student.name_banner:
+            student.name_banner = ch['banner']
+            student.save(update_fields=['name_banner'])
     return new
+
+
+def picked(student, key):
+    """Какой аватар ученик уже выбрал в челлендже (или None)."""
+    from . import avatars
+    mine = avatars.owned(student) if student else set()
+    return next((k for k in CHALLENGES[key]['pick'] if k in mine), None)
+
+
+def pick(student, key, avatar_key):
+    """Выбор одного аватара за челлендж. True — выдан."""
+    from . import avatars
+    ch = CHALLENGES.get(key)
+    if ch is None or avatar_key not in ch['pick'] or picked(student, key):
+        return False
+    if progress(student, ch['tag']) < ch['need']:
+        return False
+    avatars.give(student, avatar_key)
+    student.avatar = avatar_key
+    student.save(update_fields=['avatar'])
+    return True
