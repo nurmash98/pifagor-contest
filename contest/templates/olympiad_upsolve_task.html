@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+
+{% block title %}{{ task.display_title }} · {% t "Дорешивание" %} - {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{% url 'olympiad_upsolve' exam.id %}" class="text-decoration-none text-muted small">← 🔁 {% t "Дорешивание" %}: {{ exam.title }}</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            <h4 class="fw-bold mb-3" style="color: #1a1a4b;">{{ task.display_title }}</h4>
+            <p class="lh-lg">{{ task.display_description|linebreaksbr }}</p>
+            {% include 'task_examples.html' %}
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 p-4">
+            {% if olymp_score is not None %}<div class="small text-muted mb-2">🏆 {% t "На олимпиаде" %}: <b>{{ olymp_score }}/100</b></div>{% endif %}
+            {% if answer %}
+            <div class="alert {% if answer.best_score == task_max %}alert-success{% else %}alert-warning{% endif %} rounded-3">
+                <div class="d-flex justify-content-between"><strong>{% t "Лучший результат" %}</strong><span class="badge bg-dark">{{ answer.best_score }}/{{ task_max }}</span></div>
+                <div class="small mt-1">{% t "Последняя отправка" %}: {% t "пройдено тестов" %} {{ answer.tests_passed }}/{{ answer.tests_total }}</div>
+                {% if groups %}
+                <table class="table table-sm small mb-1 mt-2 bg-transparent">
+                    <tr><th>{% t "Группа" %}</th><th>{% t "Тесты" %}</th><th class="text-end">{% t "Баллы" %}</th></tr>
+                    {% for g in groups %}<tr class="{% if g.got %}text-success{% else %}text-danger{% endif %}"><td>{{ g.n }}</td><td>{{ g.passed }}/{{ g.total }}</td><td class="text-end fw-bold">{{ g.got }}/{{ g.points }}</td></tr>{% endfor %}
+                </table>
+                <div class="small text-muted">{% t "Баллы группы даются, только если пройдены все её тесты. Номера ниже — все тесты по порядку (сначала примеры)." %}</div>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                    {% for r in answer.results %}
+                        {% if r.ok %}<span class="badge bg-success">{{ forloop.counter }} ✓</span>
+                        {% elif r.error == 'timeout' %}<span class="badge bg-dark">{{ forloop.counter }} ⏱</span>
+                        {% elif r.error == 'memory' %}<span class="badge bg-dark">{{ forloop.counter }} 💾</span>
+                        {% else %}<span class="badge bg-danger">{{ forloop.counter }} ✗</span>{% endif %}
+                    {% endfor %}
+                </div>
+                {% if answer.compile_error %}
+                <div class="small fw-semibold text-danger mt-2">🛠 {% t "Ошибка компиляции" %} (C++):</div>
+                <pre class="bg-dark text-light p-2 rounded-3 small mb-0 mt-1" style="white-space: pre-wrap; max-height: 220px; overflow: auto;">{{ answer.compile_error }}</pre>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if submissions_left <= 0 %}
+                <div class="alert alert-secondary rounded-3 mb-2">{% t "Вы использовали все отправки по этой задаче" %} .</div>
+                {% if answer %}<pre class="bg-dark text-light p-3 rounded-3 small mb-0" style="white-space: pre-wrap;"><code>{{ answer.best_code }}</code></pre>{% endif %}
+            {% else %}
+            
+            <form method="post" id="exam-form">
+                {% csrf_token %}
+                {% if languages %}
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="form-label small text-muted fw-semibold mb-0" for="lang-select">{% t "Язык" %}:</label>
+                    <select name="language" id="lang-select" class="form-select form-select-sm w-auto">
+                        {% for key, label in languages.items %}<option value="{{ key }}" {% if key == language %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
+                {% endif %}
+                {# Олимпиада: решают в своих компиляторах — здесь простое поле, куда вставляют готовый код #}
+                <textarea name="code" class="form-control rounded-3 font-monospace p-3 mb-3 olymp-code" rows="16" wrap="off"
+                          autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
+                          placeholder="{% t "Вставьте сюда код решения" %}" required>{{ answer.code|default:'' }}</textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small text-muted">{% t "Засчитывается лучший результат." %} · {% t "Осталось отправок" %}: {{ submissions_left }}</span>
+                    <button type="submit" id="exam-submit" class="btn btn-pifagor-green px-4 py-2 rounded-3">{% t "Отправить" %} →</button>
+                </div>
+            </form>
+            <script>
+            document.getElementById('exam-form').addEventListener('submit', function () {
+                var b = document.getElementById('exam-submit'); b.disabled = true; b.textContent = '{% t "Проверяем..." %}';
+            });
+            </script>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<style>.olymp-code { font-size: 14px; line-height: 1.5; tab-size: 4; resize: vertical; white-space: pre; overflow-x: auto; }</style>
+<script>
+// Олимпиада: Tab в поле кода — 4 пробела, а не переход к следующей кнопке
+(function () {
+    var ta = document.querySelector('.olymp-code');
+    if (!ta) { return; }
+    ta.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab' || e.shiftKey) { return; }
+        e.preventDefault();
+        var s = ta.selectionStart, en = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(en);
+        ta.selectionStart = ta.selectionEnd = s + 4;
+    });
+})();
+</script>
+{% endblock %}

@@ -14,6 +14,7 @@
     <div class="d-flex gap-2"><a href="{% url 'exam_preview' exam.id %}" class="btn btn-outline-secondary rounded-pill px-3">👁 Предпросмотр</a>
     <a href="{% url 'olympiad_tasks' exam.id %}" class="btn btn-outline-dark rounded-pill px-3">📋 Задачи</a>
     <a href="{% url 'olympiad_participants' exam.id %}" class="btn btn-outline-warning rounded-pill px-3">👥 Участники</a>
+    {% include 'olympiad_upsolve_toggle.html' with o=exam %}
     {% if exam_finished and not retake %}<a href="{% url 'retake_create' exam.id %}" class="btn btn-warning rounded-pill px-3">⏱ Дать время несдавшим</a>{% endif %}</div>
     {% elif not retake %}
     <div class="d-flex gap-2"><a href="{% url 'exam_preview' exam.id %}" class="btn btn-outline-secondary rounded-pill px-3">👁 Предпросмотр</a>
@@ -80,6 +81,7 @@
                     {% else %}
                     <th class="text-center">{% if exam.is_olympiad %}Сумма{% else %}Оценка{% if has_retakes %} (экзамен){% endif %}{% endif %}</th>
                     {% if has_retakes %}<th class="text-center">🔁 Пересдача</th>{% endif %}
+                    {% if has_upsolve %}<th class="text-center" title="Лучшая сумма с учётом дорешивания (на места не влияет)">🔁 С дорешиванием</th>{% endif %}
                     {% endif %}
                 </tr>
             </thead>
@@ -124,6 +126,7 @@
                     </td>
                     {% endfor %}
                     {% if exam.is_olympiad %}<td class="text-center fw-bold fs-5">{{ row.total }}<span class="text-muted small fw-normal"> / {{ max_total }}</span></td>
+                    {% if has_upsolve %}<td class="text-center">{% if row.upsolve_total is not None %}<span class="fw-bold text-success">{{ row.upsolve_total }}</span>{% if row.upsolve_solved %}<div class="small text-muted">решено на 100: {{ row.upsolve_solved }}</div>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>{% endif %}
                     {% else %}<td class="text-center fw-bold fs-5 {% if row.grade >= 8 %}text-success{% elif row.grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.grade }}</td>{% endif %}
                     {% if retake %}
                     <td class="text-center fw-bold fs-5 {% if row.exam_grade >= 8 %}text-success{% elif row.exam_grade >= 6 %}text-warning{% else %}text-danger{% endif %}">{{ row.exam_grade }}</td>

@@ -3279,6 +3279,63 @@ class OlympiadTests(RetakeTestBase):
         self.assertTrue(Task.objects.get(title='Импорт-олимп').hidden)
 
 
+class OlympiadUpsolveTests(RetakeTestBase):
+    """Дорешивание олимпиады: после окончания (и всего доп. времени) — без ограничения времени, на места не влияет."""
+
+    def setUp(self):
+        super().setUp()
+        self.secret = make_task('Олимп-задача', 'C', self.tag1)
+        self.secret.hidden = True; self.secret.save()
+        self.olymp = Exam.objects.create(kind='OLYM', title='Олимпиада Д', school_class='',
+                                         start_at=timezone.now() - timedelta(hours=3), duration_minutes=60,
+                                         created_by=self.teacher)
+        self.olymp.tasks.set([self.secret])
+        self.st = self.students[0]
+        self.olymp.participants.add(self.st)
+        self.attempt(self.olymp, self.st, 0)
+        self.url = reverse('olympiad_upsolve_task', args=[self.olymp.id, self.secret.id])
+
+    def test_upsolve_after_end_does_not_change_places(self):
+        self.client.force_login(self.st.user)
+        self.assertContains(self.client.get(reverse('olympiad_list')), reverse('olympiad_upsolve', args=[self.olymp.id]))
+        self.assertContains(self.client.get(reverse('exam_detail', args=[self.olymp.id])), reverse('olympiad_upsolve', args=[self.olymp.id]))
+        self.assertContains(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), 'Олимп-задача')
+        self.client.post(self.url, {'code': 'print(1)', 'language': 'python'})
+        from .models import UpsolveAnswer
+        ans = UpsolveAnswer.objects.get(exam=self.olymp, student=self.st, task=self.secret)
+        self.assertEqual(ans.best_score, 100)
+        self.assertEqual(ExamAnswer.objects.get(attempt__exam=self.olymp, attempt__student=self.st).best_score, 0)
+        self.client.force_login(self.teacher_user)
+        html = self.client.get(reverse('exam_results', args=[self.olymp.id])).content.decode()
+        self.assertIn('С дорешиванием', html)
+        self.assertIn('Дорешивание: вкл', html)
+
+    def test_closed_while_olympiad_or_extra_time_runs(self):
+        self.client.force_login(self.st.user)
+        other = self.students[1]
+        self.olymp.participants.add(other)
+        rt = self.retake(self.olymp, [other], start_delta=-5, minutes=60)      # у кого-то идёт доп. время
+        self.assertRedirects(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), reverse('olympiad_list'))
+        self.client.post(self.url, {'code': 'print(1)'})
+        from .models import UpsolveAnswer
+        self.assertFalse(UpsolveAnswer.objects.exists())
+        rt.delete()
+        self.olymp.start_at = timezone.now() - timedelta(minutes=5); self.olymp.save()     # олимпиада ещё идёт
+        self.assertRedirects(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), reverse('olympiad_list'))
+
+    def test_teacher_can_turn_off_and_non_participant_blocked(self):
+        self.client.force_login(self.teacher_user)
+        self.client.post(reverse('olympiad_upsolve_toggle', args=[self.olymp.id]))
+        self.olymp.refresh_from_db()
+        self.assertFalse(self.olymp.upsolve)
+        self.client.force_login(self.st.user)
+        self.assertNotContains(self.client.get(reverse('olympiad_list')), reverse('olympiad_upsolve', args=[self.olymp.id]))
+        self.assertRedirects(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), reverse('olympiad_list'))
+        self.olymp.upsolve = True; self.olymp.save()
+        self.client.force_login(self.students[1].user)                       # не участник
+        self.assertRedirects(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), reverse('olympiad_list'))
+
+
 class OlympiadGroupScoringTests(RetakeTestBase):
     """Олимпиадная задача: тесты по группам 20/50/30, задача — до 100 баллов."""
     def setUp(self):

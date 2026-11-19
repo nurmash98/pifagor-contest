@@ -1,0 +1,5 @@
+<form method="post" action="{% url 'olympiad_upsolve_toggle' o.id %}" class="d-inline">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    {% if o.upsolve %}<button class="btn btn-sm rounded-pill px-3 btn-success" title="Ученики могут дорешивать после окончания. Нажмите, чтобы выключить.">🔁 Дорешивание: вкл</button>
+    {% else %}<button class="btn btn-sm rounded-pill px-3 btn-outline-secondary" title="Нажмите, чтобы ученики могли дорешивать задачи после окончания.">🔁 Дорешивание: выкл</button>{% endif %}
+</form>

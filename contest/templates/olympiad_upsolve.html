@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load ui_i18n %}
+{% block title %}{% t "Дорешивание" %} · {{ exam.title }} - Pifagor Contest{% endblock %}
+{% block content %}
+<div class="mb-3"><a href="{% url 'olympiad_list' %}" class="text-decoration-none text-muted small">← {% t "Олимпиада" %}</a></div>
+<div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h3 class="fw-bold mb-1" style="color:#1a1a4b;">🔁 {% t "Дорешивание" %}: {{ exam.title }}</h3>
+            <div class="text-muted small">{% t "Олимпиада закончилась — задачи можно решать без ограничения времени, на Python или C++. На места и итоги олимпиады это не влияет." %}</div>
+        </div>
+        <div class="d-flex gap-3 text-center">
+            <div><div class="text-muted small">{% t "На олимпиаде" %}</div><div class="fs-4 fw-bold text-primary">{% if took_part %}{{ olymp_total }}{% else %}—{% endif %}</div></div>
+            <div><div class="text-muted small">{% t "С дорешиванием" %}</div><div class="fs-4 fw-bold text-success">{{ now_total }}<span class="text-muted fs-6 fw-normal"> / {{ max_total }}</span></div></div>
+        </div>
+    </div>
+</div>
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <ul class="list-group list-group-flush">
+        {% for t in tasks %}
+        <a href="{% url 'olympiad_upsolve_task' exam.id t.id %}" class="list-group-item list-group-item-action p-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <span class="fw-semibold" style="color:#1a1a4b;">{{ forloop.counter }}. {{ t.display_title }}</span>
+            <span class="d-flex gap-2 align-items-center small">
+                <span class="badge bg-light text-dark border" title="{% t "На олимпиаде" %}">🏆 {% if t.olymp_score is not None %}{{ t.olymp_score }}{% else %}—{% endif %}</span>
+                {% if t.upsolve %}<span class="badge {% if t.upsolve.best_score == 100 %}bg-success{% elif t.upsolve.best_score %}bg-warning text-dark{% else %}bg-danger{% endif %}" title="{% t "Дорешивание" %}">🔁 {{ t.upsolve.best_score }}/100</span>{% endif %}
+                <span class="text-muted">→</span>
+            </span>
+        </a>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

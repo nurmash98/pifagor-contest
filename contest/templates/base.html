@@ -253,7 +253,7 @@
             var box = document.createElement('div'); box.className = 'av-zoom';
             var big = document.createElement('img'); big.src = img.src; big.alt = '';
             box.appendChild(big); box.addEventListener('click', function () { box.remove(); });
-            document.addEventListener('keydown', function esc(k) { if (k.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
+            document.addEventListener('keydown', function esc(k) { if (k.keyCode === 27) { box.remove(); document.removeEventListener('keydown', esc); } });
             document.body.appendChild(box);
         });
     })();

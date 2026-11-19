@@ -8,7 +8,8 @@
     <a href="{% url 'exam_create' %}?kind=OLYM" class="btn btn-warning rounded-pill px-3 fw-semibold">+ Создать олимпиаду</a>
 </div>
 <p class="text-muted small">Олимпиаду видят только ученики, которых вы добавите. Задачи загружаются из JSON и скрыты из общего каталога.
-    Проходит по времени в полноэкранном режиме, места — по сумме баллов.</p>
+    Проходит по времени в полноэкранном режиме, места — по сумме баллов.
+    После окончания (и всего дополнительного времени) участники могут <b>дорешивать</b> задачи без ограничения времени — на места это не влияет.</p>
 
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
     <ul class="list-group list-group-flush">
@@ -29,6 +30,7 @@
                 <a href="{% url 'olympiad_participants' o.id %}" class="btn btn-outline-warning btn-sm rounded-pill px-3">👥 Участники</a>
                 <a href="{% url 'exam_results' o.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
                 {% if o.state == 'finished' %}<a href="{% url 'retake_create' o.id %}" class="btn btn-warning btn-sm rounded-pill px-3">⏱ Дать время несдавшим</a>{% endif %}
+                {% if o.state != 'upcoming' %}{% include 'olympiad_upsolve_toggle.html' %}{% endif %}
                 {% if o.state == 'upcoming' %}
                 <a href="{% url 'exam_edit' o.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Изменить</a>
                 {% endif %}

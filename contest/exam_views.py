@@ -25,6 +25,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -346,6 +347,7 @@ def exam_detail(request, exam_id, retake_id=None):
         'run_url': exam_guard.run_url(attempt) if attempt else '',
         'max_exits': exam_guard.MAX_EXITS,
         'olymp': olymp, 'max_subs': max_submissions(exam), 'task_max': task_max(exam),
+        'upsolve_open': exam.is_olympiad and finished and upsolve_open(exam, now),
     })
 
 
@@ -815,6 +817,16 @@ def exam_results(request, exam_id, retake_id=None):
             row['extra'] = extra_of.get(row['student'].id)
             row['extra_pending'] = None if row['attempt'] else pending.get(row['student'].id)
         _olympiad_places(rows)
+        from .models import UpsolveAnswer
+        ups = {}
+        for u in UpsolveAnswer.objects.filter(exam=exam).only('student_id', 'task_id', 'best_score'):
+            ups.setdefault(u.student_id, {})[u.task_id] = u.best_score
+        for row in rows:     # дорешивание: лучший балл по задаче — олимпиада или дорешивание
+            mine = ups.get(row['student'].id)
+            if mine:
+                olymp = {c['answer'].task_id: c['answer'].best_score for c in row['cells'] if c['answer']}
+                row['upsolve_total'] = sum(max(olymp.get(t, 0), mine.get(t, 0)) for t in set(olymp) | set(mine))
+                row['upsolve_solved'] = sum(1 for v in mine.values() if v == 100)
         state = exam.status(now)
         per_student = exam.is_random
     else:
@@ -855,6 +867,7 @@ def exam_results(request, exam_id, retake_id=None):
         'has_retakes': bool(retakes) and not exam.is_olympiad, 'per_student': per_student,
         'max_total': task_max(exam) * exam.tasks_per_student(), 'task_max': task_max(exam),
         'exam_finished': exam.status(now) == 'finished',
+        'upsolve_open': upsolve_open(exam, now), 'has_upsolve': exam.is_olympiad and any('upsolve_total' in r for r in rows),
     })
 
 
@@ -1056,6 +1069,7 @@ def olympiad_list(request):
             o.state = o.status(now)
             o.participant_count = o.participants.count()
             o.task_count = len(o.tasks.all())
+            o.upsolve_open = upsolve_open(o, now)
         return render(request, 'olympiads_teacher.html', {'olympiads': olymps})
     student = get_object_or_404(Student, user=request.user)
     olymps = list(Exam.objects.filter(kind='OLYM', participants=student).prefetch_related('tasks'))
@@ -1073,6 +1087,7 @@ def olympiad_list(request):
         o.state = _attempt_state(o.window, o.my_attempt, now)
         o.my_total = sum(a.best_score for a in o.my_attempt.answers.all()) if o.my_attempt else 0
         o.max_total = 100 * len(o.tasks.all())
+        o.upsolve_open = o.state == 'finished' and upsolve_open(o, now)
         {'active': active, 'upcoming': upcoming}.get(o.state, finished).append(o)
     upcoming.sort(key=lambda e: e.window.start_at)
     return render(request, 'olympiads_student.html', {'active': active, 'upcoming': upcoming, 'finished': finished})
@@ -1260,3 +1275,142 @@ def exam_preview(request, exam_id, task_id=None):
         'languages': (LANGUAGES if cpp_available() else {'python': LANGUAGES['python']}) if exam.is_olympiad else None,
         'randomized': bool(exam.random_slots or exam.is_random),
     })
+
+
+# ---------------------------------------------------------------- дорешивание олимпиады
+
+UPSOLVE_MAX_SUBMISSIONS = 50       # на задачу — чтобы не грузить сервер бесконечными отправками
+
+
+def upsolve_open(exam, now=None):
+    """Дорешивание открыто: олимпиада и всё доп. время закончились, и учитель его не выключил.
+    Пока у кого-то идёт или впереди доп. время — закрыто (чтобы решения не утекли)."""
+    if not exam.is_olympiad or not exam.upsolve:
+        return False
+    now = now or timezone.now()
+    if exam.status(now) != 'finished':
+        return False
+    return all(rt.status(now) == 'finished' for rt in exam.retakes.all())
+
+
+def _upsolve_student(request, exam_id):
+    """(ученик, олимпиада) или (None, олимпиада) с сообщением, если дорешивать нельзя."""
+    exam = get_object_or_404(Exam, id=exam_id, kind='OLYM')
+    student = Student.objects.filter(user=request.user).first()
+    if student is None or not exam.participants.filter(id=student.id).exists():
+        messages.error(request, 'Вас не добавили в эту олимпиаду.')
+        return None, exam
+    if not upsolve_open(exam):
+        messages.warning(request, 'Дорешивание этой олимпиады сейчас закрыто.')
+        return None, exam
+    return student, exam
+
+
+def _olympiad_best(exam, student):
+    """Лучшие баллы ученика на самой олимпиаде (общее время или доп. время): {task_id: балл}."""
+    best = {}
+    for ans in ExamAnswer.objects.filter(attempt__exam=exam, attempt__student=student):
+        best[ans.task_id] = max(best.get(ans.task_id, 0), ans.best_score)
+    return best
+
+
+@login_required
+def olympiad_upsolve(request, exam_id):
+    """Дорешивание: список задач олимпиады с баллами на олимпиаде и в дорешивании."""
+    from .models import UpsolveAnswer
+    if request.user.is_staff:
+        return redirect('exam_results', exam_id=exam_id)
+    student, exam = _upsolve_student(request, exam_id)
+    if student is None:
+        return redirect('olympiad_list')
+    tasks = list(exam.tasks.defer('test_cases').order_by('id'))
+    from .views import _apply_task_language, _get_content_lang
+    _apply_task_language(tasks, _get_content_lang(request))
+    olymp = _olympiad_best(exam, student)
+    ups = {u.task_id: u for u in UpsolveAnswer.objects.filter(exam=exam, student=student)}
+    for t in tasks:
+        t.olymp_score = olymp.get(t.id)
+        t.upsolve = ups.get(t.id)
+        t.best_now = max(olymp.get(t.id) or 0, t.upsolve.best_score if t.upsolve else 0)
+    return render(request, 'olympiad_upsolve.html', {
+        'exam': exam, 'tasks': tasks, 'max_total': 100 * len(tasks),
+        'olymp_total': sum(v for v in olymp.values()), 'now_total': sum(t.best_now for t in tasks),
+        'took_part': ExamAttempt.objects.filter(exam=exam, student=student).exists(),
+    })
+
+
+@login_required
+def olympiad_upsolve_task(request, exam_id, task_id):
+    from .models import UpsolveAnswer
+    if request.user.is_staff:
+        return redirect('exam_results', exam_id=exam_id)
+    student, exam = _upsolve_student(request, exam_id)
+    if student is None:
+        return redirect('olympiad_list')
+    if not exam.tasks.filter(id=task_id).exists():
+        raise Http404
+    task = get_object_or_404(Task if request.method == 'POST' else Task.objects.defer('test_cases'), id=task_id)
+    answer = UpsolveAnswer.objects.filter(exam=exam, student=student, task=task).first()
+    back = redirect('olympiad_upsolve_task', exam_id=exam.id, task_id=task.id)
+    if request.method == 'POST':
+        if answer is not None and answer.submissions_count >= UPSOLVE_MAX_SUBMISSIONS:
+            messages.warning(request, f'По этой задаче уже {UPSOLVE_MAX_SUBMISSIONS} отправок — это максимум.')
+            return back
+        code = (request.POST.get('code') or '').replace('\r\n', '\n')
+        if not code.strip():
+            messages.warning(request, 'Код пустой — напишите решение перед отправкой.')
+            return back
+        if not cache.add(f'upsolve_submit:{student.id}', 1, EXAM_SUBMIT_THROTTLE_SECONDS):
+            messages.warning(request, f'Подождите {EXAM_SUBMIT_THROTTLE_SECONDS} секунд перед повторной отправкой.')
+            return back
+        language = request.POST.get('language', 'python')
+        if language not in LANGUAGES:
+            language = 'python'
+        if language == 'cpp' and not cpp_available():
+            messages.error(request, 'C++ на сервере сейчас недоступен — отправьте решение на Python.')
+            return back
+        result = run_autotests(task, code, language)
+        passed, total = (result['passed'], result['total']) if result.get('available') else (0, len(task.test_cases or []))
+        score = olympiad_points(task, result)
+        answer = answer or UpsolveAnswer(exam=exam, student=student, task=task)
+        answer.code, answer.language = code, language
+        answer.submissions_count += 1
+        answer.submitted_at = timezone.now()
+        answer.tests_passed, answer.tests_total = passed, total
+        answer.results = result.get('results', [])
+        answer.compile_error = result.get('compile_error', '')
+        if score >= answer.best_score:
+            answer.best_score, answer.best_code, answer.best_language = score, code, language
+        answer.save()
+        if result.get('compile_error'):
+            messages.error(request, 'Ошибка компиляции — программа не запустилась (подробности ниже).')
+        else:
+            detail = ''
+            if task.test_groups and result.get('available'):
+                groups = group_summary(task, answer.results)[0]
+                detail = ' Группы: ' + ', '.join(f"{g['n']}) {'✓' if g['got'] else '✗'} {g['got']}/{g['points']}" for g in groups) + '.'
+            messages.success(request, f'Пройдено тестов {passed} из {total} — {score} баллов.{detail} '
+                                      f'Лучший результат в дорешивании: {answer.best_score}/100.')
+        return back
+    from .views import _apply_task_language, _get_content_lang
+    _apply_task_language([task], _get_content_lang(request))
+    return render(request, 'olympiad_upsolve_task.html', {
+        'exam': exam, 'task': task, 'answer': answer, 'task_max': 100,
+        'olymp_score': _olympiad_best(exam, student).get(task.id),
+        'languages': LANGUAGES if cpp_available() else {'python': LANGUAGES['python']},
+        'language': answer.language if answer else 'python',
+        'groups': group_summary(task, answer.results)[0] if (answer and task.test_groups) else None,
+        'submissions_left': UPSOLVE_MAX_SUBMISSIONS - (answer.submissions_count if answer else 0),
+    })
+
+
+@staff_member_required
+def olympiad_upsolve_toggle(request, exam_id):
+    """Учитель включает/выключает дорешивание олимпиады."""
+    exam = get_object_or_404(Exam, id=exam_id, kind='OLYM')
+    if request.method == 'POST':
+        exam.upsolve = not exam.upsolve
+        exam.save(update_fields=['upsolve'])
+        messages.success(request, ('Дорешивание включено' if exam.upsolve else 'Дорешивание выключено') + f': «{exam.title}».')
+    nxt = request.POST.get('next', '')
+    return redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else 'olympiad_list')

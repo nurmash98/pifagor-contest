@@ -435,6 +435,9 @@ class Exam(models.Model):
     # Олимпиада: видят только ученики, которых добавил учитель (из любых классов); класс не нужен.
     participants = models.ManyToManyField('Student', blank=True, related_name='olympiads',
                                           verbose_name="Участники олимпиады")
+    # Олимпиада: после окончания (и всего доп. времени) участники могут дорешивать задачи без ограничения времени.
+    # Баллы дорешивания хранятся отдельно (UpsolveAnswer) и на места не влияют.
+    upsolve = models.BooleanField(default=True, verbose_name="Дорешивание после окончания")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name='exams', verbose_name="Кто создал")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -616,6 +619,29 @@ class ExamAnswer(models.Model):
         verbose_name = "Ответ на СОР/СОЧ"
         verbose_name_plural = "Ответы на СОР/СОЧ"
         unique_together = [('attempt', 'task')]
+
+
+class UpsolveAnswer(models.Model):
+    """Дорешивание олимпиады: решение задачи после окончания. На места и итоги олимпиады не влияет."""
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='upsolve_answers')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='upsolve_answers')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    code = models.TextField(blank=True, verbose_name="Последний код")
+    best_code = models.TextField(blank=True, verbose_name="Код с лучшим результатом")
+    best_score = models.IntegerField(default=0, verbose_name="Лучший балл (0-100)")
+    tests_passed = models.IntegerField(default=0)
+    tests_total = models.IntegerField(default=0)
+    results = models.JSONField(default=list, blank=True)
+    language = models.CharField(max_length=8, default='python', verbose_name="Язык")
+    best_language = models.CharField(max_length=8, default='python', verbose_name="Язык лучшего решения")
+    compile_error = models.TextField(blank=True, default='', verbose_name="Ошибка компиляции")
+    submissions_count = models.PositiveIntegerField(default=0)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Дорешивание олимпиады"
+        verbose_name_plural = "Дорешивание олимпиад"
+        unique_together = [('exam', 'student', 'task')]
 
 
 class SiteSettings(models.Model):
