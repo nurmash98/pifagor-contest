@@ -43,6 +43,8 @@
                     <button class="btn btn-sm btn-outline-secondary rounded-pill px-3">{% if kk == 'kk' %}Тағу{% else %}Надеть{% endif %}</button></form>
             {% elif b.kind == 'award' %}
                 <a href="{% url 'hall_of_fame' %}" class="btn btn-sm btn-outline-warning rounded-pill px-3">{% if kk == 'kk' %}Тоқсанда 1-орын{% else %}1 место в четверти{% endif %}</a>
+            {% elif b.kind == 'gift' and b.challenge %}
+                <a href="{% url 'challenge' b.challenge %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#c2185b;color:#fff">🌴 {% if kk == 'kk' %}Челлендж{% else %}Челлендж{% endif %} {{ b.progress }}/{{ b.need }}</a>
             {% elif b.kind == 'gift' %}
                 <a href="{% url 'republic_day' %}" class="btn btn-sm btn-info rounded-pill px-3">{% if kk == 'kk' %}Есептер{% else %}Задачи{% endif %} {{ republic_progress }}/{{ republic_need }}</a>
             {% elif b.short %}
@@ -88,6 +90,8 @@
             {% if a.kind == 'soon' %}<span class="badge bg-secondary rounded-pill px-3 py-2">🔒 {% if kk == 'kk' %}Жақында{% else %}Скоро{% endif %}</span>
             {% elif not student %}{% if a.kind == 'paid' %}<span class="text-warning-emphasis small fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }}</span>{% endif %}
             {% elif a.on %}<span class="badge bg-success rounded-pill px-3 py-2">✓</span>
+            {% elif a.kind == 'gift' and not a.owned %}
+                <a href="{% url 'challenge' a.challenge %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#c2185b;color:#fff">🎁 {% if kk == 'kk' %}Челлендж{% else %}За челлендж{% endif %}</a>
             {% elif not a.owned and a.short %}
                 <div class="fw-bold"><img class="coin-img sm" src="{% static 'icons/coin-64.png' %}" alt=""> {{ a.price }}</div>
                 <div class="shop-short">{% if kk == 'kk' %}жетпейді{% else %}не хватает{% endif %} {{ a.short }}</div>

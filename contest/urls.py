@@ -50,6 +50,7 @@ urlpatterns = [
     path('profile/avatar/', views.profile_avatar, name='profile_avatar'),
     path('profile/banner/', views.profile_banner, name='profile_banner'),
     path('republic-day/', views.republic_day, name='republic_day'),
+    path('challenge/<str:key>/', views.challenge, name='challenge'),
     path('shop/', views.shop, name='shop'),
     path('shop/buy/', views.shop_buy, name='shop_buy'),
     path('shop/custom/', views.shop_custom, name='shop_custom'),

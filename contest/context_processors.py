@@ -118,3 +118,18 @@ def junior(request):
     from .models import Student
     from .scratch_levels import is_junior
     return {'is_junior': is_junior(Student.objects.filter(user=user).first())}
+
+
+def challenge_promo(request):
+    """Полоса «Челлендж GTA VI» под шапкой — для учеников (кроме 1–4 классов) до конца 2026 года."""
+    from django.utils import timezone
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'challenge_promo': ''}
+    today = timezone.localdate()
+    if not (today.year == 2026 and (today.month == 12 or (today.month == 11 and today.day >= 19))):
+        return {'challenge_promo': ''}
+    from .models import Student
+    from .scratch_levels import is_junior
+    st = Student.objects.filter(user=user).first()
+    return {'challenge_promo': '' if st is None or is_junior(st) else 'gta6'}

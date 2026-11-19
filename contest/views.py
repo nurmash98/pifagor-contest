@@ -625,7 +625,9 @@ def shop(request):
                         'custom_style': banner_module.custom_style(student.custom_banner if student else {}) if key == 'custom' else '',
                         'custom': banner_module.clean_custom(student.custom_banner if student else {}) if key == 'custom' else None,
                         'owned': key in mine, 'on': bool(student and student.name_banner == key),
-                        'short': max(b.get('price', 0) - bal, 0)})
+                        'short': max(b.get('price', 0) - bal, 0), 'challenge': b.get('challenge', ''),
+                        'progress': min(banner_module.progress(student, b['tag']), b['need']) if b.get('challenge') else 0,
+                        'need': b.get('need', 0)})
     avatar_list = [{'key': '', 'img': '', 'kind': 'free', 'title': 'Әдепкі' if lang == 'kk' else 'По умолчанию',
                     'on': bool(student and not student.avatar)}]
     my_avatars = avatar_module.owned(student) if student else set()
@@ -635,7 +637,8 @@ def shop(request):
         avatar_list.append({'key': a['key'], 'img': avatar_module.img_url(a), 'kind': a['kind'],
                             'price': a.get('price', 0), 'owned': a['kind'] == 'free' or a['key'] in my_avatars,
                             'short': max(a.get('price', 0) - bal, 0),
-                            'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key'])})
+                            'title': a['kk'] if lang == 'kk' else a['ru'], 'on': bool(student and student.avatar == a['key']),
+                            'challenge': a.get('challenge', '')})
     own_ck = avatar_module.custom_key(student) if student else ''
     own = {'price': avatar_module.own_price(), 'owned': avatar_module.has_own(student), 'short': max(avatar_module.own_price() - bal, 0),
            'img': avatar_module.custom_url(own_ck) or '', 'key': own_ck, 'on': bool(student and own_ck and student.avatar == own_ck),
@@ -795,6 +798,34 @@ def republic_day(request):
         'tasks': tasks, 'student': student, 'done': min(done, need), 'need': need,
         'percent': int(100 * min(done, need) / need), 'has_banner': bool(student and 'kz_flag' in banner_module.owned(student)),
         'just_got': bool(new),
+    })
+
+
+@login_required
+def challenge(request, key):
+    """Челлендж (например, GTA VI): решил нужное число задач темы на 10/10 — баннер и аватар."""
+    from . import avatars as avatar_module
+    from . import banners as banner_module
+    ch = banner_module.CHALLENGES.get(key)
+    if ch is None:
+        raise Http404
+    student = Student.objects.filter(user=request.user).first()
+    lang = _get_content_lang(request)
+    tasks = list(Task.objects.filter(tags__name=ch['tag']).order_by('level', 'id'))
+    _apply_task_language(tasks, lang)
+    new = banner_module.sync(student) if student else []
+    if student is not None:
+        best = {s.task_id: s for s in Submission.objects.filter(student=student, task__in=tasks)}
+        for t in tasks:
+            t.user_sub = best.get(t.id)
+    done = min(banner_module.progress(student, ch['tag']), ch['need']) if student else 0
+    ava = avatar_module.BY_KEY.get(ch['avatar'])
+    return render(request, f'challenge_{key}.html', {
+        'tasks': tasks, 'student': student, 'done': done, 'need': ch['need'], 'total': len(tasks),
+        'percent': int(100 * done / ch['need']), 'just_got': bool(new),
+        'has_prize': bool(student and ch['banner'] in banner_module.owned(student)),
+        'avatar_img': avatar_module.img_url(ava) if ava else '', 'avatar_title': (ava['kk'] if lang == 'kk' else ava['ru']) if ava else '',
+        'banner_key': ch['banner'],
     })
 
 

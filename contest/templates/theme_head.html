@@ -163,6 +163,11 @@
     .b-kz_flag::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 0, rgba(255,255,255,.25) 20%, transparent 40%, rgba(0,40,60,.18) 60%, transparent 80%);
         background-size: 200% 100%; animation: nb-wave 3s linear infinite; }
     @keyframes nb-wave { to { background-position: -200% 0; } }
+    /* подарок за челлендж GTA VI: закат Vice City — пальмы с солнцем справа, неоновая рамка */
+    .b-vice { background: linear-gradient(90deg, rgba(36, 10, 70, .55), rgba(36, 10, 70, .15) 70%), url("{% static 'icons/vice-city.webp' %}") center 40% / cover no-repeat, #6b4fa0;
+        color: #fff !important; border: 2px solid #ff4fd8; text-shadow: 0 0 6px rgba(255, 79, 216, .9), 0 1px 3px rgba(0,0,0,.7);
+        box-shadow: 0 0 8px rgba(255, 79, 216, .55); animation: nb-vice 3s ease-in-out infinite; }
+    @keyframes nb-vice { 50% { box-shadow: 0 0 16px rgba(255, 79, 216, .9); } }
     .b-oyu { background: linear-gradient(180deg, #8b1d3a, #5e0f25); color: #ffe7a8 !important; border: 2px solid #d4a017; padding-left: 30px; padding-right: 30px; }
     .nb.sm.b-oyu { padding-left: 24px; padding-right: 24px; }
     .b-oyu::before, .b-oyu::after { content: ""; position: absolute; top: 0; bottom: 0; width: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='16'%3E%3Cpath d='M10 2 C4 2 3 8 7 9 C10 10 10 6 8 6 M10 2 C16 2 17 8 13 9 C10 10 10 6 12 6 M10 10 V14' stroke='%23e8b923' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") repeat-y center / 15px 12px; }

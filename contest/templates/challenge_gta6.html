@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load ui_i18n static %}
+{% block title %}{% if content_lang == 'kk' %}GTA VI челленджі{% else %}Челлендж GTA VI{% endif %} - Pifagor Contest{% endblock %}
+{% block content %}
+<div class="vc-hero rounded-4 p-4 p-md-5 mb-4 text-center position-relative overflow-hidden">
+    <div class="vc-sun"></div>
+    <div class="position-relative">
+        <div class="vc-kicker">🌴 {% if content_lang == 'kk' %}Ойынның шығуына арналған{% else %}В честь выхода игры{% endif %}</div>
+        <h2 class="vc-title">{% if content_lang == 'kk' %}GTA VI челленджі{% else %}Челлендж GTA VI{% endif %}</h2>
+        <p class="mb-3 vc-text">
+            {% if content_lang == 'kk' %}Vice City туралы {{ total }} есеп. Кез келген <b>{{ need }}</b> есепті 10/10 шеш — <b>«Vice City»</b> баннері мен <b>«{{ avatar_title }}»</b> аватарын аласың! Олар дүкенде сатылмайды.
+            {% else %}{{ total }} задач о Vice City. Решите любые <b>{{ need }}</b> на 10/10 — и получите баннер <b>«Vice City»</b> и аватар <b>«{{ avatar_title }}»</b>. В магазине их не купить!{% endif %}
+        </p>
+        <div class="d-inline-flex align-items-center gap-3 flex-wrap justify-content-center vc-prize rounded-4 px-4 py-3">
+            {% if avatar_img %}<img src="{{ avatar_img }}" alt="" width="72" height="72" style="border-radius:50%;box-shadow:0 0 0 3px #ff4fd8">{% endif %}
+            <div>
+                <div class="mb-2"><span class="nb b-{{ banner_key }}">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
+                {% if student %}
+                    {% if has_prize %}
+                    <div class="fw-bold" style="color:#ffe066;">✓ {% if content_lang == 'kk' %}Баннер мен аватар сенікі! Профильде таңдай аласың.{% else %}Баннер и аватар ваши! Выбрать их можно в профиле.{% endif %}</div>
+                    {% else %}
+                    <div class="vc-bar mx-auto"><i style="width:{{ percent }}%"></i></div>
+                    <div class="small mt-1" style="color:#ffe3f5;">{% if content_lang == 'kk' %}Шешілді{% else %}Решено{% endif %}: <b>{{ done }} / {{ need }}</b></div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% if just_got %}<div class="mt-3 fw-bold" style="color:#ffe066;font-size:1.2rem">🎉 {% if content_lang == 'kk' %}Құттықтаймыз! Сыйлықтар берілді.{% else %}Поздравляем! Награды выданы.{% endif %}</div>{% endif %}
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3 text-pifagor-blue">🌴 {% if content_lang == 'kk' %}Челлендж есептері{% else %}Задачи челленджа{% endif %}</h5>
+<div class="row g-3">
+    {% for task in tasks %}
+    <div class="col-md-6">
+        <a href="{% url 'task_detail' task.id %}?back={{ request.path|urlencode }}" class="card border-0 shadow-sm rounded-4 p-3 h-100 text-decoration-none d-flex flex-row align-items-center gap-3">
+            <span class="badge badge-level-{{ task.level }}">{{ task.level }}</span>
+            <span class="fw-semibold flex-grow-1 text-pifagor-blue">{{ task.display_title }}</span>
+            {% if task.user_sub and task.user_sub.score == 10 and task.user_sub.is_graded %}<span class="badge bg-success rounded-pill">✓ 10/10</span>
+            {% elif task.user_sub %}<span class="badge bg-warning text-dark rounded-pill">{% if content_lang == 'kk' %}үдерісте{% else %}в работе{% endif %}</span>{% endif %}
+        </a>
+    </div>
+    {% empty %}<p class="text-muted">—</p>{% endfor %}
+</div>
+<style>
+    .vc-hero { position: relative; overflow: hidden; background: linear-gradient(180deg, #1b0838 0%, #5b1470 40%, #c2185b 72%, #ff8a3d 100%); border: 3px solid #ff4fd8; box-shadow: 0 0 24px rgba(255, 79, 216, .35); }
+    .vc-sun { position: absolute; left: 50%; bottom: -120px; width: 320px; height: 320px; margin-left: -160px; border-radius: 50%; opacity: .35;
+        background: repeating-linear-gradient(180deg, #ffd166 0 22px, transparent 22px 30px); }
+    .vc-kicker { color: #ffd1f0; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
+    .vc-title { font-weight: 900; color: #fff; font-size: 2.6rem; text-shadow: 0 0 12px #ff4fd8, 0 0 30px rgba(255, 79, 216, .6); margin: 4px 0 10px; }
+    .vc-text { color: #ffe3f5; max-width: 720px; margin: 0 auto; }
+    .vc-prize { background: rgba(20, 4, 40, .45); }
+    .vc-bar { width: 260px; height: 10px; border-radius: 9px; background: rgba(255,255,255,.25); overflow: hidden; }
+    .vc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff4fd8, #ffd166); }
+</style>
+{% endblock %}

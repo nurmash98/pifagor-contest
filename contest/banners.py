@@ -1,11 +1,18 @@
 """Баннеры под именем ученика.
   • free — у всех сразу;
   • gift — «Флаг Казахстана»: за 5 задач темы «Республика күні» на 10/10;
+           «Vice City»: челлендж GTA VI — 6 из 10 задач на 10/10 (вместе с аватаром «Закат Vice City»);
   • paid — покупаются за монеты в магазине."""
 from .models import Submission
 
 REPUBLIC_TAG = 'Республика күні'
 REPUBLIC_NEED = 5
+
+# Челленджи: решил need задач темы tag на 10/10 — получаешь баннер и аватар (страница /challenge/<ключ>/)
+GTA_TAG = 'GTA VI'
+CHALLENGES = {
+    'gta6': dict(tag=GTA_TAG, need=6, banner='vice', avatar='vice_sunset', ru='Челлендж GTA VI', kk='GTA VI челленджі'),
+}
 
 # порядок = порядок в магазине
 CATALOG = {
@@ -14,6 +21,7 @@ CATALOG = {
     'sky':    dict(kind='free', ru='Небо', kk='Аспан'),
     'champion': dict(kind='award', ru='Чемпион четверти', kk='Тоқсан чемпионы'),
     'kz_flag': dict(kind='gift', ru='Флаг Казахстана', kk='Қазақстан туы', tag=REPUBLIC_TAG, need=REPUBLIC_NEED),
+    'vice': dict(kind='gift', ru='Vice City', kk='Vice City', tag=GTA_TAG, need=6, challenge='gta6'),
     'oyu':    dict(kind='paid', price=300, ru='Ою-өрнек', kk='Ою-өрнек'),
     'code':   dict(kind='paid', price=400, ru='Терминал', kk='Терминал'),
     'chess': dict(kind='paid', price=400, ru='Шахматы', kk='Шахмат'),
@@ -84,13 +92,17 @@ def give(student, key):
         student.save(update_fields=['owned_banners'])
 
 
-def holiday_progress(student):
-    """Сколько задач темы «Республика күні» ученик решил на 10/10."""
+def progress(student, tag):
+    """Сколько задач темы tag ученик решил на 10/10."""
     if student is None:
         return 0
-    return (Submission.objects.filter(student=student, is_graded=True, score=10,
-                                      task__tags__name=REPUBLIC_TAG)
+    return (Submission.objects.filter(student=student, is_graded=True, score=10, task__tags__name=tag)
             .values('task_id').distinct().count())
+
+
+def holiday_progress(student):
+    """Сколько задач темы «Республика күні» ученик решил на 10/10."""
+    return progress(student, REPUBLIC_TAG)
 
 
 def sync(student):
@@ -105,4 +117,22 @@ def sync(student):
         if not student.name_banner:
             student.name_banner = 'kz_flag'
             student.save(update_fields=['name_banner'])
+    from . import avatars
+    for ch in CHALLENGES.values():
+        if ch['banner'] in owned(student) and ch['avatar'] in avatars.owned(student):
+            continue
+        if progress(student, ch['tag']) < ch['need']:
+            continue
+        if ch['banner'] not in owned(student):
+            give(student, ch['banner'])
+            new.append(ch['banner'])
+            if not student.name_banner:
+                student.name_banner = ch['banner']
+                student.save(update_fields=['name_banner'])
+        if ch['avatar'] not in avatars.owned(student):
+            avatars.give(student, ch['avatar'])
+            new.append(ch['avatar'])
+            if not student.avatar:
+                student.avatar = ch['avatar']
+                student.save(update_fields=['avatar'])
     return new

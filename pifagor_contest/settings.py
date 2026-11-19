@@ -100,6 +100,7 @@ TEMPLATES = [
                 'contest.context_processors.coins',
                 'contest.context_processors.notices',
                 'contest.context_processors.junior',
+                'contest.context_processors.challenge_promo',
             ],
         },
     },

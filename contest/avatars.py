@@ -1,8 +1,11 @@
 """Аватары учеников. По умолчанию — значок 🎓 (поле Student.avatar пустое).
-kind: 'free' — доступен всем; 'paid' — покупается в магазине за монеты (price), после покупки — навсегда."""
+kind: 'free' — доступен всем; 'paid' — покупается в магазине за монеты (price), после покупки — навсегда;
+'gift' — выдаётся за челлендж (banners.CHALLENGES)."""
 CATALOG = [
     dict(key='school_girl', file='avatars/school-girl.webp', kind='free', ru='Оқушы қыз', kk='Оқушы қыз'),
     dict(key='school_boy', file='avatars/school-boy.webp', kind='free', ru='Оқушы бала', kk='Оқушы бала'),
+    # подарок за челлендж GTA VI (6 из 10 задач на 10/10) — не продаётся
+    dict(key='vice_sunset', file='avatars/vice-sunset.webp', kind='gift', ru='Закат Vice City', kk='Vice City күн батуы', challenge='gta6'),
     dict(key='av01', file='avatars/av-01.webp', kind='paid', price=100, ru='Мальчик в худи', kk='Худи киген бала'),
     dict(key='av02', file='avatars/av-02.webp', kind='paid', price=100, ru='Девочка в фиолетовом', kk='Күлгін киімді қыз'),
     dict(key='av03', file='avatars/av-03.webp', kind='paid', price=100, ru='Меломан', kk='Меломан'),
