@@ -192,7 +192,7 @@
                                 {% else %}
                                     {# Имя — ссылка на профиль: аватар, баннер, класс и ранг #}
                                     <a href="{% url 'profile' %}" class="nav-me" title="{% t "Профиль" %}">
-                                        {% student_avatar my_solved 32 False 'nav' user.student.avatar %}
+                                        {% student_avatar my_solved 40 False 'nav' user.student.avatar %}
                                         <strong class="nav-me-name">{% student_name user.student True %}</strong>
                                         <span class="text-muted">({{ user.student.school_class }})</span>
                                     </a> {% rank_chip my_solved 'nav' 'sm' %}
@@ -244,6 +244,18 @@
             });
         }
         document.addEventListener('DOMContentLoaded', function () { tick(); setInterval(tick, 1000); });
+        // клик по аватару в лидерборде / профиле — показать крупно
+        document.addEventListener('click', function (e) {
+            var av = e.target.closest && e.target.closest('.lb-name .pf-avatar.has-img, .pf-zoom .pf-avatar.has-img');
+            if (!av) return;
+            var img = av.querySelector('img'); if (!img) return;
+            e.preventDefault();
+            var box = document.createElement('div'); box.className = 'av-zoom';
+            var big = document.createElement('img'); big.src = img.src; big.alt = '';
+            box.appendChild(big); box.addEventListener('click', function () { box.remove(); });
+            document.addEventListener('keydown', function esc(k) { if (k.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); } });
+            document.body.appendChild(box);
+        });
     })();
     </script>
     {% if holiday %}

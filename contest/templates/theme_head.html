@@ -119,6 +119,10 @@
     .pf-avatar .pf-ring { position: absolute; inset: 0; border-radius: 50%; background: var(--bs-tertiary-bg); }
     .pf-avatar .pf-face { position: absolute; inset: 10%; border-radius: 50%; background: var(--bs-body-bg);
         display: flex; align-items: center; justify-content: center; line-height: 1; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+    .pf-avatar.has-img .pf-face { inset: 6%; }   /* у картинки рамка тоньше — лицо крупнее */
+    .lb-name .pf-avatar.has-img, .pf-zoom .pf-avatar.has-img { cursor: zoom-in; }
+    .av-zoom { position: fixed; inset: 0; z-index: 2000; background: rgba(10, 10, 30, .75); display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+    .av-zoom img { width: min(80vw, 380px); height: min(80vw, 380px); border-radius: 50%; object-fit: cover; object-position: 50% 15%; background: #fff; border: 6px solid #fff; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
     .pf-avatar .pf-face img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; object-position: 50% 15%; background: #fff; }
     .avatar-pick summary { list-style: none; } .avatar-pick summary::-webkit-details-marker { display: none; }
     .avatar-opt { background: var(--bs-tertiary-bg); border: 2px solid transparent; border-radius: 14px; padding: 8px 6px 6px; width: 92px; color: inherit; cursor: pointer; }
