@@ -12,8 +12,29 @@ REPUBLIC_NEED = 5
 GTA_TAG = 'GTA VI'
 CHALLENGES = {
     # pick — аватары на выбор: ученик берёт только один (на странице челленджа)
-    'gta6': dict(tag=GTA_TAG, need=6, banner='vice', pick=[f'gta{i:02d}' for i in range(1, 12)], ru='Челлендж GTA VI', kk='GTA VI челленджі'),
+    # ends — до какого момента (время Алматы) можно заработать награду; потом челлендж закрыт
+    'gta6': dict(tag=GTA_TAG, need=6, banner='vice', pick=[f'gta{i:02d}' for i in range(1, 12)], ru='Челлендж GTA VI', kk='GTA VI челленджі',
+                 ends='2026-11-24 23:59:59'),
 }
+
+
+def ends_at(ch):
+    """Конец челленджа как aware-datetime (или None — бессрочный)."""
+    if not ch.get('ends'):
+        return None
+    from datetime import datetime
+    from django.utils import timezone
+    return timezone.make_aware(datetime.strptime(ch['ends'], '%Y-%m-%d %H:%M:%S'))
+
+
+def timezone_now():
+    from django.utils import timezone
+    return timezone.now()
+
+
+def is_open(ch, now=None):
+    end = ends_at(ch)
+    return end is None or (now or timezone_now()) <= end
 
 # порядок = порядок в магазине
 CATALOG = {
@@ -119,7 +140,7 @@ def sync(student):
             student.name_banner = 'kz_flag'
             student.save(update_fields=['name_banner'])
     for ch in CHALLENGES.values():
-        if ch['banner'] in owned(student) or progress(student, ch['tag']) < ch['need']:
+        if ch['banner'] in owned(student) or not is_open(ch) or progress(student, ch['tag']) < ch['need']:
             continue
         give(student, ch['banner'])
         new.append(ch['banner'])
@@ -142,7 +163,8 @@ def pick(student, key, avatar_key):
     ch = CHALLENGES.get(key)
     if ch is None or avatar_key not in ch['pick'] or picked(student, key):
         return False
-    if progress(student, ch['tag']) < ch['need']:
+    # кто заработал баннер до конца челленджа — выбрать аватар может и позже
+    if ch['banner'] not in owned(student) and not (is_open(ch) and progress(student, ch['tag']) >= ch['need']):
         return False
     avatars.give(student, avatar_key)
     student.avatar = avatar_key

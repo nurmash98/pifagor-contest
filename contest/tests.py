@@ -4951,6 +4951,45 @@ class Gta6ChallengeTests(TestCase):
         self.st.refresh_from_db()
         self.assertNotIn('av01', avatars.owned(self.st))
 
+    def test_deadline_timer_and_closed_after_end(self):
+        from datetime import timedelta
+        from unittest import mock
+        from django.utils import timezone
+        from . import avatars, banners
+        ch = banners.CHALLENGES['gta6']
+        end = banners.ends_at(ch)
+        self.assertEqual(timezone.localtime(end).strftime('%d.%m %H:%M'), '24.11 23:59')
+        r = self.client.get(reverse('challenge', args=['gta6']))
+        self.assertContains(r, 'data-countdown="' + end.isoformat())
+        r = self.client.get(reverse('shop'))                          # полоса с таймером на других страницах
+        self.assertContains(r, 'Mission completed!')
+        self.assertContains(r, 'data-countdown=')
+        tasks = list(Task.objects.filter(tags__name='GTA VI').order_by('id'))
+        for t in tasks[:6]:
+            self.solve(t)
+        with mock.patch('contest.banners.timezone_now', return_value=end + timedelta(minutes=1)):
+            r = self.client.get(reverse('challenge', args=['gta6']))
+            self.assertContains(r, 'Челлендж завершён')
+            self.assertNotContains(r, reverse('challenge_pick', args=['gta6']))
+            self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'gta02'})
+            self.st.refresh_from_db()
+            self.assertNotIn('vice', banners.owned(self.st))
+            self.assertFalse({k for k in avatars.owned(self.st) if k.startswith('gta')})
+            self.assertNotContains(self.client.get(reverse('shop')), 'Mission completed!')
+
+    def test_earned_before_end_can_pick_after(self):
+        from datetime import timedelta
+        from unittest import mock
+        from . import avatars, banners
+        for t in list(Task.objects.filter(tags__name='GTA VI').order_by('id'))[:6]:
+            self.solve(t)
+        self.client.get(reverse('challenge', args=['gta6']))          # баннер выдан вовремя
+        end = banners.ends_at(banners.CHALLENGES['gta6'])
+        with mock.patch('contest.banners.timezone_now', return_value=end + timedelta(days=1)):
+            self.client.post(reverse('challenge_pick', args=['gta6']), {'avatar': 'gta04'})
+        self.st.refresh_from_db()
+        self.assertIn('gta04', avatars.owned(self.st))
+
     def test_gift_not_for_sale_and_shop_links_to_challenge(self):
         from . import avatars, banners
         r = self.client.get(reverse('shop'))

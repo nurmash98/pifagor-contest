@@ -11,6 +11,15 @@
             {% if content_lang == 'kk' %}Vice City туралы {{ total }} есеп. Кез келген <b>{{ need }}</b> есепті 10/10 шеш — <b>«Vice City»</b> баннерін аласың және төмендегі 11 кейіпкердің <b>біреуін</b> аватар етіп таңдайсың. Олар дүкенде сатылмайды!
             {% else %}{{ total }} задач о Vice City. Решите любые <b>{{ need }}</b> на 10/10 — получите баннер <b>«Vice City»</b> и выберите <b>одного</b> из 11 персонажей ниже себе на аватар. В магазине их не купить!{% endif %}
         </p>
+        {% if ends_iso %}
+        <div class="mb-3">
+            {% if is_open %}
+            <span class="vc-timer rounded-pill px-4 py-2 d-inline-block">⏳ {% if content_lang == 'kk' %}Аяқталуына{% else %}До конца{% endif %}: <b data-countdown="{{ ends_iso }}"></b></span>
+            {% else %}
+            <span class="vc-timer rounded-pill px-4 py-2 d-inline-block">🏁 {% if content_lang == 'kk' %}Челлендж аяқталды{% else %}Челлендж завершён{% endif %}</span>
+            {% endif %}
+        </div>
+        {% endif %}
         <div class="d-inline-flex align-items-center gap-3 flex-wrap justify-content-center vc-prize rounded-4 px-4 py-3">
             <div>
                 <div class="mb-2"><span class="nb b-{{ banner_key }}">{% if student %}{{ student.full_name }}{% else %}Pifagor Contest{% endif %}</span></div>
@@ -32,6 +41,7 @@
 <h5 class="fw-bold mb-2 text-pifagor-blue">🎭 {% if content_lang == 'kk' %}Аватар таңда — тек біреуін{% else %}Аватар на выбор — только один{% endif %}</h5>
 <p class="text-muted small mb-3">{% if chosen %}{% if content_lang == 'kk' %}Сен таңдауыңды жасадың.{% else %}Вы уже выбрали своего персонажа.{% endif %}
     {% elif can_pick %}{% if content_lang == 'kk' %}Мұқият таңда: кейін ауыстыру мүмкін емес.{% else %}Выбирайте внимательно: поменять потом нельзя.{% endif %}
+    {% elif not is_open %}{% if content_lang == 'kk' %}Челлендж аяқталды — жаңа сыйлықтар берілмейді.{% else %}Челлендж завершён — новые награды больше не выдаются.{% endif %}
     {% else %}{% if content_lang == 'kk' %}{{ need }} есепті шешкеннен кейін ашылады.{% else %}Откроется, когда решите {{ need }} задач.{% endif %}{% endif %}</p>
 <div class="vc-picks mb-4">
     {% for a in picks %}
@@ -59,6 +69,7 @@
     {% empty %}<p class="text-muted">—</p>{% endfor %}
 </div>
 <style>
+    .vc-timer { background: rgba(0, 0, 0, .4); color: #fff; font-size: 1.15rem; font-variant-numeric: tabular-nums; border: 1px solid rgba(255, 255, 255, .35); }
     .vc-hero { position: relative; overflow: hidden; background: linear-gradient(180deg, #1b0838 0%, #5b1470 40%, #c2185b 72%, #ff8a3d 100%); border: 3px solid #ff4fd8; box-shadow: 0 0 24px rgba(255, 79, 216, .35); }
     .vc-sun { position: absolute; left: 50%; bottom: -120px; width: 320px; height: 320px; margin-left: -160px; border-radius: 50%; opacity: .35;
         background: repeating-linear-gradient(180deg, #ffd166 0 22px, transparent 22px 30px); }

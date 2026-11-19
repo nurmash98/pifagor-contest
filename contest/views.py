@@ -829,7 +829,10 @@ def challenge(request, key):
         'percent': int(100 * done / ch['need']), 'just_got': bool(new),
         'has_prize': bool(student and ch['banner'] in banner_module.owned(student)),
         'banner_key': ch['banner'], 'picks': picks, 'chosen': chosen, 'key': key,
-        'can_pick': bool(student and done >= ch['need'] and not chosen),
+        'can_pick': bool(student and not chosen and (ch['banner'] in banner_module.owned(student)
+                                                     or (done >= ch['need'] and banner_module.is_open(ch)))),
+        'is_open': banner_module.is_open(ch),
+        'ends_iso': banner_module.ends_at(ch).isoformat() if banner_module.ends_at(ch) else '',
     })
 
 

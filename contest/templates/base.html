@@ -223,10 +223,29 @@
     <div style="background:linear-gradient(90deg,#2a0b4a,#8e1d79 45%,#e8476b 75%,#ff9a3c);border-bottom:2px solid #ff4fd8">
         <div class="container py-2 d-flex align-items-center justify-content-center gap-2 flex-wrap text-center" style="color:#fff;font-weight:600">
             ⭐ <span>{% if content_lang == 'kk' %}<b>Mission completed!</b> 10 есептің 6-ын шеш те, GTA VI-дің 11 кейіпкерінің бірін таңда{% else %}<b>Mission completed!</b> Реши 6 задач из 10 и выбери одного из 11 героев GTA VI{% endif %}</span>
+            <span class="rounded-pill px-3 py-1" style="background:rgba(0,0,0,.35);font-variant-numeric:tabular-nums;white-space:nowrap" title="{% if content_lang == 'kk' %}Челлендж аяқталғанға дейін{% else %}До конца челленджа{% endif %}">⏳ <span data-countdown="{{ challenge_ends }}"></span></span>
             <a href="{% url 'challenge' 'gta6' %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#fff;color:#8e1d79">{% if content_lang == 'kk' %}Челленджге{% else %}К челленджу{% endif %} →</a>
         </div>
     </div>
     {% endif %}
+    <script>
+    (function () {
+        // обратный отсчёт: <span data-countdown="ISO-время конца">
+        var kk = {% if content_lang == 'kk' %}true{% else %}false{% endif %};
+        function pad(n) { return (n < 10 ? '0' : '') + n; }
+        function tick() {
+            document.querySelectorAll('[data-countdown]').forEach(function (el) {
+                var end = Date.parse(el.getAttribute('data-countdown'));
+                if (isNaN(end)) return;
+                var s = Math.floor((end - Date.now()) / 1000);
+                if (s <= 0) { el.textContent = kk ? 'Уақыт бітті' : 'Время вышло'; return; }
+                var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+                el.textContent = (d ? d + (kk ? ' күн ' : ' д ') : '') + pad(h) + ':' + pad(m) + ':' + pad(s % 60);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', function () { tick(); setInterval(tick, 1000); });
+    })();
+    </script>
     {% if holiday %}
     <div class="kz-holiday">
         <div class="container d-flex align-items-center justify-content-center gap-3 py-2">
