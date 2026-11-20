@@ -4646,6 +4646,10 @@ class EmpireGameTests(TestCase):
         self.assertGreater(empire.truce_left(self.game, 0, 1), 50)
         q = self.game.players.filter(team=0).exclude(pk=p.pk).first()
         self.assertEqual(empire.move_rule(self.game, q, n[0], n[1], 1), {'error': 'truce'})
+        # стоявший на земле бывшего союзника — перенесён на свою землю и может ходить дальше
+        p.refresh_from_db()
+        self.assertNotEqual((p.x, p.y), tuple(n))
+        self.assertTrue(self.game.cells.filter(x=p.x, y=p.y, team=0).exists())
 
     def test_city_takes_seven_cells_but_not_allied(self):
         from . import empire

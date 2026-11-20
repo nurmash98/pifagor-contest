@@ -270,6 +270,24 @@ def _restart(game, victim, captor, cells):
         m.save(update_fields=['x', 'y', 'challenge'])
 
 
+def _send_home(game, team, host):
+    """Союз разорван: игроки команды team, стоящие на земле бывшего союзника host, переносятся
+    на случайную клетку своей империи (иначе они застревают — по вражеской земле не ходят)."""
+    from .models import IslandCell, IslandPlayer
+    host_cells = set(IslandCell.objects.filter(game=game, team=host).values_list('x', 'y'))
+    stuck = [m for m in IslandPlayer.objects.filter(game=game, team=team) if (m.x, m.y) in host_cells]
+    if not stuck:
+        return
+    home = list(IslandCell.objects.filter(game=game, team=team).values_list('x', 'y'))
+    if not home:
+        return
+    rng = random.Random()
+    for m in stuck:
+        m.x, m.y = rng.choice(home)
+        m.challenge = {}                           # начатая задача на чужой клетке отменяется
+        m.save(update_fields=['x', 'y', 'challenge'])
+
+
 # ------------------------------------------------------------------ действия хана
 def _locked(game):
     from .models import IslandGame
@@ -379,6 +397,8 @@ def diplomacy(game, player, action, other, now=None):
             if relation(game, me, other) != 'ally':
                 return {'error': 'not_ally'}
             rel[k] = {'s': 'enemy', 'truce': (now + timedelta(seconds=TRUCE)).isoformat()}
+            _send_home(game, me, other)
+            _send_home(game, other, me)
         game.empire['offers'] = offers
         game.version += 1
         game.save(update_fields=['empire', 'version'])
