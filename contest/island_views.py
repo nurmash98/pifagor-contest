@@ -250,8 +250,8 @@ def play_khan(request, game_id):
         res = emp.build_capital(game, player, *((int(x), int(y)) if (x or '').isdigit() and (y or '').isdigit() else (None, None)))
     elif act == 'appoint':
         res = emp.appoint(game, player, _int(request.POST.get('player'), 0, 0, 10 ** 9))
-    elif act in ('propose', 'accept', 'decline', 'cancel', 'break'):
-        res = emp.diplomacy(game, player, act, _int(request.POST.get('team'), -1, -1, 99))
+    elif act in ('propose', 'accept', 'decline', 'cancel', 'break', 'war'):
+        res = emp.diplomacy(game, player, act, _int(request.POST.get('team'), -1, -1, 99), kind=request.POST.get('kind', 'ally'))
     else:
         res = {'error': 'bad_target'}
     return JsonResponse(res)
@@ -286,10 +286,13 @@ def _texts(lang):
         'move_hint': 'Столицу можно перенести в свой город: встаньте на него и нажмите кнопку.',
         'wait_capital': 'Сначала хан должен выбрать столицу.', 'pick_capital': 'Выберите клетку для столицы',
         'appoint_btn': 'Сделать ханом', 'changes_left': 'Смен хана осталось:', 'appointed': 'Новый хан назначен',
-        'diplomacy': 'Дипломатия', 'ally': 'союз', 'enemy': 'враг', 'truce_s': 'перемирие',
+        'diplomacy': 'Дипломатия', 'ally': 'союз', 'enemy': 'война', 'neutral': 'нейтралитет',
         'propose': 'Предложить союз', 'accept': 'Принять', 'decline': 'Отклонить', 'cancel_offer': 'Отменить',
         'break': 'Разорвать союз', 'offer_sent': 'предложение отправлено', 'offer_in': 'предлагает союз',
-        'truce': 'Перемирие: пока нельзя нападать на эту империю.', 'border': 'Напасть на чужую клетку можно только со своей земли.',
+        'war_btn': 'Объявить войну', 'peace_btn': 'Предложить мир', 'peace_in': 'предлагает мир',
+        'locked_hint': 'Изменить отношение можно через', 'locked': 'Отношение недавно менялось — подождите.',
+        'min_s': 'мин',
+        'neutral_err': 'С этой империей нейтралитет — нападать нельзя. Хан может объявить войну.', 'border': 'Напасть на чужую клетку можно только со своей земли.',
         'taken': 'Эта клетка уже недоступна.', 'notkhan': 'Это может сделать только хан.', 'has_capital': 'Столица уже есть.',
         'not_own': 'Встаньте на свою клетку.', 'need_city': 'Новую столицу можно построить только в своём городе.',
         'no_changes': 'Смены хана закончились.', 'bad_target': 'Не получилось.', 'already': 'Вы уже союзники.',

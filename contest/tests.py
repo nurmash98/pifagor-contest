@@ -4616,21 +4616,26 @@ class EmpireGameTests(TestCase):
         m = self._free_neighbour(island, p)
         self._set(*m, '.')
         self._own(*m, 1)
+        self.assertEqual(empire.move_rule(self.game, p, m[0], m[1], 1), {'error': 'neutral_err'})   # нейтральных не трогают
+        self.game.empire['rel'] = {'0-1': {'s': 'enemy', 'lock': None}}
+        self.game.save(update_fields=['empire'])
         rule = empire.move_rule(self.game, p, m[0], m[1], 1)
         self.assertEqual((rule['level'], rule['enemy']), (2, True))
         self.game.cells.filter(x=p.x, y=p.y).delete()                         # стоит не на своей клетке
         self.assertEqual(empire.move_rule(self.game, p, m[0], m[1], 1), {'error': 'border'})
 
-    def test_alliance_walk_break_and_truce(self):
+    def test_alliance_walk_break_and_lock(self):
+        from datetime import timedelta
         from . import empire
         island = self._run()
         self._capitals()
         k0, k1 = self._khan(0), self._khan(1)
+        self.assertEqual(empire.relation(self.game, 0, 1), 'neutral')                 # в начале все нейтральны
         sarbaz = self.game.players.filter(team=0).exclude(pk=k0.pk).first()
         self.assertEqual(empire.diplomacy(self.game, sarbaz, 'propose', 1), {'error': 'notkhan'})
         self.assertEqual(empire.diplomacy(self.game, k0, 'propose', 1), {'ok': True})
         self.game.refresh_from_db()
-        self.assertEqual(self.game.empire['offers'], [[0, 1]])
+        self.assertEqual(self.game.empire['offers'], [[0, 1, 'ally']])
         self.assertEqual(empire.diplomacy(self.game, k1, 'accept', 0), {'ok': True})
         self.game.refresh_from_db()
         self.assertEqual(empire.relation(self.game, 0, 1), 'ally')
@@ -4640,16 +4645,38 @@ class EmpireGameTests(TestCase):
         self._own(*n, 1)
         self.assertEqual(empire.move_rule(self.game, p, n[0], n[1], 1), {'walk': True})    # по земле союзника — свободно
         self.assertEqual(island.move(self.game, p, *n), {'moved': True})
-        self.assertEqual(empire.diplomacy(self.game, k1, 'break', 0), {'ok': True})
+        # 5 минут союз не разорвать
+        self.assertEqual(empire.diplomacy(self.game, k1, 'break', 0)['error'], 'locked')
+        later = timezone.now() + timedelta(seconds=empire.LOCK + 1)
+        self.assertEqual(empire.diplomacy(self.game, k1, 'break', 0, now=later), {'ok': True})
         self.game.refresh_from_db()
-        self.assertEqual(empire.relation(self.game, 0, 1), 'enemy')
-        self.assertGreater(empire.truce_left(self.game, 0, 1), 50)
+        self.assertEqual(empire.relation(self.game, 0, 1), 'neutral')                 # разрыв — нейтралитет, не война
         q = self.game.players.filter(team=0).exclude(pk=p.pk).first()
-        self.assertEqual(empire.move_rule(self.game, q, n[0], n[1], 1), {'error': 'truce'})
-        # стоявший на земле бывшего союзника — перенесён на свою землю и может ходить дальше
+        self.assertEqual(empire.move_rule(self.game, q, n[0], n[1], 1), {'error': 'neutral_err'})
+        # стоявший на земле бывшего союзника — перенесён на свою землю
         p.refresh_from_db()
         self.assertNotEqual((p.x, p.y), tuple(n))
         self.assertTrue(self.game.cells.filter(x=p.x, y=p.y, team=0).exists())
+
+    def test_war_by_khan_alone_and_peace_by_agreement(self):
+        from datetime import timedelta
+        from . import empire
+        self._run()
+        self._capitals()
+        k0, k1 = self._khan(0), self._khan(1)
+        self.assertEqual(empire.diplomacy(self.game, k0, 'war', 1), {'ok': True})       # войну хан объявляет сам
+        self.game.refresh_from_db()
+        self.assertEqual(empire.relation(self.game, 0, 1), 'enemy')
+        self.assertGreater(empire.lock_left(self.game, 0, 1), 290)
+        self.assertEqual(empire.diplomacy(self.game, k1, 'propose', 0, kind='peace')['error'], 'locked')
+        later = timezone.now() + timedelta(seconds=empire.LOCK + 1)
+        self.assertEqual(empire.diplomacy(self.game, k1, 'propose', 0, now=later, kind='peace'), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(empire.relation(self.game, 0, 1), 'enemy')                   # пока второй хан не согласился
+        self.assertEqual(empire.diplomacy(self.game, k0, 'accept', 1, now=later, kind='peace'), {'ok': True})
+        self.game.refresh_from_db()
+        self.assertEqual(empire.relation(self.game, 0, 1), 'neutral')
+        self.assertEqual(self.game.empire['offers'], [])
 
     def test_city_takes_seven_cells_but_not_allied(self):
         from . import empire
@@ -4667,7 +4694,7 @@ class EmpireGameTests(TestCase):
         self._own(*enemy_cell, 1)
         rule = empire.move_rule(self.game, p, n[0], n[1], None)
         self.assertEqual((rule['level'], rule['points'], rule['city']), (empire.CITY_LEVEL, 5, True))
-        self.game.empire['rel'] = {'0-1': {'s': 'ally', 'truce': None}}
+        self.game.empire['rel'] = {'0-1': {'s': 'ally', 'lock': None}, '0-2': {'s': 'enemy', 'lock': None}}
         self.game.save(update_fields=['empire'])
         self._own(*ally_cell, 1)
         self._own(*enemy_cell, 2)                                            # «чужая» команда 2 — враг

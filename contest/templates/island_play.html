@@ -66,7 +66,7 @@
         #emp select { background: #0b1220; color: #e5e7eb; border: 1px solid #374151; border-radius: 8px; padding: 5px; font-size: 12px; max-width: 150px; }
         #emp .dip { padding: 7px 8px; border-radius: 10px; background: #0f172a; margin-bottom: 6px; }
         #emp .st { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
-        #emp .st.ally { background: #14532d; color: #86efac; } #emp .st.enemy { background: #7f1d1d; color: #fecaca; } #emp .st.truce { background: #1e3a8a; color: #bfdbfe; }
+        #emp .st.ally { background: #14532d; color: #86efac; } #emp .st.enemy { background: #7f1d1d; color: #fecaca; } #emp .st.truce { background: #1e3a8a; color: #bfdbfe; } #emp .st.neutral { background: #374151; color: #e5e7eb; }
         #emp .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
         #emp .hint { font-size: 12px; color: #9ca3af; margin: 6px 0; line-height: 1.4; }
         @media (max-width: 800px) { #side { display: none; } #banner { right: 0; } }
@@ -97,7 +97,7 @@
             <span class="sw" style="background:#d8cfa8"></span><span>{% t "Город" %} — {% t "задача уровня C, ещё 6 клеток вокруг" %}</span><b>+5</b>
             <span class="sw" style="background:#e7e5e4"></span><span>{% t "Столица" %}</span><b>+5</b>
         </div>
-        <div class="muted" style="line-height:1.5">{% t "По своей и союзной земле можно ходить свободно. На врага нападают только со своей земли — задача сложнее." %}
+        <div class="muted" style="line-height:1.5">{% t "В начале все нейтральны. По своей и союзной земле можно ходить свободно. На нейтральных нападать нельзя — хан может объявить войну. На врага нападают только со своей земли — задача сложнее." %}
             {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
         {% else %}
         <div class="legend">
@@ -313,10 +313,10 @@
         lastRestarts = my.restarts || 0;
         // новые предложения союза — всплывающее уведомление
         (E.offers || []).forEach(function (o) {
-            var k = o[0] + '>' + o[1];
-            if (o[1] === me.team && !seenOffers[k]) { seenOffers[k] = true; toast('🤝 ' + tinfo(o[0]).name + ' ' + TXT.offer_in, 'good'); }
+            var k = o[0] + '>' + o[1] + o[2];
+            if (o[1] === me.team && !seenOffers[k]) { seenOffers[k] = true; toast((o[2] === 'peace' ? '🕊 ' : '🤝 ') + tinfo(o[0]).name + ' ' + (o[2] === 'peace' ? TXT.peace_in : TXT.offer_in), 'good'); }
         });
-        var sig = JSON.stringify([E, me.team, me.id, me.x, me.y, map.state.players.map(function (p) { return [p[0], p[3], p[4]]; }), Math.floor(Date.now() / 5000)]);
+        var sig = JSON.stringify([E, me.team, me.id, me.x, me.y, map.state.players.map(function (p) { return [p[0], p[3], p[4]]; }), Math.floor(Date.now() / 1000)]);
         if (sig === empSig) { return; }
         empSig = sig;
         var h = '<h4>' + TXT.empire + '</h4>';
@@ -338,19 +338,27 @@
         h += '<h4 style="margin-top:14px">' + TXT.diplomacy + '</h4>';
         teams.forEach(function (t) {
             if (t.i === me.team) { return; }
-            var r = (E.rel || []).filter(function (x) { return (x[0] === t.i && x[1] === me.team) || (x[1] === t.i && x[0] === me.team); })[0] || [0, 0, 'enemy', 0];
-            var inO = (E.offers || []).some(function (o) { return o[0] === t.i && o[1] === me.team; });
-            var outO = (E.offers || []).some(function (o) { return o[0] === me.team && o[1] === t.i; });
-            var st = r[2] === 'ally' ? '<span class="st ally">' + TXT.ally + '</span>' : r[3] > 0 ? '<span class="st truce">' + TXT.truce_s + ' ' + r[3] + ' ' + TXT.sec + '</span>' : '<span class="st enemy">' + TXT.enemy + '</span>';
-            h += '<div class="dip"><div style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:' + t.color + '"></span><b style="flex:1">' + esc(t.name) + '</b>' + st + '</div>';
-            if (inO) { h += '<div class="hint">🤝 ' + TXT.offer_in + '</div>'; }
+            var r = (E.rel || []).filter(function (x) { return (x[0] === t.i && x[1] === me.team) || (x[1] === t.i && x[0] === me.team); })[0] || [0, 0, 'neutral', 0];
+            var inO = (E.offers || []).filter(function (o) { return o[0] === t.i && o[1] === me.team; })[0];
+            var outO = (E.offers || []).filter(function (o) { return o[0] === me.team && o[1] === t.i; })[0];
+            var lock = r[3] > 0 ? ' <span class="st truce" title="' + TXT.locked_hint + '">🔒 ' + Math.floor(r[3] / 60) + ':' + ('0' + r[3] % 60).slice(-2) + '</span>' : '';
+            var st = '<span class="st ' + r[2] + '">' + (r[2] === 'ally' ? '🤝 ' + TXT.ally : r[2] === 'enemy' ? '⚔️ ' + TXT.enemy : '⚪ ' + TXT.neutral) + '</span>' + lock;
+            h += '<div class="dip"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="dot" style="background:' + t.color + '"></span><b style="flex:1">' + esc(t.name) + '</b>' + st + '</div>';
+            if (inO) { h += '<div class="hint">' + (inO[2] === 'peace' ? '🕊 ' + TXT.peace_in : '🤝 ' + TXT.offer_in) + '</div>'; }
             if (outO) { h += '<div class="hint">' + TXT.offer_sent + '</div>'; }
             if (isKhan) {
+                var kd = function (o) { return ' data-kind="' + (o ? o[2] : '') + '"'; };
                 h += '<div class="acts">';
-                if (r[2] === 'ally') { h += '<button class="sbtn warn" data-k="break" data-t="' + t.i + '">' + TXT.break + '</button>'; }
-                else if (inO) { h += '<button class="sbtn go" data-k="accept" data-t="' + t.i + '">' + TXT.accept + '</button><button class="sbtn" data-k="decline" data-t="' + t.i + '">' + TXT.decline + '</button>'; }
-                else if (outO) { h += '<button class="sbtn" data-k="cancel" data-t="' + t.i + '">' + TXT.cancel_offer + '</button>'; }
-                else { h += '<button class="sbtn go" data-k="propose" data-t="' + t.i + '">🤝 ' + TXT.propose + '</button>'; }
+                if (inO && !r[3]) { h += '<button class="sbtn go" data-k="accept" data-t="' + t.i + '"' + kd(inO) + '>' + TXT.accept + '</button><button class="sbtn" data-k="decline" data-t="' + t.i + '"' + kd(inO) + '>' + TXT.decline + '</button>'; }
+                else if (inO) { h += '<button class="sbtn" data-k="decline" data-t="' + t.i + '"' + kd(inO) + '>' + TXT.decline + '</button>'; }
+                if (outO) { h += '<button class="sbtn" data-k="cancel" data-t="' + t.i + '"' + kd(outO) + '>' + TXT.cancel_offer + '</button>'; }
+                if (r[3] > 0) { h += '<span class="hint">' + TXT.locked_hint + ' ' + Math.ceil(r[3] / 60) + ' ' + TXT.min_s + '</span>'; }
+                else if (r[2] === 'ally') { h += '<button class="sbtn warn" data-k="break" data-t="' + t.i + '">' + TXT.break + '</button>'; }
+                else if (r[2] === 'enemy') { if (!outO && !inO) { h += '<button class="sbtn go" data-k="propose" data-kind="peace" data-t="' + t.i + '">🕊 ' + TXT.peace_btn + '</button>'; } }
+                else {
+                    if (!outO && !inO) { h += '<button class="sbtn go" data-k="propose" data-kind="ally" data-t="' + t.i + '">🤝 ' + TXT.propose + '</button>'; }
+                    h += '<button class="sbtn warn" data-k="war" data-t="' + t.i + '">⚔️ ' + TXT.war_btn + '</button>';
+                }
                 h += '</div>';
             }
             h += '</div>';
@@ -361,6 +369,7 @@
         var b = e.target.closest('button[data-k]'); if (!b || !canPlay()) { return; }
         var k = b.getAttribute('data-k'), data = {action: k};
         if (b.getAttribute('data-t') !== null) { data.team = b.getAttribute('data-t'); }
+        if (b.getAttribute('data-kind')) { data.kind = b.getAttribute('data-kind'); }
         if (k === 'appoint') { data.player = $('emp-mate').value; }
         b.disabled = true;
         post(U.khan, data).then(function (d) {
@@ -443,7 +452,7 @@
             } else if (d.error === 'cooldown') { coolUntil = Date.now() + d.wait * 1000; }
             else if (d.error === 'kicked') { setKicked(); }
             else if (d.error === 'over') { closeModal(); poll(); }
-            else if (d.error === 'taken' || d.error === 'truce' || d.error === 'border' || d.error === 'wait_capital') { closeModal(); challenge = null; toast(TXT[d.error], 'bad'); poll(); }
+            else if (d.error === 'taken' || d.error === 'neutral_err' || d.error === 'border' || d.error === 'wait_capital') { closeModal(); challenge = null; toast(TXT[d.error], 'bad'); poll(); }
             else { $('m-msg').textContent = TXT[d.error] || TXT.unavailable; $('m-msg').className = 'bad'; $('m-go').disabled = false; }
         }).catch(function () { busy = false; $('m-go').disabled = false; $('m-go').textContent = TXT.check; $('m-msg').textContent = TXT.unavailable; $('m-msg').className = 'bad'; });
     }

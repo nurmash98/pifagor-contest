@@ -1,14 +1,22 @@
 # -*- coding: utf-8 -*-
 """Сложный вариант игры — «Империя» (как Civilization). Карта из шестиугольников, команды — империи
 из истории Казахстана. В каждой команде один хан 👑 (остальные — сарбазы): он строит столицу, назначает
-нового хана (не больше MAX_KHAN_CHANGES раз за игру) и решает с другими ханами — союз или война.
+нового хана (не больше MAX_KHAN_CHANGES раз за игру) и решает с другими ханами — союз, нейтралитет или война.
+
+Отношения (все решения — только через ханов):
+  • ⚪ нейтралитет — в начале у всех: по чужой земле ходить нельзя и нападать нельзя;
+  • ⚔️ война — хан объявляет сам; можно захватывать землю врага (только с края своей);
+  • 🤝 союз — хан предлагает, другой хан принимает: по земле друг друга ходят свободно;
+  • 🕊 мир (война → нейтралитет) — хан предлагает, другой хан принимает;
+  • разорвать союз хан может сам — становятся нейтральными, фишки с чужой земли уходят домой.
+После любой смены отношения LOCK секунд его нельзя менять (чтобы не меняли каждую минуту).
 
 Начало: хан выбирает одну из своих 7 клеток под столицу — пока столицы нет, команда не ходит;
 когда столица построена, вся команда встаёт в неё. Позже хан может перенести столицу в свой город.
 
 Правила захвата:
   • ничья клетка — задача, как в «Острове» (трава — «что выведет код», лес — программа уровня A);
-  • вражеская клетка — на уровень сложнее и только с края своей земли; во время перемирия — нельзя;
+  • вражеская клетка (только при войне) — на уровень сложнее и только с края своей земли;
   • по своей и союзной земле ходят свободно, союзную землю захватить нельзя;
   • город (особая клетка) — сложная задача уровня C: клетка и 6 клеток вокруг становятся вашими
     (кроме союзных клеток и чужих столиц);
@@ -27,7 +35,7 @@ CITY_PTS = 5
 CAPITAL_PTS = 5
 START_CELLS = 7
 MAX_KHAN_CHANGES = 3
-TRUCE = 60                      # секунд после разрыва союза нельзя нападать друг на друга
+LOCK = 300                      # секунд после смены отношения его нельзя менять снова
 CITY_LEVEL = 4                  # задача уровня C
 
 # (ключ, қазақша, по-русски) — государства на территории Казахстана
@@ -106,18 +114,25 @@ def _key(a, b):
 
 
 def relation(game, a, b):
+    """'self' | 'ally' | 'neutral' | 'enemy'. В начале игры все нейтральны."""
     if a == b:
         return 'self'
-    return (game.empire or {}).get('rel', {}).get(_key(a, b), {}).get('s', 'enemy')
+    s = (game.empire or {}).get('rel', {}).get(_key(a, b), {}).get('s', 'neutral')
+    return s if s in ('ally', 'neutral', 'enemy') else 'neutral'
 
 
-def truce_left(game, a, b, now=None):
+def lock_left(game, a, b, now=None):
+    """Сколько секунд ещё нельзя менять отношение a–b."""
     r = (game.empire or {}).get('rel', {}).get(_key(a, b), {})
-    if not r.get('truce'):
+    if not r.get('lock'):
         return 0
     from datetime import datetime
-    end = datetime.fromisoformat(r['truce'])
+    end = datetime.fromisoformat(r['lock'])
     return max(0, int((end - (now or timezone.now())).total_seconds()))
+
+
+def _offer_kind(o):
+    return o[2] if len(o) > 2 else 'ally'
 
 
 def setup(game, players, rng):
@@ -160,8 +175,8 @@ def move_rule(game, player, x, y, owner, now=None):
     if owner == player.team or (owner is not None and relation(game, owner, player.team) == 'ally'):
         return {'walk': True}
     if owner is not None:
-        if truce_left(game, owner, player.team, now):
-            return {'error': 'truce'}
+        if relation(game, owner, player.team) != 'enemy':
+            return {'error': 'neutral_err'}       # нейтральную империю трогать нельзя — сначала хан объявляет войну
         if _owner(game, player.x, player.y) != player.team:
             return {'error': 'border'}            # нападать можно только со своей земли
     kind = terrain(game, x, y)
@@ -195,8 +210,8 @@ def capture(game, player, ch):
                 if terrain(game, *n) == WATER or n in caps:
                     continue
                 c = cells.get(n)
-                if c is not None and c.team != player.team and relation(game, c.team, player.team) == 'ally':
-                    continue
+                if c is not None and c.team != player.team and relation(game, c.team, player.team) != 'enemy':
+                    continue                             # союзные и нейтральные клетки город не забирает
                 targets.append(n)
         gained = []
         for pos in targets:
@@ -361,9 +376,11 @@ def on_kicked(game, player):
         game.save(update_fields=['empire', 'version'])
 
 
-def diplomacy(game, player, action, other, now=None):
-    """Союзы ханов: propose → у другого хана «Принять / Отклонить»; break — союз разорван, TRUCE секунд перемирия."""
+def diplomacy(game, player, action, other, now=None, kind='ally'):
+    """Решения ханов. war — объявить войну (сам); propose/accept/decline/cancel — предложения союза (kind='ally')
+    или мира (kind='peace'); break — разорвать союз (сам). После смены отношения LOCK секунд его не изменить."""
     now = now or timezone.now()
+    kind = 'peace' if kind == 'peace' else 'ally'
     with transaction.atomic():
         game = _locked(game)
         if game.status != 'running':
@@ -374,34 +391,56 @@ def diplomacy(game, player, action, other, now=None):
             return {'error': 'notkhan'}
         if str(other) not in game.empire['teams'] or other == me:
             return {'error': 'bad_target'}
-        offers = [o for o in game.empire.get('offers', []) if o]
+        offers = [list(o) for o in game.empire.get('offers', []) if o]
         rel = game.empire.setdefault('rel', {})
         k = _key(me, other)
-        if action == 'propose':
-            if relation(game, me, other) == 'ally':
-                return {'error': 'already'}
-            if [other, me] in offers:                        # он уже предлагал — сразу союз
-                action = 'accept'
-            elif [me, other] not in offers:
-                offers.append([me, other])
-        if action == 'accept':
-            if [other, me] not in offers:
-                return {'error': 'no_offer'}
-            rel[k] = {'s': 'ally', 'truce': None}
-            offers = [o for o in offers if sorted(o) != sorted([me, other])]
-        elif action == 'decline':
-            offers = [o for o in offers if o != [other, me]]
-        elif action == 'cancel':
-            offers = [o for o in offers if o != [me, other]]
+        cur = relation(game, me, other)
+        need = 'neutral' if kind == 'ally' else 'enemy'       # союз — из нейтралитета, мир — из войны
+        changed = None
+
+        def has(a, b):
+            return any(o[0] == a and o[1] == b and _offer_kind(o) == kind for o in offers)
+
+        def drop_pair():
+            return [o for o in offers if sorted(o[:2]) != sorted([me, other])]
+
+        if action in ('war', 'break', 'propose', 'accept') and lock_left(game, me, other, now):
+            return {'error': 'locked', 'left': lock_left(game, me, other, now)}
+        if action == 'war':
+            if cur != 'neutral':
+                return {'error': 'bad_target'}
+            changed = 'enemy'
         elif action == 'break':
-            if relation(game, me, other) != 'ally':
+            if cur != 'ally':
                 return {'error': 'not_ally'}
-            rel[k] = {'s': 'enemy', 'truce': (now + timedelta(seconds=TRUCE)).isoformat()}
-            _send_home(game, me, other)
-            _send_home(game, other, me)
+            changed = 'neutral'
+        elif action == 'propose':
+            if cur != need:
+                return {'error': 'already' if cur == 'ally' else 'bad_target'}
+            if has(other, me):                                 # он уже предлагал то же — сразу согласие
+                changed = 'ally' if kind == 'ally' else 'neutral'
+            elif not has(me, other):
+                offers = [o for o in offers if not (o[0] == me and o[1] == other)]
+                offers.append([me, other, kind])
+        elif action == 'accept':
+            if not has(other, me) or cur != need:
+                return {'error': 'no_offer'}
+            changed = 'ally' if kind == 'ally' else 'neutral'
+        elif action == 'decline':
+            offers = [o for o in offers if not (o[0] == other and o[1] == me)]
+        elif action == 'cancel':
+            offers = [o for o in offers if not (o[0] == me and o[1] == other)]
+        else:
+            return {'error': 'bad_target'}
+        if changed:
+            rel[k] = {'s': changed, 'lock': (now + timedelta(seconds=LOCK)).isoformat()}
+            offers = drop_pair()
         game.empire['offers'] = offers
         game.version += 1
         game.save(update_fields=['empire', 'version'])
+        if changed and cur == 'ally':
+            _send_home(game, me, other)
+            _send_home(game, other, me)
     return {'ok': True}
 
 
@@ -418,5 +457,6 @@ def public(game, players, lang='ru', now=None):
     ids = sorted(int(t) for t in teams)
     for i, a in enumerate(ids):
         for b in ids[i + 1:]:
-            rel.append([a, b, relation(game, a, b), truce_left(game, a, b, now)])
-    return {'teams': teams, 'rel': rel, 'offers': meta.get('offers', []), 'max_changes': MAX_KHAN_CHANGES}
+            rel.append([a, b, relation(game, a, b), lock_left(game, a, b, now)])
+    offers = [[o[0], o[1], _offer_kind(o)] for o in meta.get('offers', []) if o]
+    return {'teams': teams, 'rel': rel, 'offers': offers, 'max_changes': MAX_KHAN_CHANGES, 'lock': LOCK}

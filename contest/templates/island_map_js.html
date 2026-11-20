@@ -38,7 +38,7 @@ function IslandMap(canvas, opt) {
     }
     function relation(a, b) {
         if (a === b) { return 'self'; }
-        var e = S.empire, out = 'enemy';
+        var e = S.empire, out = 'neutral';
         if (e) { e.rel.forEach(function (r) { if ((r[0] === a && r[1] === b) || (r[0] === b && r[1] === a)) { out = r[2]; } }); }
         return out;
     }
@@ -218,7 +218,10 @@ function IslandMap(canvas, opt) {
     }
     function neighbours() {
         if (!S.me || S.me.kicked) { return []; }
-        return nbs(S.me.x, S.me.y).filter(function (c) { return land(c[0], c[1]); });
+        return nbs(S.me.x, S.me.y).filter(function (c) {   // в «Империи» на нейтральную землю шагнуть нельзя
+            var o = S.cells[c[0] + ',' + c[1]];
+            return land(c[0], c[1]) && !(S.empire && o !== undefined && o !== S.me.team && relation(o, S.me.team) === 'neutral');
+        });
     }
     function draw() {
         if (!S.map) { return; }

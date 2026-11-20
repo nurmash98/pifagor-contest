@@ -161,10 +161,10 @@
                 (MODE === 'teams' ? ' <span class="muted2">· ' + r.t.size + '</span>' : '') + khan + '</span><span class="pt">' + r.s + '</span></div>'; }).join('');
         if (!E) { $('dip').innerHTML = ''; return; }
         var tm = {}; d.teams.forEach(function (t) { tm[t.i] = t; });
-        var allies = E.rel.filter(function (r) { return r[2] === 'ally'; });
-        $('dip').innerHTML = '<h4 style="margin-top:14px">Союзы</h4>' + (allies.length ? allies.map(function (r) {
-            return '<div class="row2" style="font-size:12px">🤝 ' + esc((tm[r[0]] || {}).name) + ' + ' + esc((tm[r[1]] || {}).name) + '</div>'; }).join('')
-            : '<div class="muted2 small">Пока все воюют друг с другом.</div>');
+        var shown = E.rel.filter(function (r) { return r[2] === 'ally' || r[2] === 'enemy'; });
+        $('dip').innerHTML = '<h4 style="margin-top:14px">Союзы и войны</h4>' + (shown.length ? shown.map(function (r) {
+            return '<div class="row2" style="font-size:12px">' + (r[2] === 'ally' ? '🤝 ' : '⚔️ ') + esc((tm[r[0]] || {}).name) + (r[2] === 'ally' ? ' + ' : ' vs ') + esc((tm[r[1]] || {}).name) + '</div>'; }).join('')
+            : '<div class="muted2 small">Пока все нейтральны.</div>');
     }
     function players(d) {
         var tm = {}; d.teams.forEach(function (t) { tm[t.i] = t; });
