@@ -18,6 +18,9 @@ def make_task(title, level, tag, ok=True):
     return task
 
 
+from .templatetags.ui_i18n import UI_TRANSLATIONS
+
+
 class RetakeTestBase(TestCase):
     def setUp(self):
         cache.clear()
@@ -3982,6 +3985,25 @@ class IslandGameTests(TestCase):
         island.shuffle_teams(self.game, random.Random(1))
         self.game = island.start(self.game, random.Random(2))
         return island
+
+    def test_switch_language_in_game_without_reload(self):
+        self._run()
+        st = self.sts[0]
+        self.client.force_login(st.user)
+        html = self.client.get(reverse('island_play', args=[self.game.id])).content.decode()
+        self.assertIn('data-l="kk"', html)
+        self.assertIn('data-tr="Очки"', html)
+        p = self.game.players.get(student=st)
+        exits = p.exits
+        r = self.client.post(reverse('island_lang', args=[self.game.id]), {'lang': 'kk', 'keys': '["Очки", "Выходы"]'}).json()
+        self.assertTrue(r['ok'])
+        self.assertEqual(r['tr']['Выходы'], UI_TRANSLATIONS.get('Выходы', 'Выходы'))
+        self.assertEqual(r['txt']['started'], UI_TRANSLATIONS['Игра началась!'])
+        self.assertEqual(self.client.session['content_lang'], 'kk')
+        p.refresh_from_db()
+        self.assertEqual(p.exits, exits)                                     # смена языка — не выход из игры
+        r = self.client.post(reverse('island_lang', args=[self.game.id]), {'lang': 'ru', 'keys': '["Очки"]'}).json()
+        self.assertEqual(r['tr'], {'Очки': 'Очки'})
 
     def _neutral_neighbour(self, island, p, kind):
         owned = {(c.x, c.y) for c in self.game.cells.all()}

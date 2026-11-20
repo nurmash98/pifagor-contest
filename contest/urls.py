@@ -150,6 +150,7 @@ urlpatterns = [
     path('teacher/games/island/<int:game_id>/action/', island_views.control_action, name='island_control_action'),
     path('games/island/<int:game_id>/', island_views.play, name='island_play'),
     path('games/island/<int:game_id>/state/', island_views.play_state, name='island_state'),
+    path('games/island/<int:game_id>/lang/', island_views.play_lang, name='island_lang'),
     path('games/island/<int:game_id>/arm/', island_views.play_arm, name='island_arm'),
     path('games/island/<int:game_id>/exit/', island_views.play_exit, name='island_exit'),
     path('games/island/<int:game_id>/move/', island_views.play_move, name='island_move'),

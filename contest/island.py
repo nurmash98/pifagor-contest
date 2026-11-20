@@ -447,7 +447,7 @@ def public_challenge(player, lang='ru'):
             return None
         out.update(title=task.get_display_title(lang), text=task.get_display_description(lang),
                    input=task.get_display_input_example(lang).replace('\\n', '\n'),
-                   output=task.get_display_output_example(lang).replace('\\n', '\n'), level=task.level)
+                   output=task.get_display_output_example(lang).replace('\\n', '\n'), level=task.level, task=task.id)
     return out
 
 

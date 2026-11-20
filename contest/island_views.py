@@ -257,6 +257,27 @@ def play_khan(request, game_id):
     return JsonResponse(res)
 
 
+@login_required
+@require_POST
+def play_lang(request, game_id):
+    """Переключить язык прямо в игре (RU/KZ) — без перезагрузки страницы, иначе это считалось бы выходом."""
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    st, game, player = _player_game(request, game_id)
+    if player is None:
+        raise Http404
+    lang = request.POST.get('lang')
+    if lang not in ('ru', 'kk'):
+        return JsonResponse({'ok': False})
+    request.session['content_lang'] = lang
+    try:
+        keys = [k for k in json.loads(request.POST.get('keys') or '[]') if isinstance(k, str)][:300]
+    except ValueError:
+        keys = []
+    tr = {k: (UI_TRANSLATIONS.get(k, k) if lang == 'kk' else k) for k in keys}
+    return JsonResponse({'ok': True, 'txt': _texts(lang), 'tr': tr,
+                         'challenge': island.public_challenge(player, lang) if player.challenge else None})
+
+
 def _texts(lang):
     """Надписи игры для JS — на языке ученика."""
     from .templatetags.ui_i18n import UI_TRANSLATIONS
@@ -286,6 +307,7 @@ def _texts(lang):
         'move_hint': 'Столицу можно перенести в свой город: встаньте на него и нажмите кнопку.',
         'wait_capital': 'Сначала хан должен выбрать столицу.', 'pick_capital': 'Выберите клетку для столицы',
         'appoint_btn': 'Сделать ханом', 'changes_left': 'Смен хана осталось:', 'appointed': 'Новый хан назначен',
+        'started': 'Игра началась!',
         'diplomacy': 'Дипломатия', 'ally': 'союз', 'enemy': 'война', 'neutral': 'нейтралитет',
         'propose': 'Предложить союз', 'accept': 'Принять', 'decline': 'Отклонить', 'cancel_offer': 'Отменить',
         'break': 'Разорвать союз', 'offer_sent': 'предложение отправлено', 'offer_in': 'предлагает союз',

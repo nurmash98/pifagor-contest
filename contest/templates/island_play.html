@@ -11,6 +11,9 @@
         button { font-family: inherit; }
         #bar { height: 52px; display: flex; align-items: center; gap: 14px; padding: 0 14px; background: #111827; border-bottom: 1px solid #1f2937; font-size: 14px; }
         #bar .ttl { font-weight: 800; white-space: nowrap; }
+        #lang { position: relative; z-index: 25; }   /* видно и поверх заставок (вход в полный экран, лобби, итоги) */
+        #lang button { border: 0; background: transparent; color: #cbd5e1; font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+        #lang button.on { background: #fbbf24; color: #111827; } #lang button:disabled { opacity: .6; cursor: wait; }
         .chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: #1f2937; font-weight: 700; white-space: nowrap; }
         .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid #fff; }
         #timer { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 800; }
@@ -74,67 +77,68 @@
 </head>
 <body>
 <div id="bar">
-    <span class="ttl">{% if game.variant == 'empire' %}👑 {% t "Империя" %}{% else %}🏝️ {% t "Битва за остров" %}{% endif %}</span>
+    <span class="ttl">{% if game.variant == 'empire' %}👑 <span data-tr="Империя">{% t "Империя" %}</span>{% else %}🏝️ <span data-tr="Битва за остров">{% t "Битва за остров" %}</span>{% endif %}</span>
     <span class="chip" id="my-team" style="display:none"><span class="dot" id="my-dot"></span><span id="my-name"></span> · <span id="my-score">0</span></span>
     <span class="chip" id="cool" style="display:none">⏳ <span id="cool-n">0</span></span>
     <span class="sp"></span>
-    <span class="chip">{% t "Выходы" %}: <span id="exits">{{ player.exits }}</span>/{{ max_exits }}</span>
+    <span class="chip"><span data-tr="Выходы">{% t "Выходы" %}</span>: <span id="exits">{{ player.exits }}</span>/{{ max_exits }}</span>
     <span class="chip">⏱ <span id="timer">--:--</span></span>
-    <button class="btn ghost" id="center" type="button">◎ {% t "К моей точке" %}</button>
+    <span id="lang" class="chip" style="padding:3px"><button type="button" data-l="ru" class="{% if content_lang != 'kk' %}on{% endif %}">RU</button><button type="button" data-l="kk" class="{% if content_lang == 'kk' %}on{% endif %}">KZ</button></span>
+    <button class="btn ghost" id="center" type="button">◎ <span data-tr="К моей точке">{% t "К моей точке" %}</span></button>
 </div>
 <div id="banner"></div>
 <div id="wrap">
     <canvas id="map"></canvas>
     <aside id="side">
         <div id="emp" style="display:none;margin-bottom:14px"></div>
-        <h4>{% t "Очки" %}</h4>
+        <h4><span data-tr="Очки">{% t "Очки" %}</span></h4>
         <div id="board"></div>
-        <h4 style="margin-top:16px">{% t "Клетки" %}</h4>
+        <h4 style="margin-top:16px"><span data-tr="Клетки">{% t "Клетки" %}</span></h4>
         {% if game.variant == 'empire' %}
         <div class="legend">
-            <span class="sw" style="background:#a5d458"></span><span>{% t "Трава" %} — {% t "что выведет код" %}</span><b>+1</b>
-            <span class="sw" style="background:#4c9a2c"></span><span>{% t "Лес" %} — {% t "написать программу" %}</span><b>+1</b>
-            <span class="sw" style="background:#d8cfa8"></span><span>{% t "Город" %} — {% t "задача уровня C, ещё 6 клеток вокруг" %}</span><b>+5</b>
-            <span class="sw" style="background:#e7e5e4"></span><span>{% t "Столица" %}</span><b>+5</b>
+            <span class="sw" style="background:#a5d458"></span><span><span data-tr="Трава">{% t "Трава" %}</span> — <span data-tr="что выведет код">{% t "что выведет код" %}</span></span><b>+1</b>
+            <span class="sw" style="background:#4c9a2c"></span><span><span data-tr="Лес">{% t "Лес" %}</span> — <span data-tr="написать программу">{% t "написать программу" %}</span></span><b>+1</b>
+            <span class="sw" style="background:#d8cfa8"></span><span><span data-tr="Город">{% t "Город" %}</span> — <span data-tr="задача уровня C, ещё 6 клеток вокруг">{% t "задача уровня C, ещё 6 клеток вокруг" %}</span></span><b>+5</b>
+            <span class="sw" style="background:#e7e5e4"></span><span><span data-tr="Столица">{% t "Столица" %}</span></span><b>+5</b>
         </div>
-        <div class="muted" style="line-height:1.5">{% t "В начале все нейтральны. По своей и союзной земле можно ходить свободно. На нейтральных нападать нельзя — хан может объявить войну. На врага нападают только со своей земли — задача сложнее." %}
-            {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
+        <div class="muted" style="line-height:1.5"><span data-tr="В начале все нейтральны. По своей и союзной земле можно ходить свободно. На нейтральных нападать нельзя — хан может объявить войну. На врага нападают только со своей земли — задача сложнее.">{% t "В начале все нейтральны. По своей и союзной земле можно ходить свободно. На нейтральных нападать нельзя — хан может объявить войну. На врага нападают только со своей земли — задача сложнее." %}</span>
+            <span data-tr="Неверный ответ — пауза">{% t "Неверный ответ — пауза" %}</span> {{ cooldown }} <span data-tr="сек">{% t "сек" %}</span>.</div>
         {% else %}
         <div class="legend">
-            <span class="sw" style="background:#a5d458"></span><span>{% t "Трава" %} — {% t "что выведет код" %}</span><b>+1</b>
-            <span class="sw" style="background:#4c9a2c"></span><span>{% t "Лес" %} — {% t "написать программу" %}</span><b>+2</b>
-            <span class="sw" style="background:#b5afa8"></span><span>{% t "Крепость" %} — {% t "задача сложнее" %}</span><b>+3</b>
+            <span class="sw" style="background:#a5d458"></span><span><span data-tr="Трава">{% t "Трава" %}</span> — <span data-tr="что выведет код">{% t "что выведет код" %}</span></span><b>+1</b>
+            <span class="sw" style="background:#4c9a2c"></span><span><span data-tr="Лес">{% t "Лес" %}</span> — <span data-tr="написать программу">{% t "написать программу" %}</span></span><b>+2</b>
+            <span class="sw" style="background:#b5afa8"></span><span><span data-tr="Крепость">{% t "Крепость" %}</span> — <span data-tr="задача сложнее">{% t "задача сложнее" %}</span></span><b>+3</b>
         </div>
-        <div class="muted" style="line-height:1.5">{% t "Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей." %}
-            {% t "По своим клеткам можно ходить свободно. Чужую клетку можно отбить, но задача будет сложнее." %}
-            {% t "Неверный ответ — пауза" %} {{ cooldown }} {% t "сек" %}.</div>
+        <div class="muted" style="line-height:1.5"><span data-tr="Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей.">{% t "Нажмите на соседнюю клетку (или стрелки), решите задачу — клетка станет вашей." %}</span>
+            <span data-tr="По своим клеткам можно ходить свободно. Чужую клетку можно отбить, но задача будет сложнее.">{% t "По своим клеткам можно ходить свободно. Чужую клетку можно отбить, но задача будет сложнее." %}</span>
+            <span data-tr="Неверный ответ — пауза">{% t "Неверный ответ — пауза" %}</span> {{ cooldown }} <span data-tr="сек">{% t "сек" %}</span>.</div>
         {% endif %}
     </aside>
 </div>
 
 <div class="over" id="lobby"><div class="box">
     <div style="font-size:56px">{% if game.variant == 'empire' %}👑{% else %}🏝️{% endif %}</div>
-    <h2>{% if game.variant == 'empire' %}{% t "Империя" %}{% else %}{% t "Битва за остров" %}{% endif %}</h2>
-    <p class="muted">{% t "Ждём, пока учитель начнёт игру" %}… {% t "В игре" %}: <b id="lobby-n">0</b></p>
+    <h2>{% if game.variant == 'empire' %}<span data-tr="Империя">{% t "Империя" %}</span>{% else %}<span data-tr="Битва за остров">{% t "Битва за остров" %}</span>{% endif %}</h2>
+    <p class="muted"><span data-tr="Ждём, пока учитель начнёт игру">{% t "Ждём, пока учитель начнёт игру" %}</span>… <span data-tr="В игре">{% t "В игре" %}</span>: <b id="lobby-n">0</b></p>
     <div class="names" id="lobby-names"></div>
-    <p class="muted" style="margin-top:18px;font-size:13px">{% t "Игра идёт в полноэкранном режиме." %} {{ max_exits }} {% t "выхода из него — и вы выбиты из игры." %}</p>
+    <p class="muted" style="margin-top:18px;font-size:13px"><span data-tr="Игра идёт в полноэкранном режиме.">{% t "Игра идёт в полноэкранном режиме." %}</span> {{ max_exits }} <span data-tr="выхода из него — и вы выбиты из игры.">{% t "выхода из него — и вы выбиты из игры." %}</span></p>
 </div></div>
 
 <div class="over" id="gate"><div class="box">
     <div style="font-size:52px" id="gate-icon">🖥</div>
-    <h2 id="gate-title">{% t "Игра началась!" %}</h2>
-    <p id="gate-text" class="muted">{% t "Игра идёт только в полноэкранном режиме. Любой выход — Esc, другое окно, другая вкладка, обновление страницы — считается." %}</p>
+    <h2 id="gate-title"><span data-tr="Игра началась!">{% t "Игра началась!" %}</span></h2>
+    <p id="gate-text" class="muted"><span data-tr="Игра идёт только в полноэкранном режиме. Любой выход — Esc, другое окно, другая вкладка, обновление страницы — считается.">{% t "Игра идёт только в полноэкранном режиме. Любой выход — Esc, другое окно, другая вкладка, обновление страницы — считается." %}</span></p>
     <p class="warn" id="gate-warn"></p>
-    <button class="btn big" id="fs-btn" type="button">{% t "Начать в полноэкранном режиме" %}</button>
+    <button class="btn big" id="fs-btn" type="button"><span data-tr="Начать в полноэкранном режиме">{% t "Начать в полноэкранном режиме" %}</span></button>
 </div></div>
 
 <div class="over" id="final"><div class="box">
     <div style="font-size:56px">🏆</div>
-    <h2>{% t "Игра окончена" %}</h2>
+    <h2><span data-tr="Игра окончена">{% t "Игра окончена" %}</span></h2>
     <p id="final-me" style="font-size:18px;font-weight:700"></p>
     <p id="final-mvp" style="display:none;margin:10px 0 14px;padding:10px 14px;border-radius:14px;background:#422006;border:1px solid #f59e0b;color:#fde68a;font-weight:700"></p>
     <table class="res" id="final-table"></table>
-    <p style="margin-top:20px"><a class="btn big" style="text-decoration:none;display:inline-block" href="{% url 'codegames' %}">{% t "К играм" %}</a></p>
+    <p style="margin-top:20px"><a class="btn big" style="text-decoration:none;display:inline-block" href="{% url 'codegames' %}"><span data-tr="К играм">{% t "К играм" %}</span></a></p>
 </div></div>
 
 <div id="modal"><div class="card">
@@ -142,18 +146,18 @@
     <div class="muted" id="m-sub" style="margin-bottom:10px"></div>
     <div id="m-output">
         <pre id="m-code"></pre>
-        <label class="muted" for="m-ans" style="display:block;margin:10px 0 4px;font-weight:700">{% t "Ответ" %}</label>
+        <label class="muted" for="m-ans" style="display:block;margin:10px 0 4px;font-weight:700"><span data-tr="Ответ">{% t "Ответ" %}</span></label>
         <textarea id="m-ans" rows="2" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
     </div>
     <div id="m-task" style="display:none">
         <div id="m-text"></div>
-        <div class="ex"><div><b>{% t "Пример ввода" %}</b><span id="m-in"></span></div><div><b>{% t "Пример вывода" %}</b><span id="m-out"></span></div></div>
+        <div class="ex"><div><b><span data-tr="Пример ввода">{% t "Пример ввода" %}</span></b><span id="m-in"></span></div><div><b><span data-tr="Пример вывода">{% t "Пример вывода" %}</span></b><span id="m-out"></span></div></div>
         <textarea id="ch-code" class="code-editor" data-norun data-height="260" spellcheck="false" style="width:100%;min-height:240px;background:#272822;color:#f8f8f2;border-radius:12px;padding:10px;font:14px monospace"></textarea>
     </div>
     <div id="m-msg"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button class="btn ghost" id="m-cancel" type="button">{% t "Отмена" %}</button>
-        <button class="btn" id="m-go" type="button">{% t "Проверить" %}</button>
+        <button class="btn ghost" id="m-cancel" type="button"><span data-tr="Отмена">{% t "Отмена" %}</span></button>
+        <button class="btn" id="m-go" type="button"><span data-tr="Проверить">{% t "Проверить" %}</span></button>
     </div>
 </div></div>
 <div id="toast"></div>
@@ -165,7 +169,7 @@
 (function () {
     var TXT = {{ i18n|safe }}, MAX_EXITS = {{ max_exits }};
     var U = {state: '{% url "island_state" game.id %}', arm: '{% url "island_arm" game.id %}', exit: '{% url "island_exit" game.id %}',
-             move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}', khan: '{% url "island_khan" game.id %}'};
+             move: '{% url "island_move" game.id %}', answer: '{% url "island_answer" game.id %}', khan: '{% url "island_khan" game.id %}', lang: '{% url "island_lang" game.id %}'};
     var EMPIRE = '{{ game.variant }}' === 'empire', empSig = '', seenOffers = {}, lastRestarts = null;
     var csrf = document.querySelector('#csrf input').value, $ = function (id) { return document.getElementById(id); };
     var ver = 0, status = '{{ game.status }}', left = 0, me = null, teams = [], scores = {}, kicked = {{ player.kicked|yesno:"true,false" }};
@@ -197,7 +201,7 @@
         if (!needFs()) { $('gate').style.display = 'none'; return; }
         if (!canFs) { showGate('🖥', TXT.no_fs, '', ''); $('fs-btn').style.display = 'none'; return; }
         if (fs === 'in' && inFs()) { $('gate').style.display = 'none'; return; }
-        if (fs !== 'out') { showGate('🖥', '{% t "Игра началась!" %}', '', TXT.start_fs); }
+        if (fs !== 'out') { showGate('🖥', TXT.started, '', TXT.start_fs); }
     }
     function onFs() {
         if (inFs()) {
@@ -426,7 +430,7 @@
         if (code) {
             $('m-text').textContent = ch.text; $('m-in').textContent = ch.input; $('m-out').textContent = ch.output;
             var cm = editor();
-            if (cm) { if (cm._cell !== ch.x + ',' + ch.y + ',' + ch.title) { cm.setValue(''); cm._cell = ch.x + ',' + ch.y + ',' + ch.title; } setTimeout(function () { cm.refresh(); cm.focus(); }, 30); }
+            if (cm) { if (cm._cell !== ch.x + ',' + ch.y + ',' + (ch.task || ch.title)) { cm.setValue(''); cm._cell = ch.x + ',' + ch.y + ',' + (ch.task || ch.title); } setTimeout(function () { cm.refresh(); cm.focus(); }, 30); }
             else { $('ch-code').focus(); }
         } else { $('m-code').textContent = ch.code; $('m-ans').value = ''; setTimeout(function () { $('m-ans').focus(); }, 30); }
         $('m-go').textContent = TXT.check; $('m-go').disabled = false;
@@ -457,6 +461,27 @@
         }).catch(function () { busy = false; $('m-go').disabled = false; $('m-go').textContent = TXT.check; $('m-msg').textContent = TXT.unavailable; $('m-msg').className = 'bad'; });
     }
     $('m-go').addEventListener('click', send);
+
+    // ---------- язык RU/KZ — без перезагрузки (перезагрузка считалась бы выходом из игры) ----------
+    document.querySelectorAll('#lang button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var l = b.getAttribute('data-l');
+            if (b.classList.contains('on')) { return; }
+            var keys = []; document.querySelectorAll('[data-tr]').forEach(function (el) { keys.push(el.getAttribute('data-tr')); });
+            document.querySelectorAll('#lang button').forEach(function (x) { x.disabled = true; });
+            post(U.lang, {lang: l, keys: JSON.stringify(keys)}).then(function (d) {
+                document.querySelectorAll('#lang button').forEach(function (x) { x.disabled = false; x.classList.toggle('on', x.getAttribute('data-l') === l); });
+                if (!d.ok) { return; }
+                TXT = d.txt; document.documentElement.lang = l;
+                document.querySelectorAll('[data-tr]').forEach(function (el) { var k = el.getAttribute('data-tr'); if (d.tr[k] !== undefined) { el.textContent = d.tr[k]; } });
+                if (d.challenge && challenge && d.challenge.x === challenge.x && d.challenge.y === challenge.y) {
+                    challenge = d.challenge;
+                    if ($('modal').style.display === 'flex') { var keep = busy; openModal(); busy = keep; }
+                }
+                empSig = ''; ver = 0; poll();                 // названия империй и панель — на новом языке
+            }).catch(function () { document.querySelectorAll('#lang button').forEach(function (x) { x.disabled = false; }); });
+        });
+    });
     $('m-cancel').addEventListener('click', closeModal);
     $('m-ans').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
     $('center').addEventListener('click', function () { map.centerOnMe(); });
