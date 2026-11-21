@@ -143,8 +143,11 @@ def challenge_promo(request):
 def room_open(request):
     """Полоса «Учитель открыл коворкинг» — ученикам класса, пока зал открыт (кеш 30 сек, без лишних запросов)."""
     user = getattr(request, 'user', None)
-    if user is None or not user.is_authenticated or user.is_staff:
+    if user is None or not user.is_authenticated:
         return {'room_open': None, 'office_open': False}
+    if user.is_staff:
+        from . import office
+        return {'room_open': None, 'office_open': False, 'office_live': office.is_open()}
     m = getattr(request, 'resolver_match', None)
     if m and m.url_name and m.url_name.startswith('room_'):
         return {'room_open': None, 'office_open': False}

@@ -29,6 +29,10 @@
                 <div class="gicon">{{ c.icon }}</div>
                 <h5 class="fw-bold mb-1" style="color:#1a1a4b;">{{ c.title }}</h5>
                 <p class="small text-muted mb-3">{{ c.about }}</p>
+                {% if c.key == 'office' %}
+                <div class="d-flex gap-4 mb-2"><div class="gstat"><b>{{ c.active }}</b><br>в офисе сейчас</div></div>
+                <div class="mt-auto pt-2">{% if c.classes %}<span class="badge bg-success">открыт сейчас — войти</span>{% else %}<span class="small text-muted">Откроется в субботу в 9:00 (сб/вс 9:00–20:00)</span>{% endif %}</div>
+                {% else %}
                 <div class="d-flex gap-4 mb-2">
                     <div class="gstat"><b>{{ c.active }}</b><br>открыто</div>
                     <div class="gstat"><b>{{ c.total }}</b><br>всего игр</div>
@@ -37,6 +41,7 @@
                 <div class="mt-auto pt-2">
                     {% for cl in c.classes %}<span class="badge bg-primary-subtle text-primary-emphasis me-1">{{ cl }}</span>{% empty %}<span class="small text-muted">Пока никому не открыта</span>{% endfor %}
                 </div>
+                {% endif %}
             </div>
         </a>
     </div>

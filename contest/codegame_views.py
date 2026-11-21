@@ -45,6 +45,8 @@ GAME_TYPES = [
      'about': 'Обезвредить бомбу: ученик читает код и вводит, что он выведет, или перерезает провод с верным выводом.'},
     {'key': 'island', 'icon': '🏝️', 'title': 'Битва за остров', 'url': 'island_manage',
      'about': 'Весь класс на одной карте: команды захватывают клетки, решая задачи. 40 минут, полноэкранный режим.'},
+    {'key': 'office', 'icon': '🏢', 'title': 'Офис выходного дня', 'url': 'office_play',
+     'about': 'Сб/вс 9:00–20:00, без учителя: ученики решают любые задачи в кабинетах своих параллелей, монеты x2, в 20:00 топ-3 каждой параллели — по 20 монет. Учителя сидят в «Администрации».'},
     {'key': 'room', 'icon': '🏢', 'title': 'Компания «Пифагор»', 'url': 'room_manage',
      'about': '3D-офис на урок: вы — руководитель, ученики — сотрудники. Подходят к вашему столу, получают задания по порядку и зарабатывают зарплату: A — 10 000 ₸, B — 20 000 ₸, C — 30 000 ₸.'},
 ]
@@ -103,6 +105,14 @@ def games_hub(request):
     from .models import IslandGame, IslandPlayer
     islands = list(IslandGame.objects.all() if request.user.is_superuser else IslandGame.objects.filter(owner=request.user))
     for t in GAME_TYPES:
+        if t['key'] == 'office':
+            from . import office as of
+            from .room import people
+            from django.utils import timezone as tz
+            live = of.is_open()
+            cards.append(dict(t, total=0, active=len(people(of.rid(tz.localdate()))) if live else 0,
+                              classes=['открыт сейчас'] if live else [], runs=0))
+            continue
         if t['key'] == 'room':
             from .models import StudyRoom
             rooms = list(StudyRoom.objects.all() if request.user.is_superuser else StudyRoom.objects.filter(owner=request.user))

@@ -5329,6 +5329,8 @@ class WeekendOfficeTests(TestCase):
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': 'adm-0'}).json()['error'], 'admin_only')
             teacher = User.objects.create_user('of_t', password='p', is_staff=True)
             self.client.force_login(teacher)
+            self.assertContains(self.client.get(reverse('teacher_dashboard')), reverse('office_play'))
+            self.assertContains(self.client.get(reverse('games_hub')), reverse('office_play'))
             self.assertContains(self.client.get(reverse('office_play')), '"adm-0"')
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': 'adm-1'}).json(), {'ok': True})
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '8-1'}).json()['error'], 'other_grade')
