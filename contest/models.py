@@ -661,6 +661,25 @@ class OfficeDay(models.Model):
         ordering = ['-day']
 
 
+class OfficePackage(models.Model):
+    """Задание руководителя кабинета в офисе выходного дня: 3 нерешённые задачи по выбранной теме
+    на уровне, где ученик остановился. Решил все три — премия (bonus) к зарплате дня."""
+    day = models.DateField()
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='office_packages')
+    grade = models.CharField(max_length=4, blank=True)
+    tag_name = models.CharField(max_length=100, blank=True)
+    level = models.CharField(max_length=1, blank=True)
+    tasks = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    done_at = models.DateTimeField(null=True, blank=True)
+    bonus = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Задание руководителя (офис)"
+        verbose_name_plural = "Задания руководителя (офис)"
+        ordering = ['-created_at']
+
+
 class OfficeSolve(models.Model):
     """Задача, впервые решённая на 10/10 в офисе выходного дня: двойные монеты и «зарплата» в тенге."""
     day = models.DateField()

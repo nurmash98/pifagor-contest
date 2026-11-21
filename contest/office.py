@@ -62,7 +62,7 @@ def layout(grade_list):
     per_row = math.ceil(n / 2)
     W = 1 + per_row * COL + 6                       # +6 — лаунж в конце коридора
     H = 19
-    objs, seats, block = [], [], set()
+    objs, seats, block, managers = [], [], set(), []
 
     def put(kind, x, y, w=1, d=1, solid=True, **kw):
         objs.append(dict(kw, t=kind, x=x, y=y, w=w, d=d))
@@ -87,6 +87,8 @@ def layout(grade_list):
             put('glass', ox + CAB_W, y, axis='y')
         put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢')
         put('plant', ox + (CAB_W - 1 if row == 0 else 0), oy if row == 0 else oy + 5)
+        if g != ADMIN:                                # руководитель кабинета стоит у входа, внутри
+            managers.append({'grade': g, 'x': ox + 5, 'y': 6 if row == 0 else 12, 'name': MANAGER_NAMES[k % len(MANAGER_NAMES)]})
         sid = 0
         if admin:                                    # учительская: 4 больших стола, кресла лицом к двери
             dy = a + 1
@@ -122,7 +124,79 @@ def layout(grade_list):
     put('cooler', lx + 4, 15)
     for (px, py) in ((lx + 4, 1), (lx, 17), (lx + 4, 17)):
         put('plant', px, py)
-    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': []}
+    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [], 'managers': managers}
+
+
+MANAGER_NAMES = ['Ерлан', 'Динара', 'Бауыржан', 'Айгерім', 'Нұрлан', 'Жанар', 'Серік', 'Мадина', 'Тимур', 'Әсел']
+PACKAGE_SIZE = 3
+PACKAGE_BONUS = 10000            # премия руководителя за все 3 задачи, ₸
+
+
+def manager_of(grade):
+    return next((m for m in layout(grades())['managers'] if m['grade'] == grade), None)
+
+
+def near_manager(presence, grade):
+    m = manager_of(grade)
+    if not m or not presence:
+        return False
+    return abs(round(presence.get('x', -9)) - m['x']) <= 2 and abs(round(presence.get('y', -9)) - m['y']) <= 2
+
+
+def topics_for(student):
+    """Темы (теги) с нерешёнными задачами: [{'id', 'name', 'level', 'left'}] — level: где ученик остановился."""
+    from .models import Submission, Task
+    solved = set(Submission.objects.filter(student=student, is_graded=True, score=10).values_list('task_id', flat=True))
+    by_tag = {}
+    for t in Task.objects.filter(hidden=False).prefetch_related('tags').only('id', 'level'):
+        for g in t.tags.all():
+            by_tag.setdefault((g.id, g.name), []).append(t)
+    out = []
+    for (gid, name), ts in sorted(by_tag.items(), key=lambda kv: kv[0][1].lower()):
+        free = [t for t in ts if t.id not in solved]
+        if not free:
+            continue
+        level = min(t.level for t in free)               # самый лёгкий уровень, где ещё есть нерешённые: там и остановился
+        out.append({'id': gid, 'name': name, 'level': level, 'left': len(free)})
+    return out
+
+
+def give_package(student, grade, tag_id, day):
+    """Руководитель даёт 3 нерешённые задачи по теме на уровне, где ученик остановился. (pkg, ошибка)"""
+    from .models import OfficePackage, Submission, Tag, Task
+    if OfficePackage.objects.filter(student=student, day=day, done_at__isnull=True).exists():
+        return None, 'busy'
+    tag = Tag.objects.filter(id=tag_id).first()
+    if tag is None:
+        return None, 'bad'
+    solved = set(Submission.objects.filter(student=student, is_graded=True, score=10).values_list('task_id', flat=True))
+    free = sorted((t for t in Task.objects.filter(hidden=False, tags=tag).only('id', 'level') if t.id not in solved),
+                  key=lambda t: (t.level, t.id))
+    if not free:
+        return None, 'none'
+    level = free[0].level
+    pick = [t.id for t in free if t.level == level][:PACKAGE_SIZE]
+    if len(pick) < PACKAGE_SIZE:                         # на этом уровне меньше трёх — добираем со следующего
+        pick += [t.id for t in free if t.id not in pick][:PACKAGE_SIZE - len(pick)]
+    pkg = OfficePackage.objects.create(day=day, student=student, grade=grade, tag_name=tag.name, level=level, tasks=pick)
+    return pkg, None
+
+
+def check_packages(day, student_ids):
+    """Все задачи задания решены на 10/10 — премия. Вызывается из collect() для тех, кто в офисе."""
+    from django.utils import timezone as tz
+    from .models import OfficePackage, Submission
+    changed = False
+    for pkg in OfficePackage.objects.filter(day=day, student_id__in=student_ids, done_at__isnull=True):
+        ok = set(Submission.objects.filter(student_id=pkg.student_id, task_id__in=pkg.tasks, is_graded=True, score=10)
+                 .values_list('task_id', flat=True))
+        if set(pkg.tasks) <= ok:
+            pkg.done_at, pkg.bonus = tz.now(), PACKAGE_BONUS
+            pkg.save(update_fields=['done_at', 'bonus'])
+            cache.delete(f'office:me:{day}:{pkg.student_id}')
+            changed = True
+    if changed:
+        cache.delete(f'office:stats:{day}')
 
 
 def seat_grade(seat_id):
@@ -147,6 +221,7 @@ def collect(day, now=None):
     if not online:
         return
     joined = {p['sid']: p.get('j', 0) for p in online}
+    check_packages(day, list(joined))
     grade = {p['sid']: p.get('g', '') for p in online}
     since = datetime.fromtimestamp(min(joined.values()), tz=timezone.get_current_timezone()) if joined else now
     subs = list(Submission.objects.filter(student_id__in=list(joined), is_graded=True, score=10, updated_at__gte=since)
@@ -187,11 +262,17 @@ def stats(day):
     data = cache.get(key)
     if data is None:
         from django.db.models import Count, Max, Sum
-        from .models import OfficeSolve
-        data = {}
+        from .models import OfficePackage, OfficeSolve
+        rows = {}
         for r in (OfficeSolve.objects.filter(day=day).values('student_id', 'grade')
-                  .annotate(m=Sum('money'), n=Count('id'), last=Max('at')).order_by('-m', 'last')):
-            data.setdefault(r['grade'], []).append([r['student_id'], r['m'], r['n']])
+                  .annotate(m=Sum('money'), n=Count('id'), last=Max('at'))):
+            rows[r['student_id']] = [r['grade'], r['m'], r['n'], r['last']]
+        for r in OfficePackage.objects.filter(day=day, bonus__gt=0).values('student_id', 'grade').annotate(b=Sum('bonus'), last=Max('done_at')):
+            row = rows.setdefault(r['student_id'], [r['grade'], 0, 0, r['last']])
+            row[1] += r['b']                             # премии руководителя входят в зарплату дня
+        data = {}
+        for sid, (g, m, n, last) in sorted(rows.items(), key=lambda kv: (-kv[1][1], kv[1][3])):
+            data.setdefault(g, []).append([sid, m, n])
         cache.set(key, data, 10)
     return data
 

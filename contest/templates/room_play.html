@@ -103,6 +103,10 @@
         #chat-quick button:hover { background: rgba(20,184,166,.2); }
         #chat .m.bot { background: rgba(20,184,166,.14); border: 1px solid rgba(20,184,166,.35); }
         #chat .m .go { display: inline-block; margin-top: 6px; border: 0; background: #14b8a6; color: #fff; border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 12px; cursor: pointer; }
+        .plab .pmgr { background: linear-gradient(135deg, #1e3a8a, #4338ca); color: #fde68a; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
+        .pkgcard { border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid rgba(67,56,202,.35); background: linear-gradient(135deg, rgba(67,56,202,.1), rgba(251,191,36,.12)); }
+        .pkgcard .t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: #4338ca; }
+        html[data-theme="dark"] .pkgcard .t { color: #a5b4fc; }
         .plab .pdm { background: #ef4444; color: #fff; font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 999px; }
         #chat { position: absolute; right: 60px; bottom: 74px; width: min(340px, calc(100% - 80px)); max-height: 60%; display: none; flex-direction: column;
                 background: var(--panel); border-radius: 16px; box-shadow: 0 12px 32px rgba(15,23,42,.28); z-index: 6; overflow: hidden; border: 1px solid var(--line); }
@@ -407,7 +411,7 @@
         if (p.id === ME) { ellipse(x, y, 0, 18, 9, 'rgba(99,102,241,.28)'); }
         ellipse(x, y, 0, 11, 5.5, 'rgba(15,23,42,.18)');
         var base = scr(x, y, z0 + bob), s = zoom;
-        var shirt = p.bot ? p.color : p.teacher ? '#1e293b' : COLORS[p.c % COLORS.length];
+        var shirt = p.mgr ? '#1e3a8a' : p.bot ? p.color : p.teacher ? '#1e293b' : COLORS[p.c % COLORS.length];
         ctx.save();
         if (!seated) { ctx.fillStyle = '#334155'; ctx.fillRect(base[0] - 6 * s, base[1] - 12 * s, 5 * s, 12 * s); ctx.fillRect(base[0] + 1 * s, base[1] - 12 * s, 5 * s, 12 * s); }
         rr(base[0] - 9 * s, base[1] - (seated ? 26 : 32) * s, 18 * s, 22 * s, 7 * s); ctx.fillStyle = shirt; ctx.fill();
@@ -432,6 +436,10 @@
     // ---------- плашки над головой (HTML поверх холста): аватар + имя на баннере, сообщение, ✋, ✅ ----------
     var labEls = {};
     function labelHtml(p) {
+        if (p.mgr) {
+            return (p.msg ? '<div class="pmsg" style="background:rgba(30,58,138,.95)">' + esc(p.msg) + '</div>' : '') +
+                   '<div class="pname"><span class="pmgr">👔 ' + esc(p.name) + ' · ' + esc(TXT.mgr_role.replace('{g}', p.grade)) + '</span></div>';
+        }
         if (p.bot) {
             return (p.msg ? '<div class="pmsg" style="background:rgba(15,118,110,.92)">' + esc(p.msg) + '</div>' : '') +
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pbot">🤖 ' + esc(p.name) + ' · ' + esc(TXT.bot_role) + '</span>' +
@@ -614,6 +622,14 @@
         var h = '<div class="mycard"><div class="lbl">' + TXT.earned + '</div><div class="sal">' + money(OME.money) + '</div>' +
                 '<div class="hint" style="margin:4px 0 0">🪙 +' + (OME.coins * 2) + ' ' + TXT.coins_x2 + ' · ✅ ' + OME.today.length + '</div></div>';
         if (!seated && !TEACHER) { h += '<div class="hint">🪑 ' + TXT.sit_own + '</div>'; }
+        var pk = OME.pkg;
+        if (pk && !pk.finished) {
+            h += '<div class="pkgcard"><div class="t">📋 ' + TXT.pkg_title + ' · ' + esc(pk.tag) + ' · ' + pk.level + '</div>' +
+                 pk.tasks.map(function (id) { var t = taskById(id), d = pk.done.indexOf(id) >= 0; return t ? '<div class="task' + (d ? ' done' : '') + '" data-id="' + id + '" style="margin:6px 0 0"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + esc(t.title) + '</span>' + (d ? '✅' : '→') + '</div>' : ''; }).join('') +
+                 '<div class="hint" style="margin:6px 0 0">🎁 ' + TXT.pkg_bonus.replace('{n}', pk.done.length) + '</div></div>';
+        } else {
+            h += '<div class="hint">👔 ' + (pk && pk.finished ? TXT.pkg_more : TXT.pkg_go) + '</div>';
+        }
         $('tasks').innerHTML = h;
         officeList();
     }
@@ -676,6 +692,7 @@
     }
     $('tasks').addEventListener('click', function (e) {
         var el = e.target.closest('.task'); if (!el) { return; }
+        if (OFFICE) { if (!seated && !TEACHER) { toast(TXT.sit_own); return; } openTask(taskById(+el.getAttribute('data-id'))); return; }
         if (!seated && !TEACHER) { toast(TXT.sit_first); return; }
         if (!TEACHER && +el.getAttribute('data-id') !== CO.cur && CO.done.indexOf(+el.getAttribute('data-id')) < 0) { return; }
         var t = TASKS.filter(function (x) { return x.id === +el.getAttribute('data-id'); })[0];
@@ -745,7 +762,8 @@
             var newOnes = d.ome.today.filter(function (id) { return OME.today.indexOf(id) < 0; });
             if (OME.loaded && newOnes.length) { var tt = taskById(newOnes[0]); toast('🎉 +' + (tt ? (tt.level === 'C' ? 6 : tt.level === 'B' ? 4 : 2) : 2) + ' 🪙 (x2) · +' + money(tt ? tt.pay : 0)); }
             var sv = OME.solved; d.ome.solved.forEach(function (id) { if (sv.indexOf(id) < 0) { sv.push(id); } });
-            OME = {money: d.ome.money, coins: d.ome.coins, today: d.ome.today, solved: sv, loaded: true};
+            if (OME.loaded && OME.pkg && !OME.pkg.finished && d.ome.pkg && d.ome.pkg.finished) { toast('🎁 ' + TXT.pkg_paid); }
+            OME = {money: d.ome.money, coins: d.ome.coins, today: d.ome.today, solved: sv, loaded: true, pkg: d.ome.pkg, bonus: d.ome.bonus};
             officePanel();
         }
         if (d.me) {
@@ -837,6 +855,7 @@
     var UNREAD = {}, chatWith = null, lastUnreadSig = '';
     function openChat(uid) {
         uid = +uid; if (!uid || uid === ME || !people[uid]) { return; }
+        if (uid <= -100) { openManager(uid); return; }
         if (uid < 0) { openBot(uid); return; }
         $('chat-quick').style.display = 'none'; $('chat-form').style.display = 'flex';
         chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 BOSS · ' : '') + people[uid].name;
@@ -1014,6 +1033,56 @@
         document.addEventListener('pointerdown', firstGesture, true); document.addEventListener('keydown', firstGesture, true);
         paint();
     })();
+
+    // ---------------- руководители кабинетов: подошёл — спрашивает тему и даёт 3 нерешённые задачи, за все три — премия ----------------
+    var MGRS = (L.managers || []), pendingMgr = null;
+    MGRS.forEach(function (m, k) {
+        var p = person(-100 - k); p.mgr = true; p.bot = true; p.name = m.name; p.grade = m.grade; p.color = '#1e3a8a';
+        setTarget(p, m.x, m.y, null); p.act = '';
+    });
+    function mgrById(id) { return MGRS[-100 - id]; }
+    function openManager(id) {
+        var m = mgrById(id), me = people[ME]; if (!m || !me) { return; }
+        if (TEACHER) { openBotShell(id); botSay(TXT.bot_teacher); return; }
+        if (Math.abs(Math.round(me.rx) - m.x) > 2 || Math.abs(Math.round(me.ry) - m.y) > 2) {      // сначала подойти
+            var f = freeNear(m.x, m.y); if (f) { pendingMgr = id; goTo(f[0], f[1], null); toast('🚶 ' + TXT.mgr_going); }
+            return;
+        }
+        openBotShell(id);
+        if (m.grade !== MY_GRADE) { botSay(TXT.mgr_other.replace('{g}', m.grade).replace('{my}', MY_GRADE)); return; }
+        var pk = OME.pkg;
+        if (pk && !pk.finished) { botSay(TXT.mgr_busy.replace('{n}', pk.tasks.length - pk.done.length), pkgButtons(pk.tasks)); return; }
+        botSay((pk && pk.finished ? TXT.mgr_again : TXT.mgr_hello).replace('{name}', m.name));
+        fetch(U2.bot + '?q=topics', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.topics.length) { botSay(TXT.mgr_all); return; }
+            $('chat-quick').innerHTML = d.topics.map(function (t) {
+                return '<button type="button" data-tag="' + t.id + '">' + esc(t.name) + ' · ' + t.level + ' <span style="opacity:.6">(' + t.left + ')</span></button>'; }).join('');
+        });
+    }
+    function openBotShell(id) {
+        botWith = id; chatWith = null;
+        var p = people[id];
+        $('chat-name').textContent = (p.mgr ? '👔 ' + p.name + ' · ' + TXT.mgr_role.replace('{g}', p.grade) : '🤖 ' + p.name);
+        $('chat-form').style.display = 'none'; $('chat-quick').style.display = 'flex'; $('chat-quick').innerHTML = '';
+        $('chat').style.display = 'flex'; botConv = [];
+    }
+    function pkgButtons(ids) {
+        return ids.map(function (id) { var t = taskById(id); return t ? ' <button class="go" type="button" data-act="open" data-id="' + id + '">▶ ' + esc(t.title) + ' (' + t.level + ')</button>' : ''; }).join('');
+    }
+    $('chat-quick').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-tag]'); if (!b || !botWith || botWith > -100) { return; }
+        e.stopImmediatePropagation();
+        botConv.push({bot: false, text: b.textContent}); renderBot();
+        post({a: 'package', tag: b.getAttribute('data-tag')}).then(function (d) {
+            if (d.error) { botSay(TXT[d.error] || d.error); return; }
+            $('chat-quick').innerHTML = '';
+            OME.pkg = {tasks: d.tasks, tag: d.tag, level: d.level, done: [], finished: false, bonus: 0}; officePanel();
+            botSay(TXT.mgr_gave.replace('{tag}', d.tag).replace('{l}', d.level), pkgButtons(d.tasks));
+            poll(true);
+        });
+    }, true);
+    var _arrived = arrived;
+    arrived = function () { _arrived(); if (pendingMgr !== null) { var id = pendingMgr; pendingMgr = null; openManager(id); } };
 
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();

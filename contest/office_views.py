@@ -54,7 +54,25 @@ def _office_texts(lang):
     return t
 
 
-BOT_TEXTS = {'bot_role': 'администратор',
+BOT_TEXTS = {
+    'mgr_role': 'руководитель {g} кл.',
+    'mgr_going': 'Идёте к руководителю…',
+    'mgr_hello': 'Здравствуйте! Я {name}, руководитель вашего кабинета. Какую тему вы сейчас проходите? Выберите ниже — дам 3 задачи там, где вы остановились.',
+    'mgr_again': 'Отличная работа, премия ваша! Готовы к новому заданию? Выберите тему ниже.',
+    'mgr_other': 'Я руководитель {g} класса. Ваш руководитель — в кабинете {my} класса.',
+    'mgr_busy': 'У вас уже есть моё задание — осталось решить: {n}. Сначала закончите его, потом дам новое.',
+    'mgr_gave': 'Вот ваше задание по теме «{tag}» (уровень {l}). Решите все три — получите премию 10 000 ₸!',
+    'mgr_all': 'Вы решили все задачи по всем темам — я в восторге! 🏆',
+    'pkg_title': 'Задание руководителя',
+    'pkg_bonus': 'Решено {n} из 3 — за все три премия 10 000 ₸',
+    'pkg_go': 'Подойдите к руководителю своего кабинета — он даст 3 задачи и премию 10 000 ₸ за их решение.',
+    'pkg_more': 'Премия получена! Руководитель даст новое задание.',
+    'pkg_paid': 'Задание руководителя выполнено! Премия +10 000 ₸',
+    'far_manager': 'Подойдите ближе к руководителю',
+    'pkg_busy': 'Сначала закончите текущее задание руководителя',
+    'pkg_none': 'По этой теме вы всё решили — выберите другую',
+    'pkg_bad': 'Тема не найдена',
+    'bot_role': 'администратор',
     'bot1': 'Айна',
     'bot2': 'Арман',
     'bot_water': '💧 поливает цветы',
@@ -174,11 +192,21 @@ def office_state(request):
         key = f'office:me:{day}:{st.id}'
         mine = None if request.GET.get('fresh') == '1' else cache.get(key)
         if mine is None:
-            from .models import OfficeSolve
-            mine = list(OfficeSolve.objects.filter(student=st, day=day).values_list('task_id', 'money', 'coins'))
+            from .models import OfficePackage, OfficeSolve
+            pk = OfficePackage.objects.filter(student=st, day=day).first()
+            solved_pk = set()
+            if pk is not None:
+                from .models import Submission
+                solved_pk = set(Submission.objects.filter(student=st, task_id__in=pk.tasks, is_graded=True, score=10)
+                                .values_list('task_id', flat=True))
+            mine = {'rows': list(OfficeSolve.objects.filter(student=st, day=day).values_list('task_id', 'money', 'coins')),
+                    'bonus': sum(OfficePackage.objects.filter(student=st, day=day).values_list('bonus', flat=True)),
+                    'pkg': {'id': pk.id, 'tasks': pk.tasks, 'tag': pk.tag_name, 'level': pk.level, 'done': [t for t in pk.tasks if t in solved_pk],
+                            'finished': pk.done_at is not None, 'bonus': pk.bonus} if pk else None}
             cache.set(key, mine, 15)
-        out['ome'] = {'money': sum(m for _, m, _ in mine), 'coins': sum(c for _, _, c in mine), 'today': [t for t, _, _ in mine],
-                      'solved': [t for t, _, _ in mine]}
+        rows_ = mine['rows']
+        out['ome'] = {'money': sum(m for _, m, _ in rows_) + mine['bonus'], 'coins': sum(c for _, _, c in rows_), 'today': [t for t, _, _ in rows_],
+                      'solved': [t for t, _, _ in rows_], 'pkg': mine['pkg'], 'bonus': mine['bonus']}
     return JsonResponse(out)
 
 
@@ -219,6 +247,14 @@ def office_act(request):
         p = rm.touch(r, me, base)
         rm.touch(r, me, base, hand=not p.get('hand'))
         return JsonResponse({'ok': True})
+    if act == 'package' and not teacher:
+        if not of.near_manager(rm.get(r, me), grade):
+            return JsonResponse({'error': 'far_manager'})
+        pkg, err = of.give_package(st, grade, request.POST.get('tag'), timezone.localdate())
+        if err:
+            return JsonResponse({'error': 'pkg_' + err})
+        cache.delete(f'office:me:{timezone.localdate()}:{st.id}')
+        return JsonResponse({'ok': True, 'tasks': pkg.tasks, 'level': pkg.level, 'tag': pkg.tag_name})
     if act == 'exit':
         return JsonResponse({'ok': True})
     return JsonResponse({'error': 'bad'})
@@ -263,6 +299,8 @@ def office_bot(request):
         pick = (next((t for t in free if t['level'] == level and last_tags & set(t['tags'])), None)
                 or next((t for t in free if t['level'] == level), None) or (free[0] if free else None))
         return JsonResponse({'task': pick['id'] if pick else None, 'level': level, 'solved': len(solved)})
+    if q == 'topics':
+        return JsonResponse({'topics': of.topics_for(st) if st else []})
     if q == 'theory':
         try:
             tid = int(request.GET.get('task'))

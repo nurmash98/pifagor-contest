@@ -5362,6 +5362,36 @@ class WeekendOfficeTests(TestCase):
         office.finalize_due(self.sat.replace(hour=21))                                         # второй раз — ничего
         self.assertEqual(CoinTransaction.objects.filter(key__startswith='officetop:').count(), 3)
 
+    def test_manager_gives_3_tasks_where_stopped_and_bonus(self):
+        from . import office
+        from .models import OfficePackage
+        tag = Tag.objects.get(name='Циклы')
+        extra = [make_task(f'A{i}', 'A', tag) for i in range(2, 5)]            # A1..A4 + B1, C1
+        st = self.sts[0]
+        Submission.objects.create(student=st, task=self.tA, status='DONE', is_graded=True, score=10)   # A1 уже решена
+        Submission.objects.filter(student=st, task=self.tA).update(updated_at=self.sat - timedelta(hours=1))
+        m = office.manager_of('8')
+        with self._at(self.sat):
+            self.client.force_login(st.user)
+            self.client.get(reverse('office_play'))
+            topics = self.client.get(reverse('office_bot') + '?q=topics').json()['topics']
+            t = [x for x in topics if x['name'] == 'Циклы'][0]
+            self.assertEqual(t['level'], 'A')
+            act = reverse('office_act')
+            self.assertEqual(self.client.post(act, {'a': 'package', 'tag': tag.id}).json()['error'], 'far_manager')
+            self.client.post(act, {'a': 'move', 'x': m['x'] - 1, 'y': m['y']})
+            r = self.client.post(act, {'a': 'package', 'tag': tag.id}).json()
+            self.assertEqual(r['tasks'], [x.id for x in extra])                   # следующие 3 нерешённые на уровне A
+            self.assertEqual(self.client.post(act, {'a': 'package', 'tag': tag.id}).json()['error'], 'pkg_busy')
+        for x in extra:
+            Submission.objects.create(student=st, task=x, status='DONE', is_graded=True, score=10)
+        Submission.objects.filter(student=st, task__in=extra).update(updated_at=self.sat + timedelta(minutes=3))
+        with self._at(self.sat + timedelta(minutes=4)):
+            office.collect(self.sat.date())
+        pkg = OfficePackage.objects.get(student=st)
+        self.assertEqual(pkg.bonus, 10000)
+        self.assertEqual(office.stats(self.sat.date())['8'][0][1], 3 * 10000 + 10000)   # 3 задачи A + премия
+
     def test_admin_bot_advice_and_theory(self):
         from .models import Course, Topic
         st = self.sts[0]
