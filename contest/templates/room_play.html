@@ -596,7 +596,7 @@
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();
     window.addEventListener('resize', function () {});
-    poll(); setInterval(function () { if (!document.hidden) { poll(); } }, 2000);
+    poll(); setInterval(function () { if (!document.hidden) { poll(); } }, 3000);
     requestAnimationFrame(frame);
 })();
 </script>

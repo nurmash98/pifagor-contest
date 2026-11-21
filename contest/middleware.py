@@ -45,7 +45,8 @@ class ExamLockMiddleware:
     def __call__(self, request):
         request.active_exam_attempt = None
         user = getattr(request, 'user', None)
-        if user is not None and user.is_authenticated and not user.is_staff:
+        polling = is_polling(request.path)            # частые опросы игр — без лишних запросов к базе
+        if user is not None and not polling and user.is_authenticated and not user.is_staff:
             from .exam_views import active_attempt_for
             request.active_exam_attempt = active_attempt_for(user)
         return self.get_response(request)
@@ -64,3 +65,24 @@ class ExamLockMiddleware:
             messages.warning(request, 'Идёт СОР/СОЧ (или пересдача) — Курсы и Все задачи откроются после его окончания.')
             return redirect(attempt.get_absolute_url())
         return None
+
+
+def is_polling(path):
+    """Частые опросы игр (раз в 2–3 секунды): коворкинг и остров."""
+    return path.endswith('/state/') and (path.startswith('/room/') or path.startswith('/games/island/'))
+
+
+from django.contrib.sessions.middleware import SessionMiddleware  # noqa: E402
+
+
+class PollingSessionMiddleware(SessionMiddleware):
+    """Как обычная сессия (SESSION_SAVE_EVERY_REQUEST продлевает её на каждом запросе), но частые опросы игр
+    продлевают сессию не чаще раза в 5 минут — иначе каждый опрос писал бы в базу (Neon)."""
+
+    def process_response(self, request, response):
+        session = getattr(request, 'session', None)
+        if session is not None and is_polling(request.path) and not session.modified and session.session_key:
+            from django.core.cache import cache
+            if not cache.add(f'sess:touch:{session.session_key}', 1, 300):
+                return response
+        return super().process_response(request, response)

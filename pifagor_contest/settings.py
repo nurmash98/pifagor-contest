@@ -68,7 +68,7 @@ MIDDLEWARE = [
     # где нет отдельного Nginx перед приложением. На своём сервере тоже оставляем:
     # статику раздаёт сам Gunicorn (быстро и без лишних прав доступа для nginx).
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'contest.middleware.PollingSessionMiddleware',   # = SessionMiddleware, но опросы игр не пишут сессию каждый раз
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -225,3 +225,6 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 # СОР/СОЧ открываются внутри полноэкранной страницы-оболочки (iframe того же сайта)
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# Сессии читаются из кеша (а в базу — только при записи): меньше запросов к Neon на каждой странице и при опросах игр.
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'

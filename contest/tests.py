@@ -5226,6 +5226,17 @@ class StudyRoomTests(TestCase):
         self.client.force_login(self.other.user)
         self.assertEqual(self.client.get(reverse('room_theory', args=[room.id, 'topic', topic.id])).status_code, 404)
 
+    def test_state_poll_is_cheap(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        room = self._open()
+        self.client.force_login(self.sts[0].user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.get(reverse('room_state', args=[room.id]))                      # прогрели кеш
+        with CaptureQueriesContext(connection) as q:
+            self.client.get(reverse('room_state', args=[room.id]))
+        self.assertLessEqual(len(q), 2, [x['sql'] for x in q.captured_queries])     # пользователь (+ сессия) — и всё
+
     def test_label_shows_banner_and_avatar(self):
         room = self._open()
         a = self.sts[0]

@@ -51,14 +51,27 @@ def _can_teach(user, room):
     return scope is None or room.school_class in scope
 
 
-def _access(request, room_id):
-    """(room, student, teacher?) или Http404."""
-    room = get_object_or_404(StudyRoom, id=room_id)
+def _access(request, room_id, cached=False):
+    """(room, student, teacher?) или Http404.
+    cached=True — для частого опроса (каждые 3 сек): зал и ученик берутся из кеша, база не трогается."""
+    if cached:
+        room = cache.get(f'room:obj:{room_id}')
+        if room is None:
+            room = get_object_or_404(StudyRoom, id=room_id)
+            room.n_tasks = room.tasks.count()
+            cache.set(f'room:obj:{room_id}', room, 15)
+    else:
+        room = get_object_or_404(StudyRoom, id=room_id)
     if request.user.is_staff:
         if not _can_teach(request.user, room):
             raise Http404
         return room, None, True
-    st = Student.objects.filter(user=request.user).first()
+    key = f'room:st:{request.user.id}'
+    st = cache.get(key) if cached else None
+    if st is None:
+        st = Student.objects.filter(user=request.user).first()
+        if cached and st is not None:
+            cache.set(key, st, 120)
     if st is None or st.school_class != room.school_class:
         raise Http404
     return room, st, False
@@ -153,6 +166,7 @@ def room_close(request, room_id):
         room.closed_at = timezone.now()
         room.save(update_fields=['closed_at'])
     _forget_open(room.school_class)
+    cache.delete(f'room:obj:{room.id}')
     messages.success(request, f'Коворкинг {room.school_class} закрыт.')
     return redirect('room_manage')
 
@@ -271,7 +285,13 @@ def room_play(request, room_id):
 def _stats_rows(room, data, online, exits=None):
     rows = []
     exits = exits or {}
-    for s in Student.objects.filter(school_class=room.school_class).only('id', 'full_name', 'user_id').order_by('full_name'):
+    key = f'room:class:{room.school_class}'
+    students = cache.get(key)
+    if students is None:
+        students = list(Student.objects.filter(school_class=room.school_class).values_list('id', 'full_name', 'user_id'))
+        cache.set(key, students, 60)
+    for sid, full_name, user_id in students:
+        s = Student(id=sid, full_name=full_name, user_id=user_id)
         rows.append([s.user_id, s.full_name, len(data['now'].get(s.id, [])), len(data['before'].get(s.id, [])), s.user_id in online,
                      exits.get(s.user_id, 0)])
     rows.sort(key=lambda r: (-r[2], -r[3], r[1]))
@@ -280,7 +300,7 @@ def _stats_rows(room, data, online, exits=None):
 
 @login_required
 def room_state(request, room_id):
-    room, st, teacher = _access(request, room_id)
+    room, st, teacher = _access(request, room_id, cached=True)
     me = request.user.id
     fresh = request.GET.get('fresh') == '1' and cache.add(f'room:fresh:{me}', 1, 3)
     if room.is_open():
@@ -290,7 +310,7 @@ def room_state(request, room_id):
     online = {p[0] for p in ppl}
     out = {'open': room.is_open(), 'people': ppl,
            'left': max(0, int((room.ends_at - timezone.now()).total_seconds())) if room.ends_at else None,
-           'stats': _stats_rows(room, data, online, rm.exits(room.id) if teacher else None), 'n_tasks': room.tasks.count()}
+           'stats': _stats_rows(room, data, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count()}
     if st is not None:
         out['mine'] = data['now'].get(st.id, []) + data['before'].get(st.id, [])
     if teacher:
