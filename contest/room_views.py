@@ -64,7 +64,29 @@ def _access(request, room_id):
     return room, st, False
 
 
+def _label(st):
+    """Плашка над головой: аватар (с рамкой по значку) + имя на своём баннере — как на сайте."""
+    from django.template.loader import render_to_string
+    from . import avatars
+    from .models import Submission
+    solved = Submission.objects.filter(student=st, is_graded=True, score=10).count()
+    html = render_to_string('room_label.html', {'st': st, 'solved': solved})
+    pic = avatars.get(st.avatar)
+    img = avatars.img_url(pic) if pic else (avatars.custom_url(st.avatar) or '')
+    return {'h': ' '.join(html.split()), 'ai': img}
+
+
+def _base_lazy(request, st, teacher):
+    return lambda: _base(request, st, teacher)
+
+
 def _base(request, st, teacher):
+    if not teacher:
+        return dict(_base_plain(request, st, teacher), **_label(st))
+    return _base_plain(request, st, teacher)
+
+
+def _base_plain(request, st, teacher):
     if teacher:
         name = request.user.get_full_name() or request.user.username
         return {'n': name, 'teacher': True, 'c': -1, 'x': 10, 'y': 2, 'seat': 't'}      # учитель сразу за своим столом
@@ -186,7 +208,9 @@ def room_play(request, room_id):
     n = Student.objects.filter(school_class=room.school_class).count()
     tasks = _task_list(room, lang)
     me = request.user.id
-    rm.touch(room.id, me, _base(request, st, teacher))
+    rm.touch(room.id, me, _base_lazy(request, st, teacher))
+    if st is not None:
+        rm.touch(room.id, me, {}, **_label(st))          # баннер/аватар могли смениться — обновляем при входе
     return render(request, 'room_play.html', {
         'room': room, 'teacher': teacher, 'me': me,
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
@@ -210,7 +234,7 @@ def room_state(request, room_id):
     me = request.user.id
     fresh = request.GET.get('fresh') == '1' and cache.add(f'room:fresh:{me}', 1, 3)
     if room.is_open():
-        rm.touch(room.id, me, _base(request, st, teacher))
+        rm.touch(room.id, me, _base_lazy(request, st, teacher))
     ppl = rm.public(room.id)
     data = rm.stats(room, fresh=fresh)
     online = {p[0] for p in ppl}
@@ -231,7 +255,7 @@ def room_act(request, room_id):
     if not room.is_open():
         return JsonResponse({'error': 'closed'})
     me = request.user.id
-    base = _base(request, st, teacher)
+    base = _base_lazy(request, st, teacher)
     act = request.POST.get('a')
     if act == 'move':
         try:

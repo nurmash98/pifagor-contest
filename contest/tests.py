@@ -5161,6 +5161,7 @@ class StudyRoomTests(TestCase):
         st = self.client.get(reverse('room_state', args=[room.id])).json()
         me_a = [p for p in st['people'] if p[0] == a.user_id][0]
         self.assertEqual((me_a[4], me_a[5], me_a[6]), ('s1', 'Помогите с задачей', True))
+        self.assertIn('Ученик 0', me_a[9])                                                   # плашка с именем (и баннером, если есть)
         self.assertNotIn('log', st)                                                          # журнал — только учителю
         self.client.force_login(self.tu)
         st = self.client.get(reverse('room_state', args=[room.id])).json()
@@ -5201,6 +5202,17 @@ class StudyRoomTests(TestCase):
         self.client.force_login(self.tu)
         st = self.client.get(reverse('room_state', args=[room.id])).json()
         self.assertEqual([r for r in st['stats'] if r[0] == a.user_id][0][5], 2)
+
+    def test_label_shows_banner_and_avatar(self):
+        room = self._open()
+        a = self.sts[0]
+        a.name_banner, a.avatar = 'vice', 'gta03'
+        a.save()
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        me = [p for p in self.client.get(reverse('room_state', args=[room.id])).json()['people'] if p[0] == a.user_id][0]
+        self.assertIn('b-vice', me[9])
+        self.assertIn('gta-03', me[10])
 
     def test_close_room(self):
         room = self._open()

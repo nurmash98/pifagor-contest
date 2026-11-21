@@ -1,0 +1,1 @@
+{% load badge_tags %}<span class="rl-av">{% student_avatar solved 30 False 'rl' st.avatar %}</span>{% if st.name_banner %}{% student_name st True %}{% else %}<span class="plain">{{ st.full_name }}</span>{% endif %}

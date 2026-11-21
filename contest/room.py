@@ -94,6 +94,7 @@ def touch(rid, uid, base, now=None, **changes):
     p = cache.get(k)
     fresh = p is None
     if fresh:
+        base = base() if callable(base) else base         # имя/баннер/аватар считаются только при входе
         p = dict({'seat': None}, **base)
         p.update(x=base.get('x', 11), y=base.get('y', 5), msg='', mt=0, hand=False)
     elif not changes and now - p.get('ts', 0) < 8:
@@ -136,13 +137,13 @@ def log(rid):
 
 
 def public(rid, now=None):
-    """Для браузера: [[uid, имя, x, y, место, сообщение, рука, учитель, цвет]]."""
+    """Для браузера: [[uid, имя, x, y, место, сообщение, рука, учитель, цвет, html-плашка с баннером, картинка аватара]]."""
     now = now or time.time()
     out = []
     for u, p in people(rid, now).items():
         msg = p.get('msg', '') if now - p.get('mt', 0) < BUBBLE else ''
         out.append([u, p.get('n', ''), p.get('x'), p.get('y'), p.get('seat'), msg, bool(p.get('hand')),
-                    bool(p.get('teacher')), p.get('c', 0)])
+                    bool(p.get('teacher')), p.get('c', 0), p.get('h', ''), p.get('ai', '')])
     return out
 
 
