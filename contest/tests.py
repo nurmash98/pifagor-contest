@@ -5373,7 +5373,8 @@ class WeekendOfficeTests(TestCase):
         m = office.manager_of('8')
         with self._at(self.sat):
             self.client.force_login(st.user)
-            self.client.get(reverse('office_play'))
+            page = self.client.get(reverse('office_play')).content.decode()
+            self.assertNotIn('id="olist"', page)                                  # свободного списка задач нет — задачи даёт руководитель
             topics = self.client.get(reverse('office_bot') + '?q=topics').json()['topics']
             t = [x for x in topics if x['name'] == 'Циклы'][0]
             self.assertEqual(t['level'], 'A')
