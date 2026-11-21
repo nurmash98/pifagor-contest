@@ -91,6 +91,8 @@
         .plab.me .pname::after { content: ''; }
         .plab { pointer-events: auto; cursor: pointer; }
         .plab.me { cursor: default; }
+        .plab .pboss { zoom: .8; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #111827; font-weight: 900; letter-spacing: .08em;
+                       padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
         .plab .pdm { background: #ef4444; color: #fff; font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 999px; }
         #chat { position: absolute; right: 60px; bottom: 74px; width: min(340px, calc(100% - 80px)); max-height: 60%; display: none; flex-direction: column;
                 background: var(--panel); border-radius: 16px; box-shadow: 0 12px 32px rgba(15,23,42,.28); z-index: 6; overflow: hidden; border: 1px solid var(--line); }
@@ -418,7 +420,7 @@
     // ---------- плашки над головой (HTML поверх холста): аватар + имя на баннере, сообщение, ✋, ✅ ----------
     var labEls = {};
     function labelHtml(p) {
-        var name = p.h ? p.h : '<span class="plain' + (p.teacher ? ' t' : '') + '">' + (p.teacher ? '👔 ' : '') + esc(p.name) + '</span>';
+        var name = p.h ? p.h : (p.teacher ? '<span class="pboss">👔 BOSS</span>' : '') + '<span class="plain' + (p.teacher ? ' t' : '') + '">' + esc(p.name) + '</span>';
         var done = statsBy[p.id];
         return (p.msg ? '<div class="pmsg' + (p.teacher ? ' t' : '') + '">' + esc(p.msg) + '</div>' : '') +
                '<div class="pname">' + (UNREAD[p.id] ? '<span class="pdm">💬' + UNREAD[p.id] + '</span>' : '') + (p.hand ? '<span class="phand">✋</span>' : '') + name + (done ? '<span class="pok">💰 ' + money(done) + '</span>' : '') + '</div>';
@@ -815,7 +817,7 @@
     var UNREAD = {}, chatWith = null, lastUnreadSig = '';
     function openChat(uid) {
         uid = +uid; if (!uid || uid === ME || !people[uid]) { return; }
-        chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 ' : '') + people[uid].name;
+        chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 BOSS · ' : '') + people[uid].name;
         $('chat').style.display = 'flex'; $('chat-msgs').innerHTML = ''; $('chat-in').focus(); poll();
     }
     function renderConv(conv) {
