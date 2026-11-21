@@ -5286,4 +5286,87 @@ class StudyRoomTests(TestCase):
         self.client.force_login(self.sts[0].user)
         self.assertRedirects(self.client.get(reverse('room_play', args=[room.id])), reverse('codegames'), fetch_redirect_response=False)
         self.assertEqual(self.client.post(reverse('room_act', args=[room.id]), {'a': 'hand'}).json()['error'], 'closed')
-        self.assertNotContains(self.client.get(reverse('all_tasks')), 'class="room-strip"')
+        self.assertNotContains(self.client.get(reverse('all_tasks')), reverse('room_play', args=[room.id]))
+
+
+class WeekendOfficeTests(TestCase):
+    """Офис выходного дня: сб/вс 9–20, кабинеты параллелей, x2 монеты за решённое в офисе, топ-3 параллели — по 20 монет."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        tag = Tag.objects.create(name='Циклы')
+        self.tA, self.tB, self.tC = make_task('A1', 'A', tag), make_task('B1', 'B', tag), make_task('C1', 'C', tag)
+        self.sts = [Student.objects.create(user=User.objects.create_user(f'of{i}', password='p'), full_name=f'Офис {i}', school_class='8A')
+                    for i in range(4)]
+        self.kid = Student.objects.create(user=User.objects.create_user('ofkid', password='p'), full_name='Малыш', school_class='3A')
+        from datetime import datetime
+        self.sat = timezone.make_aware(datetime(2026, 11, 21, 12, 0))          # суббота, 12:00
+
+    def _at(self, dt):
+        from unittest import mock
+        return mock.patch('django.utils.timezone.now', return_value=dt)
+
+    def test_open_hours(self):
+        from . import office
+        self.assertTrue(office.is_open(self.sat))
+        self.assertFalse(office.is_open(self.sat.replace(hour=20, minute=0)))
+        self.assertFalse(office.is_open(self.sat.replace(hour=8, minute=59)))
+        self.assertFalse(office.is_open(self.sat - timedelta(days=1)))                       # пятница
+        self.assertTrue(office.is_open(self.sat + timedelta(days=1)))                        # воскресенье
+
+    def test_solve_in_office_gives_double_coins_money_and_top3(self):
+        from . import office
+        from .models import CoinTransaction, OfficeSolve
+        with self._at(self.sat):
+            for i, st in enumerate(self.sts):
+                self.client.force_login(st.user)
+                r = self.client.get(reverse('office_play'))
+                self.assertEqual(r.status_code, 200)
+            # сесть в кабинет чужой параллели нельзя
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '9-0'}).json()['error'], 'other_grade')
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '8-0'}).json(), {'ok': True})
+        later = self.sat + timedelta(minutes=5)
+        Submission.objects.create(student=self.sts[0], task=self.tC, status='DONE', is_graded=True, score=10)
+        Submission.objects.create(student=self.sts[1], task=self.tB, status='DONE', is_graded=True, score=10)
+        Submission.objects.create(student=self.sts[2], task=self.tA, status='DONE', is_graded=True, score=10)
+        Submission.objects.create(student=self.sts[3], task=self.tA, status='DONE', is_graded=True, score=6)   # не решена
+        Submission.objects.filter(score=10).update(updated_at=later)
+        with self._at(later):
+            office.collect(self.sat.date())
+        self.assertEqual(OfficeSolve.objects.count(), 3)
+        self.assertEqual(CoinTransaction.objects.get(student=self.sts[0], key=f'office:{self.tC.id}').amount, 3)     # +3 сверху к обычным 3
+        rows = office.stats(self.sat.date())['8']
+        self.assertEqual([r[1] for r in rows], [30000, 20000, 10000])
+        with self._at(later):
+            self.client.force_login(self.sts[0].user)
+            st = self.client.get(reverse('office_state') + '?fresh=1').json()
+            self.assertEqual(st['ome']['money'], 30000)
+            self.assertEqual(st['stats'][0][2], 30000)
+        # итоги дня — после 20:00
+        office.finalize_due(self.sat.replace(hour=19))
+        self.assertFalse(CoinTransaction.objects.filter(key__startswith='officetop:').exists())
+        office.finalize_due(self.sat.replace(hour=20, minute=1))
+        tops = CoinTransaction.objects.filter(key=f'officetop:{self.sat.date()}')
+        self.assertEqual(sorted(t.student_id for t in tops), sorted(s.id for s in self.sts[:3]))
+        self.assertTrue(all(t.amount == 20 for t in tops))
+        office.finalize_due(self.sat.replace(hour=21))                                         # второй раз — ничего
+        self.assertEqual(CoinTransaction.objects.filter(key__startswith='officetop:').count(), 3)
+
+    def test_solved_before_entering_not_counted_and_closed_on_weekdays(self):
+        from . import office
+        from .models import OfficeSolve
+        Submission.objects.create(student=self.sts[0], task=self.tA, status='DONE', is_graded=True, score=10)
+        Submission.objects.filter(student=self.sts[0]).update(updated_at=self.sat - timedelta(minutes=30))
+        with self._at(self.sat):
+            self.client.force_login(self.sts[0].user)
+            self.client.get(reverse('office_play'))
+            Submission.objects.filter(student=self.sts[0]).update(updated_at=self.sat - timedelta(minutes=30))
+            office.collect(self.sat.date())
+        self.assertFalse(OfficeSolve.objects.exists())
+        with self._at(self.sat - timedelta(days=1)):
+            self.assertRedirects(self.client.get(reverse('office_play')), reverse('codegames'), fetch_redirect_response=False)
+            self.client.force_login(self.kid.user)
+        with self._at(self.sat):
+            self.client.force_login(self.kid.user)
+            self.assertRedirects(self.client.get(reverse('office_play')), reverse('codegames'), fetch_redirect_response=False)

@@ -242,6 +242,8 @@ ROOM_TEXTS = {
     'got': 'Руководитель дал задание', 'go_boss': 'Подойдите к руководителю за заданием', 'cur': 'Текущее задание',
     'in_work': 'в работе', 'done': 'выполнено', 'salary': 'Зарплата', 'to_boss': 'К руководителю', 'paid': 'Задание выполнено! Зарплата',
     'boss': 'Руководитель', 'tenge': '₸', 'no_task': 'нет задания',
+    'earned': 'Заработано сегодня', 'coins_x2': 'монет (x2)', 'sit_own': 'Сядьте за стол в кабинете своей параллели',
+    'other_grade': 'Это кабинет другой параллели — садиться можно только в своём', 'pick_task': 'Вы за столом — выберите задачу справа',
 }
 
 
@@ -290,7 +292,9 @@ def room_play(request, room_id):
     if st is not None:
         rm.touch(room.id, me, {}, **_label(st))          # баннер/аватар могли смениться — обновляем при входе
     return render(request, 'room_play.html', {
-        'room': room, 'teacher': teacher, 'me': me,
+        'room': room, 'teacher': teacher, 'me': me, 'office': False,
+        'state_url': reverse('room_state', args=[room.id]), 'act_url': reverse('room_act', args=[room.id]),
+        'lang_url': reverse('room_lang', args=[room.id]),
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': json.dumps(_theory_items(room), ensure_ascii=False), 'texts': json.dumps(_texts(lang), ensure_ascii=False),
     })

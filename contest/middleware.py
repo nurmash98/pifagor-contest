@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 EXAM_LOCKED_VIEWS = {
     'all_tasks', 'task_detail',
     'courses', 'course_detail', 'topic_video', 'topic_theory',
-    'olympiad_upsolve', 'olympiad_upsolve_task', 'room_enter', 'room_play', 'room_state', 'room_act',
+    'olympiad_upsolve', 'olympiad_upsolve_task', 'room_enter', 'room_play', 'room_state', 'room_act', 'office_play', 'office_act',
 }
 
 
@@ -69,7 +69,7 @@ class ExamLockMiddleware:
 
 def is_polling(path):
     """Частые опросы игр (раз в 2–3 секунды): коворкинг и остров."""
-    return path.endswith('/state/') and (path.startswith('/room/') or path.startswith('/games/island/'))
+    return path.endswith('/state/') and (path.startswith('/room/') or path.startswith('/office/') or path.startswith('/games/island/'))
 
 
 from django.contrib.sessions.middleware import SessionMiddleware  # noqa: E402

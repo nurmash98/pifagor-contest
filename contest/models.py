@@ -649,6 +649,35 @@ class StudyRoom(models.Model):
         return f'{self.school_class}: {self.title or "коворкинг"}'
 
 
+class OfficeDay(models.Model):
+    """«Офис выходного дня» (сб/вс 9:00–20:00, без учителя): один рабочий день. После 20:00 топ-3 каждой параллели
+    по заработку получают по 20 монет (finalized — награды уже выданы)."""
+    day = models.DateField(unique=True)
+    finalized = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Офис выходного дня"
+        verbose_name_plural = "Офис выходного дня"
+        ordering = ['-day']
+
+
+class OfficeSolve(models.Model):
+    """Задача, впервые решённая на 10/10 в офисе выходного дня: двойные монеты и «зарплата» в тенге."""
+    day = models.DateField()
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='office_solves')
+    task = models.ForeignKey('Task', on_delete=models.CASCADE)
+    grade = models.CharField(max_length=4, blank=True, verbose_name="Параллель")
+    money = models.PositiveIntegerField(default=0)
+    coins = models.PositiveIntegerField(default=0, verbose_name="Доп. монеты (x2)")
+    at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Решение в офисе"
+        verbose_name_plural = "Решения в офисе"
+        unique_together = [('student', 'task')]
+        ordering = ['at']
+
+
 class RoomAssignment(models.Model):
     """«Компания Пифагор»: задание, которое ученик-сотрудник получил у руководителя (учителя).
     Пока задание не выполнено (задача не решена полностью), нового не дают. За выполненное — зарплата."""
@@ -791,7 +820,7 @@ class CoinTransaction(models.Model):
     key уникален для ученика — одно и то же начисление не может прийти дважды
     (например, 'task:15', 'day:2026-10-23', 'm:50', 'exam:7', 'buy:banner:gold')."""
     KIND_CHOICES = [('task', 'Задача 10/10'), ('day', 'Первая задача дня'), ('milestone', 'Каждые 50 задач'),
-                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('game', 'Игра'), ('scratch', 'Scratch-тренажёр'), ('grant', 'От учителя'), ('buy', 'Покупка')]
+                    ('exam', 'СОР/СОЧ на 10'), ('award', 'Награда четверти'), ('gift', 'Подарок дня'), ('game', 'Игра'), ('scratch', 'Scratch-тренажёр'), ('office', 'Офис выходного дня'), ('grant', 'От учителя'), ('buy', 'Покупка')]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='coin_transactions')
     key = models.CharField(max_length=60)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)

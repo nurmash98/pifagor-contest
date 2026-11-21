@@ -14,6 +14,17 @@
 <p class="text-muted small mb-4">{% t "Обезвредь бомбу: смотри на код и пиши, что он выведет. Числа каждый раз новые." %}
     {% t "у тебя" %}: <strong>{{ balance }} <img class="coin-ico" src="{% static 'icons/coin-64.png' %}" alt=""></strong>. {% t "Игра идёт на весь экран — выход из него засчитывается как проигрыш." %}</p>
 <div class="row g-3">
+    {% if office_ok %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 p-4" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff)">
+            <div style="font-size:40px">🏢</div>
+            <h5 class="fw-bold mt-2">{% t "Офис выходного дня" %}</h5>
+            <p class="text-muted small">{% t "Суббота и воскресенье, 9:00–20:00. Решай любые задачи в кабинете своей параллели: монеты x2, зарплата, а в 20:00 топ-3 параллели получают по 20 монет." %}</p>
+            {% if office_open %}<a href="{% url 'office_play' %}" class="btn btn-pifagor-green rounded-pill px-4 mt-auto align-self-start">▶ {% t "Войти" %}</a>
+            {% else %}<span class="badge bg-secondary rounded-pill mt-auto align-self-start px-3 py-2">{% t "Откроется в субботу в 9:00" %}</span>{% endif %}
+        </div>
+    </div>
+    {% endif %}
     {% if room_id %}
     <div class="col-md-6 col-lg-4">
         <div class="card border-0 shadow-sm rounded-4 h-100 p-4" style="background:linear-gradient(135deg,#ecfdf5,#d1fae5)">
@@ -55,7 +66,7 @@
         </div>
     </div>
     {% empty %}
-    {% if not islands and not room_id %}<div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>{% endif %}
+    {% if not islands and not room_id and not office_ok %}<div class="col-12"><div class="alert alert-secondary">{% t "Учитель пока не открыл тебе игры." %}</div></div>{% endif %}
     {% endfor %}
 </div>
 <div id="no-fs" class="alert alert-warning mt-3" style="display:none;">{% t "На этом устройстве нет полноэкранного режима, а игра идёт только в нём. Открой её на компьютере в Chrome или Edge." %}</div>

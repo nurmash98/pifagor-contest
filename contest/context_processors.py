@@ -144,11 +144,21 @@ def room_open(request):
     """Полоса «Учитель открыл коворкинг» — ученикам класса, пока зал открыт (кеш 30 сек, без лишних запросов)."""
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated or user.is_staff:
-        return {'room_open': None}
+        return {'room_open': None, 'office_open': False}
     m = getattr(request, 'resolver_match', None)
     if m and m.url_name and m.url_name.startswith('room_'):
-        return {'room_open': None}
+        return {'room_open': None, 'office_open': False}
+    from django.core.cache import cache
+    from . import office
     from .models import Student
+    from .quarters import grade_of
     from .room_views import open_room_for_class
+    if cache.add('office:finalize', 1, 600):            # итоги офиса выходного дня (топ-3 по 20 монет) — раз в 10 минут
+        try:
+            office.finalize_due()
+        except Exception:                               # награды не должны ломать страницы
+            pass
     cls = Student.objects.filter(user=user).values_list('school_class', flat=True).first()
-    return {'room_open': open_room_for_class(cls)}
+    g = grade_of(cls or '')
+    office_open = bool(office.is_open() and g.isdigit() and int(g) >= 5 and not (m and m.url_name and m.url_name.startswith('office_')))
+    return {'room_open': open_room_for_class(cls), 'office_open': office_open, 'office_ok': g.isdigit() and int(g) >= 5}
