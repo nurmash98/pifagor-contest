@@ -50,9 +50,14 @@ def grades():
     return out
 
 
+ADMIN = 'adm'
+
+
 def layout(grade_list):
-    """Этаж офиса: кабинеты параллелей в два ряда, между ними коридор с лаунжем.
-    В каждом кабинете 2 блока по 6 мест; места помечены параллелью (seat['grade'])."""
+    """Этаж офиса: кабинеты параллелей в два ряда, между ними коридор с лаунжем; последний кабинет —
+    «Администрация» для учителей (4 рабочих стола). В кабинете параллели 2 блока по 6 мест;
+    места помечены параллелью (seat['grade']), в администрации — 'adm' и teacher=True."""
+    grade_list = list(grade_list) + [ADMIN]
     n = max(1, len(grade_list))
     per_row = math.ceil(n / 2)
     W = 1 + per_row * COL + 6                       # +6 — лаунж в конце коридора
@@ -73,15 +78,26 @@ def layout(grade_list):
             oy, wall_y, door_y, a = 1, 7, 7, 2          # интерьер y 1..6, стекло по y=7
         else:
             oy, wall_y, door_y, a = 12, 11, 11, 13      # стекло по y=11, интерьер y 12..17
-        put('zone', ox, oy, CAB_W, 6, solid=False, c='carpet' if k % 2 else 'wood')
+        admin = g == ADMIN
+        put('zone', ox, oy, CAB_W, 6, solid=False, c='wood' if admin else ('carpet' if k % 2 else 'wood'))
         for x in range(ox, ox + CAB_W):
             if x not in (ox + 4,):                      # дверь
                 put('glass', x, wall_y, axis='x')
         for y in range(min(oy, wall_y), max(oy + 5, wall_y) + 1):
             put('glass', ox + CAB_W, y, axis='y')
-        put('sign', ox + 4, door_y, 1, 1, solid=False, text=f'{g} класс' if g else '', icon='🏢')
+        put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢')
         put('plant', ox + (CAB_W - 1 if row == 0 else 0), oy if row == 0 else oy + 5)
         sid = 0
+        if admin:                                    # учительская: 4 больших стола, кресла лицом к двери
+            dy = a + 1
+            for k2, bx in enumerate((ox + 1, ox + 5)):
+                for yy in (dy, dy + 3) if row == 0 else (dy, dy + 3):
+                    cy = yy - 1 if row == 0 else yy - 1
+                    put('tdesk', bx + 1, yy, 2, 1, cx=bx + 2, cy=cy)
+                    seats.append({'id': f'{ADMIN}-{sid}', 'x': bx + 2, 'y': cy, 'teacher': True, 'grade': ADMIN}); sid += 1
+                    put('chair', bx + 2, cy, solid=False, face='down', boss=True)
+            put('shelf', ox + 3, oy if row == 0 else oy + 5, 3, 1) if row == 0 else put('plant', ox + 8, oy + 5)
+            continue
         for bx in (ox + 1, ox + 5):
             for i in range(3):
                 x = bx + i

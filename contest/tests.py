@@ -5326,6 +5326,13 @@ class WeekendOfficeTests(TestCase):
             # сесть в кабинет чужой параллели нельзя
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '9-0'}).json()['error'], 'other_grade')
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '8-0'}).json(), {'ok': True})
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': 'adm-0'}).json()['error'], 'admin_only')
+            teacher = User.objects.create_user('of_t', password='p', is_staff=True)
+            self.client.force_login(teacher)
+            self.assertContains(self.client.get(reverse('office_play')), '"adm-0"')
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': 'adm-1'}).json(), {'ok': True})
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'move', 'x': 2, 'y': 2, 'seat': '8-1'}).json()['error'], 'other_grade')
+            self.client.force_login(self.sts[3].user)
         later = self.sat + timedelta(minutes=5)
         Submission.objects.create(student=self.sts[0], task=self.tC, status='DONE', is_graded=True, score=10)
         Submission.objects.create(student=self.sts[1], task=self.tB, status='DONE', is_graded=True, score=10)

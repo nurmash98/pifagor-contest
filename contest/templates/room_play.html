@@ -476,7 +476,7 @@
         var s = seatAt[x + ',' + y];
         if (!s && block[x + ',' + y]) {
             L.objs.forEach(function (o) { if (o.t === 'desk' && o.x === x && o.y === y) { s = seatAt[o.cx + ',' + o.cy]; } });   // стол → его стул
-            if (!s) { L.objs.forEach(function (o) { if (o.t === 'tdesk' && x >= o.x && x < o.x + o.w && y === o.y) { s = seatById.t; } }); }
+            if (!s) { L.objs.forEach(function (o) { if (o.t === 'tdesk' && x >= o.x && x < o.x + o.w && y === o.y) { s = o.cx !== undefined ? seatAt[o.cx + ',' + o.cy] : seatById.t; } }); }
         }
         return s || null;
     }
@@ -499,8 +499,8 @@
         var x = t[0], y = t[1];
         if (x < 0 || y < 0 || x >= W || y >= H) { return; }
         var s = seatOfClick(x, y);
+        if (s && OFFICE && s.grade !== MY_GRADE) { toast('🚪 ' + (s.grade === 'adm' ? TXT.admin_only : TXT.other_grade)); return; }
         if (s && s.teacher && !TEACHER) { goBoss(); return; }                       // стол руководителя — подойти за заданием
-        if (s && OFFICE && s.grade !== MY_GRADE) { toast('🚪 ' + TXT.other_grade); return; }
         if (s) {
             if (s.teacher !== TEACHER) { toast(TEACHER ? TXT.taken : TXT.teacher_seat); return; }
             if (takenBy(s.id)) { toast(TXT.taken); return; }
@@ -558,7 +558,15 @@
     function standUp() { if (seated) { seated = false; closeDrawer(); tasksPanel(); } }
     // ---------- офис выходного дня: свои задачи по темам, x2 монеты, топ параллели ----------
     var OME = {money: 0, coins: 0, today: [], solved: {{ solved_json|default:"[]"|safe }}}, otag = null, oq = '';
+    var OGRADE = '', GRADES = {{ grades_json|default:"[]"|safe }};
     function officePanel() {
+        if (TEACHER) {                                   // учитель: какую параллель показывать в топе
+            if (!OGRADE && GRADES.length) { OGRADE = GRADES[0]; }
+            $('tasks').innerHTML = '<div class="hint">👔 ' + TXT.admin_hint + '</div><div class="otags">' + GRADES.map(function (g) {
+                return '<button type="button" data-g="' + g + '" class="' + (g === OGRADE ? 'on' : '') + '">' + g + '</button>'; }).join('') + '</div>';
+            officeList();
+            return;
+        }
         var h = '<div class="mycard"><div class="lbl">' + TXT.earned + '</div><div class="sal">' + money(OME.money) + '</div>' +
                 '<div class="hint" style="margin:4px 0 0">🪙 +' + (OME.coins * 2) + ' ' + TXT.coins_x2 + ' · ✅ ' + OME.today.length + '</div></div>';
         if (!seated && !TEACHER) { h += '<div class="hint">🪑 ' + TXT.sit_own + '</div>'; }
@@ -575,6 +583,12 @@
             return '<div class="task' + (done ? ' done' : '') + '" data-id="' + t.id + '"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + esc(t.title) + '</span>' +
                    (done ? '✅' : '<span class="pay">' + money(t.pay) + '</span>') + '</div>';
         }).join('') || '<div class="hint">' + TXT.none + '</div>';
+    }
+    if (OFFICE && TEACHER) {
+        $('tasks').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-g]'); if (!b) { return; }
+            OGRADE = b.getAttribute('data-g'); officePanel(); poll();
+        });
     }
     if (OFFICE) {
         $('otags').innerHTML = OTAGS.map(function (g) { return '<button type="button" data-tag="' + g[0] + '">' + esc(g[1]) + '</button>'; }).join('');
@@ -659,7 +673,8 @@
     // ---------------- опрос сервера ----------------
     var timerLeft = null, timerAt = 0;
     function poll(fresh) {
-        fetch(U.state + (fresh ? '?fresh=1' : ''), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
+        var qs = (fresh ? '?fresh=1' : '?') + (OFFICE && TEACHER && OGRADE ? '&g=' + encodeURIComponent(OGRADE) : '');
+        fetch(U.state + (qs === '?' ? '' : qs), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
     }
     function apply(d) {
         if (!d.open && !TEACHER) { $('closed').style.display = 'flex'; }

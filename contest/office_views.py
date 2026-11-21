@@ -35,7 +35,7 @@ def _who(request):
 def _base(request, st, grade, teacher):
     def make():
         if teacher:
-            return {'n': request.user.get_full_name() or request.user.username, 'teacher': True, 'c': -1,
+            return {'n': request.user.get_full_name() or request.user.username, 'teacher': True, 'c': -1, 'g': of.ADMIN,
                     'x': of.SPAWN[0], 'y': of.SPAWN[1], 'j': timezone.now().timestamp()}
         return dict({'n': st.full_name, 'teacher': False, 'c': st.id % len(COLORS), 'sid': st.id, 'g': grade,
                      'x': of.SPAWN[0] + request.user.id % 8, 'y': of.SPAWN[1], 'j': timezone.now().timestamp()}, **_label(st))
@@ -79,10 +79,10 @@ def office_play(request):
     solved = list(Submission.objects.filter(student=st, is_graded=True, score=10).values_list('task_id', flat=True)) if st else []
     room = type('R', (), {'id': 0, 'school_class': '', 'title': ''})()
     return render(request, 'room_play.html', {
-        'room': room, 'teacher': teacher, 'me': request.user.id, 'office': True, 'my_grade': grade or '',
+        'room': room, 'teacher': teacher, 'me': request.user.id, 'office': True, 'my_grade': of.ADMIN if teacher else (grade or ''),
         'state_url': reverse('office_state'), 'act_url': reverse('office_act'), 'lang_url': reverse('office_lang'),
         'layout': json.dumps(of.layout(of.grades())), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
-        'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved),
+        'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved), 'grades_json': json.dumps(of.grades()),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_texts(lang), ensure_ascii=False),
     })
 
@@ -111,7 +111,7 @@ def office_state(request):
         of.collect(day)
     data = of.stats(day)
     online = {p[0] for p in ppl}
-    show = grade or (request.GET.get('g') or (of.grades() or [''])[0])
+    show = grade if not teacher else (request.GET.get('g') or (of.grades() or [''])[0])
     names = _class_names(show)
     rows = [[names[sid][0], names[sid][1], m, n, names[sid][0] in online, 0, None] for sid, m, n in data.get(show, []) if sid in names]
     out = {'open': open_, 'people': ppl, 'stats': rows[:15],
@@ -147,8 +147,8 @@ def office_act(request):
         except (TypeError, ValueError):
             return JsonResponse({'error': 'bad'})
         seat = (request.POST.get('seat') or '')[:8] or None
-        if seat and (teacher or of.seat_grade(seat) != grade):
-            return JsonResponse({'error': 'other_grade'})
+        if seat and of.seat_grade(seat) != (of.ADMIN if teacher else grade):
+            return JsonResponse({'error': 'admin_only' if of.seat_grade(seat) == of.ADMIN else 'other_grade'})
         if seat and rm.seat_taken(r, seat, me):
             return JsonResponse({'error': 'taken'})
         rm.touch(r, me, base, x=round(x, 2), y=round(y, 2), seat=seat)
