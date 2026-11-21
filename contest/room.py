@@ -165,3 +165,15 @@ def stats(room, fresh=False):
         data = {'now': now_solved, 'before': before}
         cache.set(key, data, 10)
     return data
+
+
+def add_exit(rid, uid):
+    """Ученик вышел из полного экрана или ушёл на другую вкладку — учитель видит счётчик 🚪."""
+    k = f'room:{rid}:exits'
+    data = cache.get(k) or {}
+    data[uid] = data.get(uid, 0) + 1
+    cache.set(k, data, TTL)
+
+
+def exits(rid):
+    return cache.get(f'room:{rid}:exits') or {}

@@ -5183,6 +5183,25 @@ class StudyRoomTests(TestCase):
         self.assertEqual(st['mine'], [self.tasks[0].id])
         self.assertEqual(st['n_tasks'], 2)
 
+    def test_lang_switch_and_fullscreen_exits_seen_by_teacher(self):
+        room = self._open()
+        a = self.sts[0]
+        self.client.force_login(a.user)
+        html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
+        self.assertIn('data-tr="Задачи урока"', html)
+        r = self.client.post(reverse('room_lang', args=[room.id]), {'lang': 'kk', 'keys': '["Задачи урока"]'}).json()
+        self.assertEqual(r['tr']['Задачи урока'], UI_TRANSLATIONS['Задачи урока'])
+        self.assertEqual(r['txt']['fs_start'], UI_TRANSLATIONS['Войти в полноэкранном режиме'])
+        self.assertEqual(len(r['tasks']), 2)
+        act = reverse('room_act', args=[room.id])
+        self.client.post(act, {'a': 'exit', 'kind': 'fullscreen'})
+        self.client.post(act, {'a': 'exit', 'kind': 'hidden'})
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertEqual([r for r in st['stats'] if r[0] == a.user_id][0][5], 0)            # ученик чужие выходы не видит
+        self.client.force_login(self.tu)
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertEqual([r for r in st['stats'] if r[0] == a.user_id][0][5], 2)
+
     def test_close_room(self):
         room = self._open()
         self.client.post(reverse('room_close', args=[room.id]))

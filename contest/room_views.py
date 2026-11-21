@@ -139,6 +139,43 @@ def room_enter(request):
     return redirect('room_play', room_id=rid)
 
 
+ROOM_TEXTS = {
+    'sit_first': 'Сначала сядьте за стол', 'taken': 'Это место занято', 'wait': 'Не так быстро — подождите пару секунд',
+    'teacher_seat': 'Это стол учителя', 'you': 'вы', 'hand_up': 'Опустить руку', 'hand': 'Поднять руку', 'lower': 'опустить',
+    'none': '—', 'of': 'из', 'at_desk': 'Вы за столом — выбирайте задачу справа', 'close_q': 'Закрыть зал для всего класса?',
+    'fs_title': 'Урок в коворкинге', 'fs_start': 'Войти в полноэкранном режиме', 'fs_out': 'Вы вышли из полноэкранного режима',
+    'fs_back': 'Вернуться в полноэкранный режим', 'exits': 'Выходов из полного экрана / на другие вкладки',
+}
+
+
+def _texts(lang):
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    return {k: (UI_TRANSLATIONS.get(v, v) if lang == 'kk' else v) for k, v in ROOM_TEXTS.items()}
+
+
+def _task_list(room, lang):
+    return [{'id': t.id, 'title': t.get_display_title(lang), 'level': t.level, 'url': reverse('task_detail', args=[t.id])}
+            for t in room.tasks.order_by('level', 'id')]
+
+
+@login_required
+@require_POST
+def room_lang(request, room_id):
+    """RU/KZ прямо в зале, без перезагрузки (иначе сбросился бы полный экран)."""
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    room, st, teacher = _access(request, room_id)
+    lang = request.POST.get('lang')
+    if lang not in ('ru', 'kk'):
+        return JsonResponse({'ok': False})
+    request.session['content_lang'] = lang
+    try:
+        keys = [k for k in json.loads(request.POST.get('keys') or '[]') if isinstance(k, str)][:200]
+    except ValueError:
+        keys = []
+    return JsonResponse({'ok': True, 'txt': _texts(lang), 'tasks': _task_list(room, lang),
+                         'tr': {k: (UI_TRANSLATIONS.get(k, k) if lang == 'kk' else k) for k in keys}})
+
+
 @login_required
 def room_play(request, room_id):
     room, st, teacher = _access(request, room_id)
@@ -147,21 +184,22 @@ def room_play(request, room_id):
         return redirect('codegames')
     lang = _lang(request)
     n = Student.objects.filter(school_class=room.school_class).count()
-    tasks = [{'id': t.id, 'title': t.get_display_title(lang), 'level': t.level, 'url': reverse('task_detail', args=[t.id])}
-             for t in room.tasks.order_by('level', 'id')]
+    tasks = _task_list(room, lang)
     me = request.user.id
     rm.touch(room.id, me, _base(request, st, teacher))
     return render(request, 'room_play.html', {
         'room': room, 'teacher': teacher, 'me': me,
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
-        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX,
+        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'texts': json.dumps(_texts(lang), ensure_ascii=False),
     })
 
 
-def _stats_rows(room, data, online):
+def _stats_rows(room, data, online, exits=None):
     rows = []
+    exits = exits or {}
     for s in Student.objects.filter(school_class=room.school_class).only('id', 'full_name', 'user_id').order_by('full_name'):
-        rows.append([s.user_id, s.full_name, len(data['now'].get(s.id, [])), len(data['before'].get(s.id, [])), s.user_id in online])
+        rows.append([s.user_id, s.full_name, len(data['now'].get(s.id, [])), len(data['before'].get(s.id, [])), s.user_id in online,
+                     exits.get(s.user_id, 0)])
     rows.sort(key=lambda r: (-r[2], -r[3], r[1]))
     return rows
 
@@ -178,7 +216,7 @@ def room_state(request, room_id):
     online = {p[0] for p in ppl}
     out = {'open': room.is_open(), 'people': ppl,
            'left': max(0, int((room.ends_at - timezone.now()).total_seconds())) if room.ends_at else None,
-           'stats': _stats_rows(room, data, online), 'n_tasks': room.tasks.count()}
+           'stats': _stats_rows(room, data, online, rm.exits(room.id) if teacher else None), 'n_tasks': room.tasks.count()}
     if st is not None:
         out['mine'] = data['now'].get(st.id, []) + data['before'].get(st.id, [])
     if teacher:
@@ -215,6 +253,9 @@ def room_act(request, room_id):
     if act == 'hand':
         p = rm.touch(room.id, me, base)
         rm.touch(room.id, me, base, hand=not p.get('hand'))
+        return JsonResponse({'ok': True})
+    if act == 'exit' and not teacher:
+        rm.add_exit(room.id, me)
         return JsonResponse({'ok': True})
     if act == 'lower' and teacher:
         try:
