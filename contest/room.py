@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""3D-коворкинг класса: планировка зала, присутствие (в кеше), сообщения, поднятые руки, статистика урока.
+"""«Компания Пифагор» (бывший коворкинг класса): офис, присутствие (в кеше), сообщения, поднятые руки,
+задания от руководителя и зарплата.
 
 База почти не трогается: позиции/сообщения — в кеше (FileBasedCache, общий для всех воркеров),
 статистика решённых задач считается одним запросом и кешируется на 10 секунд на весь зал."""
@@ -59,7 +60,8 @@ def layout(n_students):
     put('bean', 18, H - 3, solid=True)
     put('bean', 20, H - 3, solid=True)
     put('lrug', 17, 6, 6, 6, solid=False)
-    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block)}
+    boss = [[x, y] for x in range(8, 12) for y in (4, 5)]           # «приёмная» руководителя: сюда подходят за заданием
+    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': boss}
 
 
 # ------------------------------------------------------------------ присутствие
@@ -132,6 +134,13 @@ def say(rid, uid, text, now=None):
     return None
 
 
+def log_event(rid, name, text):
+    """Событие в журнал руководителя (взял задание и т.п.)."""
+    log = cache.get(f'room:{rid}:log') or []
+    log.append([int(time.time()), name, text, False])
+    cache.set(f'room:{rid}:log', log[-LOG_MAX:], TTL)
+
+
 def log(rid):
     return cache.get(f'room:{rid}:log') or []
 
@@ -147,25 +156,76 @@ def public(rid, now=None):
     return out
 
 
-# ------------------------------------------------------------------ статистика урока
+# ------------------------------------------------------------------ компания: задания и зарплата
 
-def stats(room, fresh=False):
-    """Кто сколько задач урока решил с начала урока: {student_id: [task_id, …]} + всего решено ранее.
-    Кешируется на 10 секунд на весь зал — один запрос к базе на всех."""
-    key = f'room:{room.id}:stats'
+PAY = {'A': 10000, 'B': 20000, 'C': 30000}          # ₸ за лёгкую / среднюю / сложную задачу
+BOSS = {(x, y) for x in range(8, 12) for y in (4, 5)}
+
+
+def near_boss(p):
+    return p is not None and (round(p.get('x', -9)), round(p.get('y', -9))) in BOSS
+
+
+def company(room, fresh=False):
+    """Задания и зарплата по ученикам: {student_id: {'salary', 'done': [task_id], 'cur': task_id|None}}.
+    Заодно отмечает выполненные задания (задача решена полностью после выдачи).
+    Кешируется на 10 секунд на весь офис — 1–2 запроса к базе на всех."""
+    key = f'room:{room.id}:co'
     data = None if fresh else cache.get(key)
-    if data is None:
-        from .models import Submission
-        task_ids = list(room.tasks.values_list('id', flat=True))
-        now_solved, before = {}, {}
-        if task_ids:
-            for sid, tid, upd in (Submission.objects.filter(student__school_class=room.school_class, task_id__in=task_ids,
-                                                            is_graded=True, score=10)
-                                  .values_list('student_id', 'task_id', 'updated_at')):
-                (now_solved if upd >= room.started_at else before).setdefault(sid, []).append(tid)
-        data = {'now': now_solved, 'before': before}
-        cache.set(key, data, 10)
+    if data is not None:
+        return data
+    from django.utils import timezone
+    from .models import RoomAssignment, Submission
+    rows = list(RoomAssignment.objects.filter(room=room).values('id', 'student_id', 'task_id', 'pay', 'assigned_at', 'done_at'))
+    open_ = [r for r in rows if r['done_at'] is None]
+    if open_:
+        since = min(r['assigned_at'] for r in open_)
+        solved = {}
+        for sid, tid, upd in (Submission.objects.filter(student_id__in={r['student_id'] for r in open_},
+                                                        task_id__in={r['task_id'] for r in open_}, is_graded=True, score=10,
+                                                        updated_at__gte=since).values_list('student_id', 'task_id', 'updated_at')):
+            solved[(sid, tid)] = upd
+        now = timezone.now()
+        done_ids = [r['id'] for r in open_ if (r['student_id'], r['task_id']) in solved
+                    and solved[(r['student_id'], r['task_id'])] >= r['assigned_at']]
+        if done_ids:
+            RoomAssignment.objects.filter(id__in=done_ids, done_at__isnull=True).update(done_at=now)
+            for r in rows:
+                if r['id'] in done_ids:
+                    r['done_at'] = now
+    data = {}
+    for r in rows:
+        d = data.setdefault(r['student_id'], {'salary': 0, 'done': [], 'cur': None})
+        if r['done_at'] is None:
+            d['cur'] = r['task_id']
+        else:
+            d['salary'] += r['pay']
+            d['done'].append(r['task_id'])
+    cache.set(key, data, 10)
     return data
+
+
+def take(room, student, presence):
+    """Ученик подошёл к руководителю — выдать следующее задание из списка.
+    Возвращает (task, None) или (None, ошибка): far / busy / all_done."""
+    from .models import RoomAssignment, Submission, Task
+    if not near_boss(presence):
+        return None, 'far'
+    mine = company(room, fresh=True).get(student.id, {})
+    if mine.get('cur'):
+        return None, 'busy'
+    tasks = {t.id: t for t in room.tasks.all()}
+    order = [i for i in (room.task_order or []) if i in tasks] + sorted((i for i in tasks if i not in (room.task_order or [])),
+                                                                        key=lambda i: (tasks[i].level, i))
+    had = set(RoomAssignment.objects.filter(room=room, student=student).values_list('task_id', flat=True))
+    solved = set(Submission.objects.filter(student=student, task_id__in=order, is_graded=True, score=10).values_list('task_id', flat=True))
+    nxt = next((i for i in order if i not in had and i not in solved), None)     # уже решённые раньше — не выдаём
+    if nxt is None:
+        return None, 'all_done'
+    t = tasks[nxt]
+    RoomAssignment.objects.get_or_create(room=room, student=student, task=t, defaults={'pay': PAY.get(t.level, PAY['A'])})
+    cache.delete(f'room:{room.id}:co')
+    return t, None
 
 
 def add_exit(rid, uid):

@@ -230,7 +230,7 @@
     {% if room_open %}
     <div class="room-strip" style="background:linear-gradient(90deg,#0f766e,#22c55e);color:#fff">
         <div class="container py-2 d-flex align-items-center justify-content-center gap-3 flex-wrap text-center fw-semibold">
-            🏫 <span>{% if content_lang == 'kk' %}Мұғалім сыныпқа коворкинг ашты — үстелге отырып, сабақ есептерін шығар!{% else %}Учитель открыл коворкинг класса — садись за стол и решай задачи урока!{% endif %}</span>
+            🏢 <span>{% if content_lang == 'kk' %}«Пифагор» компаниясында жұмыс күні басталды — басшыдан тапсырма алып, жалақы тап!{% else %}В компании «Пифагор» начался рабочий день — получи задание у руководителя и заработай зарплату!{% endif %}</span>
             <a href="{% url 'room_play' room_open %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#fff;color:#0f766e">{% if content_lang == 'kk' %}Кіру{% else %}Войти{% endif %} →</a>
         </div>
     </div>

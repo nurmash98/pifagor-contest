@@ -135,6 +135,13 @@ def room_manage(request):
                                         ends_at=now + timedelta(minutes=minutes), theory_topic=topic,
                                         theory_text=(request.POST.get('theory_text') or '').strip()[:20000])
         room.tasks.set(tasks)
+        valid = {t.id for t in tasks}
+        order = []
+        for x in (request.POST.get('order') or '').split(','):
+            if x.strip().isdigit() and int(x) in valid and int(x) not in order:
+                order.append(int(x))
+        room.task_order = order + [t.id for t in sorted(tasks, key=lambda t: (t.level, t.id)) if t.id not in order]
+        room.save(update_fields=['task_order'])
         _forget_open(cls)
         return redirect('room_play', room_id=room.id)
     now = timezone.now()
@@ -167,7 +174,7 @@ def room_close(request, room_id):
         room.save(update_fields=['closed_at'])
     _forget_open(room.school_class)
     cache.delete(f'room:obj:{room.id}')
-    messages.success(request, f'Коворкинг {room.school_class} закрыт.')
+    messages.success(request, f'Рабочий день в компании ({room.school_class}) закончен.')
     return redirect('room_manage')
 
 
@@ -227,10 +234,14 @@ def room_theory(request, room_id, kind, item_id):
 ROOM_TEXTS = {
     'sit_first': 'Сначала сядьте за стол', 'taken': 'Это место занято', 'wait': 'Не так быстро — подождите пару секунд',
     'teacher_seat': 'Это стол учителя', 'you': 'вы', 'hand_up': 'Опустить руку', 'hand': 'Поднять руку', 'lower': 'опустить',
-    'none': '—', 'of': 'из', 'at_desk': 'Вы за столом — выбирайте задачу справа', 'close_q': 'Закрыть зал для всего класса?',
-    'fs_title': 'Урок в коворкинге', 'fs_start': 'Войти в полноэкранном режиме', 'fs_out': 'Вы вышли из полноэкранного режима',
+    'none': '—', 'of': 'из', 'at_desk': 'Вы за столом — откройте задание справа', 'close_q': 'Закончить рабочий день для всего класса?',
+    'fs_title': 'Компания «Пифагор»', 'fs_start': 'Войти в полноэкранном режиме', 'fs_out': 'Вы вышли из полноэкранного режима',
     'fs_back': 'Вернуться в полноэкранный режим', 'exits': 'Выходов из полного экрана / на другие вкладки',
     'notes': 'Объяснение учителя',
+    'far': 'Подойдите к столу руководителя', 'busy': 'Сначала закончите текущее задание', 'all_done': 'Все задания выполнены — отличная работа!',
+    'got': 'Руководитель дал задание', 'go_boss': 'Подойдите к руководителю за заданием', 'cur': 'Текущее задание',
+    'in_work': 'в работе', 'done': 'выполнено', 'salary': 'Зарплата', 'to_boss': 'К руководителю', 'paid': 'Задание выполнено! Зарплата',
+    'boss': 'Руководитель', 'tenge': '₸', 'no_task': 'нет задания',
 }
 
 
@@ -240,8 +251,11 @@ def _texts(lang):
 
 
 def _task_list(room, lang):
-    return [{'id': t.id, 'title': t.get_display_title(lang), 'level': t.level, 'url': reverse('task_detail', args=[t.id])}
-            for t in room.tasks.order_by('level', 'id')]
+    """Задачи в том порядке, в каком руководитель их выдаёт."""
+    order = {tid: i for i, tid in enumerate(room.task_order or [])}
+    tasks = sorted(room.tasks.all(), key=lambda t: (order.get(t.id, 10 ** 6), t.level, t.id))
+    return [{'id': t.id, 'title': t.get_display_title(lang), 'level': t.level, 'url': reverse('task_detail', args=[t.id]),
+             'pay': rm.PAY.get(t.level, rm.PAY['A'])} for t in tasks]
 
 
 @login_required
@@ -266,7 +280,7 @@ def room_lang(request, room_id):
 def room_play(request, room_id):
     room, st, teacher = _access(request, room_id)
     if not room.is_open() and not teacher:
-        messages.info(request, 'Этот коворкинг уже закрыт.')
+        messages.info(request, 'Рабочий день в компании уже закончился.')
         return redirect('codegames')
     lang = _lang(request)
     n = Student.objects.filter(school_class=room.school_class).count()
@@ -282,7 +296,8 @@ def room_play(request, room_id):
     })
 
 
-def _stats_rows(room, data, online, exits=None):
+def _stats_rows(room, co, online, exits=None):
+    """[[uid, имя, зарплата, выполнено заданий, в офисе, выходов, текущее задание (id|None)]] — по зарплате."""
     rows = []
     exits = exits or {}
     key = f'room:class:{room.school_class}'
@@ -292,9 +307,10 @@ def _stats_rows(room, data, online, exits=None):
         cache.set(key, students, 60)
     for sid, full_name, user_id in students:
         s = Student(id=sid, full_name=full_name, user_id=user_id)
-        rows.append([s.user_id, s.full_name, len(data['now'].get(s.id, [])), len(data['before'].get(s.id, [])), s.user_id in online,
-                     exits.get(s.user_id, 0)])
-    rows.sort(key=lambda r: (-r[2], -r[3], r[1]))
+        d = co.get(s.id, {})
+        rows.append([s.user_id, s.full_name, d.get('salary', 0), len(d.get('done', [])), s.user_id in online,
+                     exits.get(s.user_id, 0), d.get('cur')])
+    rows.sort(key=lambda r: (-r[2], -r[3], not r[4], r[1]))
     return rows
 
 
@@ -306,13 +322,14 @@ def room_state(request, room_id):
     if room.is_open():
         rm.touch(room.id, me, _base_lazy(request, st, teacher))
     ppl = rm.public(room.id)
-    data = rm.stats(room, fresh=fresh)
+    co = rm.company(room, fresh=fresh)
     online = {p[0] for p in ppl}
     out = {'open': room.is_open(), 'people': ppl,
            'left': max(0, int((room.ends_at - timezone.now()).total_seconds())) if room.ends_at else None,
-           'stats': _stats_rows(room, data, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count()}
+           'stats': _stats_rows(room, co, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count()}
     if st is not None:
-        out['mine'] = data['now'].get(st.id, []) + data['before'].get(st.id, [])
+        mine = co.get(st.id, {})
+        out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0)}
     if teacher:
         out['log'] = rm.log(room.id)[-30:]
     return JsonResponse(out)
@@ -348,6 +365,12 @@ def room_act(request, room_id):
         p = rm.touch(room.id, me, base)
         rm.touch(room.id, me, base, hand=not p.get('hand'))
         return JsonResponse({'ok': True})
+    if act == 'take' and not teacher:
+        task, err = rm.take(room, st, rm.get(room.id, me))
+        if err:
+            return JsonResponse({'error': err})
+        rm.log_event(room.id, st.full_name, f'📋 взял задание «{task.title}» ({task.level})')
+        return JsonResponse({'ok': True, 'task': task.id})
     if act == 'exit' and not teacher:
         rm.add_exit(room.id, me)
         return JsonResponse({'ok': True})

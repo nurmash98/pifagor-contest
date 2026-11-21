@@ -630,6 +630,7 @@ class StudyRoom(models.Model):
     tasks = models.ManyToManyField('Task', blank=True, verbose_name="Задачи урока")
     theory_topic = models.ForeignKey('Topic', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Теория из курса")
     theory_text = models.TextField(blank=True, verbose_name="Теория / заметки учителя")
+    task_order = models.JSONField(default=list, blank=True, verbose_name="Порядок выдачи задач (id)")
     started_at = models.DateTimeField(auto_now_add=True)
     ends_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыть автоматически")
     closed_at = models.DateTimeField(null=True, blank=True)
@@ -646,6 +647,23 @@ class StudyRoom(models.Model):
 
     def __str__(self):
         return f'{self.school_class}: {self.title or "коворкинг"}'
+
+
+class RoomAssignment(models.Model):
+    """«Компания Пифагор»: задание, которое ученик-сотрудник получил у руководителя (учителя).
+    Пока задание не выполнено (задача не решена полностью), нового не дают. За выполненное — зарплата."""
+    room = models.ForeignKey(StudyRoom, on_delete=models.CASCADE, related_name='assignments')
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='room_assignments')
+    task = models.ForeignKey('Task', on_delete=models.CASCADE)
+    pay = models.PositiveIntegerField(default=0, verbose_name="Зарплата за задание, ₸")
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    done_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Задание в компании"
+        verbose_name_plural = "Задания в компании"
+        unique_together = [('room', 'student', 'task')]
+        ordering = ['assigned_at']
 
 
 class UpsolveAnswer(models.Model):

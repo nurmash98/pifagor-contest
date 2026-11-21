@@ -5170,28 +5170,58 @@ class StudyRoomTests(TestCase):
         st = self.client.get(reverse('room_state', args=[room.id])).json()
         self.assertFalse([p for p in st['people'] if p[0] == a.user_id][0][6])
 
-    def test_stats_count_tasks_solved_during_lesson(self):
-        room = self._open()
+    def _post_open(self, order, tasks):
+        self.client.force_login(self.tu)
+        self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'tasks': [t.id for t in tasks],
+                                                  'order': ','.join(str(t.id) for t in order)})
+        return StudyRoom.objects.get()
+
+    def test_company_tasks_from_boss_in_order_and_salary(self):
+        from django.core.cache import cache
+        from .models import RoomAssignment
+        b = make_task('Средняя', 'B', Tag.objects.get(name='Циклы'))
+        room = self._post_open([b, self.tasks[0]], [self.tasks[0], b])
+        self.assertEqual(room.task_order, [b.id, self.tasks[0].id])                 # порядок — как выбрал руководитель
+        a = self.sts[0]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.post(act, {'a': 'move', 'x': 3, 'y': 8, 'seat': 's1'})
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'far')      # надо подойти к столу руководителя
+        self.client.post(act, {'a': 'move', 'x': 9, 'y': 4})
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json(), {'ok': True, 'task': b.id})
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'busy')     # пока не выполнил — нового нет
+        st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
+        self.assertEqual(st['me'], {'cur': b.id, 'done': [], 'salary': 0})
+        Submission.objects.create(student=a, task=b, status='DONE', is_graded=True, score=10)
+        cache.delete(f'room:fresh:{a.user_id}')
+        st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
+        self.assertEqual(st['me'], {'cur': None, 'done': [b.id], 'salary': 20000})
+        self.assertIsNotNone(RoomAssignment.objects.get(student=a, task=b).done_at)
+        row = [r for r in st['stats'] if r[0] == a.user_id][0]
+        self.assertEqual((row[2], row[3]), (20000, 1))
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['task'], self.tasks[0].id)
+        self.client.force_login(self.tu)
+        self.assertIn('взял задание', self.client.get(reverse('room_state', args=[room.id])).json()['log'][-1][2])
+
+    def test_company_skips_tasks_solved_before_and_all_done(self):
         a = self.sts[0]
         Submission.objects.create(student=a, task=self.tasks[0], status='DONE', is_graded=True, score=10)
-        Submission.objects.create(student=a, task=self.tasks[2], status='DONE', is_graded=True, score=10)   # не задача урока
-        Submission.objects.create(student=self.sts[1], task=self.tasks[1], status='DONE', is_graded=True, score=6)
+        room = self._post_open([self.tasks[0]], [self.tasks[0]])
+        act = reverse('room_act', args=[room.id])
         self.client.force_login(a.user)
-        st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
-        rows = {r[0]: r for r in st['stats']}
-        self.assertEqual(rows[a.user_id][2], 1)
-        self.assertEqual(rows[self.sts[1].user_id][2], 0)
-        self.assertEqual(st['mine'], [self.tasks[0].id])
-        self.assertEqual(st['n_tasks'], 2)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.post(act, {'a': 'move', 'x': 10, 'y': 5})
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'all_done')
 
     def test_lang_switch_and_fullscreen_exits_seen_by_teacher(self):
         room = self._open()
         a = self.sts[0]
         self.client.force_login(a.user)
         html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
-        self.assertIn('data-tr="Задачи урока"', html)
-        r = self.client.post(reverse('room_lang', args=[room.id]), {'lang': 'kk', 'keys': '["Задачи урока"]'}).json()
-        self.assertEqual(r['tr']['Задачи урока'], UI_TRANSLATIONS['Задачи урока'])
+        self.assertIn('data-tr="Моя работа"', html)
+        r = self.client.post(reverse('room_lang', args=[room.id]), {'lang': 'kk', 'keys': '["Моя работа"]'}).json()
+        self.assertEqual(r['tr']['Моя работа'], UI_TRANSLATIONS['Моя работа'])
         self.assertEqual(r['txt']['fs_start'], UI_TRANSLATIONS['Войти в полноэкранном режиме'])
         self.assertEqual(len(r['tasks']), 2)
         act = reverse('room_act', args=[room.id])

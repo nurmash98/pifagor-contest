@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% t "Коворкинг" %} {{ room.school_class }} — Pifagor Contest</title>
+    <title>{% t "Компания Пифагор" %} {{ room.school_class }} — Pifagor Contest</title>
     <script>
         (function () { var t = null; try { t = localStorage.getItem('pifagor-theme'); } catch (e) {}
           if (t !== 'dark' && t !== 'light') { t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
@@ -73,6 +73,12 @@
         .plab .pmsg { max-width: 230px; background: rgba(15,23,42,.88); color: #fff; font-weight: 700; font-size: 13px; line-height: 1.3;
                       padding: 6px 12px; border-radius: 12px; text-align: center; white-space: normal; word-break: break-word; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
         .plab .pmsg.t { background: rgba(180,83,9,.94); }
+        .mycard { border-radius: 14px; padding: 12px; background: linear-gradient(135deg, rgba(34,197,94,.14), rgba(14,165,233,.12)); border: 1px solid rgba(34,197,94,.35); margin-bottom: 10px; }
+        .mycard .sal { font-size: 22px; font-weight: 800; color: #15803d; }
+        .mycard .lbl { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+        .task .pay { font-size: 11px; font-weight: 800; color: #15803d; white-space: nowrap; }
+        .task.cur { border: 2px solid #f59e0b; background: rgba(245,158,11,.1); }
+        .srow .cur { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .plab .pok { background: #16a34a; color: #fff; font-weight: 800; font-size: 12px; padding: 3px 8px; border-radius: 8px; }
         .plab .phand { font-size: 20px; animation: hb .5s ease-in-out infinite alternate; }
         @keyframes hb { to { transform: translateY(-4px); } }
@@ -83,7 +89,7 @@
 <body>
 <div id="bar">
     <a href="{% if teacher %}{% url 'room_manage' %}{% else %}{% url 'codegames' %}{% endif %}" class="btn ghost" title="{% t "Выйти" %}">←</a>
-    <span class="ttl">🏫 <span data-tr="Коворкинг">{% t "Коворкинг" %}</span> {{ room.school_class }}{% if room.title %} · {{ room.title }}{% endif %}</span>
+    <span class="ttl">🏢 <span data-tr="Компания Пифагор">{% t "Компания Пифагор" %}</span> · {{ room.school_class }}{% if room.title %} · {{ room.title }}{% endif %}</span>
     <span class="sp"></span>
     <span class="chip" title="{% t "В зале" %}">👥 <span id="online">0</span></span>
     <span class="chip" id="tchip">⏱ <span id="timer">--:--</span></span>
@@ -92,13 +98,13 @@
     <button class="btn ghost" id="theme" type="button" title="🌙 / ☀️">🌙</button>
     <button class="btn ghost" id="fsb" type="button" title="⛶">⛶</button>
     <button class="btn ghost" id="center" type="button">◎ <span data-tr="Ко мне">{% t "Ко мне" %}</span></button>
-    {% if teacher %}<form method="post" action="{% url 'room_close' room.id %}" style="margin:0" id="close-form">{% csrf_token %}<button class="btn warn"><span data-tr="Закрыть зал">{% t "Закрыть зал" %}</span></button></form>{% endif %}
+    {% if teacher %}<form method="post" action="{% url 'room_close' room.id %}" style="margin:0" id="close-form">{% csrf_token %}<button class="btn warn"><span data-tr="Закончить рабочий день">{% t "Закончить рабочий день" %}</span></button></form>{% endif %}
 </div>
 <div id="wrap">
     <div id="stage">
         <canvas id="map"></canvas>
         <div id="labels"></div>
-        <div id="help">🖱 <span data-tr="Нажмите на пол — идти, на стул — сесть. Сели за стол — справа задачи урока. Колёсико — масштаб, перетаскивание — обзор.">{% t "Нажмите на пол — идти, на стул — сесть. Сели за стол — справа задачи урока. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>
+        <div id="help">🖱 <span data-tr="Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор.">{% t "Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>
         <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
         <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><iframe id="d-frame"></iframe></div>
@@ -109,10 +115,10 @@
         <h4 style="margin-top:14px">💬 <span data-tr="Сообщения">{% t "Сообщения" %}</span></h4><div id="log" class="hint" style="max-height:180px;overflow-y:auto">—</div>
         {% endif %}
         <div id="theory-box" style="display:none"><h4 style="margin-top:6px">📖 <span data-tr="Теория урока">{% t "Теория урока" %}</span></h4><div id="theory"></div></div>
-        <h4 style="margin-top:6px">📝 <span data-tr="Задачи урока">{% t "Задачи урока" %}</span></h4>
-        <div id="sit-hint" class="hint">{% if teacher %}<span data-tr="Нажмите, чтобы посмотреть условие.">{% t "Нажмите, чтобы посмотреть условие." %}</span>{% else %}<span data-tr="Сядьте за свободный стол, чтобы решать.">{% t "Сядьте за свободный стол, чтобы решать." %}</span>{% endif %}</div>
+        <h4 style="margin-top:6px">📋 {% if teacher %}<span data-tr="Задания по порядку">{% t "Задания по порядку" %}</span>{% else %}<span data-tr="Моя работа">{% t "Моя работа" %}</span>{% endif %}</h4>
+        <div id="sit-hint" class="hint">{% if teacher %}<span data-tr="Сотрудники сами подходят к вашему столу и получают следующее задание. Нажмите, чтобы посмотреть условие.">{% t "Сотрудники сами подходят к вашему столу и получают следующее задание. Нажмите, чтобы посмотреть условие." %}</span>{% endif %}</div>
         <div id="tasks"></div>
-        <h4 style="margin-top:14px">📊 <span data-tr="Решено за урок">{% t "Решено за урок" %}</span></h4>
+        <h4 style="margin-top:14px">💰 <span data-tr="Зарплаты сотрудников">{% t "Зарплаты сотрудников" %}</span></h4>
         <div id="stats"></div>
     </aside>
 </div>
@@ -123,7 +129,7 @@
     <button class="btn big" id="fs-btn" type="button"></button>
 </div></div>
 <div id="toast"></div>
-<div id="closed"><div><div style="font-size:54px">🏫</div><h2><span data-tr="Зал закрыт">{% t "Зал закрыт" %}</span></h2><p><span data-tr="Учитель закрыл коворкинг. Спасибо за урок!">{% t "Учитель закрыл коворкинг. Спасибо за урок!" %}</span></p><a class="btn" href="{% url 'codegames' %}"><span data-tr="К играм">{% t "К играм" %}</span></a></div></div>
+<div id="closed"><div><div style="font-size:54px">🏢</div><h2><span data-tr="Рабочий день окончен">{% t "Рабочий день окончен" %}</span></h2><p><span data-tr="Руководитель закончил рабочий день. Спасибо за работу!">{% t "Руководитель закончил рабочий день. Спасибо за работу!" %}</span></p><a class="btn" href="{% url 'codegames' %}"><span data-tr="К играм">{% t "К играм" %}</span></a></div></div>
 <span id="csrf" style="display:none">{% csrf_token %}</span>
 <script>
 (function () {
@@ -175,7 +181,11 @@
     }
 
     // ---------------- люди ----------------
-    var people = {}, statsBy = {}, nTasks = TASKS.length, mine = [], handUp = false;
+    var people = {}, statsBy = {}, nTasks = TASKS.length, handUp = false;
+    var CO = {cur: null, done: [], salary: 0}, allDone = false, BOSS = {};
+    (L.boss || []).forEach(function (b) { BOSS[b[0] + ',' + b[1]] = true; });
+    function money(n) { return (n || 0).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ' + TXT.tenge; }
+    function taskById(id) { return TASKS.filter(function (t) { return t.id === id; })[0]; }
     function person(id) {
         if (!people[id]) { people[id] = {id: id, rx: null, ry: null, tx: 0, ty: 0, seat: null, route: [], name: '', msg: '', hand: false, teacher: false, c: 0}; }
         return people[id];
@@ -282,6 +292,7 @@
         } }
         L.objs.forEach(function (o) {
             if (o.t === 'rug') { poly([[o.x + .2, o.y + .2, .005], [o.x + o.w - .2, o.y + .2, .005], [o.x + o.w - .2, o.y + o.d - .2, .005], [o.x + .2, o.y + o.d - .2, .005]], P.rug); }
+            if (o.t === 'rug') { (L.boss || []).forEach(function (b) { poly([[b[0] + .06, b[1] + .06, .008], [b[0] + .94, b[1] + .06, .008], [b[0] + .94, b[1] + .94, .008], [b[0] + .06, b[1] + .94, .008]], 'rgba(245,158,11,.28)'); }); }
             if (o.t === 'lrug') { poly([[o.x + .2, o.y + .2, .005], [o.x + o.w - .2, o.y + .2, .005], [o.x + o.w - .2, o.y + o.d - .2, .005], [o.x + .2, o.y + o.d - .2, .005]], P.lrug); }
         });
         // задние стены с окнами
@@ -325,10 +336,10 @@
     // ---------- плашки над головой (HTML поверх холста): аватар + имя на баннере, сообщение, ✋, ✅ ----------
     var labEls = {};
     function labelHtml(p) {
-        var name = p.h ? p.h : '<span class="plain' + (p.teacher ? ' t' : '') + '">' + (p.teacher ? '🎓 ' : '') + esc(p.name) + '</span>';
+        var name = p.h ? p.h : '<span class="plain' + (p.teacher ? ' t' : '') + '">' + (p.teacher ? '👔 ' : '') + esc(p.name) + '</span>';
         var done = statsBy[p.id];
         return (p.msg ? '<div class="pmsg' + (p.teacher ? ' t' : '') + '">' + esc(p.msg) + '</div>' : '') +
-               '<div class="pname">' + (p.hand ? '<span class="phand">✋</span>' : '') + name + (done ? '<span class="pok">✅' + done + '</span>' : '') + '</div>';
+               '<div class="pname">' + (p.hand ? '<span class="phand">✋</span>' : '') + name + (done ? '<span class="pok">💰 ' + money(done) + '</span>' : '') + '</div>';
     }
     function updateLabels() {
         var box = $('labels'), seen = {};
@@ -424,6 +435,7 @@
         var x = t[0], y = t[1];
         if (x < 0 || y < 0 || x >= W || y >= H) { return; }
         var s = seatOfClick(x, y);
+        if (s && s.teacher && !TEACHER) { goBoss(); return; }                       // стол руководителя — подойти за заданием
         if (s) {
             if (s.teacher !== TEACHER) { toast(TEACHER ? TXT.taken : TXT.teacher_seat); return; }
             if (takenBy(s.id)) { toast(TXT.taken); return; }
@@ -445,18 +457,67 @@
 
     // ---------------- сидя: задачи урока ----------------
     var seated = false;
-    function arrived() { var me = people[ME]; seated = !!me.seat; tasksPanel(); if (seated && !TEACHER) { toast('📝 ' + TXT.at_desk); } }
+    function arrived() {
+        var me = people[ME]; seated = !!me.seat; tasksPanel();
+        if (TEACHER) { return; }
+        if (BOSS[Math.round(me.rx) + ',' + Math.round(me.ry)]) { takeTask(); return; }
+        if (seated) { toast('📝 ' + (CO.cur ? TXT.at_desk : TXT.go_boss)); }
+    }
+    function goBoss() {
+        var me = people[ME]; if (!me || me.rx === null) { return; }
+        var best = null, bd = 1e9;
+        (L.boss || []).forEach(function (b) {
+            if (!free(b[0], b[1])) { return; }
+            var d = Math.abs(b[0] - me.rx) + Math.abs(b[1] - me.ry);
+            if (d < bd) { bd = d; best = b; }
+        });
+        if (!best) { return; }
+        if (Math.round(me.rx) === best[0] && Math.round(me.ry) === best[1] && !me.route.length) { takeTask(); return; }
+        goTo(best[0], best[1], null);
+    }
+    var taking = false;
+    function takeTask() {
+        if (taking) { return; }
+        if (CO.cur) { toast('⏳ ' + TXT.busy); return; }
+        taking = true;
+        setTimeout(function () {                                   // ход уже дошёл до сервера
+            post({a: 'take'}).then(function (d) {
+                taking = false;
+                if (d.error) { if (d.error === 'all_done') { allDone = true; } toast((d.error === 'all_done' ? '🏆 ' : '') + (TXT[d.error] || d.error)); tasksPanel(); return; }
+                CO.cur = d.task; var t = taskById(d.task);
+                toast('📋 ' + TXT.got + ': ' + (t ? t.title : '') + (t ? ' · ' + money(t.pay) : ''));
+                tasksPanel(); poll(true);
+            }).catch(function () { taking = false; });
+        }, 350);
+    }
     function standUp() { if (seated) { seated = false; closeDrawer(); tasksPanel(); } }
     function tasksPanel() {
-        $('sit-hint').style.display = (seated || TEACHER) ? 'none' : '';
-        $('tasks').innerHTML = TASKS.map(function (t) {
-            var done = mine.indexOf(t.id) >= 0;
-            return '<div class="task' + (done ? ' done' : '') + '" data-id="' + t.id + '"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + esc(t.title) + '</span>' + (done ? '✅' : '→') + '</div>';
-        }).join('');
+        if (TEACHER) {
+            $('tasks').innerHTML = TASKS.map(function (t, i) {
+                return '<div class="task" data-id="' + t.id + '"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + (i + 1) + '. ' + esc(t.title) + '</span><span class="pay">' + money(t.pay) + '</span></div>';
+            }).join('');
+            return;
+        }
+        var h = '<div class="mycard"><div class="lbl">' + TXT.salary + '</div><div class="sal">' + money(CO.salary) + '</div></div>';
+        var cur = CO.cur ? taskById(CO.cur) : null;
+        h += '<div class="lbl hint" style="font-weight:700">' + TXT.cur + '</div>';
+        if (cur) {
+            h += '<div class="task cur" data-id="' + cur.id + '"><span class="lv lv-' + cur.level + '">' + cur.level + '</span><span class="nm">' + esc(cur.title) + '<span class="hint" style="display:block;margin:0">' + TXT.in_work + (seated ? '' : ' · ' + TXT.sit_first) + '</span></span><span class="pay">+' + money(cur.pay) + '</span></div>';
+        } else {
+            h += '<div class="hint">' + (allDone ? '🏆 ' + TXT.all_done : TXT.go_boss) + '</div>';
+            if (!allDone) { h += '<button class="btn" id="go-boss" type="button" style="width:100%;justify-content:center;margin-bottom:10px">📋 ' + TXT.to_boss + '</button>'; }
+        }
+        if (CO.done.length) {
+            h += '<div class="hint" style="font-weight:700;margin-top:6px">✅ ' + TXT.done + ': ' + CO.done.length + '</div>';
+            h += CO.done.map(function (id) { var t = taskById(id); return t ? '<div class="task done" data-id="' + t.id + '"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + esc(t.title) + '</span><span class="pay">+' + money(t.pay) + '</span></div>' : ''; }).join('');
+        }
+        $('tasks').innerHTML = h;
+        if ($('go-boss')) { $('go-boss').addEventListener('click', goBoss); }
     }
     $('tasks').addEventListener('click', function (e) {
         var el = e.target.closest('.task'); if (!el) { return; }
         if (!seated && !TEACHER) { toast(TXT.sit_first); return; }
+        if (!TEACHER && +el.getAttribute('data-id') !== CO.cur && CO.done.indexOf(+el.getAttribute('data-id')) < 0) { return; }
         var t = TASKS.filter(function (x) { return x.id === +el.getAttribute('data-id'); })[0];
         $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex';
     });
@@ -512,10 +573,17 @@
         statsBy = {};
         d.stats.forEach(function (r) { statsBy[r[0]] = r[2]; });
         $('stats').innerHTML = d.stats.map(function (r) {
-            var pct = d.n_tasks ? Math.round(r[2] / d.n_tasks * 100) : 0;
-            return '<div class="srow' + (r[0] === ME ? ' me' : '') + '"><span class="on-dot' + (r[4] ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><span class="nm" style="display:block">' + esc(r[1]) + (TEACHER && r[5] ? ' <span class="ex" title="' + TXT.exits + '">🚪' + r[5] + '</span>' : '') + '</span><span class="bar-s"><i style="width:' + pct + '%"></i></span></span><span class="ok">' + r[2] + '<span style="color:#94a3b8;font-weight:600">/' + d.n_tasks + '</span></span></div>';
+            var cur = TEACHER && r[6] ? taskById(r[6]) : null;
+            return '<div class="srow' + (r[0] === ME ? ' me' : '') + '"><span class="on-dot' + (r[4] ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><span class="nm" style="display:block">' + esc(r[1]) + (TEACHER && r[5] ? ' <span class="ex" title="' + TXT.exits + '">🚪' + r[5] + '</span>' : '') + '</span>' +
+                   (TEACHER ? '<span class="cur">' + (cur ? '📋 ' + esc(cur.title) : '— ' + TXT.no_task) + (r[3] ? ' · ✅' + r[3] : '') + '</span>' : '') +
+                   '</span><span class="ok">' + money(r[2]) + '</span></div>';
         }).join('') || '<div class="hint">' + TXT.none + '</div>';
-        if (d.mine) { var was = mine.join(','); mine = d.mine; if (was !== mine.join(',')) { tasksPanel(); } }
+        if (d.me) {
+            var prev = CO.cur, sig = JSON.stringify(CO);
+            if (prev && !d.me.cur && d.me.done.indexOf(prev) >= 0) { var t = taskById(prev); toast('🎉 ' + TXT.paid + ' +' + money(t ? t.pay : 0)); }
+            CO = d.me; if (CO.cur) { allDone = false; }
+            if (sig !== JSON.stringify(CO)) { tasksPanel(); }
+        }
         if (TEACHER) {
             var hands = d.people.filter(function (r) { return r[6]; });
             $('hands').innerHTML = hands.length ? hands.map(function (r) { return '<div class="handrow" data-u="' + r[0] + '" data-x="' + r[2] + '" data-y="' + r[3] + '">✋ <span style="flex:1">' + esc(r[1]) + '</span><button class="btn ghost" style="padding:3px 10px" data-lower="' + r[0] + '">' + TXT.lower + '</button></div>'; }).join('') : TXT.none;
