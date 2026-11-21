@@ -245,7 +245,9 @@ ROOM_TEXTS = {
     'earned': 'Заработано сегодня', 'coins_x2': 'монет (x2)', 'sit_own': 'Сядьте за стол в кабинете своей параллели',
     'other_grade': 'Это кабинет другой параллели — садиться можно только в своём',
     'admin_only': 'Это администрация — здесь сидят учителя. Можно зайти и задать вопрос',
-    'admin_hint': 'Вы в администрации. Топ какой параллели показать:', 'pick_task': 'Вы за столом — выберите задачу справа',
+    'admin_hint': 'Вы в администрации. Топ какой параллели показать:',
+    'dm_hint': 'Напишите вопрос — его увидит только этот человек', 'dm_new': 'новое сообщение (нажмите на него)',
+    'dm_gone': 'Этот человек уже вышел', 'dm_wait': 'Не так быстро', 'dm_empty': 'Напишите текст', 'pick_task': 'Вы за столом — выберите задачу справа',
 }
 
 
@@ -338,7 +340,17 @@ def room_state(request, room_id):
         out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0)}
     if teacher:
         out['log'] = rm.log(room.id)[-30:]
+    _dm_state(request, room.id, out)
     return JsonResponse(out)
+
+
+def _dm_state(request, rid, out):
+    """Непрочитанные личные сообщения и открытая переписка (?dm=<uid>)."""
+    me = request.user.id
+    other = request.GET.get('dm')
+    if other and other.isdigit():
+        out['conv'] = [int(other), rm.dm_get(rid, me, other)]
+    out['unread'] = rm.dm_unread(rid, me)
 
 
 @login_required
@@ -363,6 +375,10 @@ def room_act(request, room_id):
             return JsonResponse({'error': 'taken'})
         rm.touch(room.id, me, base, x=round(x, 2), y=round(y, 2), seat=seat)
         return JsonResponse({'ok': True})
+    if act == 'dm':
+        rm.touch(room.id, me, base)
+        err = rm.dm_send(room.id, me, request.POST.get('to') or 0, request.POST.get('text'))
+        return JsonResponse({'error': err} if err else {'ok': True, 'conv': rm.dm_get(room.id, me, request.POST.get('to'))})
     if act == 'say':
         rm.touch(room.id, me, base)
         err = rm.say(room.id, me, request.POST.get('text'))

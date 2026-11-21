@@ -116,6 +116,8 @@ def office_state(request):
     rows = [[names[sid][0], names[sid][1], m, n, names[sid][0] in online, 0, None] for sid, m, n in data.get(show, []) if sid in names]
     out = {'open': open_, 'people': ppl, 'stats': rows[:15],
            'left': max(0, int((of.closes_at() - timezone.now()).total_seconds())) if open_ else None}
+    from .room_views import _dm_state
+    _dm_state(request, r, out)
     if st is not None:
         key = f'office:me:{day}:{st.id}'
         mine = None if request.GET.get('fresh') == '1' else cache.get(key)
@@ -153,6 +155,10 @@ def office_act(request):
             return JsonResponse({'error': 'taken'})
         rm.touch(r, me, base, x=round(x, 2), y=round(y, 2), seat=seat)
         return JsonResponse({'ok': True})
+    if act == 'dm':
+        rm.touch(r, me, base)
+        err = rm.dm_send(r, me, request.POST.get('to') or 0, request.POST.get('text'))
+        return JsonResponse({'error': err} if err else {'ok': True, 'conv': rm.dm_get(r, me, request.POST.get('to'))})
     if act == 'say':
         rm.touch(r, me, base)
         err = rm.say(r, me, request.POST.get('text'))

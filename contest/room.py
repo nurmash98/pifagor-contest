@@ -273,3 +273,48 @@ def add_exit(rid, uid):
 
 def exits(rid):
     return cache.get(f'room:{rid}:exits') or {}
+
+
+# ------------------------------------------------------------------ личные сообщения (нажал на человека — написал ему)
+
+DM_MAX = 200          # символов
+DM_KEEP = 40          # сообщений в переписке
+DM_EVERY = 2          # не чаще раза в 2 секунды
+
+
+def _pair(rid, a, b):
+    a, b = sorted((int(a), int(b)))
+    return f'room:{rid}:dm:{a}-{b}'
+
+
+def dm_send(rid, frm, to, text):
+    """Ошибка или None. Писать можно только тому, кто сейчас в зале/офисе."""
+    text = ' '.join((text or '').split())[:DM_MAX]
+    if not text:
+        return 'empty'
+    if int(to) == int(frm) or int(to) not in people(rid):
+        return 'gone'
+    if not cache.add(f'room:{rid}:dmsay:{frm}', 1, DM_EVERY):
+        return 'wait'
+    k = _pair(rid, frm, to)
+    conv = cache.get(k) or []
+    conv.append([int(frm), text, int(time.time())])
+    cache.set(k, conv[-DM_KEEP:], TTL)
+    uk = f'room:{rid}:unread:{int(to)}'
+    unread = cache.get(uk) or {}
+    unread[str(int(frm))] = unread.get(str(int(frm)), 0) + 1
+    cache.set(uk, unread, TTL)
+    return None
+
+
+def dm_get(rid, me, other):
+    """Переписка с other; заодно отмечает её прочитанной."""
+    uk = f'room:{rid}:unread:{int(me)}'
+    unread = cache.get(uk) or {}
+    if unread.pop(str(int(other)), None):
+        cache.set(uk, unread, TTL)
+    return cache.get(_pair(rid, me, other)) or []
+
+
+def dm_unread(rid, me):
+    return cache.get(f'room:{rid}:unread:{int(me)}') or {}

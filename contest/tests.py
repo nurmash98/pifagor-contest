@@ -5379,3 +5379,38 @@ class WeekendOfficeTests(TestCase):
         with self._at(self.sat):
             self.client.force_login(self.kid.user)
             self.assertRedirects(self.client.get(reverse('office_play')), reverse('codegames'), fetch_redirect_response=False)
+
+
+class RoomDmTests(TestCase):
+    """Личные сообщения в «Компании» и офисе: нажал на человека — написал ему."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.tu = User.objects.create_user('dm_t', password='p', is_staff=True, is_superuser=True)
+        self.a = Student.objects.create(user=User.objects.create_user('dm_a', password='p'), full_name='Аа', school_class='8A')
+        self.b = Student.objects.create(user=User.objects.create_user('dm_b', password='p'), full_name='Бб', school_class='8A')
+        self.task = make_task('Т', 'A', Tag.objects.create(name='x'))
+
+    def test_dm_between_student_and_teacher(self):
+        self.client.force_login(self.tu)
+        self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'tasks': [self.task.id]})
+        room = StudyRoom.objects.get()
+        act, state = reverse('room_act', args=[room.id]), reverse('room_state', args=[room.id])
+        self.client.get(reverse('room_play', args=[room.id]))                                   # учитель в зале
+        self.client.force_login(self.a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.assertEqual(self.client.post(act, {'a': 'dm', 'to': self.b.user_id, 'text': 'привет'}).json()['error'], 'gone')   # Бб нет в зале
+        r = self.client.post(act, {'a': 'dm', 'to': self.tu.id, 'text': 'Как решить задачу 2?'}).json()
+        self.assertEqual(r['conv'][0][:2], [self.a.user_id, 'Как решить задачу 2?'])
+        self.client.force_login(self.tu)
+        st = self.client.get(state).json()
+        self.assertEqual(st['unread'], {str(self.a.user_id): 1})
+        st = self.client.get(state + f'?dm={self.a.user_id}').json()
+        self.assertEqual(st['conv'][1][0][1], 'Как решить задачу 2?')
+        self.assertEqual(self.client.get(state).json()['unread'], {})                       # прочитано
+        self.assertTrue(self.client.post(act, {'a': 'dm', 'to': self.a.user_id, 'text': 'Используй цикл for'}).json()['ok'])
+        self.client.force_login(self.b.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.assertNotIn('conv', self.client.get(state).json())
+        self.assertEqual(self.client.get(state + f'?dm={self.a.user_id}').json()['conv'][1], [])   # чужую переписку не видно
