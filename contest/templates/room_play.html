@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if office %}{% t "Офис выходного дня" %}{% else %}{% t "Компания Пифагор" %} {{ room.school_class }}{% endif %} — Pifagor Contest</title>
+    <script src="{% static 'js/lofi.js' %}"></script>
     <script>
         (function () { var t = null; try { t = localStorage.getItem('pifagor-theme'); } catch (e) {}
           if (t !== 'dark' && t !== 'light') { t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
@@ -57,6 +58,8 @@
         #drawer iframe { flex: 1; border: 0; width: 100%; }
         #closed { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.85); color: #fff; display: none; align-items: center; justify-content: center; text-align: center; }
         #help { position: absolute; left: 12px; top: 12px; background: var(--panel); opacity: .93; border-radius: 12px; padding: 8px 12px; font-size: 12px; color: var(--muted); max-width: 330px; box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+        #music.on { background: #a855f7; color: #fff; }
+        @media (max-width: 1100px) { #music-vol { display: none; } }
         #lang { display: inline-flex; padding: 3px; gap: 2px; }
         #lang button { border: 0; background: transparent; color: var(--muted); font-weight: 800; font-size: 12px; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
         #lang button.on { background: #fbbf24; color: #111827; }
@@ -123,6 +126,7 @@
     <span class="chip" id="tchip">⏱ <span id="timer">--:--</span></span>
     {% if not teacher %}<button class="btn hand" id="hand" type="button">✋ <span data-tr="Поднять руку">{% t "Поднять руку" %}</span></button>{% endif %}
     <span id="lang" class="chip"><button type="button" data-l="ru" class="{% if content_lang != 'kk' %}on{% endif %}">RU</button><button type="button" data-l="kk" class="{% if content_lang == 'kk' %}on{% endif %}">KZ</button></span>
+    <span class="chip" id="music-box" style="padding:3px 8px 3px 3px"><button class="btn ghost" id="music" type="button" title="Музыка" style="padding:5px 10px">🎵</button><input id="music-vol" type="range" min="0" max="100" value="50" title="Громкость" style="width:70px"></span>
     <button class="btn ghost" id="theme" type="button" title="🌙 / ☀️">🌙</button>
     <button class="btn ghost" id="fsb" type="button" title="⛶">⛶</button>
     <button class="btn ghost" id="center" type="button">◎ <span data-tr="Ко мне">{% t "Ко мне" %}</span></button>
@@ -984,6 +988,32 @@
         }
         if (a === 'url') { $('d-title').textContent = b.getAttribute('data-title'); $('d-frame').src = b.getAttribute('data-url'); $('drawer').style.display = 'flex'; }
     });
+
+    // ---------------- музыка: бесконечный lo-fi, генерируется в браузере (static/js/lofi.js) ----------------
+    (function () {
+        var KEY = OFFICE ? 'office-music' : 'room-music', want = OFFICE, vol = 50;
+        try { var v = localStorage.getItem(KEY); if (v) { want = v === 'on'; } vol = +(localStorage.getItem('room-music-vol') || 50); } catch (e) {}
+        $('music-vol').value = vol;
+        if (!window.LoFi) { $('music-box').style.display = 'none'; return; }
+        window.LoFi.setVolume(vol / 100);
+        function paint() { $('music').classList.toggle('on', window.LoFi.playing); $('music').textContent = window.LoFi.playing ? '🎵' : '🔇'; }
+        function save() { try { localStorage.setItem(KEY, want ? 'on' : 'off'); } catch (e) {} }
+        $('music').addEventListener('click', function (e) {
+            e.stopPropagation(); want = !window.LoFi.playing;
+            if (want) { window.LoFi.start(); } else { window.LoFi.stop(); }
+            save(); paint();
+        });
+        $('music-vol').addEventListener('input', function () {
+            window.LoFi.setVolume(this.value / 100);
+            try { localStorage.setItem('room-music-vol', this.value); } catch (e) {}
+        });
+        function firstGesture() {                     // браузер разрешает звук только после первого нажатия
+            document.removeEventListener('pointerdown', firstGesture, true); document.removeEventListener('keydown', firstGesture, true);
+            if (want && !window.LoFi.playing) { window.LoFi.start(); paint(); }
+        }
+        document.addEventListener('pointerdown', firstGesture, true); document.addEventListener('keydown', firstGesture, true);
+        paint();
+    })();
 
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();
