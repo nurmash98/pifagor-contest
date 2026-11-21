@@ -156,6 +156,7 @@ urlpatterns = [
     path('room/<int:room_id>/state/', room_views.room_state, name='room_state'),
     path('room/<int:room_id>/act/', room_views.room_act, name='room_act'),
     path('room/<int:room_id>/lang/', room_views.room_lang, name='room_lang'),
+    path('room/<int:room_id>/theory/<str:kind>/<int:item_id>/', room_views.room_theory, name='room_theory'),
     path('teacher/room/', room_views.room_manage, name='room_manage'),
     path('teacher/room/<int:room_id>/close/', room_views.room_close, name='room_close'),
     path('games/island/<int:game_id>/arm/', island_views.play_arm, name='island_arm'),

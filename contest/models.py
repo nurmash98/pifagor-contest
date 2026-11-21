@@ -628,6 +628,8 @@ class StudyRoom(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='study_rooms', verbose_name="Учитель")
     title = models.CharField(max_length=120, blank=True, verbose_name="Тема урока")
     tasks = models.ManyToManyField('Task', blank=True, verbose_name="Задачи урока")
+    theory_topic = models.ForeignKey('Topic', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Теория из курса")
+    theory_text = models.TextField(blank=True, verbose_name="Теория / заметки учителя")
     started_at = models.DateTimeField(auto_now_add=True)
     ends_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыть автоматически")
     closed_at = models.DateTimeField(null=True, blank=True)

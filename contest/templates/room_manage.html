@@ -9,6 +9,10 @@
     .lv-A { background: #dcfce7; color: #166534; } .lv-B { background: #fef9c3; color: #854d0e; } .lv-C { background: #fee2e2; color: #991b1b; }
     .tpick .tg { font-size: 11px; color: #6b7280; margin-left: auto; text-align: right; }
     [data-bs-theme="dark"] .tpick { border-color: #3d4566; }
+    .tagchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .tagchip { border: 1px solid rgba(108,92,231,.35); background: transparent; color: inherit; border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .tagchip .n { opacity: .55; font-weight: 500; margin-left: 3px; }
+    .tagchip.on { background: #6c5ce7; border-color: #6c5ce7; color: #fff; }
 </style>
 <div class="mb-3"><a href="{% url 'games_hub' %}" class="text-decoration-none text-muted small">← Игры</a></div>
 <h2 class="fw-bold mb-1" style="color:#1a1a4b">🏫 Коворкинг класса</h2>
@@ -49,9 +53,17 @@
         <span class="badge bg-primary rounded-pill" id="picked">0</span>
         <input id="tsearch" class="form-control form-control-sm rounded-pill ms-auto" style="max-width:280px" placeholder="🔍 Поиск по названию или теме">
     </div>
+    <div class="tagchips" id="tags">
+        <span class="small text-muted fw-semibold me-1 align-self-center">Темы:</span>
+        {% for g, n in tags %}<button type="button" class="tagchip" data-tag="{{ g.id }}">{{ g.name }}<span class="n">{{ n }}</span></button>{% endfor %}
+    </div>
+    <div class="d-flex gap-2 mb-2">
+        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" id="pick-shown">✓ Отметить все показанные</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" id="pick-none">Снять все</button>
+    </div>
     <div class="tpick mb-3" id="tlist">
         {% for t in tasks %}
-        <label data-s="{{ t.title|lower }} {% for g in t.tags.all %}{{ g.name|lower }} {% endfor %}">
+        <label data-s="{{ t.title|lower }} {% for g in t.tags.all %}{{ g.name|lower }} {% endfor %}" data-tags="{% for g in t.tags.all %} {{ g.id }} {% endfor %}">
             <input type="checkbox" name="tasks" value="{{ t.id }}" class="form-check-input mt-0">
             <span class="lv lv-{{ t.level }}">{{ t.level }}</span>
             <span>{{ t.title }}</span>
@@ -59,16 +71,54 @@
         </label>
         {% endfor %}
     </div>
+    <h6 class="fw-bold mt-2 mb-2">📖 Теория на урок <span class="text-muted fw-normal small">(необязательно)</span></h6>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Теория из курса</label>
+            <select name="theory_topic" id="theory-topic" class="form-select rounded-3">
+                <option value="">— без теории из курса —</option>
+                {% for tp in topics %}<option value="{{ tp.id }}">{{ tp.title }}</option>{% endfor %}
+            </select>
+            <button type="button" class="btn btn-sm btn-link px-0 mt-1" id="topic-tasks" style="display:none">✓ Отметить задачи этой темы</button>
+            <div class="form-text">HTML-теория, подтемы и видео темы откроются ученикам прямо в зале.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Свои заметки / объяснение</label>
+            <textarea name="theory_text" rows="5" class="form-control rounded-3 font-monospace" style="font-size:13px" placeholder="Например: while повторяет, пока условие истинно.&#10;i = 1&#10;while i <= 5:&#10;    print(i)&#10;    i += 1"></textarea>
+        </div>
+    </div>
     <button class="btn btn-pifagor-green rounded-pill px-4 fw-semibold align-self-start" {% if not classes %}disabled{% endif %}>🏫 Открыть зал и войти</button>
 </form>
 <script>
 (function () {
     var q = document.getElementById('tsearch'), list = document.getElementById('tlist'), cnt = document.getElementById('picked');
-    q.addEventListener('input', function () {
-        var v = q.value.trim().toLowerCase();
-        list.querySelectorAll('label').forEach(function (l) { l.style.display = !v || l.getAttribute('data-s').indexOf(v) >= 0 || l.querySelector('input').checked ? '' : 'none'; });
+    var active = {}, TOPICS = {{ topics_json|safe }};
+    function count() { cnt.textContent = list.querySelectorAll('input:checked').length; }
+    function filter() {
+        var v = q.value.trim().toLowerCase(), tags = Object.keys(active);
+        list.querySelectorAll('label').forEach(function (l) {
+            var okText = !v || l.getAttribute('data-s').indexOf(v) >= 0;
+            var okTag = !tags.length || tags.some(function (t) { return l.getAttribute('data-tags').indexOf(' ' + t + ' ') >= 0; });
+            l.style.display = (okText && okTag) || l.querySelector('input').checked ? '' : 'none';
+        });
+    }
+    q.addEventListener('input', filter);
+    document.getElementById('tags').addEventListener('click', function (e) {
+        var b = e.target.closest('.tagchip'); if (!b) { return; }
+        var id = b.getAttribute('data-tag');
+        if (active[id]) { delete active[id]; b.classList.remove('on'); } else { active[id] = true; b.classList.add('on'); }
+        filter();
     });
-    list.addEventListener('change', function () { cnt.textContent = list.querySelectorAll('input:checked').length; });
+    document.getElementById('pick-shown').addEventListener('click', function () {
+        list.querySelectorAll('label').forEach(function (l) { if (l.style.display !== 'none') { l.querySelector('input').checked = true; } }); count();
+    });
+    document.getElementById('pick-none').addEventListener('click', function () { list.querySelectorAll('input').forEach(function (i) { i.checked = false; }); count(); filter(); });
+    var tsel = document.getElementById('theory-topic'), tbtn = document.getElementById('topic-tasks');
+    tsel.addEventListener('change', function () { tbtn.style.display = (TOPICS[tsel.value] || []).length ? '' : 'none'; });
+    tbtn.addEventListener('click', function () {
+        (TOPICS[tsel.value] || []).forEach(function (id) { var i = list.querySelector('input[value="' + id + '"]'); if (i) { i.checked = true; } }); count(); filter();
+    });
+    list.addEventListener('change', count);
 })();
 </script>
 {% endblock %}

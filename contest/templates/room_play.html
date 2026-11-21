@@ -62,7 +62,7 @@
         #gate { position: fixed; inset: 0; z-index: 45; display: none; align-items: center; justify-content: center; text-align: center; padding: 18px; background: rgba(11,18,32,.94); color: #fff; }
         #gate .big { padding: 14px 30px; font-size: 17px; }
         .ex { color: #ef4444; font-weight: 800; font-size: 11px; }
-        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; }
         .plab { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; will-change: transform; }
         .plab .pname { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; }
         .plab .pname .nb.sm, .plab .pname .plain, .plab .pname .pok { zoom: .72; }   /* баннер поменьше, но со всеми его узорами */
@@ -108,6 +108,7 @@
         <h4>✋ <span data-tr="Поднятые руки">{% t "Поднятые руки" %}</span></h4><div id="hands" class="hint">—</div>
         <h4 style="margin-top:14px">💬 <span data-tr="Сообщения">{% t "Сообщения" %}</span></h4><div id="log" class="hint" style="max-height:180px;overflow-y:auto">—</div>
         {% endif %}
+        <div id="theory-box" style="display:none"><h4 style="margin-top:6px">📖 <span data-tr="Теория урока">{% t "Теория урока" %}</span></h4><div id="theory"></div></div>
         <h4 style="margin-top:6px">📝 <span data-tr="Задачи урока">{% t "Задачи урока" %}</span></h4>
         <div id="sit-hint" class="hint">{% if teacher %}<span data-tr="Нажмите, чтобы посмотреть условие.">{% t "Нажмите, чтобы посмотреть условие." %}</span>{% else %}<span data-tr="Сядьте за свободный стол, чтобы решать.">{% t "Сядьте за свободный стол, чтобы решать." %}</span>{% endif %}</div>
         <div id="tasks"></div>
@@ -128,6 +129,7 @@
 (function () {
     'use strict';
     var L = {{ layout|safe }}, TASKS = {{ tasks_json|safe }}, COLORS = {{ colors|safe }};
+    var THEORY = {{ theory|safe }};
     var ME = {{ me }}, TEACHER = {{ teacher|yesno:"true,false" }};
     var U = {state: '{% url "room_state" room.id %}', act: '{% url "room_act" room.id %}'};
     var TXT = {{ texts|safe }};
@@ -458,6 +460,20 @@
         var t = TASKS.filter(function (x) { return x.id === +el.getAttribute('data-id'); })[0];
         $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex';
     });
+    function theoryPanel() {
+        if (!THEORY.length) { return; }
+        $('theory-box').style.display = '';
+        $('theory').innerHTML = THEORY.map(function (t, i) {
+            var title = t.kind === 'text' ? TXT.notes : t.title;
+            return '<div class="task theory" data-i="' + i + '"><span class="lv" style="background:#e0e7ff;color:#3730a3">' + (t.kind === 'video' ? '▶' : '📖') + '</span><span class="nm">' + esc(title) + '</span>→</div>';
+        }).join('');
+    }
+    $('theory').addEventListener('click', function (e) {
+        var el = e.target.closest('.theory'); if (!el) { return; }
+        var t = THEORY[+el.getAttribute('data-i')];
+        $('d-title').textContent = t.kind === 'text' ? TXT.notes : t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex';
+    });
+    theoryPanel();
     function closeDrawer() { $('drawer').style.display = 'none'; $('d-frame').src = 'about:blank'; }
     $('d-close').addEventListener('click', closeDrawer);
     $('d-frame').addEventListener('load', function () { if ($('drawer').style.display === 'flex') { poll(true); } });
@@ -546,7 +562,7 @@
                 document.querySelectorAll('[data-trp]').forEach(function (el) { var k = el.getAttribute('data-trp'); if (d.tr[k] !== undefined) { el.placeholder = d.tr[k]; } });
                 var byId = {}; d.tasks.forEach(function (t) { byId[t.id] = t.title; });
                 TASKS.forEach(function (t) { if (byId[t.id]) { t.title = byId[t.id]; } });
-                tasksPanel(); paintHand(); if (!TEACHER) { fsGate(); }
+                tasksPanel(); theoryPanel(); paintHand(); if (!TEACHER) { fsGate(); }
                 if ($('drawer').style.display === 'flex') { var f = $('d-frame'); var cur = TASKS.filter(function (t) { return f.src.indexOf(t.url) >= 0; })[0]; if (cur) { $('d-title').textContent = cur.title; } f.src = f.src; }
             });
         });

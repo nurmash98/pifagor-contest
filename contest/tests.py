@@ -5203,6 +5203,29 @@ class StudyRoomTests(TestCase):
         st = self.client.get(reverse('room_state', args=[room.id])).json()
         self.assertEqual([r for r in st['stats'] if r[0] == a.user_id][0][5], 2)
 
+    def test_theory_from_course_and_teacher_notes(self):
+        from .models import Course, Topic
+        course = Course.objects.create(name='Python')
+        topic = Topic.objects.create(course=course, name='Циклы', theory_html='<h1>while</h1>', theory_video_url='https://youtu.be/abcdefghijk')
+        self.client.force_login(self.tu)
+        page = self.client.get(reverse('room_manage')).content.decode()
+        self.assertIn('data-tag=', page)
+        self.assertIn('Python — Циклы', page)
+        self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'tasks': [self.tasks[0].id],
+                                                  'theory_topic': topic.id, 'theory_text': 'i = 1\nwhile i <= 5:\n    i += 1'})
+        room = StudyRoom.objects.get()
+        self.assertEqual(room.theory_topic, topic)
+        self.client.force_login(self.sts[0].user)
+        html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
+        self.assertIn(reverse('room_theory', args=[room.id, 'topic', topic.id]), html)
+        self.assertIn('youtube.com/embed/abcdefghijk', html)
+        r = self.client.get(reverse('room_theory', args=[room.id, 'topic', topic.id]))
+        self.assertContains(r, '<h1>while</h1>')
+        self.assertIn('sandbox', r['Content-Security-Policy'])
+        self.assertContains(self.client.get(reverse('room_theory', args=[room.id, 'text', 0])), 'while i &lt;= 5:')
+        self.client.force_login(self.other.user)
+        self.assertEqual(self.client.get(reverse('room_theory', args=[room.id, 'topic', topic.id])).status_code, 404)
+
     def test_label_shows_banner_and_avatar(self):
         room = self._open()
         a = self.sts[0]

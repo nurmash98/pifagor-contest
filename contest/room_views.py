@@ -116,8 +116,11 @@ def room_manage(request):
             minutes = 45
         now = timezone.now()
         StudyRoom.objects.filter(school_class=cls, closed_at__isnull=True).update(closed_at=now)   # один зал на класс
+        from .models import Topic
+        topic = Topic.objects.filter(id=request.POST.get('theory_topic') or 0).first()
         room = StudyRoom.objects.create(school_class=cls, owner=request.user, title=(request.POST.get('title') or '').strip()[:120],
-                                        ends_at=now + timedelta(minutes=minutes))
+                                        ends_at=now + timedelta(minutes=minutes), theory_topic=topic,
+                                        theory_text=(request.POST.get('theory_text') or '').strip()[:20000])
         room.tasks.set(tasks)
         _forget_open(cls)
         return redirect('room_play', room_id=room.id)
@@ -127,7 +130,17 @@ def room_manage(request):
         r.open_now = r.is_open(now)
         r.online = len(rm.people(r.id)) if r.open_now else 0
     tasks = list(Task.objects.filter(hidden=False).prefetch_related('tags').order_by('level', 'title'))
-    return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'tasks': tasks})
+    from collections import Counter
+    from .models import Topic
+    tag_count = Counter(g for t in tasks for g in t.tags.all())
+    tags = sorted(tag_count.items(), key=lambda kv: kv[0].name.lower())
+    topics = []
+    for tp in Topic.objects.select_related('course').prefetch_related('tasks', 'subtopics').order_by('course__name', 'order', 'name'):
+        has = bool(tp.theory_html or tp.theory_video_url or any(st.theory_html for st in tp.subtopics.all()))
+        if has:
+            topics.append({'id': tp.id, 'title': f'{tp.course.name} — {tp.name}', 'tasks': [t.id for t in tp.tasks.all()]})
+    return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'tasks': tasks, 'tags': tags,
+                                                'topics': topics, 'topics_json': json.dumps({t['id']: t['tasks'] for t in topics})})
 
 
 @staff_member_required
@@ -159,12 +172,51 @@ def room_enter(request):
     return redirect('room_play', room_id=rid)
 
 
+def _theory_items(room):
+    """Теория урока для боковой панели: [{'title', 'url', 'kind'}]."""
+    out = []
+    if room.theory_text:
+        out.append({'title': 'Заметки учителя', 'url': reverse('room_theory', args=[room.id, 'text', 0]), 'kind': 'text'})
+    tp = room.theory_topic
+    if tp is not None:
+        if tp.theory_html:
+            out.append({'title': tp.name, 'url': reverse('room_theory', args=[room.id, 'topic', tp.id]), 'kind': 'html'})
+        for st in tp.subtopics.all():
+            if st.theory_html:
+                out.append({'title': st.name, 'url': reverse('room_theory', args=[room.id, 'sub', st.id]), 'kind': 'html'})
+        if tp.youtube_embed_url():
+            out.append({'title': '▶ ' + tp.name, 'url': tp.youtube_embed_url(), 'kind': 'video'})
+    return out
+
+
+@login_required
+def room_theory(request, room_id, kind, item_id):
+    """Теория урока в зале: заметки учителя или HTML-теория темы курса (в песочнице, как на странице курса)."""
+    from django.http import HttpResponse
+    room, st, teacher = _access(request, room_id)
+    tp = room.theory_topic
+    if kind == 'text' and room.theory_text:
+        return render(request, 'room_theory_text.html', {'room': room})
+    html = ''
+    if kind == 'topic' and tp is not None and tp.id == item_id:
+        html = tp.theory_html
+    elif kind == 'sub' and tp is not None:
+        sub = tp.subtopics.filter(id=item_id).first()
+        html = sub.theory_html if sub else ''
+    if not html:
+        raise Http404
+    response = HttpResponse(html, content_type='text/html; charset=utf-8')
+    response['Content-Security-Policy'] = 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox'
+    return response
+
+
 ROOM_TEXTS = {
     'sit_first': 'Сначала сядьте за стол', 'taken': 'Это место занято', 'wait': 'Не так быстро — подождите пару секунд',
     'teacher_seat': 'Это стол учителя', 'you': 'вы', 'hand_up': 'Опустить руку', 'hand': 'Поднять руку', 'lower': 'опустить',
     'none': '—', 'of': 'из', 'at_desk': 'Вы за столом — выбирайте задачу справа', 'close_q': 'Закрыть зал для всего класса?',
     'fs_title': 'Урок в коворкинге', 'fs_start': 'Войти в полноэкранном режиме', 'fs_out': 'Вы вышли из полноэкранного режима',
     'fs_back': 'Вернуться в полноэкранный режим', 'exits': 'Выходов из полного экрана / на другие вкладки',
+    'notes': 'Объяснение учителя',
 }
 
 
@@ -212,7 +264,7 @@ def room_play(request, room_id):
     return render(request, 'room_play.html', {
         'room': room, 'teacher': teacher, 'me': me,
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
-        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'texts': json.dumps(_texts(lang), ensure_ascii=False),
+        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': json.dumps(_theory_items(room), ensure_ascii=False), 'texts': json.dumps(_texts(lang), ensure_ascii=False),
     })
 
 
