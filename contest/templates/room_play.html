@@ -429,6 +429,11 @@
             ctx.beginPath(); ctx.arc(base[0], hy, 8.5 * s, 0, Math.PI * 2); ctx.fillStyle = '#f2c9a0'; ctx.fill();
             ctx.beginPath(); ctx.arc(base[0], hy - 1.5 * s, 8.8 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.lineWidth = 4 * s; ctx.strokeStyle = p.teacher ? '#6b7280' : '#3f2a1d'; ctx.stroke();
         }
+        if (p.prop && !p.route.length) {                  // что руководитель держит в руках (качается — «работает»)
+            var ph = Math.sin(performance.now() / (p.prop === '💻' ? 90 : 420)) * (p.prop === '💻' ? 1 : 2.5) * s;
+            ctx.font = Math.round(15 * s) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(p.prop, base[0] + 12 * s, base[1] - 20 * s + ph);
+        }
         p.sx = base[0]; p.sy = hy - 12 * s; p.depth = x + y;
         ctx.restore();
     }
@@ -440,7 +445,8 @@
     function labelHtml(p) {
         if (p.mgr) {
             return (p.msg ? '<div class="pmsg" style="background:rgba(30,58,138,.95)">' + esc(p.msg) + '</div>' : '') +
-                   '<div class="pname"><span class="pmgr">👔 ' + esc(p.name) + ' · ' + esc(TXT.mgr_role.replace('{g}', p.grade)) + '</span></div>';
+                   '<div class="pname" style="flex-direction:column;gap:0"><span class="pmgr">👔 ' + esc(p.name) + ' · ' + esc(TXT.mgr_role.replace('{g}', p.grade)) + '</span>' +
+                   (p.act ? '<span class="pact" style="color:#1e3a8a">' + esc(p.act) + '</span>' : '') + '</div>';
         }
         if (p.bot) {
             return (p.msg ? '<div class="pmsg" style="background:rgba(15,118,110,.92)">' + esc(p.msg) + '</div>' : '') +
@@ -1050,14 +1056,39 @@
         setTarget(p, m.x, m.y, null); p.act = '';
     });
     function mgrById(id) { return MGRS[-100 - id]; }
+    var MGR_PROP = {report: '📋', files: '🗂', watch: '', phone: '📱', coffee: '☕', laptop: '💻'};
+    function mgrDo(k, sp) {                                   // руководитель идёт на место и занимается делом
+        var p = people[-100 - k]; if (!p) { return; }
+        setTarget(p, sp[0], sp[1], null, true); p.act = TXT['mgr_act_' + sp[2]] || ''; p.prop = MGR_PROP[sp[2]] || '';
+        var say = TXT['mgr_say_' + sp[2]];
+        if (say && Math.random() < .5) { setTimeout(function () { if (botWith !== p.id && p.act === TXT['mgr_act_' + sp[2]]) { p.msg = say; setTimeout(function () { if (p.msg === say) { p.msg = ''; } }, 4500); } }, 2500); }
+    }
+    function mgrHeld(k) { var id = -100 - k; return botWith === id || pendingMgr === id || MGRS[k].hold; }
+    MGRS.forEach(function (m, k) { if (m.spots && m.spots.length) { m.cur = k % m.spots.length; mgrDo(k, m.spots[m.cur]); } });
+    setInterval(function () {                                 // каждые ~12 с — новое дело; у каждого свой ритм
+        var now = Date.now() / 1000;
+        MGRS.forEach(function (m, k) {
+            if (!m.spots || !m.spots.length || mgrHeld(k)) { return; }
+            var i = (Math.floor((now + k * 7) / (10 + (k * 3) % 5)) + k) % m.spots.length;   // у каждого свой ритм и сдвиг
+            if (i === m.cur) { return; }
+            m.cur = i; mgrDo(k, m.spots[i]);
+        });
+    }, 1000);
+    function mgrToPost(id) {                                  // позвали — бросает дела и идёт на свой пост у входа
+        var m = mgrById(id), p = people[id]; if (!m || !p) { return; }
+        m.hold = true; m.cur = -1;
+        if (Math.round(p.rx) !== m.x || Math.round(p.ry) !== m.y) { setTarget(p, m.x, m.y, null, true); p.act = TXT.mgr_coming; p.prop = ''; p.msg = ''; }
+        clearTimeout(m.holdT); m.holdT = setTimeout(function release() { if (botWith === id || pendingMgr === id) { m.holdT = setTimeout(release, 3000); return; } m.hold = false; }, 8000);
+    }
     function openManager(id) {
         var m = mgrById(id), me = people[ME]; if (!m || !me) { return; }
+        mgrToPost(id);
         if (TEACHER) { openBotShell(id); botSay(TXT.bot_teacher); return; }
         if (Math.abs(Math.round(me.rx) - m.x) > 2 || Math.abs(Math.round(me.ry) - m.y) > 2) {      // сначала подойти
             var f = freeNear(m.x, m.y); if (f) { pendingMgr = id; goTo(f[0], f[1], null); toast('🚶 ' + TXT.mgr_going); }
             return;
         }
-        openBotShell(id);
+        openBotShell(id); people[id].act = TXT.bot_talk; people[id].prop = '';
         if (m.grade !== MY_GRADE) { botSay(TXT.mgr_other.replace('{g}', m.grade).replace('{my}', MY_GRADE)); return; }
         var pk = OME.pkg;
         if (pk && !pk.finished) { botSay(TXT.mgr_busy.replace('{n}', pk.tasks.length - pk.done.length), pkgButtons(pk.tasks)); return; }

@@ -87,8 +87,12 @@ def layout(grade_list):
             put('glass', ox + CAB_W, y, axis='y')
         put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢')
         put('plant', ox + (CAB_W - 1 if row == 0 else 0), oy if row == 0 else oy + 5)
-        if g != ADMIN:                                # руководитель кабинета стоит у входа, внутри
-            managers.append({'grade': g, 'x': ox + 5, 'y': 6 if row == 0 else 12, 'name': MANAGER_NAMES[k % len(MANAGER_NAMES)]})
+        if g != ADMIN:                                # руководитель кабинета: пост у входа + места, где он работает
+            back, front, mid = (1, 6, 3) if row == 0 else (17, 12, 14)
+            put('shelf', ox + 1, back, 3, 1)            # шкаф с папками у дальней стены
+            managers.append({'grade': g, 'x': ox + 5, 'y': front, 'name': MANAGER_NAMES[k % len(MANAGER_NAMES)],
+                             'spots': [[ox + 5, front, 'report'], [ox + 4, back, 'files'], [ox + 4, mid, 'watch'],
+                                       [ox + 7, back, 'phone'], [ox + 8, mid + 1, 'coffee'], [ox + 1, front, 'laptop']]})
         sid = 0
         if admin:                                    # учительская: 4 больших стола, кресла лицом к двери
             dy = a + 1
