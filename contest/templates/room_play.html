@@ -238,7 +238,7 @@
         Object.keys(people).forEach(function (k) {
             var p = people[k];
             if (!p.route.length || p.rx === null) { return; }
-            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = 3.6 * dt;
+            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = (OFFICE ? 5.5 : 3.6) * dt;
             if (d <= sp) { p.rx = t[0]; p.ry = t[1]; p.route.shift(); if (!p.route.length && p.id === ME) { arrived(); } }
             else { p.rx += dx / d * sp; p.ry += dy / d * sp; p.walk = (p.walk || 0) + dt * 10; }
         });
@@ -514,6 +514,7 @@
         if (!r) { return; }
         me.route = r.slice(1); me.tx = x; me.ty = y; me.seat = seat;
         standUp();
+        if (!me.route.length) { arrived(); }                 // уже на месте (например, нажал на свой же стул)
         clearTimeout(sendT);
         sendT = setTimeout(function () {
             post({a: 'move', x: x, y: y, seat: seat || ''}).then(function (d) {
@@ -794,7 +795,8 @@
     function enterFs() { try { var pr = (root.requestFullscreen || root.webkitRequestFullscreen).call(root); if (pr && pr.catch) { pr.catch(function () {}); } } catch (e) {} }
     function fsGate() {
         if (!canFs || inFs()) { $('gate').style.display = 'none'; return; }
-        $('gate-icon').textContent = fsState === 'out' ? '⚠️' : '🏫';
+        $('gate-icon').textContent = fsState === 'out' ? '⚠️' : '🏢';
+        if (TXT.gate_text) { $('gate-text').textContent = TXT.gate_text; }
         $('gate-title').textContent = fsState === 'out' ? TXT.fs_out : TXT.fs_title;
         $('fs-btn').textContent = fsState === 'out' ? TXT.fs_back : TXT.fs_start;
         $('gate').style.display = 'flex';
@@ -850,7 +852,7 @@
         }
     }
 
-    window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }};   // для автотестов: где на экране клетка
+    window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();
     window.addEventListener('resize', function () {});
     poll(); setInterval(function () { if (!document.hidden) { poll(); } }, 3000);

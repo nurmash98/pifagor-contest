@@ -42,6 +42,16 @@ def _base(request, st, grade, teacher):
     return make
 
 
+def _office_texts(lang):
+    """Тексты зала + свои для офиса (заставка полного экрана без «урока» и «учителя»)."""
+    from .templatetags.ui_i18n import UI_TRANSLATIONS
+    t = _texts(lang)
+    tr = (lambda v: UI_TRANSLATIONS.get(v, v)) if lang == 'kk' else (lambda v: v)
+    t['fs_title'] = tr('Офис выходного дня')
+    t['gate_text'] = tr('Офис работает в полноэкранном режиме — так удобнее решать задачи.')
+    return t
+
+
 def _tasks(lang):
     key = f'office:tasks:{lang}'
     out = cache.get(key)
@@ -83,7 +93,7 @@ def office_play(request):
         'state_url': reverse('office_state'), 'act_url': reverse('office_act'), 'lang_url': reverse('office_lang'),
         'layout': json.dumps(of.layout(of.grades())), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
         'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved), 'grades_json': json.dumps(of.grades()),
-        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_texts(lang), ensure_ascii=False),
+        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_office_texts(lang), ensure_ascii=False),
     })
 
 
@@ -185,5 +195,5 @@ def office_lang(request):
     except ValueError:
         keys = []
     tasks, _ = _tasks(lang)
-    return JsonResponse({'ok': True, 'txt': _texts(lang), 'tasks': tasks,
+    return JsonResponse({'ok': True, 'txt': _office_texts(lang), 'tasks': tasks,
                          'tr': {k: (UI_TRANSLATIONS.get(k, k) if lang == 'kk' else k) for k in keys}})
