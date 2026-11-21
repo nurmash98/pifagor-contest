@@ -57,6 +57,13 @@
         #drawer .hd { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 800; }
         #drawer iframe { flex: 1; border: 0; width: 100%; }
         #closed { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.85); color: #fff; display: none; align-items: center; justify-content: center; text-align: center; }
+        #earned { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; pointer-events: none; text-align: center;
+                   background: linear-gradient(135deg, #064e3b, #15803d); color: #fff; border-radius: 14px; padding: 6px 22px 8px; box-shadow: 0 6px 20px rgba(21,128,61,.35); }
+        #earned .l { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
+        #earned .v { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; color: #bbf7d0; }
+        #earned.up { animation: earnUp .9s ease; }
+        @keyframes earnUp { 0% { transform: translateX(-50%) scale(1); } 30% { transform: translateX(-50%) scale(1.12); box-shadow: 0 0 34px rgba(74,222,128,.9); } 100% { transform: translateX(-50%) scale(1); } }
+        @media (max-width: 820px) { #earned .v { font-size: 18px; } }
         #help { position: absolute; left: 12px; top: 12px; background: var(--panel); opacity: .93; border-radius: 12px; padding: 8px 12px; font-size: 12px; color: var(--muted); max-width: 330px; box-shadow: 0 4px 14px rgba(15,23,42,.08); }
         #music.on { background: #a855f7; color: #fff; }
         @media (max-width: 1100px) { #music-vol { display: none; } }
@@ -140,7 +147,8 @@
     <div id="stage">
         <canvas id="map"></canvas>
         <div id="labels"></div>
-        {% if office %}<div id="help">🖱 <span data-tr="Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
+        {% if office %}<div id="earned"><div class="l">💰 <span id="earned-l">{% t "Офис заработал сегодня" %}</span></div><div class="v" id="earned-v">0 ₸</div></div>
+        <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
         {% else %}<div id="help">🖱 <span data-tr="Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор.">{% t "Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>{% endif %}
         <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
@@ -239,6 +247,20 @@
     var people = {}, statsBy = {}, nTasks = TASKS.length, handUp = false, lastStats = [], lastTask = null;
     var CO = {cur: null, done: [], salary: 0}, allDone = false, BOSS = {};
     (L.boss || []).forEach(function (b) { BOSS[b[0] + ',' + b[1]] = true; });
+    var GEARN = {}, earnShown = null, earnAnim = null;          // общий заработок офиса за день — крупно сверху, по кабинетам — на табличках
+    function earnedTo(v) {
+        var box = $('earned'); if (!box) { return; }
+        $('earned-l').textContent = TXT.earned_today;
+        if (earnShown === null) { earnShown = v; $('earned-v').textContent = money(v); return; }
+        if (v === earnShown) { return; }
+        var from = earnShown, t0 = performance.now(); earnShown = v; cancelAnimationFrame(earnAnim);
+        if (v > from) { box.classList.remove('up'); void box.offsetWidth; box.classList.add('up'); }
+        (function tick(now) {                                         // цифры «набегают», как счётчик
+            var k = Math.min(1, (now - t0) / 1200), e = 1 - Math.pow(1 - k, 3);
+            $('earned-v').textContent = money(Math.round((from + (v - from) * e) / 100) * 100);
+            if (k < 1) { earnAnim = requestAnimationFrame(tick); } else { $('earned-v').textContent = money(v); }
+        })(t0);
+    }
     function money(n) { return (n || 0).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ' + TXT.tenge; }
     function taskById(id) { return TASKS.filter(function (t) { return t.id === id; })[0]; }
     function person(id) {
@@ -345,9 +367,12 @@
         sign: function (o) {
             var s = scr(o.x + o.w / 2, o.y + .5, 1.75); ctx.save();
             ctx.font = '800 ' + Math.round(12 * zoom) + 'px Montserrat, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            var ic = o.icon || '👔', w = ctx.measureText(ic + ' ' + o.text).width + 14 * zoom;
+            var ic = o.icon || '👔', txt = ic + ' ' + o.text, cash = (OFFICE && o.grade) ? '  💰 ' + money(GEARN[o.grade] || 0) : '';
+            var w1 = ctx.measureText(txt).width, w = w1 + (cash ? ctx.measureText(cash).width : 0) + 14 * zoom;
             rr(s[0] - w / 2, s[1] - 10 * zoom, w, 20 * zoom, 6 * zoom); ctx.fillStyle = '#111827'; ctx.fill();
-            ctx.fillStyle = '#fbbf24'; ctx.fillText(ic + ' ' + o.text, s[0], s[1]); ctx.restore();
+            ctx.textAlign = 'left'; ctx.fillStyle = '#fbbf24'; ctx.fillText(txt, s[0] - w / 2 + 7 * zoom, s[1]);
+            if (cash) { ctx.fillStyle = '#4ade80'; ctx.fillText(cash, s[0] - w / 2 + 7 * zoom + w1, s[1]); }
+            ctx.restore();
         },
         logo: function (o) {
             poly([[o.x, .02, .7], [o.x + o.w, .02, .7], [o.x + o.w, .02, 2.1], [o.x, .02, 2.1]], NIGHT ? '#0f172a' : '#111827');
@@ -758,6 +783,7 @@
         });
         Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME && +k > 0) { delete people[k]; } });
         lastStats = d.stats || [];
+        if (OFFICE && d.total !== undefined) { earnedTo(d.total); GEARN = d.by_grade || {}; }
         $('online').textContent = d.people.length;
         statsBy = {};
         d.stats.forEach(function (r) { statsBy[r[0]] = r[2]; });

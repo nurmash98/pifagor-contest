@@ -55,6 +55,8 @@ def _office_texts(lang):
 
 
 BOT_TEXTS = {
+    'earned_today': 'Офис заработал сегодня',
+
     'mgr_act_report': '📋 проверяет отчёты',
     'mgr_act_files': '🗂 ищет папку с делами',
     'mgr_act_watch': '👀 смотрит, как идёт работа',
@@ -197,7 +199,8 @@ def office_state(request):
     show = grade if not teacher else (request.GET.get('g') or (of.grades() or [''])[0])
     names = _class_names(show)
     rows = [[names[sid][0], names[sid][1], m, n, names[sid][0] in online, 0, None] for sid, m, n in data.get(show, []) if sid in names]
-    out = {'open': open_, 'people': ppl, 'stats': rows[:15],
+    by_grade = {g: sum(r[1] for r in rs) for g, rs in data.items()}          # заработано за день: по параллелям и всем офисом
+    out = {'open': open_, 'people': ppl, 'stats': rows[:15], 'total': sum(by_grade.values()), 'by_grade': by_grade,
            'left': max(0, int((of.closes_at() - timezone.now()).total_seconds())) if open_ else None}
     from .room_views import _dm_state
     _dm_state(request, r, out)

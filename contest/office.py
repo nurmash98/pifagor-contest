@@ -85,7 +85,7 @@ def layout(grade_list):
                 put('glass', x, wall_y, axis='x')
         for y in range(min(oy, wall_y), max(oy + 5, wall_y) + 1):
             put('glass', ox + CAB_W, y, axis='y')
-        put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢')
+        put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢', grade='' if admin else g)
         put('plant', ox + (CAB_W - 1 if row == 0 else 0), oy if row == 0 else oy + 5)
         if g != ADMIN:                                # руководитель кабинета: пост у входа + места, где он работает
             back, front, mid = (1, 6, 3) if row == 0 else (17, 12, 14)
