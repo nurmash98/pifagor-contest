@@ -65,12 +65,10 @@ def _access(request, room_id):
 
 
 def _label(st):
-    """Плашка над головой: аватар (с рамкой по значку) + имя на своём баннере — как на сайте."""
+    """Плашка над головой: имя на своём баннере, как на сайте (аватар — на голове персонажа)."""
     from django.template.loader import render_to_string
     from . import avatars
-    from .models import Submission
-    solved = Submission.objects.filter(student=st, is_graded=True, score=10).count()
-    html = render_to_string('room_label.html', {'st': st, 'solved': solved})
+    html = render_to_string('room_label.html', {'st': st})
     pic = avatars.get(st.avatar)
     img = avatars.img_url(pic) if pic else (avatars.custom_url(st.avatar) or '')
     return {'h': ' '.join(html.split()), 'ai': img}
