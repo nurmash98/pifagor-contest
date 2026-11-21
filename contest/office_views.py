@@ -49,7 +49,49 @@ def _office_texts(lang):
     tr = (lambda v: UI_TRANSLATIONS.get(v, v)) if lang == 'kk' else (lambda v: v)
     t['fs_title'] = tr('Офис выходного дня')
     t['gate_text'] = tr('Офис работает в полноэкранном режиме — так удобнее решать задачи.')
+    for k, v in BOT_TEXTS.items():
+        t[k] = tr(v)
     return t
+
+
+BOT_TEXTS = {'bot_role': 'администратор',
+    'bot1': 'Айна',
+    'bot2': 'Арман',
+    'bot_water': '💧 поливает цветы',
+    'bot_coffee': '☕ варит кофе',
+    'bot_water2': '🚰 меняет воду в кулере',
+    'bot_walk': '👀 обходит офис',
+    'bot_desk': '🛎 на ресепшене',
+    'bot_talk': '💬 отвечает на вопрос',
+    'bot_hello': 'Привет! Я администратор офиса. Нажми на меня, если нужна помощь 🙂',
+    'bot_hi': 'Здравствуйте! Я {name}, администратор офиса. Чем помочь? Выберите вопрос ниже 👇',
+    'botq_x2': 'Как получить монеты x2?',
+    'botq_cab': 'Где мой кабинет?',
+    'botq_top': 'Как попасть в топ-3?',
+    'botq_earn': 'Сколько я заработал?',
+    'botq_advice': 'Посоветуй задачу',
+    'botq_theory': 'Где теория по задаче?',
+    'botq_rules': 'Как тут всё устроено?',
+    'bot_a_x2': 'Садитесь за стол в кабинете своей параллели и решайте задачи прямо здесь. За задачу, которую вы впервые решили на 10/10 в офисе, — обычные монеты и столько же сверху: A — 2, B — 4, C — 6. Старые решения не считаются.',
+    'bot_a_rules': 'Офис открыт по субботам и воскресеньям с 9:00 до 20:00. Садитесь в кабинете своей параллели, выбирайте тему и задачу справа. За решённые задачи — монеты x2 и зарплата: A — 10 000 ₸, B — 20 000 ₸, C — 30 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет. Учителя сидят в «Администрации» — им можно написать, нажав на них.',
+    'bot_a_earn': 'Сегодня вы заработали {m}, монет за офис: +{c}, решено задач: {n}.',
+    'bot_a_top_in': 'Вы сейчас на {p} месте в своей параллели — так держать! В 20:00 топ-3 получают по 20 монет.',
+    'bot_a_top_out': 'Вы на {p} месте. Решайте задачи посложнее — B и C дают больше зарплаты.',
+    'bot_a_top_none': 'Вы пока не в списке — решите первую задачу, и вы появитесь в топе.',
+    'bot_a_top_third': 'У третьего места сейчас {m}.',
+    'bot_a_cab': 'Ваш кабинет — «{g} класс». Садиться можно только там. Могу отвести!',
+    'bot_a_cab_t': 'Учителя сидят в кабинете «Администрация».',
+    'bot_lead': 'Отведи меня',
+    'bot_follow': 'Идёмте за мной! Садитесь за свободный стол 🙂',
+    'bot_a_adv': 'Попробуйте «{t}» — уровень {l}, зарплата {m}.',
+    'bot_a_adv_none': 'Вы решили все задачи — вот это да! 🏆',
+    'bot_open': 'Открыть задачу',
+    'bot_sit_then': 'Сначала сядьте за стол в своём кабинете — я провожу. Потом откройте задачу справа.',
+    'bot_a_th_first': 'Сначала откройте задачу, а потом спросите меня — я найду теорию по ней.',
+    'bot_a_th': 'Вот теория к задаче «{t}»:',
+    'bot_a_th_none': 'К задаче «{t}» теории в курсах нет. Попробуйте раздел «Курсы» или спросите учителя в «Администрации».',
+    'bot_teacher': 'Это для учеников 🙂 Вы — учитель, вы и так всё знаете!'}
+
 
 
 def _tasks(lang):
@@ -197,3 +239,40 @@ def office_lang(request):
     tasks, _ = _tasks(lang)
     return JsonResponse({'ok': True, 'txt': _office_texts(lang), 'tasks': tasks,
                          'tr': {k: (UI_TRANSLATIONS.get(k, k) if lang == 'kk' else k) for k in keys}})
+
+
+@login_required
+def office_bot(request):
+    """Администратор офиса (персонаж без ИИ): «Посоветуй задачу» и «Где теория?». Ответы — по данным сайта."""
+    from .models import Submission, Topic
+    from .views import _course_open_for
+    st, grade, teacher = _who(request)
+    q = request.GET.get('q')
+    lang = _lang(request)
+    if q == 'advice':
+        if st is None:
+            return JsonResponse({'task': None})
+        solved = set(Submission.objects.filter(student=st, is_graded=True, score=10).values_list('task_id', flat=True))
+        tasks, _ = _tasks(lang)
+        by_level = {lv: sum(1 for t in tasks if t['level'] == lv and t['id'] in solved) for lv in 'ABC'}
+        level = 'A' if by_level['A'] < 5 else ('B' if by_level['B'] < 5 else 'C')      # растём постепенно: A → B → C
+        last = (Submission.objects.filter(student=st, is_graded=True, score=10).order_by('-updated_at')
+                .values_list('task_id', flat=True).first())
+        last_tags = next((set(t['tags']) for t in tasks if t['id'] == last), set())
+        free = [t for t in tasks if t['id'] not in solved]
+        pick = (next((t for t in free if t['level'] == level and last_tags & set(t['tags'])), None)
+                or next((t for t in free if t['level'] == level), None) or (free[0] if free else None))
+        return JsonResponse({'task': pick['id'] if pick else None, 'level': level, 'solved': len(solved)})
+    if q == 'theory':
+        try:
+            tid = int(request.GET.get('task'))
+        except (TypeError, ValueError):
+            return JsonResponse({'items': []})
+        items = []
+        for tp in Topic.objects.filter(tasks__id=tid).select_related('course'):
+            if not _course_open_for(request.user, tp.course):
+                continue
+            url = reverse('topic_theory', args=[tp.id]) if tp.theory_html else reverse('course_detail', args=[tp.course_id])
+            items.append({'title': f'{tp.course.name} — {tp.name}', 'url': url})
+        return JsonResponse({'items': items[:3]})
+    return JsonResponse({'error': 'bad'})

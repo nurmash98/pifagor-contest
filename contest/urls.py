@@ -156,6 +156,7 @@ urlpatterns = [
     path('office/state/', office_views.office_state, name='office_state'),
     path('office/act/', office_views.office_act, name='office_act'),
     path('office/lang/', office_views.office_lang, name='office_lang'),
+    path('office/bot/', office_views.office_bot, name='office_bot'),
     path('room/<int:room_id>/', room_views.room_play, name='room_play'),
     path('room/<int:room_id>/state/', room_views.room_state, name='room_state'),
     path('room/<int:room_id>/act/', room_views.room_act, name='room_act'),

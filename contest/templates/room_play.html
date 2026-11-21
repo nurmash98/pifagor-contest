@@ -93,6 +93,13 @@
         .plab.me { cursor: default; }
         .plab .pboss { zoom: .8; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #111827; font-weight: 900; letter-spacing: .08em;
                        padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+        .plab .pbot { background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
+        .plab .pact { display: block; text-align: center; font-size: 10px; font-weight: 700; color: #0f766e; background: rgba(255,255,255,.85); border-radius: 6px; padding: 1px 6px; margin-top: 2px; }
+        #chat-quick { display: none; flex-wrap: wrap; gap: 5px; padding: 8px; border-top: 1px solid var(--line); max-height: 40%; overflow-y: auto; }
+        #chat-quick button { border: 1px solid rgba(20,184,166,.5); background: rgba(20,184,166,.08); color: var(--fg); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        #chat-quick button:hover { background: rgba(20,184,166,.2); }
+        #chat .m.bot { background: rgba(20,184,166,.14); border: 1px solid rgba(20,184,166,.35); }
+        #chat .m .go { display: inline-block; margin-top: 6px; border: 0; background: #14b8a6; color: #fff; border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 12px; cursor: pointer; }
         .plab .pdm { background: #ef4444; color: #fff; font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 999px; }
         #chat { position: absolute; right: 60px; bottom: 74px; width: min(340px, calc(100% - 80px)); max-height: 60%; display: none; flex-direction: column;
                 background: var(--panel); border-radius: 16px; box-shadow: 0 12px 32px rgba(15,23,42,.28); z-index: 6; overflow: hidden; border: 1px solid var(--line); }
@@ -131,6 +138,7 @@
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
         <div id="chat"><div class="hd">💬 <span id="chat-name" style="flex:1"></span><button class="btn ghost" id="chat-x" type="button" style="padding:4px 10px">✕</button></div>
             <div class="msgs" id="chat-msgs"></div>
+            <div id="chat-quick"></div>
             <form id="chat-form" autocomplete="off"><input id="chat-in" maxlength="200" data-trp="Написать сообщение…" placeholder="{% t "Написать сообщение…" %}"><button class="btn" type="submit">➤</button></form></div>
         <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><iframe id="d-frame"></iframe></div>
     </div>
@@ -175,7 +183,7 @@
     var ME = {{ me }}, TEACHER = {{ teacher|yesno:"true,false" }};
     var U = {state: '{{ state_url }}', act: '{{ act_url }}'};
     var TXT = {{ texts|safe }};
-    var U2 = {lang: '{{ lang_url }}'};
+    var U2 = {lang: '{{ lang_url }}', bot: '{% if office %}{% url "office_bot" %}{% endif %}'};
     var OFFICE = {{ office|yesno:"true,false" }}, MY_GRADE = '{{ my_grade|default:"" }}', OTAGS = {{ tags_json|default:"[]"|safe }};
     var $ = function (id) { return document.getElementById(id); };
     var csrf = document.querySelector('#csrf input').value;
@@ -218,7 +226,7 @@
     }
 
     // ---------------- люди ----------------
-    var people = {}, statsBy = {}, nTasks = TASKS.length, handUp = false;
+    var people = {}, statsBy = {}, nTasks = TASKS.length, handUp = false, lastStats = [], lastTask = null;
     var CO = {cur: null, done: [], salary: 0}, allDone = false, BOSS = {};
     (L.boss || []).forEach(function (b) { BOSS[b[0] + ',' + b[1]] = true; });
     function money(n) { return (n || 0).toLocaleString('ru-RU').replace(/,/g, ' ') + ' ' + TXT.tenge; }
@@ -395,7 +403,7 @@
         if (p.id === ME) { ellipse(x, y, 0, 18, 9, 'rgba(99,102,241,.28)'); }
         ellipse(x, y, 0, 11, 5.5, 'rgba(15,23,42,.18)');
         var base = scr(x, y, z0 + bob), s = zoom;
-        var shirt = p.teacher ? '#1e293b' : COLORS[p.c % COLORS.length];
+        var shirt = p.bot ? p.color : p.teacher ? '#1e293b' : COLORS[p.c % COLORS.length];
         ctx.save();
         if (!seated) { ctx.fillStyle = '#334155'; ctx.fillRect(base[0] - 6 * s, base[1] - 12 * s, 5 * s, 12 * s); ctx.fillRect(base[0] + 1 * s, base[1] - 12 * s, 5 * s, 12 * s); }
         rr(base[0] - 9 * s, base[1] - (seated ? 26 : 32) * s, 18 * s, 22 * s, 7 * s); ctx.fillStyle = shirt; ctx.fill();
@@ -420,6 +428,11 @@
     // ---------- плашки над головой (HTML поверх холста): аватар + имя на баннере, сообщение, ✋, ✅ ----------
     var labEls = {};
     function labelHtml(p) {
+        if (p.bot) {
+            return (p.msg ? '<div class="pmsg" style="background:rgba(15,118,110,.92)">' + esc(p.msg) + '</div>' : '') +
+                   '<div class="pname" style="flex-direction:column;gap:0"><span class="pbot">🤖 ' + esc(p.name) + ' · ' + esc(TXT.bot_role) + '</span>' +
+                   (p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
+        }
         var name = p.h ? p.h : (p.teacher ? '<span class="pboss">👔 BOSS</span>' : '') + '<span class="plain' + (p.teacher ? ' t' : '') + '">' + esc(p.name) + '</span>';
         var done = statsBy[p.id];
         return (p.msg ? '<div class="pmsg' + (p.teacher ? ' t' : '') + '">' + esc(p.msg) + '</div>' : '') +
@@ -629,10 +642,10 @@
         $('olist').addEventListener('click', function (e) {
             var el = e.target.closest('.task'); if (!el) { return; }
             if (!seated && !TEACHER) { toast(TXT.sit_own); return; }
-            var t = taskById(+el.getAttribute('data-id'));
-            $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex';
+            openTask(taskById(+el.getAttribute('data-id')));
         });
     }
+    function openTask(t) { if (!t) { return; } lastTask = t.id; $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex'; }
     function tasksPanel() {
         if (OFFICE) { officePanel(); return; }
         if (TEACHER) {
@@ -713,7 +726,8 @@
             if (r[0] === ME) { if (p.rx === null) { setTarget(p, r[2], r[3], r[4]); seated = !!r[4]; tasksPanel(); } handUp = r[6]; paintHand(); }
             else { setTarget(p, r[2], r[3], r[4]); }
         });
-        Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME) { delete people[k]; } });
+        Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME && +k > 0) { delete people[k]; } });
+        lastStats = d.stats || [];
         $('online').textContent = d.people.length;
         statsBy = {};
         d.stats.forEach(function (r) { statsBy[r[0]] = r[2]; });
@@ -819,6 +833,8 @@
     var UNREAD = {}, chatWith = null, lastUnreadSig = '';
     function openChat(uid) {
         uid = +uid; if (!uid || uid === ME || !people[uid]) { return; }
+        if (uid < 0) { openBot(uid); return; }
+        $('chat-quick').style.display = 'none'; $('chat-form').style.display = 'flex';
         chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 BOSS · ' : '') + people[uid].name;
         $('chat').style.display = 'flex'; $('chat-msgs').innerHTML = ''; $('chat-in').focus(); poll();
     }
@@ -831,7 +847,7 @@
         if (atBottom || conv.length && conv[conv.length - 1][0] === ME) { box.scrollTop = box.scrollHeight; }
     }
     $('labels').addEventListener('click', function (e) { var el = e.target.closest('.plab'); if (el) { openChat(el.getAttribute('data-uid')); } });
-    $('chat-x').addEventListener('click', function () { chatWith = null; $('chat').style.display = 'none'; });
+    $('chat-x').addEventListener('click', function () { chatWith = null; botWith = null; $('chat').style.display = 'none'; });
     $('chat-form').addEventListener('submit', function (e) {
         e.preventDefault(); var v = $('chat-in').value.trim(); if (!v || !chatWith) { return; }
         post({a: 'dm', to: chatWith, text: v}).then(function (d) {
@@ -851,6 +867,123 @@
             lastUnreadSig = sig;
         }
     }
+
+    // ---------------- администраторы офиса (персонажи без ИИ): ходят, поливают цветы, отвечают на частые вопросы ----------------
+    var botWith = null, botConv = [];
+    function freeNear(x, y) {
+        var D = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+        for (var i = 0; i < D.length; i++) { if (free(x + D[i][0], y + D[i][1])) { return [x + D[i][0], y + D[i][1]]; } }
+        return null;
+    }
+    var BOTS = [];
+    if (OFFICE) {
+        var plants = [], counter = null, cooler = null;
+        L.objs.forEach(function (o) {
+            if (o.t === 'plant') { var f = freeNear(o.x, o.y); if (f) { plants.push([f[0], f[1], TXT.bot_water]); } }
+            if (o.t === 'counter' && !counter) { counter = [o.x + 1, o.y + 1, TXT.bot_coffee]; }
+            if (o.t === 'cooler' && !cooler) { var f2 = freeNear(o.x, o.y); if (f2) { cooler = [f2[0], f2[1], TXT.bot_water2]; } }
+        });
+        var corridor = [];
+        for (var cx = 2; cx < W - 6; cx += 6) { corridor.push([cx, 9, TXT.bot_walk]); }
+        var reception = counter ? [counter[0], counter[1] + 1, TXT.bot_desk] : [W - 4, 9, TXT.bot_desk];
+        BOTS = [
+            {id: -1, name: TXT.bot1, color: '#0d9488', wps: [reception, counter || reception, reception, cooler || reception].filter(Boolean), every: 16, off: 0},
+            {id: -2, name: TXT.bot2, color: '#0284c7', wps: plants.concat(corridor).filter(Boolean), every: 11, off: 5}
+        ];
+        BOTS.forEach(function (b) {
+            if (!b.wps.length) { return; }
+            var p = person(b.id); p.bot = true; p.name = b.name; p.color = b.color; p.c = 0;
+            var w = b.wps[0]; setTarget(p, w[0], w[1], null); p.act = w[2]; b.cur = 0;
+        });
+        setInterval(function () {
+            var now = Date.now() / 1000;
+            BOTS.forEach(function (b) {
+                if (!b.wps.length) { return; }
+                var i = Math.floor((now + b.off) / b.every) % b.wps.length;
+                if (i === b.cur) { return; }
+                b.cur = i; var w = b.wps[i], p = people[b.id];
+                if (botWith === b.id) { return; }                       // пока разговаривает — стоит на месте
+                setTarget(p, w[0], w[1], null, true); p.act = w[2];
+            });
+        }, 1000);
+        try {                                                             // приветствие — раз в день
+            var gk = 'office-greet-' + new Date().toDateString();
+            if (!localStorage.getItem(gk)) {
+                localStorage.setItem(gk, '1');
+                setTimeout(function () { var p = people[-1]; if (p) { p.msg = TXT.bot_hello; setTimeout(function () { p.msg = ''; }, 9000); } }, 1500);
+            }
+        } catch (e) {}
+    }
+    function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
+    function renderBot() {
+        var box = $('chat-msgs');
+        box.innerHTML = botConv.map(function (m) { return '<div class="m' + (m.bot ? ' bot' : ' mine') + '">' + esc(m.text) + (m.extra || '') + '</div>'; }).join('');
+        box.scrollTop = box.scrollHeight;
+    }
+    var BOTQ = [['x2', '🪙'], ['cab', '🚪'], ['top', '🏆'], ['earn', '💰'], ['advice', '🎯'], ['theory', '📖'], ['rules', '❓']];
+    function openBot(id) {
+        botWith = id; chatWith = null;
+        var p = people[id]; p.route = []; p.act = TXT.bot_talk;
+        $('chat-name').textContent = '🤖 ' + p.name + ' · ' + TXT.bot_role;
+        $('chat-form').style.display = 'none'; $('chat-quick').style.display = 'flex';
+        $('chat-quick').innerHTML = BOTQ.map(function (q) { return '<button type="button" data-q="' + q[0] + '">' + q[1] + ' ' + esc(TXT['botq_' + q[0]]) + '</button>'; }).join('');
+        $('chat').style.display = 'flex';
+        botConv = []; botSay(TXT.bot_hi.replace('{name}', p.name));
+    }
+    function myPlace() { for (var i = 0; i < lastStats.length; i++) { if (lastStats[i][0] === ME) { return i + 1; } } return 0; }
+    function goMyCabinet() {
+        var best = null, bd = 1e9, me = people[ME]; if (!me) { return; }
+        L.seats.forEach(function (st) {
+            if (st.grade !== MY_GRADE || takenBy(st.id)) { return; }
+            var d = Math.abs(st.x - me.rx) + Math.abs(st.y - me.ry); if (d < bd) { bd = d; best = st; }
+        });
+        if (best) { goTo(best.x, best.y, best.id); } else { toast(TXT.taken); }
+    }
+    $('chat-quick').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-q]'); if (!b || !botWith) { return; }
+        var q = b.getAttribute('data-q');
+        botConv.push({bot: false, text: b.textContent}); renderBot();
+        if (q === 'x2') { botSay(TXT.bot_a_x2); }
+        else if (q === 'rules') { botSay(TXT.bot_a_rules); }
+        else if (q === 'earn') { botSay(TEACHER ? TXT.bot_teacher : TXT.bot_a_earn.replace('{m}', money(OME.money)).replace('{c}', OME.coins * 2).replace('{n}', OME.today.length)); }
+        else if (q === 'top') {
+            if (TEACHER) { botSay(TXT.bot_teacher); return; }
+            var pl = myPlace(), third = lastStats[2] ? money(lastStats[2][2]) : null;
+            botSay(pl && pl <= 3 ? TXT.bot_a_top_in.replace('{p}', pl) : (pl ? TXT.bot_a_top_out.replace('{p}', pl) : TXT.bot_a_top_none) + (third ? ' ' + TXT.bot_a_top_third.replace('{m}', third) : ''));
+        }
+        else if (q === 'cab') {
+            if (TEACHER) { botSay(TXT.bot_a_cab_t); return; }
+            botSay(TXT.bot_a_cab.replace('{g}', MY_GRADE), ' <button class="go" type="button" data-act="lead">🚶 ' + esc(TXT.bot_lead) + '</button>');
+        }
+        else if (q === 'advice') {
+            if (TEACHER) { botSay(TXT.bot_teacher); return; }
+            fetch(U2.bot + '?q=advice', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+                var t = d.task ? taskById(d.task) : null;
+                if (!t) { botSay(TXT.bot_a_adv_none); return; }
+                botSay(TXT.bot_a_adv.replace('{t}', t.title).replace('{l}', t.level).replace('{m}', money(t.pay)), ' <button class="go" type="button" data-act="open" data-id="' + t.id + '">▶ ' + esc(TXT.bot_open) + '</button>');
+            });
+        }
+        else if (q === 'theory') {
+            var tid = lastTask;
+            if (!tid) { botSay(TXT.bot_a_th_first); return; }
+            fetch(U2.bot + '?q=theory&task=' + tid, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+                if (!d.items || !d.items.length) { botSay(TXT.bot_a_th_none.replace('{t}', (taskById(tid) || {}).title || '')); return; }
+                botSay(TXT.bot_a_th.replace('{t}', (taskById(tid) || {}).title || ''), d.items.map(function (it) {
+                    return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.title) + '</button>'; }).join(''));
+            });
+        }
+    });
+    $('chat-msgs').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-act]'); if (!b) { return; }
+        var a = b.getAttribute('data-act');
+        if (a === 'lead') { goMyCabinet(); botSay(TXT.bot_follow); }
+        if (a === 'open') {
+            var t = taskById(+b.getAttribute('data-id'));
+            if (!seated && !TEACHER) { lastTask = t.id; botSay(TXT.bot_sit_then); goMyCabinet(); return; }
+            openTask(t);
+        }
+        if (a === 'url') { $('d-title').textContent = b.getAttribute('data-title'); $('d-frame').src = b.getAttribute('data-url'); $('drawer').style.display = 'flex'; }
+    });
 
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();

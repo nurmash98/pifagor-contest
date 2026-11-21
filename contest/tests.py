@@ -5362,6 +5362,21 @@ class WeekendOfficeTests(TestCase):
         office.finalize_due(self.sat.replace(hour=21))                                         # второй раз — ничего
         self.assertEqual(CoinTransaction.objects.filter(key__startswith='officetop:').count(), 3)
 
+    def test_admin_bot_advice_and_theory(self):
+        from .models import Course, Topic
+        st = self.sts[0]
+        self.client.force_login(st.user)
+        r = self.client.get(reverse('office_bot') + '?q=advice').json()
+        self.assertEqual(r['level'], 'A')                                                   # новичку — лёгкая задача
+        self.assertEqual(Task.objects.get(id=r['task']).level, 'A')
+        Submission.objects.create(student=st, task_id=r['task'], status='DONE', is_graded=True, score=10)
+        self.assertNotEqual(self.client.get(reverse('office_bot') + '?q=advice').json()['task'], r['task'])   # решённую не советует
+        course = Course.objects.create(name='Python', is_visible=True)
+        tp = Topic.objects.create(course=course, name='Циклы', theory_html='<p>for</p>')
+        tp.tasks.add(self.tB)
+        items = self.client.get(reverse('office_bot') + f'?q=theory&task={self.tB.id}').json()['items']
+        self.assertTrue(all('Python' in i['title'] for i in items))
+
     def test_solved_before_entering_not_counted_and_closed_on_weekdays(self):
         from . import office
         from .models import OfficeSolve
