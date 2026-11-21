@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import room_views, views
 from . import exam_views, exam_report, scratch_views
 from . import exam_guard
 from . import moderation_views
@@ -151,6 +151,12 @@ urlpatterns = [
     path('games/island/<int:game_id>/', island_views.play, name='island_play'),
     path('games/island/<int:game_id>/state/', island_views.play_state, name='island_state'),
     path('games/island/<int:game_id>/lang/', island_views.play_lang, name='island_lang'),
+    path('room/', room_views.room_enter, name='room_enter'),
+    path('room/<int:room_id>/', room_views.room_play, name='room_play'),
+    path('room/<int:room_id>/state/', room_views.room_state, name='room_state'),
+    path('room/<int:room_id>/act/', room_views.room_act, name='room_act'),
+    path('teacher/room/', room_views.room_manage, name='room_manage'),
+    path('teacher/room/<int:room_id>/close/', room_views.room_close, name='room_close'),
     path('games/island/<int:game_id>/arm/', island_views.play_arm, name='island_arm'),
     path('games/island/<int:game_id>/exit/', island_views.play_exit, name='island_exit'),
     path('games/island/<int:game_id>/move/', island_views.play_move, name='island_move'),

@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import (Course, Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, Submission, LoginEvent, Tag, Task, Teacher)
+from .models import (Course, Duel, DuelQueueEntry, Exam, ExamAnswer, ExamAttempt, ExamRetake, Student, StudyRoom, Submission, LoginEvent, Tag, Task, Teacher)
 
 
 def make_task(title, level, tag, ok=True):
@@ -5110,3 +5110,85 @@ class Gta6ChallengeTests(TestCase):
         self.assertNotIn('gta01', avatars.owned(self.st))
         self.assertNotIn('vice', banners.owned(self.st))
         self.assertEqual(self.client.get(reverse('challenge', args=['nope'])).status_code, 404)
+
+
+class StudyRoomTests(TestCase):
+    """3D-коворкинг класса: учитель открывает зал с задачами, ученики садятся, пишут, поднимают руку; статистика урока."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.tu = User.objects.create_user('rm_t', password='p', is_staff=True, is_superuser=True)
+        self.sts = [Student.objects.create(user=User.objects.create_user(f'rm_s{i}', password='p'), full_name=f'Ученик {i}', school_class='8A')
+                    for i in range(3)]
+        self.other = Student.objects.create(user=User.objects.create_user('rm_o', password='p'), full_name='Чужой', school_class='8B')
+        tag = Tag.objects.create(name='Циклы')
+        self.tasks = [make_task(f'Задача {i}', 'A', tag) for i in range(3)]
+
+    def _open(self):
+        self.client.force_login(self.tu)
+        r = self.client.post(reverse('room_manage'), {'school_class': '8A', 'title': 'Циклы', 'minutes': 45,
+                                                       'tasks': [t.id for t in self.tasks[:2]]})
+        room = StudyRoom.objects.get()
+        self.assertRedirects(r, reverse('room_play', args=[room.id]))
+        return room
+
+    def test_open_room_with_tasks_and_students_see_it(self):
+        room = self._open()
+        self.assertEqual(list(room.tasks.order_by('id')), self.tasks[:2])
+        self.client.force_login(self.sts[0].user)
+        self.assertContains(self.client.get(reverse('all_tasks')), reverse('room_play', args=[room.id]))       # полоса-приглашение
+        html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
+        self.assertIn('Задача 0', html)
+        self.assertNotIn('Задача 2', html)
+        self.client.force_login(self.other.user)
+        self.assertEqual(self.client.get(reverse('room_play', args=[room.id])).status_code, 404)     # чужой класс
+
+    def test_move_sit_say_hand_and_seat_conflict(self):
+        room = self._open()
+        a, b = self.sts[0], self.sts[1]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.assertEqual(self.client.post(act, {'a': 'move', 'x': 3, 'y': 8, 'seat': 's1'}).json(), {'ok': True})
+        self.assertEqual(self.client.post(act, {'a': 'move', 'x': 10, 'y': 2, 'seat': 't'}).json()['error'], 'teacher_seat')
+        self.assertEqual(self.client.post(act, {'a': 'say', 'text': 'Помогите  с задачей'}).json(), {'ok': True})
+        self.assertEqual(self.client.post(act, {'a': 'say', 'text': 'ещё'}).json()['error'], 'wait')        # не чаще раза в 4 сек
+        self.client.post(act, {'a': 'hand'})
+        self.client.force_login(b.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.assertEqual(self.client.post(act, {'a': 'move', 'x': 3, 'y': 8, 'seat': 's1'}).json()['error'], 'taken')
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        me_a = [p for p in st['people'] if p[0] == a.user_id][0]
+        self.assertEqual((me_a[4], me_a[5], me_a[6]), ('s1', 'Помогите с задачей', True))
+        self.assertNotIn('log', st)                                                          # журнал — только учителю
+        self.client.force_login(self.tu)
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertEqual(st['log'][-1][2], 'Помогите с задачей')
+        self.client.post(act, {'a': 'lower', 'uid': a.user_id})
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertFalse([p for p in st['people'] if p[0] == a.user_id][0][6])
+
+    def test_stats_count_tasks_solved_during_lesson(self):
+        room = self._open()
+        a = self.sts[0]
+        Submission.objects.create(student=a, task=self.tasks[0], status='DONE', is_graded=True, score=10)
+        Submission.objects.create(student=a, task=self.tasks[2], status='DONE', is_graded=True, score=10)   # не задача урока
+        Submission.objects.create(student=self.sts[1], task=self.tasks[1], status='DONE', is_graded=True, score=6)
+        self.client.force_login(a.user)
+        st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
+        rows = {r[0]: r for r in st['stats']}
+        self.assertEqual(rows[a.user_id][2], 1)
+        self.assertEqual(rows[self.sts[1].user_id][2], 0)
+        self.assertEqual(st['mine'], [self.tasks[0].id])
+        self.assertEqual(st['n_tasks'], 2)
+
+    def test_close_room(self):
+        room = self._open()
+        self.client.post(reverse('room_close', args=[room.id]))
+        room.refresh_from_db()
+        self.assertIsNotNone(room.closed_at)
+        self.client.force_login(self.sts[0].user)
+        self.assertRedirects(self.client.get(reverse('room_play', args=[room.id])), reverse('codegames'), fetch_redirect_response=False)
+        self.assertEqual(self.client.post(reverse('room_act', args=[room.id]), {'a': 'hand'}).json()['error'], 'closed')
+        self.assertNotContains(self.client.get(reverse('all_tasks')), 'class="room-strip"')

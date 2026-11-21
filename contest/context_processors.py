@@ -138,3 +138,17 @@ def challenge_promo(request):
     if st is None or is_junior(st):
         return none
     return {'challenge_promo': 'gta6', 'challenge_ends': ends_at(ch).isoformat()}
+
+
+def room_open(request):
+    """Полоса «Учитель открыл коворкинг» — ученикам класса, пока зал открыт (кеш 30 сек, без лишних запросов)."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or user.is_staff:
+        return {'room_open': None}
+    m = getattr(request, 'resolver_match', None)
+    if m and m.url_name and m.url_name.startswith('room_'):
+        return {'room_open': None}
+    from .models import Student
+    from .room_views import open_room_for_class
+    cls = Student.objects.filter(user=user).values_list('school_class', flat=True).first()
+    return {'room_open': open_room_for_class(cls)}

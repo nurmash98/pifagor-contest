@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Коворкинг класса - Pifagor Contest{% endblock %}
+{% block content %}
+<style>
+    .tpick { max-height: 380px; overflow-y: auto; border: 1px solid rgba(0,0,0,.1); border-radius: 14px; }
+    .tpick label { display: flex; gap: 10px; align-items: center; padding: 7px 12px; border-bottom: 1px solid rgba(0,0,0,.05); cursor: pointer; margin: 0; }
+    .tpick label:hover { background: rgba(108,92,231,.06); }
+    .tpick .lv { width: 26px; text-align: center; font-weight: 800; border-radius: 6px; font-size: 12px; padding: 2px 0; }
+    .lv-A { background: #dcfce7; color: #166534; } .lv-B { background: #fef9c3; color: #854d0e; } .lv-C { background: #fee2e2; color: #991b1b; }
+    .tpick .tg { font-size: 11px; color: #6b7280; margin-left: auto; text-align: right; }
+    [data-bs-theme="dark"] .tpick { border-color: #3d4566; }
+</style>
+<div class="mb-3"><a href="{% url 'games_hub' %}" class="text-decoration-none text-muted small">← Игры</a></div>
+<h2 class="fw-bold mb-1" style="color:#1a1a4b">🏫 Коворкинг класса</h2>
+<p class="text-muted">Класс заходит в 3D-зал: ученики садятся за столы и решают задачи, которые вы выбрали на урок.
+Можно ходить, садиться, писать короткие сообщения над головой и поднимать руку ✋. Вы тоже в зале — за своим столом у доски.
+Справа видна статистика: кто сколько задач решил за урок.</p>
+
+{% if rooms %}
+<div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
+    <h5 class="fw-bold mb-2">Залы</h5>
+    {% for r in rooms %}
+    <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not forloop.last %}border-bottom{% endif %}">
+        <span class="badge {% if r.open_now %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{% if r.open_now %}открыт{% else %}закрыт{% endif %}</span>
+        <b>{{ r.school_class }}</b> <span>{{ r.title|default:"—" }}</span>
+        <span class="text-muted small">{{ r.started_at|date:"d.m H:i" }} · задач: {{ r.tasks.all|length }}{% if r.open_now %} · в зале: {{ r.online }}{% endif %}</span>
+        <span class="ms-auto d-flex gap-2">
+            <a href="{% url 'room_play' r.id %}" class="btn btn-sm btn-pifagor-green rounded-pill px-3">{% if r.open_now %}▶ Войти{% else %}Статистика{% endif %}</a>
+            {% if r.open_now %}<form method="post" action="{% url 'room_close' r.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger rounded-pill px-3">Закрыть</button></form>{% endif %}
+        </span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="card border-0 shadow-sm rounded-4 p-4">{% csrf_token %}
+    <h5 class="fw-bold mb-3">Открыть зал на урок</h5>
+    {% if not classes %}<div class="alert alert-warning">У вас пока нет своих классов — укажите их в «Мои классы».</div>{% endif %}
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><label class="form-label small fw-semibold">Класс</label>
+            <select name="school_class" class="form-select rounded-3" required>{% for c, n in classes %}<option value="{{ c }}">{{ c }} ({{ n }} уч.)</option>{% endfor %}</select></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">Тема урока</label>
+            <input name="title" class="form-control rounded-3" maxlength="120" placeholder="Например: Циклы while"></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">Длительность, минут</label>
+            <input name="minutes" type="number" min="5" max="240" value="45" class="form-control rounded-3"></div>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <label class="form-label small fw-semibold mb-0">Задачи урока</label>
+        <span class="badge bg-primary rounded-pill" id="picked">0</span>
+        <input id="tsearch" class="form-control form-control-sm rounded-pill ms-auto" style="max-width:280px" placeholder="🔍 Поиск по названию или теме">
+    </div>
+    <div class="tpick mb-3" id="tlist">
+        {% for t in tasks %}
+        <label data-s="{{ t.title|lower }} {% for g in t.tags.all %}{{ g.name|lower }} {% endfor %}">
+            <input type="checkbox" name="tasks" value="{{ t.id }}" class="form-check-input mt-0">
+            <span class="lv lv-{{ t.level }}">{{ t.level }}</span>
+            <span>{{ t.title }}</span>
+            <span class="tg">{% for g in t.tags.all|slice:":3" %}{{ g.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+        </label>
+        {% endfor %}
+    </div>
+    <button class="btn btn-pifagor-green rounded-pill px-4 fw-semibold align-self-start" {% if not classes %}disabled{% endif %}>🏫 Открыть зал и войти</button>
+</form>
+<script>
+(function () {
+    var q = document.getElementById('tsearch'), list = document.getElementById('tlist'), cnt = document.getElementById('picked');
+    q.addEventListener('input', function () {
+        var v = q.value.trim().toLowerCase();
+        list.querySelectorAll('label').forEach(function (l) { l.style.display = !v || l.getAttribute('data-s').indexOf(v) >= 0 || l.querySelector('input').checked ? '' : 'none'; });
+    });
+    list.addEventListener('change', function () { cnt.textContent = list.querySelectorAll('input:checked').length; });
+})();
+</script>
+{% endblock %}

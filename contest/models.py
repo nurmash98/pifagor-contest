@@ -621,6 +621,31 @@ class ExamAnswer(models.Model):
         unique_together = [('attempt', 'task')]
 
 
+class StudyRoom(models.Model):
+    """3D-коворкинг класса на урок: ученики сидят за столами и решают задачи, выбранные учителем.
+    Позиции, сообщения и поднятые руки живут в кеше (не в базе) — см. contest/room.py."""
+    school_class = models.CharField(max_length=20, verbose_name="Класс")
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='study_rooms', verbose_name="Учитель")
+    title = models.CharField(max_length=120, blank=True, verbose_name="Тема урока")
+    tasks = models.ManyToManyField('Task', blank=True, verbose_name="Задачи урока")
+    started_at = models.DateTimeField(auto_now_add=True)
+    ends_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыть автоматически")
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Коворкинг (урок)"
+        verbose_name_plural = "Коворкинги (уроки)"
+        ordering = ['-started_at']
+
+    def is_open(self, now=None):
+        from django.utils import timezone
+        now = now or timezone.now()
+        return self.closed_at is None and (self.ends_at is None or now < self.ends_at)
+
+    def __str__(self):
+        return f'{self.school_class}: {self.title or "коворкинг"}'
+
+
 class UpsolveAnswer(models.Model):
     """Дорешивание олимпиады: решение задачи после окончания. На места и итоги олимпиады не влияет."""
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='upsolve_answers')

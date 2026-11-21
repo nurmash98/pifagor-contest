@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 EXAM_LOCKED_VIEWS = {
     'all_tasks', 'task_detail',
     'courses', 'course_detail', 'topic_video', 'topic_theory',
-    'olympiad_upsolve', 'olympiad_upsolve_task',
+    'olympiad_upsolve', 'olympiad_upsolve_task', 'room_enter', 'room_play', 'room_state', 'room_act',
 }
 
 

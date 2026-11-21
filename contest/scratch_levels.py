@@ -367,6 +367,10 @@ def is_junior(student):
     """Ученик 1–4 класса: Scratch вместо задач на Python."""
     if student is None:
         return False
+    return is_junior_class(student.school_class)
+
+
+def is_junior_class(cls):
     from .quarters import grade_of
-    g = grade_of(student.school_class)
+    g = grade_of(cls or '')
     return g.isdigit() and 1 <= int(g) <= 4

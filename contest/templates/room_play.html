@@ -1,0 +1,464 @@
+{% load ui_i18n static %}<!DOCTYPE html>
+<html lang="{% if content_lang == 'kk' %}kk{% else %}ru{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% t "Коворкинг" %} {{ room.school_class }} — Pifagor Contest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; background: #e9eef5; color: #1f2937; overflow: hidden; font-family: 'Montserrat', system-ui, sans-serif; }
+        * { box-sizing: border-box; }
+        button, input { font-family: inherit; }
+        #bar { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: #fff; border-bottom: 1px solid #dbe2ec; font-size: 14px; position: relative; z-index: 5; }
+        #bar .ttl { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: #f1f5f9; font-weight: 700; white-space: nowrap; }
+        .sp { flex: 1; }
+        .btn { border: 0; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer; background: #22c55e; color: #fff; font-size: 13px; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:hover { filter: brightness(1.06); }
+        .btn.ghost { background: #f1f5f9; color: #1f2937; }
+        .btn.warn { background: #fee2e2; color: #991b1b; }
+        .btn.hand.on { background: #fbbf24; color: #111827; }
+        #wrap { display: flex; height: calc(100% - 52px); }
+        #stage { flex: 1; position: relative; min-width: 0; }
+        #map { display: block; width: 100%; height: 100%; cursor: pointer; touch-action: none; }
+        #side { width: 300px; background: #fff; border-left: 1px solid #dbe2ec; overflow-y: auto; padding: 14px; font-size: 13px; }
+        #side h4 { margin: 4px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; }
+        .task { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 6px; cursor: pointer; background: #fff; }
+        .task:hover { border-color: #22c55e; background: #f0fdf4; }
+        .task.done { background: #dcfce7; border-color: #86efac; }
+        .task .lv { width: 22px; text-align: center; font-weight: 800; border-radius: 6px; font-size: 11px; padding: 2px 0; flex: 0 0 auto; }
+        .lv-A { background: #dcfce7; color: #166534; } .lv-B { background: #fef9c3; color: #854d0e; } .lv-C { background: #fee2e2; color: #991b1b; }
+        .task .nm { flex: 1; font-weight: 600; }
+        .hint { color: #64748b; font-size: 12px; margin-bottom: 8px; }
+        .srow { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; }
+        .srow.me { background: #eef2ff; }
+        .srow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+        .srow .ok { font-weight: 800; color: #15803d; font-variant-numeric: tabular-nums; }
+        .on-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; flex: 0 0 auto; } .on-dot.on { background: #22c55e; }
+        .bar-s { height: 4px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 2px; } .bar-s i { display: block; height: 100%; background: #22c55e; }
+        .log { font-size: 12px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; } .log b { color: #4338ca; } .log.t b { color: #b45309; }
+        .handrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fef3c7; border-radius: 10px; margin-bottom: 5px; font-weight: 600; cursor: pointer; }
+        #say { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; background: #fff; padding: 6px; border-radius: 999px; box-shadow: 0 6px 20px rgba(15,23,42,.15); width: min(520px, calc(100% - 24px)); }
+        #say input { flex: 1; border: 0; outline: 0; padding: 6px 12px; font-size: 14px; background: transparent; min-width: 0; }
+        #zoom { position: absolute; right: 12px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+        #zoom button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 4px 12px rgba(15,23,42,.15); font-weight: 800; font-size: 18px; cursor: pointer; }
+        #toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 40; padding: 9px 18px; border-radius: 999px; font-weight: 700; background: #1f2937; color: #fff; display: none; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+        #drawer { position: absolute; inset: 0; z-index: 8; background: #fff; display: none; flex-direction: column; }
+        #drawer .hd { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 800; }
+        #drawer iframe { flex: 1; border: 0; width: 100%; }
+        #closed { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.85); color: #fff; display: none; align-items: center; justify-content: center; text-align: center; }
+        #help { position: absolute; left: 12px; top: 12px; background: rgba(255,255,255,.92); border-radius: 12px; padding: 8px 12px; font-size: 12px; color: #475569; max-width: 330px; box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+        @media (max-width: 820px) { #side { display: none; } #help { display: none; } }
+    </style>
+</head>
+<body>
+<div id="bar">
+    <a href="{% if teacher %}{% url 'room_manage' %}{% else %}{% url 'codegames' %}{% endif %}" class="btn ghost" title="{% t "Выйти" %}">←</a>
+    <span class="ttl">🏫 {% t "Коворкинг" %} {{ room.school_class }}{% if room.title %} · {{ room.title }}{% endif %}</span>
+    <span class="sp"></span>
+    <span class="chip" title="{% t "В зале" %}">👥 <span id="online">0</span></span>
+    <span class="chip" id="tchip">⏱ <span id="timer">--:--</span></span>
+    {% if not teacher %}<button class="btn hand" id="hand" type="button">✋ {% t "Поднять руку" %}</button>{% endif %}
+    <button class="btn ghost" id="center" type="button">◎ {% t "Ко мне" %}</button>
+    {% if teacher %}<form method="post" action="{% url 'room_close' room.id %}" style="margin:0" onsubmit="return confirm('{% t "Закрыть зал для всего класса?" %}')">{% csrf_token %}<button class="btn warn">{% t "Закрыть зал" %}</button></form>{% endif %}
+</div>
+<div id="wrap">
+    <div id="stage">
+        <canvas id="map"></canvas>
+        <div id="help">🖱 {% t "Нажмите на пол — идти, на стул — сесть. Сели за стол — справа задачи урока. Колёсико — масштаб, перетаскивание — обзор." %}</div>
+        <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
+        <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
+        <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ {% t "Закрыть" %}</button></div><iframe id="d-frame" title="task"></iframe></div>
+    </div>
+    <aside id="side">
+        {% if teacher %}
+        <h4>✋ {% t "Поднятые руки" %}</h4><div id="hands" class="hint">—</div>
+        <h4 style="margin-top:14px">💬 {% t "Сообщения" %}</h4><div id="log" class="hint" style="max-height:180px;overflow-y:auto">—</div>
+        {% endif %}
+        <h4 style="margin-top:6px">📝 {% t "Задачи урока" %}</h4>
+        <div id="sit-hint" class="hint">{% if teacher %}{% t "Нажмите, чтобы посмотреть условие." %}{% else %}{% t "Сядьте за свободный стол, чтобы решать." %}{% endif %}</div>
+        <div id="tasks"></div>
+        <h4 style="margin-top:14px">📊 {% t "Решено за урок" %}</h4>
+        <div id="stats"></div>
+    </aside>
+</div>
+<div id="toast"></div>
+<div id="closed"><div><div style="font-size:54px">🏫</div><h2>{% t "Зал закрыт" %}</h2><p>{% t "Учитель закрыл коворкинг. Спасибо за урок!" %}</p><a class="btn" href="{% url 'codegames' %}">{% t "К играм" %}</a></div></div>
+<span id="csrf" style="display:none">{% csrf_token %}</span>
+<script>
+(function () {
+    'use strict';
+    var L = {{ layout|safe }}, TASKS = {{ tasks_json|safe }}, COLORS = {{ colors|safe }};
+    var ME = {{ me }}, TEACHER = {{ teacher|yesno:"true,false" }};
+    var U = {state: '{% url "room_state" room.id %}', act: '{% url "room_act" room.id %}'};
+    var TXT = {sit_first: '{% t "Сначала сядьте за стол" %}', taken: '{% t "Это место занято" %}', wait: '{% t "Не так быстро — подождите пару секунд" %}',
+               teacher_seat: '{% t "Это стол учителя" %}', you: '{% t "вы" %}', hand_up: '{% t "Опустить руку" %}', hand: '{% t "Поднять руку" %}',
+               lower: '{% t "опустить" %}', none: '—', of: '{% t "из" %}'};
+    var $ = function (id) { return document.getElementById(id); };
+    var csrf = document.querySelector('#csrf input').value;
+    function post(data) {
+        var fd = new FormData(); fd.append('csrfmiddlewaretoken', csrf);
+        for (var k in data) { fd.append(k, data[k]); }
+        return fetch(U.act, {method: 'POST', body: fd, credentials: 'same-origin'}).then(function (r) { return r.json(); });
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+    var toastT = 0;
+    function toast(t) { var el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(function () { el.style.display = 'none'; }, 2600); }
+
+    // ---------------- карта зала ----------------
+    var W = L.W, H = L.H, block = {}, seatAt = {}, seatById = {};
+    L.block.forEach(function (b) { block[b[0] + ',' + b[1]] = true; });
+    L.seats.forEach(function (s) { seatAt[s.x + ',' + s.y] = s; seatById[s.id] = s; });
+    function free(x, y) { return x >= 0 && y >= 0 && x < W && y < H && !block[x + ',' + y] && !seatAt[x + ',' + y]; }
+
+    function path(sx, sy, tx, ty) {           // BFS по клеткам, 8 направлений без срезания углов; стул — только как конечная точка
+        sx = Math.round(sx); sy = Math.round(sy);
+        if (sx === tx && sy === ty) { return [[tx, ty]]; }
+        var ok = function (x, y) { return (x === tx && y === ty) || free(x, y) || (x === sx && y === sy); };
+        var prev = {}, q = [[sx, sy]], k0 = sx + ',' + sy; prev[k0] = null;
+        var D = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+        while (q.length) {
+            var c = q.shift();
+            if (c[0] === tx && c[1] === ty) { break; }
+            if (seatAt[c[0] + ',' + c[1]] && !(c[0] === sx && c[1] === sy)) { continue; }   // через стул не проходим
+            for (var i = 0; i < 8; i++) {
+                var nx = c[0] + D[i][0], ny = c[1] + D[i][1], k = nx + ',' + ny;
+                if (k in prev || !ok(nx, ny)) { continue; }
+                if (D[i][0] && D[i][1] && (!ok(c[0] + D[i][0], c[1]) || !ok(c[0], c[1] + D[i][1]))) { continue; }
+                prev[k] = c; q.push([nx, ny]);
+            }
+        }
+        if (!((tx + ',' + ty) in prev)) { return null; }
+        var out = [], cur = [tx, ty];
+        while (cur) { out.unshift(cur); cur = prev[cur[0] + ',' + cur[1]]; }
+        return out;
+    }
+
+    // ---------------- люди ----------------
+    var people = {}, statsBy = {}, nTasks = TASKS.length, mine = [], handUp = false;
+    function person(id) {
+        if (!people[id]) { people[id] = {id: id, rx: null, ry: null, tx: 0, ty: 0, seat: null, route: [], name: '', msg: '', hand: false, teacher: false, c: 0}; }
+        return people[id];
+    }
+    function setTarget(p, x, y, seat, local) {
+        if (p.rx === null) { p.rx = x; p.ry = y; p.tx = x; p.ty = y; p.seat = seat; p.route = []; return; }
+        if (!local && p.tx === x && p.ty === y && p.seat === seat) { return; }
+        p.tx = x; p.ty = y; p.seat = seat;
+        var r = path(p.rx, p.ry, Math.round(x), Math.round(y));
+        p.route = r ? r.slice(1) : [[x, y]];
+    }
+    function stepPeople(dt) {
+        Object.keys(people).forEach(function (k) {
+            var p = people[k];
+            if (!p.route.length || p.rx === null) { return; }
+            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = 3.6 * dt;
+            if (d <= sp) { p.rx = t[0]; p.ry = t[1]; p.route.shift(); if (!p.route.length && p.id === ME) { arrived(); } }
+            else { p.rx += dx / d * sp; p.ry += dy / d * sp; p.walk = (p.walk || 0) + dt * 10; }
+        });
+    }
+
+    // ---------------- рисование (изометрия) ----------------
+    var cv = $('map'), ctx = cv.getContext('2d'), DPR = window.devicePixelRatio || 1;
+    var TW = 64, TH = 32, HZ = 38, zoom = 1, cam = {x: 0, y: 0};
+    function iso(x, y, z) { return [(x - y) * TW / 2, (x + y) * TH / 2 - (z || 0) * HZ]; }
+    function scr(x, y, z) { var p = iso(x, y, z); return [(p[0] - cam.x) * zoom + cv.width / DPR / 2, (p[1] - cam.y) * zoom + cv.height / DPR / 2]; }
+    function poly(pts, fill, stroke) {
+        ctx.beginPath(); pts.forEach(function (p, i) { var s = scr(p[0], p[1], p[2]); if (i) { ctx.lineTo(s[0], s[1]); } else { ctx.moveTo(s[0], s[1]); } });
+        ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+    function shade(hex, f) {
+        var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+        r = Math.max(0, Math.min(255, Math.round(r * f))); g = Math.max(0, Math.min(255, Math.round(g * f))); b = Math.max(0, Math.min(255, Math.round(b * f)));
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    function box(x, y, w, d, z, h, col, opt) {
+        opt = opt || {};
+        var t = z + h;
+        poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, t], [x, y + d, t]], opt.left || shade(col, .82));
+        poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, t], [x + w, y, t]], opt.right || shade(col, .68));
+        poly([[x, y, t], [x + w, y, t], [x + w, y + d, t], [x, y + d, t]], opt.top || col);
+    }
+    function ellipse(x, y, z, rx, ry, fill) {
+        var s = scr(x, y, z); ctx.beginPath(); ctx.ellipse(s[0], s[1], rx * zoom, ry * zoom, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+    }
+    function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+    var occupied = {};
+    var DRAW = {
+        desk: function (o) {
+            box(o.x + .06, o.y + .12, .88, .76, 0, .45, '#d6b38a');
+            var lit = occupied[o.x + ',' + (o.y + 1)];
+            box(o.x + .28, o.y + .2, .44, .06, .45, .3, '#334155', {left: lit ? '#38bdf8' : '#1e293b'});
+            box(o.x + .45, o.y + .26, .1, .1, .45, .04, '#475569');
+            box(o.x + .25, o.y + .5, .5, .16, .45, .02, '#e2e8f0');
+        },
+        tdesk: function (o) {
+            box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .48, '#8b5e3c');
+            box(o.x + .6, o.y + .3, .5, .35, .48, .02, '#cbd5e1');
+            box(o.x + .6, o.y + .28, .5, .04, .5, .26, '#94a3b8', {left: '#0ea5e9'});
+            ellipse(o.x + 1.6, o.y + .5, .52, 6, 4, '#f87171');
+        },
+        chair: function (o) {
+            var col = o.face === 'down' ? '#b45309' : '#475569';
+            box(o.x + .27, o.y + .27, .46, .46, .22, .07, col);
+            if (o.face === 'up') { box(o.x + .27, o.y + .68, .46, .06, .29, .38, col); }
+            else { box(o.x + .27, o.y + .26, .46, .06, .29, .45, col); }
+        },
+        board: function (o) {
+            poly([[o.x, .02, .75], [o.x + o.w, .02, .75], [o.x + o.w, .02, 2.05], [o.x, .02, 2.05]], '#1f5135', '#7c5a3a');
+            var s = scr(o.x + o.w / 2, .02, 1.5); ctx.save(); ctx.fillStyle = 'rgba(255,255,255,.85)';
+            ctx.font = '700 ' + Math.round(16 * zoom) + 'px Montserrat, sans-serif'; ctx.textAlign = 'center';
+            ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.transform(1, 0.5, 0, 1, s[0], s[1]); ctx.fillText('print("Pifagor")', 0, 0); ctx.restore();
+        },
+        shelf: function (o) {
+            box(o.x, o.y + .05, o.w, .5, 0, 1.6, '#a16207');
+            var cols = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316'];
+            for (var r = 0; r < 3; r++) { for (var i = 0; i < 8; i++) {
+                var bx = o.x + .1 + i * (o.w - .2) / 8; poly([[bx, o.y + .56, .15 + r * .5], [bx + .32, o.y + .56, .15 + r * .5], [bx + .32, o.y + .56, .5 + r * .5], [bx, o.y + .56, .5 + r * .5]], cols[(i + r) % cols.length]);
+            } }
+        },
+        cooler: function (o) { box(o.x + .3, o.y + .3, .4, .4, 0, .8, '#f8fafc'); box(o.x + .36, o.y + .36, .28, .28, .8, .35, '#7dd3fc'); },
+        plant: function (o) {
+            box(o.x + .3, o.y + .3, .4, .4, 0, .35, '#c2410c');
+            ellipse(o.x + .5, o.y + .5, .75, 15, 12, '#16a34a'); ellipse(o.x + .35, o.y + .5, .95, 11, 9, '#22c55e'); ellipse(o.x + .6, o.y + .4, 1.05, 10, 8, '#4ade80');
+        },
+        sofa: function (o) { box(o.x + .05, o.y + .05, .85, o.d - .1, 0, .3, '#6366f1'); box(o.x + .65, o.y + .05, .3, o.d - .1, .3, .35, '#4f46e5'); },
+        table: function (o) { box(o.x + .15, o.y + .15, .7, .7, 0, .3, '#f5f5f4'); ellipse(o.x + .45, o.y + .45, .33, 5, 3, '#fb923c'); },
+        bean: function (o) { ellipse(o.x + .5, o.y + .5, .15, 20, 12, o.x % 4 ? '#f472b6' : '#facc15'); ellipse(o.x + .5, o.y + .45, .3, 15, 9, o.x % 4 ? '#f9a8d4' : '#fde047'); }
+    };
+
+    function drawFloor() {
+        for (var y = 0; y < H; y++) { for (var x = 0; x < W; x++) {
+            poly([[x, y, 0], [x + 1, y, 0], [x + 1, y + 1, 0], [x, y + 1, 0]], (x + y) % 2 ? '#eef1f5' : '#e6eaf0', 'rgba(148,163,184,.25)');
+        } }
+        L.objs.forEach(function (o) {
+            if (o.t === 'rug') { poly([[o.x + .2, o.y + .2, .005], [o.x + o.w - .2, o.y + .2, .005], [o.x + o.w - .2, o.y + o.d - .2, .005], [o.x + .2, o.y + o.d - .2, .005]], 'rgba(59,130,246,.18)'); }
+            if (o.t === 'lrug') { poly([[o.x + .2, o.y + .2, .005], [o.x + o.w - .2, o.y + .2, .005], [o.x + o.w - .2, o.y + o.d - .2, .005], [o.x + .2, o.y + o.d - .2, .005]], 'rgba(34,197,94,.16)'); }
+        });
+        // задние стены с окнами
+        box(-.25, -.25, W + .25, .25, 0, 2.4, '#f8fafc', {left: '#e2e8f0', top: '#cbd5e1'});
+        box(-.25, 0, .25, H, 0, 2.4, '#f8fafc', {right: '#dbe3ee', top: '#cbd5e1'});
+        for (var i = 1; i < W - 1; i += 4) { if (i > 4 && i < 15) { continue; } poly([[i, .001, .9], [i + 2, .001, .9], [i + 2, .001, 2], [i, .001, 2]], 'rgba(125,211,252,.55)', '#94a3b8'); }
+        for (var j = 2; j < H - 1; j += 4) { poly([[.001, j, .9], [.001, j + 2, .9], [.001, j + 2, 2], [.001, j, 2]], 'rgba(125,211,252,.5)', '#94a3b8'); }
+        // низкий бортик спереди
+        box(0, H, W, .12, 0, .18, '#cbd5e1'); box(W, 0, .12, H + .12, 0, .18, '#cbd5e1');
+    }
+
+    function drawPerson(p) {
+        var x = p.rx + .5, y = p.ry + .5, seated = !!p.seat && !p.route.length;
+        var z0 = seated ? .26 : 0, bob = p.route.length ? Math.abs(Math.sin(p.walk || 0)) * .04 : 0;
+        if (p.id === ME) { ellipse(x, y, 0, 18, 9, 'rgba(99,102,241,.28)'); }
+        ellipse(x, y, 0, 11, 5.5, 'rgba(15,23,42,.18)');
+        var base = scr(x, y, z0 + bob), s = zoom;
+        var shirt = p.teacher ? '#1e293b' : COLORS[p.c % COLORS.length];
+        ctx.save();
+        if (!seated) { ctx.fillStyle = '#334155'; ctx.fillRect(base[0] - 6 * s, base[1] - 12 * s, 5 * s, 12 * s); ctx.fillRect(base[0] + 1 * s, base[1] - 12 * s, 5 * s, 12 * s); }
+        rr(base[0] - 9 * s, base[1] - (seated ? 26 : 32) * s, 18 * s, 22 * s, 7 * s); ctx.fillStyle = shirt; ctx.fill();
+        if (p.teacher) { ctx.fillStyle = '#fbbf24'; ctx.fillRect(base[0] - 1.5 * s, base[1] - (seated ? 24 : 30) * s, 3 * s, 10 * s); }
+        var hy = base[1] - (seated ? 34 : 40) * s;
+        ctx.beginPath(); ctx.arc(base[0], hy, 8.5 * s, 0, Math.PI * 2); ctx.fillStyle = '#f2c9a0'; ctx.fill();
+        ctx.beginPath(); ctx.arc(base[0], hy - 1.5 * s, 8.8 * s, Math.PI * 1.05, Math.PI * 1.95); ctx.lineWidth = 4 * s; ctx.strokeStyle = p.teacher ? '#6b7280' : '#3f2a1d'; ctx.stroke();
+        // имя
+        ctx.font = '700 ' + Math.max(9, Math.round(11 * s)) + 'px Montserrat, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        var nm = (p.teacher ? '🎓 ' : '') + short(p.name) + (p.id === ME ? ' (' + TXT.you + ')' : ''), done = statsBy[p.id];
+        if (done) { nm += '  ✅' + done; }
+        var tw = ctx.measureText(nm).width + 12 * s, ny = hy - 17 * s;
+        rr(base[0] - tw / 2, ny - 8 * s, tw, 16 * s, 8 * s); ctx.fillStyle = p.teacher ? 'rgba(180,83,9,.92)' : 'rgba(15,23,42,.78)'; ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(nm, base[0], ny);
+        if (p.hand) { ctx.font = Math.round(20 * s) + 'px sans-serif'; ctx.fillText('✋', base[0] + 16 * s, hy - 4 * s - Math.abs(Math.sin(Date.now() / 250)) * 4 * s); }
+        if (p.msg) {
+            ctx.font = '600 ' + Math.max(10, Math.round(12 * s)) + 'px Montserrat, sans-serif';
+            var lines = wrap(p.msg, 26), bw = 0;
+            lines.forEach(function (l) { bw = Math.max(bw, ctx.measureText(l).width); });
+            bw += 16 * s; var lh = 15 * s, bh = lines.length * lh + 10 * s, by = ny - 14 * s - bh;
+            rr(base[0] - bw / 2, by, bw, bh, 10 * s); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = p.teacher ? '#f59e0b' : '#6366f1'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(base[0] - 5 * s, by + bh); ctx.lineTo(base[0], by + bh + 7 * s); ctx.lineTo(base[0] + 5 * s, by + bh); ctx.fillStyle = '#fff'; ctx.fill();
+            ctx.fillStyle = '#0f172a'; lines.forEach(function (l, i) { ctx.fillText(l, base[0], by + 5 * s + lh / 2 + i * lh); });
+        }
+        ctx.restore();
+    }
+    function short(n) { var a = String(n || '').split(' '); return a.length > 1 ? a[1] + ' ' + a[0].charAt(0) + '.' : a[0]; }
+    function wrap(t, n) { var out = [], cur = ''; String(t).split(' ').forEach(function (w) { if ((cur + ' ' + w).trim().length > n && cur) { out.push(cur); cur = w; } else { cur = (cur + ' ' + w).trim(); } }); if (cur) { out.push(cur); } return out.slice(0, 3); }
+
+    function render() {
+        var w = cv.clientWidth, h = cv.clientHeight;
+        if (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR)) { cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR); }
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#dbeafe'); g.addColorStop(1, '#eef2f7'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+        occupied = {}; Object.keys(people).forEach(function (k) { var p = people[k]; if (p.seat && !p.route.length && seatById[p.seat]) { occupied[seatById[p.seat].x + ',' + seatById[p.seat].y] = true; } });
+        drawFloor();
+        var items = [];
+        L.objs.forEach(function (o) { if (DRAW[o.t]) { items.push({k: o.x + o.w / 2 + o.y + o.d / 2 + (o.t === 'chair' ? .05 : 0), f: DRAW[o.t], o: o}); } });
+        Object.keys(people).forEach(function (k) { var p = people[k]; if (p.rx !== null) { items.push({k: p.rx + p.ry + 1.2, p: p}); } });
+        items.sort(function (a, b) { return a.k - b.k; });
+        items.forEach(function (it) { if (it.p) { drawPerson(it.p); } else { it.f(it.o); } });
+        if (hover) { poly([[hover[0], hover[1], .01], [hover[0] + 1, hover[1], .01], [hover[0] + 1, hover[1] + 1, .01], [hover[0], hover[1] + 1, .01]], 'rgba(34,197,94,.18)', '#22c55e'); }
+    }
+    var last = performance.now();
+    function frame(t) { var dt = Math.min(.05, (t - last) / 1000); last = t; stepPeople(dt); render(); requestAnimationFrame(frame); }
+
+    // ---------------- управление ----------------
+    function tileAt(cx, cy) {
+        var px = (cx - cv.clientWidth / 2) / zoom + cam.x, py = (cy - cv.clientHeight / 2) / zoom + cam.y;
+        var a = px / (TW / 2), b = py / (TH / 2);
+        return [Math.floor((a + b) / 2), Math.floor((b - a) / 2)];
+    }
+    function centerOn(x, y) { var p = iso(x + .5, y + .5, .6); cam.x = p[0]; cam.y = p[1]; }
+    function fit() {
+        var w = cv.clientWidth || 800, h = cv.clientHeight || 600, sw = (W + H) * TW / 2, sh = (W + H) * TH / 2 + 3 * HZ;
+        zoom = Math.max(.45, Math.min(1.6, Math.min(w / sw, h / sh) * 1.05)); var c = iso(W / 2, H / 2, .5); cam.x = c[0]; cam.y = c[1];
+    }
+    var drag = null, hover = null;
+    cv.addEventListener('pointerdown', function (e) { drag = {x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false}; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', function (e) {
+        var r = cv.getBoundingClientRect();
+        if (drag) {
+            var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+            if (Math.abs(dx) + Math.abs(dy) > 5) { drag.moved = true; }
+            if (drag.moved) { cam.x = drag.cx - dx / zoom; cam.y = drag.cy - dy / zoom; }
+        }
+        var t = tileAt(e.clientX - r.left, e.clientY - r.top); hover = (t[0] >= 0 && t[1] >= 0 && t[0] < W && t[1] < H) ? t : null;
+    });
+    cv.addEventListener('pointerup', function (e) {
+        var r = cv.getBoundingClientRect(), d = drag; drag = null;
+        if (d && d.moved) { return; }
+        click(tileAt(e.clientX - r.left, e.clientY - r.top));
+    });
+    cv.addEventListener('wheel', function (e) { e.preventDefault(); zoom = Math.max(.35, Math.min(2.6, zoom * (e.deltaY < 0 ? 1.1 : .9))); }, {passive: false});
+    document.querySelectorAll('#zoom button').forEach(function (b) { b.addEventListener('click', function () { zoom = Math.max(.35, Math.min(2.6, zoom * parseFloat(b.getAttribute('data-z')))); }); });
+    $('center').addEventListener('click', function () { var p = people[ME]; if (p && p.rx !== null) { centerOn(p.rx, p.ry); } });
+
+    function seatOfClick(x, y) {
+        var s = seatAt[x + ',' + y];
+        if (!s && block[x + ',' + y]) {
+            s = seatAt[x + ',' + (y + 1)];                                            // стол → стул перед ним
+            if (!s) { L.objs.forEach(function (o) { if (o.t === 'tdesk' && x >= o.x && x < o.x + o.w && y === o.y) { s = seatById.t; } }); }
+        }
+        return s || null;
+    }
+    function takenBy(seatId) { var who = null; Object.keys(people).forEach(function (k) { if (+k !== ME && people[k].seat === seatId) { who = people[k]; } }); return who; }
+    var sendT = 0;
+    function goTo(x, y, seat) {
+        var me = people[ME]; if (!me || me.rx === null) { return; }
+        var r = path(me.rx, me.ry, x, y);
+        if (!r) { return; }
+        me.route = r.slice(1); me.tx = x; me.ty = y; me.seat = seat;
+        standUp();
+        clearTimeout(sendT);
+        sendT = setTimeout(function () {
+            post({a: 'move', x: x, y: y, seat: seat || ''}).then(function (d) {
+                if (d.error) { toast(TXT[d.error] || d.error); if (d.error === 'taken') { me.seat = null; } }
+            });
+        }, 150);
+    }
+    function click(t) {
+        var x = t[0], y = t[1];
+        if (x < 0 || y < 0 || x >= W || y >= H) { return; }
+        var s = seatOfClick(x, y);
+        if (s) {
+            if (s.teacher !== TEACHER) { toast(TEACHER ? TXT.taken : TXT.teacher_seat); return; }
+            if (takenBy(s.id)) { toast(TXT.taken); return; }
+            goTo(s.x, s.y, s.id); return;
+        }
+        if (free(x, y)) { goTo(x, y, null); }
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') { return; }
+        var me = people[ME]; if (!me || me.rx === null) { return; }
+        var m = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0]}[e.key];
+        if (!m) { return; }
+        e.preventDefault();
+        var bx = me.route.length ? me.route[me.route.length - 1][0] : Math.round(me.rx), by = me.route.length ? me.route[me.route.length - 1][1] : Math.round(me.ry);
+        var nx = bx + m[0], ny = by + m[1];
+        var s = seatAt[nx + ',' + ny];
+        if (s && s.teacher === TEACHER && !takenBy(s.id)) { goTo(nx, ny, s.id); } else if (free(nx, ny)) { goTo(nx, ny, null); }
+    });
+
+    // ---------------- сидя: задачи урока ----------------
+    var seated = false;
+    function arrived() { var me = people[ME]; seated = !!me.seat; tasksPanel(); if (seated && !TEACHER) { toast('📝 ' + '{% t "Вы за столом — выбирайте задачу справа" %}'); } }
+    function standUp() { if (seated) { seated = false; closeDrawer(); tasksPanel(); } }
+    function tasksPanel() {
+        $('sit-hint').style.display = (seated || TEACHER) ? 'none' : '';
+        $('tasks').innerHTML = TASKS.map(function (t) {
+            var done = mine.indexOf(t.id) >= 0;
+            return '<div class="task' + (done ? ' done' : '') + '" data-id="' + t.id + '"><span class="lv lv-' + t.level + '">' + t.level + '</span><span class="nm">' + esc(t.title) + '</span>' + (done ? '✅' : '→') + '</div>';
+        }).join('');
+    }
+    $('tasks').addEventListener('click', function (e) {
+        var el = e.target.closest('.task'); if (!el) { return; }
+        if (!seated && !TEACHER) { toast(TXT.sit_first); return; }
+        var t = TASKS.filter(function (x) { return x.id === +el.getAttribute('data-id'); })[0];
+        $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex';
+    });
+    function closeDrawer() { $('drawer').style.display = 'none'; $('d-frame').src = 'about:blank'; }
+    $('d-close').addEventListener('click', closeDrawer);
+    $('d-frame').addEventListener('load', function () { if ($('drawer').style.display === 'flex') { poll(true); } });
+
+    // ---------------- сообщения и рука ----------------
+    $('say').addEventListener('submit', function (e) {
+        e.preventDefault(); var v = $('say-in').value.trim(); if (!v) { return; }
+        post({a: 'say', text: v}).then(function (d) {
+            if (d.error) { toast(TXT[d.error] || d.error); return; }
+            $('say-in').value = ''; var me = people[ME]; if (me) { me.msg = v; } poll();
+        });
+    });
+    if ($('hand')) {
+        $('hand').addEventListener('click', function () {
+            post({a: 'hand'}).then(function () { handUp = !handUp; paintHand(); poll(); });
+        });
+    }
+    function paintHand() { var b = $('hand'); if (!b) { return; } b.classList.toggle('on', handUp); b.textContent = '✋ ' + (handUp ? TXT.hand_up : TXT.hand); }
+
+    // ---------------- опрос сервера ----------------
+    var timerLeft = null, timerAt = 0;
+    function poll(fresh) {
+        fetch(U.state + (fresh ? '?fresh=1' : ''), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
+    }
+    function apply(d) {
+        if (!d.open && !TEACHER) { $('closed').style.display = 'flex'; }
+        var seen = {};
+        d.people.forEach(function (r) {
+            var p = person(r[0]); seen[r[0]] = true;
+            p.name = r[1]; p.msg = r[5]; p.hand = r[6]; p.teacher = r[7]; p.c = r[8];
+            if (r[0] === ME) { if (p.rx === null) { setTarget(p, r[2], r[3], r[4]); seated = !!r[4]; tasksPanel(); } handUp = r[6]; paintHand(); }
+            else { setTarget(p, r[2], r[3], r[4]); }
+        });
+        Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME) { delete people[k]; } });
+        $('online').textContent = d.people.length;
+        statsBy = {};
+        d.stats.forEach(function (r) { statsBy[r[0]] = r[2]; });
+        $('stats').innerHTML = d.stats.map(function (r) {
+            var pct = d.n_tasks ? Math.round(r[2] / d.n_tasks * 100) : 0;
+            return '<div class="srow' + (r[0] === ME ? ' me' : '') + '"><span class="on-dot' + (r[4] ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><span class="nm" style="display:block">' + esc(r[1]) + '</span><span class="bar-s"><i style="width:' + pct + '%"></i></span></span><span class="ok">' + r[2] + '<span style="color:#94a3b8;font-weight:600">/' + d.n_tasks + '</span></span></div>';
+        }).join('') || '<div class="hint">' + TXT.none + '</div>';
+        if (d.mine) { var was = mine.join(','); mine = d.mine; if (was !== mine.join(',')) { tasksPanel(); } }
+        if (TEACHER) {
+            var hands = d.people.filter(function (r) { return r[6]; });
+            $('hands').innerHTML = hands.length ? hands.map(function (r) { return '<div class="handrow" data-u="' + r[0] + '" data-x="' + r[2] + '" data-y="' + r[3] + '">✋ <span style="flex:1">' + esc(r[1]) + '</span><button class="btn ghost" style="padding:3px 10px" data-lower="' + r[0] + '">' + TXT.lower + '</button></div>'; }).join('') : TXT.none;
+            $('log').innerHTML = (d.log || []).slice().reverse().map(function (l) { var t = new Date(l[0] * 1000); return '<div class="log' + (l[3] ? ' t' : '') + '"><span style="color:#94a3b8">' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + '</span> <b>' + esc(short(l[1])) + ':</b> ' + esc(l[2]) + '</div>'; }).join('') || TXT.none;
+        }
+        if (d.left !== null && d.left !== undefined) { timerLeft = d.left; timerAt = Date.now(); } else { $('tchip').style.display = 'none'; }
+    }
+    if (TEACHER) {
+        $('hands').addEventListener('click', function (e) {
+            var lb = e.target.closest('[data-lower]');
+            if (lb) { post({a: 'lower', uid: lb.getAttribute('data-lower')}).then(function () { poll(); }); return; }
+            var row = e.target.closest('.handrow'); if (row) { centerOn(+row.getAttribute('data-x'), +row.getAttribute('data-y')); }
+        });
+    }
+    setInterval(function () {
+        if (timerLeft === null) { return; }
+        var s = Math.max(0, timerLeft - Math.floor((Date.now() - timerAt) / 1000));
+        $('timer').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    }, 1000);
+
+    window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }};   // для автотестов: где на экране клетка
+    tasksPanel(); fit();
+    window.addEventListener('resize', function () {});
+    poll(); setInterval(function () { if (!document.hidden) { poll(); } }, 2000);
+    requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

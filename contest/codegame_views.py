@@ -45,6 +45,8 @@ GAME_TYPES = [
      'about': 'Обезвредить бомбу: ученик читает код и вводит, что он выведет, или перерезает провод с верным выводом.'},
     {'key': 'island', 'icon': '🏝️', 'title': 'Битва за остров', 'url': 'island_manage',
      'about': 'Весь класс на одной карте: команды захватывают клетки, решая задачи. 40 минут, полноэкранный режим.'},
+    {'key': 'room', 'icon': '🏫', 'title': 'Коворкинг класса', 'url': 'room_manage',
+     'about': '3D-зал на урок: ученики садятся за столы и решают выбранные вами задачи, пишут короткие сообщения, поднимают руку. Видно, кто сколько решил.'},
 ]
 
 
@@ -101,6 +103,12 @@ def games_hub(request):
     from .models import IslandGame, IslandPlayer
     islands = list(IslandGame.objects.all() if request.user.is_superuser else IslandGame.objects.filter(owner=request.user))
     for t in GAME_TYPES:
+        if t['key'] == 'room':
+            from .models import StudyRoom
+            rooms = list(StudyRoom.objects.all() if request.user.is_superuser else StudyRoom.objects.filter(owner=request.user))
+            live = [r for r in rooms if r.is_open()]
+            cards.append(dict(t, total=len(rooms), active=len(live), classes=sorted({r.school_class for r in live}), runs=0))
+            continue
         if t['key'] == 'island':
             live = [g for g in islands if g.status != 'finished']
             cards.append(dict(t, total=len(islands), active=len(live),
@@ -182,8 +190,10 @@ def games(request):
         items.append({'game': g, 'best': min(won) if won else None, 'wins': len(won),
                       'topics': [cg.TOPIC_LABELS.get(t, t) for t in g.topic_list()]})
     from .models import IslandGame
+    from .room_views import open_room_for_class
     return render(request, 'codegames.html', {'items': items, 'fee': cg.ENTRY_FEE, 'payout': cg.PAYOUT, 'balance': balance(st),
-                                              'islands': IslandGame.open_for(st)})
+                                              'islands': IslandGame.open_for(st),
+                                              'room_id': open_room_for_class(st.school_class) if st else None})
 
 
 @login_required

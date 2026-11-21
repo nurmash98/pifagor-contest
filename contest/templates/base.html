@@ -5,6 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Pifagor Contest{% endblock %}</title>
+    <script>
+        // страница открыта внутри коворкинга (задача в рамке) — прячем шапку, полосы и подвал
+        if (window.self !== window.top) { document.documentElement.classList.add('in-frame'); }
+    </script>
+    <style>
+        html.in-frame body > nav, html.in-frame .kz-holiday, html.in-frame .site-promo, html.in-frame .room-strip, html.in-frame body > footer { display: none !important; }
+        html.in-frame main.container { margin-top: 1rem !important; margin-bottom: 1rem !important; }
+    </style>
 
     <!-- Подключение Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -219,8 +227,16 @@
     </nav>
 
     <!-- Основной контент -->
+    {% if room_open %}
+    <div class="room-strip" style="background:linear-gradient(90deg,#0f766e,#22c55e);color:#fff">
+        <div class="container py-2 d-flex align-items-center justify-content-center gap-3 flex-wrap text-center fw-semibold">
+            🏫 <span>{% if content_lang == 'kk' %}Мұғалім сыныпқа коворкинг ашты — үстелге отырып, сабақ есептерін шығар!{% else %}Учитель открыл коворкинг класса — садись за стол и решай задачи урока!{% endif %}</span>
+            <a href="{% url 'room_play' room_open %}" class="btn btn-sm rounded-pill px-3 fw-bold" style="background:#fff;color:#0f766e">{% if content_lang == 'kk' %}Кіру{% else %}Войти{% endif %} →</a>
+        </div>
+    </div>
+    {% endif %}
     {% if challenge_promo == 'gta6' and request.resolver_match.url_name != 'challenge' %}
-    <div style="background:linear-gradient(90deg,#2a0b4a,#8e1d79 45%,#e8476b 75%,#ff9a3c);border-bottom:2px solid #ff4fd8">
+    <div class="site-promo" style="background:linear-gradient(90deg,#2a0b4a,#8e1d79 45%,#e8476b 75%,#ff9a3c);border-bottom:2px solid #ff4fd8">
         <div class="container py-2 d-flex align-items-center justify-content-center gap-2 flex-wrap text-center" style="color:#fff;font-weight:600">
             ⭐ <span>{% if content_lang == 'kk' %}<b>Mission completed!</b> 10 есептің 6-ын шеш те, GTA VI-дің 11 кейіпкерінің бірін таңда{% else %}<b>Mission completed!</b> Реши 6 задач из 10 и выбери одного из 11 героев GTA VI{% endif %}</span>
             <span class="rounded-pill px-3 py-1" style="background:rgba(0,0,0,.35);font-variant-numeric:tabular-nums;white-space:nowrap" title="{% if content_lang == 'kk' %}Челлендж аяқталғанға дейін{% else %}До конца челленджа{% endif %}">⏳ <span data-countdown="{{ challenge_ends }}"></span></span>
