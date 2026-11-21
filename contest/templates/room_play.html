@@ -46,6 +46,7 @@
         .bar-s { height: 4px; background: var(--cardline); border-radius: 4px; overflow: hidden; margin-top: 2px; } .bar-s i { display: block; height: 100%; background: #22c55e; }
         .log { font-size: 12px; padding: 4px 0; border-bottom: 1px dashed var(--cardline); } .log b { color: #4338ca; } .log.t b { color: #b45309; }
         .handrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(251,191,36,.25); border-radius: 10px; margin-bottom: 5px; font-weight: 600; cursor: pointer; }
+        #say, #zoom button, #help, #chat { border: 1px solid var(--cardline); }
         #say { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; background: var(--panel); padding: 6px; border-radius: 999px; box-shadow: 0 6px 20px rgba(15,23,42,.15); width: min(520px, calc(100% - 24px)); }
         #say input { flex: 1; border: 0; outline: 0; padding: 6px 12px; font-size: 14px; background: transparent; min-width: 0; color: var(--fg); }
         #zoom { position: absolute; right: 12px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
@@ -258,9 +259,9 @@
     function box(x, y, w, d, z, h, col, opt) {
         opt = opt || {};
         var t = z + h;
-        poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, t], [x, y + d, t]], opt.left || shade(col, .82));
-        poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, t], [x + w, y, t]], opt.right || shade(col, .68));
-        poly([[x, y, t], [x + w, y, t], [x + w, y + d, t], [x, y + d, t]], opt.top || col);
+        poly([[x, y + d, z], [x + w, y + d, z], [x + w, y + d, t], [x, y + d, t]], opt.left || shade(col, .82), opt.stroke);
+        poly([[x + w, y, z], [x + w, y + d, z], [x + w, y + d, t], [x + w, y, t]], opt.right || shade(col, .68), opt.stroke);
+        poly([[x, y, t], [x + w, y, t], [x + w, y + d, t], [x, y + d, t]], opt.top || col, opt.stroke);
     }
     function ellipse(x, y, z, rx, ry, fill) {
         var s = scr(x, y, z); ctx.beginPath(); ctx.ellipse(s[0], s[1], rx * zoom, ry * zoom, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
@@ -272,7 +273,7 @@
         NIGHT = document.documentElement.getAttribute('data-theme') === 'dark';
         P = NIGHT ? {sky1: '#0b1220', sky2: '#111a2e', f1: '#1f2738', f2: '#1b2231', fline: 'rgba(148,163,184,.12)', wall: '#273046', wallL: '#222a3e', wallR: '#1c2335', wallT: '#323b52',
                      win: 'rgba(30,64,175,.55)', winLine: '#475569', rug: 'rgba(59,130,246,.22)', lrug: 'rgba(34,197,94,.18)', desk: '#8b6b4a', edge: '#334155', board: '#14532d'}
-                 : {sky1: '#dbeafe', sky2: '#eef2f7', f1: '#eef1f5', f2: '#e6eaf0', fline: 'rgba(148,163,184,.25)', wall: '#f8fafc', wallL: '#e2e8f0', wallR: '#dbe3ee', wallT: '#cbd5e1',
+                 : {sky1: '#dbeafe', sky2: '#eef2f7', f1: '#eef1f5', f2: '#e6eaf0', fline: 'rgba(100,116,139,.28)', wall: '#f8fafc', wallL: '#e2e8f0', wallR: '#dbe3ee', wallT: '#cbd5e1',
                      win: 'rgba(125,211,252,.55)', winLine: '#94a3b8', rug: 'rgba(59,130,246,.18)', lrug: 'rgba(34,197,94,.16)', desk: '#d6b38a', edge: '#cbd5e1', board: '#1f5135'};
     }
     palette();
@@ -300,12 +301,12 @@
             }
         },
         tdesk: function (o) {
-            box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .5, '#3f2d22', {top: '#5b3f2e'});
+            box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .5, NIGHT ? '#7c5a43' : '#3f2d22', {top: NIGHT ? '#9a7355' : '#5b3f2e'});
             monitor(o.x + .7, o.y + .25, true, true); monitor(o.x + 1.3, o.y + .25, true, true);
             ellipse(o.x + 1.75, o.y + .65, .53, 5, 3, '#f8fafc');
         },
         chair: function (o) {
-            var col = o.boss ? '#111827' : '#334155';
+            var col = NIGHT ? (o.boss ? '#94a3b8' : '#64748b') : (o.boss ? '#111827' : '#334155');   // ночью стулья светлее, иначе сливаются с полом
             box(o.x + .27, o.y + .27, .46, .46, .22, .07, col);
             if (o.face === 'up') { box(o.x + .27, o.y + .68, .46, .06, .29, o.boss ? .6 : .4, col); }
             else { box(o.x + .27, o.y + .26, .46, .06, .29, o.boss ? .6 : .45, col); }
@@ -316,9 +317,10 @@
         },
         armchair: function (o) { box(o.x + .15, o.y + .15, .7, .7, 0, .28, '#0f766e'); box(o.x + .15, o.y + .15, .7, .14, .28, .3, '#115e59'); },
         glass: function (o) {
-            var c = 'rgba(186,230,253,.28)', e = 'rgba(56,189,248,.55)';
-            if (o.axis === 'x') { box(o.x, o.y + .46, 1, .08, 0, 1.55, '#bae6fd', {left: c, right: c, top: e}); }
-            else { box(o.x + .46, o.y, .08, 1, 0, 1.55, '#bae6fd', {left: c, right: c, top: e}); }
+            var c = NIGHT ? 'rgba(186,230,253,.28)' : 'rgba(14,165,233,.16)', e = NIGHT ? 'rgba(56,189,248,.55)' : '#0284c7',
+                k = NIGHT ? null : 'rgba(2,132,199,.55)';                 // днём стекло с рамкой — иначе на светлом полу его не видно
+            if (o.axis === 'x') { box(o.x, o.y + .46, 1, .08, 0, 1.55, '#bae6fd', {left: c, right: c, top: e, stroke: k}); }
+            else { box(o.x + .46, o.y, .08, 1, 0, 1.55, '#bae6fd', {left: c, right: c, top: e, stroke: k}); }
         },
         sign: function (o) {
             var s = scr(o.x + o.w / 2, o.y + .5, 1.75); ctx.save();
@@ -353,8 +355,9 @@
             ellipse(o.x + .5, o.y + .5, .75, 15, 12, '#16a34a'); ellipse(o.x + .35, o.y + .5, .95, 11, 9, '#22c55e'); ellipse(o.x + .6, o.y + .4, 1.05, 10, 8, '#4ade80');
         },
         sofa: function (o) {
-            box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .28, '#475569');
-            if (o.face === 'down') { box(o.x + .05, o.y + .1, o.w - .1, .22, .28, .32, '#334155'); } else { box(o.x + .05, o.y + .68, o.w - .1, .22, .28, .32, '#334155'); }
+            var sc = NIGHT ? '#64748b' : '#475569', sb = NIGHT ? '#94a3b8' : '#334155';
+            box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .28, sc);
+            if (o.face === 'down') { box(o.x + .05, o.y + .1, o.w - .1, .22, .28, .32, sb); } else { box(o.x + .05, o.y + .68, o.w - .1, .22, .28, .32, sb); }
         },
         table: function (o) { box(o.x + .15, o.y + .15, .7, .7, 0, .3, '#f5f5f4'); ellipse(o.x + .45, o.y + .45, .33, 5, 3, '#fb923c'); },
         bean: function (o) { ellipse(o.x + .5, o.y + .5, .15, 20, 12, o.x % 4 ? '#f472b6' : '#facc15'); ellipse(o.x + .5, o.y + .45, .3, 15, 9, o.x % 4 ? '#f9a8d4' : '#fde047'); }
