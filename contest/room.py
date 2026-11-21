@@ -18,12 +18,19 @@ TTL = 6 * 3600
 PER_ROW = 12           # мест в ряду (3 блока по 4 стола)
 
 
+BOSS = {(x, y) for x in range(2, 6) for y in (4, 5)}          # приёмная в кабинете руководителя: сюда подходят за заданием
+TEACHER_SPOT = (4, 2)                                            # кресло руководителя
+SPAWN_Y = 7                                                      # коридор между кабинетами и open space
+
+
 def layout(n_students):
-    """Планировка зала. Сетка W×H клеток; объекты: стены, доска, столы с компьютерами, стулья, диван, растения.
+    """Офис компании «Пифагор»: стеклянный кабинет руководителя (CEO), переговорная, лаунж с кофе-пойнтом
+    и open space — блоки рабочих мест по 6 (столы друг напротив друга, между ними перегородка).
     seats — места: [{'id', 'x', 'y', 'teacher'}]. block — занятые клетки (по ним не ходят)."""
-    rows = max(2, min(4, math.ceil(max(n_students, 1) / PER_ROW)))
-    W = 24
-    H = 7 + rows * 3 + 3
+    per_row = 30                                     # 5 блоков × 6 мест
+    rows = max(1, min(3, math.ceil(max(n_students, 1) / per_row)))
+    W = 28
+    H = 9 + rows * 5 + 1
     objs, seats, block = [], [], set()
 
     def put(kind, x, y, w=1, d=1, solid=True, **kw):
@@ -33,35 +40,64 @@ def layout(n_students):
                 for j in range(d):
                     block.add((x + i, y + j))
 
-    # доска на задней стене и стол учителя
-    put('board', 6, 0, 8, 1)
-    put('tdesk', 9, 3, 2, 1)
-    seats.append({'id': 't', 'x': 10, 'y': 2, 'teacher': True})
-    put('chair', 10, 2, solid=False, face='down')
-    put('rug', 5, 1, 10, 4, solid=False)
-    # ряды столов: стол (y) и стул перед ним (y+1), ученики смотрят на доску
+    def glass(x, y, axis):
+        put('glass', x, y, axis=axis)
+
+    # --- кабинет руководителя (CEO): x 1..7, y 1..5; стекло по y=6 (дверь x=4..5) и по x=8
+    put('zone', 1, 1, 7, 5, solid=False, c='wood')
+    for x in (1, 2, 3, 6, 7):
+        glass(x, 6, 'x')
+    for y in range(1, 7):
+        glass(8, y, 'y')
+    put('sign', 4, 6, 2, 1, solid=False, text='CEO')
+    put('tdesk', 3, 3, 2, 1)
+    seats.append({'id': 't', 'x': TEACHER_SPOT[0], 'y': TEACHER_SPOT[1], 'teacher': True})
+    put('chair', TEACHER_SPOT[0], TEACHER_SPOT[1], solid=False, face='down', boss=True)
+    put('shelf', 1, 0, 3, 1)
+    put('plant', 7, 1)
+    put('plant', 1, 5)
+    put('armchair', 6, 4)
+    # --- лаунж и кофе-пойнт: x 9..18, y 1..5; логотип компании на задней стене
+    put('logo', 10, 0, 7, 1)
+    put('zone', 9, 1, 10, 5, solid=False, c='lounge')
+    put('sofa', 10, 2, 3, 1, face='down')
+    put('table', 11, 3)
+    put('sofa', 10, 4, 3, 1, face='up')
+    put('counter', 15, 1, 3, 1)
+    put('coffee', 15, 1, solid=False)
+    put('cooler', 18, 1)
+    put('bean', 15, 4)
+    put('bean', 17, 4)
+    put('plant', 9, 1)
+    # --- переговорная: x 20..26, y 1..6; стекло по y=7 (дверь x=23) и по x=19
+    put('zone', 20, 1, 7, 6, solid=False, c='wood')
+    for x in (20, 21, 22, 24, 25, 26):
+        glass(x, 7, 'x')
+    for y in range(1, 8):
+        glass(19, y, 'y')
+    put('tv', 21, 0, 5, 1)
+    put('mtable', 21, 3, 5, 2)
+    for x in range(21, 26):
+        put('mchair', x, 2, face='down')
+        put('mchair', x, 5, face='up')
+    put('plant', 26, 1)
+    # --- open space: блоки по 6 мест (3 стола сверху, 3 снизу, лицом друг к другу)
+    put('zone', 1, 9, W - 2, rows * 5, solid=False, c='carpet')
     sid = 0
     for r in range(rows):
-        y = 7 + r * 3
-        for bx in (2, 7, 12):
-            for i in range(4):
+        y0 = 9 + r * 5                                # стулья верхнего ряда
+        for bx in (2, 7, 12, 17, 22):
+            for i in range(3):
                 x = bx + i
-                put('desk', x, y)
-                seats.append({'id': f's{sid}', 'x': x, 'y': y + 1, 'teacher': False})
-                put('chair', x, y + 1, solid=False, face='up')
-                sid += 1
-    # зона отдыха справа: диван, столик, растения, кулер, шкаф
-    put('sofa', 20, 7, 1, 3)
-    put('table', 18, 8)
-    put('shelf', 17, 0, 4, 1)
-    put('cooler', 22, 1)
-    for (px, py) in ((1, 1), (22, 4), (1, H - 2), (22, H - 2), (16, 1)):
+                put('desk', x, y0 + 1, cx=x, cy=y0, face='down')       # стул сверху, смотрит вниз на стол
+                seats.append({'id': f's{sid}', 'x': x, 'y': y0, 'teacher': False}); sid += 1
+                put('chair', x, y0, solid=False, face='down')
+                put('desk', x, y0 + 2, cx=x, cy=y0 + 3, face='up')     # стул снизу, смотрит вверх
+                seats.append({'id': f's{sid}', 'x': x, 'y': y0 + 3, 'teacher': False}); sid += 1
+                put('chair', x, y0 + 3, solid=False, face='up')
+    for (px, py) in ((1, H - 2), (W - 2, H - 2), (1, 8), (W - 2, 8)):
         put('plant', px, py)
-    put('bean', 18, H - 3, solid=True)
-    put('bean', 20, H - 3, solid=True)
-    put('lrug', 17, 6, 6, 6, solid=False)
-    boss = [[x, y] for x in range(8, 12) for y in (4, 5)]           # «приёмная» руководителя: сюда подходят за заданием
-    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': boss}
+    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': sorted(BOSS)}
 
 
 # ------------------------------------------------------------------ присутствие
@@ -159,7 +195,6 @@ def public(rid, now=None):
 # ------------------------------------------------------------------ компания: задания и зарплата
 
 PAY = {'A': 10000, 'B': 20000, 'C': 30000}          # ₸ за лёгкую / среднюю / сложную задачу
-BOSS = {(x, y) for x in range(8, 12) for y in (4, 5)}
 
 
 def near_boss(p):

@@ -100,9 +100,9 @@ def _base(request, st, teacher):
 def _base_plain(request, st, teacher):
     if teacher:
         name = request.user.get_full_name() or request.user.username
-        return {'n': name, 'teacher': True, 'c': -1, 'x': 10, 'y': 2, 'seat': 't'}      # учитель сразу за своим столом
+        return {'n': name, 'teacher': True, 'c': -1, 'x': rm.TEACHER_SPOT[0], 'y': rm.TEACHER_SPOT[1], 'seat': 't'}   # руководитель — в своём кабинете
     return {'n': st.full_name or request.user.username, 'teacher': False, 'c': st.id % len(COLORS),
-            'x': 2 + request.user.id % 15, 'y': 5}                                      # входят в проход перед рядами
+            'x': 9 + request.user.id % 10, 'y': rm.SPAWN_Y}                              # входят в коридор офиса
 
 
 # ------------------------------------------------------------------ учитель

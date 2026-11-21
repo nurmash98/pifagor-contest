@@ -5188,7 +5188,7 @@ class StudyRoomTests(TestCase):
         self.client.get(reverse('room_play', args=[room.id]))
         self.client.post(act, {'a': 'move', 'x': 3, 'y': 8, 'seat': 's1'})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'far')      # надо подойти к столу руководителя
-        self.client.post(act, {'a': 'move', 'x': 9, 'y': 4})
+        self.client.post(act, {'a': 'move', 'x': 3, 'y': 4})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json(), {'ok': True, 'task': b.id})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'busy')     # пока не выполнил — нового нет
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
@@ -5211,7 +5211,7 @@ class StudyRoomTests(TestCase):
         act = reverse('room_act', args=[room.id])
         self.client.force_login(a.user)
         self.client.get(reverse('room_play', args=[room.id]))
-        self.client.post(act, {'a': 'move', 'x': 10, 'y': 5})
+        self.client.post(act, {'a': 'move', 'x': 4, 'y': 5})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'all_done')
 
     def test_lang_switch_and_fullscreen_exits_seen_by_teacher(self):
