@@ -64,6 +64,7 @@
         #earned.up { animation: earnUp .9s ease; }
         @keyframes earnUp { 0% { transform: translateX(-50%) scale(1); } 30% { transform: translateX(-50%) scale(1.12); box-shadow: 0 0 34px rgba(74,222,128,.9); } 100% { transform: translateX(-50%) scale(1); } }
         @media (max-width: 820px) { #earned .v { font-size: 18px; } }
+        .coinico { width: 1.15em; height: 1.15em; vertical-align: -.2em; display: inline-block; }
         #help { position: absolute; left: 12px; top: 12px; background: var(--panel); opacity: .93; border-radius: 12px; padding: 8px 12px; font-size: 12px; color: var(--muted); max-width: 330px; box-shadow: 0 4px 14px rgba(15,23,42,.08); }
         #music.on { background: #a855f7; color: #fff; }
         @media (max-width: 1100px) { #music-vol { display: none; } }
@@ -130,7 +131,7 @@
 <body>
 <div id="bar">
     <a href="{% if teacher and not office %}{% url 'room_manage' %}{% else %}{% url 'codegames' %}{% endif %}" class="btn ghost" title="{% t "Выйти" %}">←</a>
-    {% if office %}<span class="ttl">🏢 <span data-tr="Офис выходного дня">{% t "Офис выходного дня" %}</span> · <span style="color:#16a34a">x2 🪙</span></span>
+    {% if office %}<span class="ttl">🏢 <span data-tr="Офис выходного дня">{% t "Офис выходного дня" %}</span> · <span style="color:#16a34a">x2 <img class="coinico" src="{% static 'icons/coin-64.png' %}" alt=""></span></span>
     {% else %}<span class="ttl">🏢 <span data-tr="Компания Пифагор">{% t "Компания Пифагор" %}</span> · {{ room.school_class }}{% if room.title %} · {{ room.title }}{% endif %}</span>{% endif %}
     <span class="sp"></span>
     <span class="chip" title="{% t "В зале" %}">👥 <span id="online">0</span></span>
@@ -212,7 +213,8 @@
     }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
     var toastT = 0;
-    function toast(t) { var el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(function () { el.style.display = 'none'; }, 2600); }
+    var COIN = '<img class="coinico" src="{% static 'icons/coin-64.png' %}" alt="">';   // наша монета
+    function toast(t, html) { var el = $('toast'); if (html) { el.innerHTML = t; } else { el.textContent = t; } el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(function () { el.style.display = 'none'; }, 2600); }
 
     // ---------------- карта зала ----------------
     var W = L.W, H = L.H, block = {}, seatAt = {}, seatById = {};
@@ -653,7 +655,7 @@
             return;
         }
         var h = '<div class="mycard"><div class="lbl">' + TXT.earned + '</div><div class="sal">' + money(OME.money) + '</div>' +
-                '<div class="hint" style="margin:4px 0 0">🪙 +' + (OME.coins * 2) + ' ' + TXT.coins_x2 + ' · ✅ ' + OME.today.length + '</div></div>';
+                '<div class="hint" style="margin:4px 0 0">' + COIN + ' +' + (OME.coins * 2) + ' ' + TXT.coins_x2 + ' · ✅ ' + OME.today.length + '</div></div>';
         if (!seated && !TEACHER) { h += '<div class="hint">🪑 ' + TXT.sit_own + '</div>'; }
         var pk = OME.pkg;
         if (pk && !pk.finished) {
@@ -795,7 +797,7 @@
         }).join('') || '<div class="hint">' + TXT.none + '</div>';
         if (d.ome) {
             var newOnes = d.ome.today.filter(function (id) { return OME.today.indexOf(id) < 0; });
-            if (OME.loaded && newOnes.length) { var tt = taskById(newOnes[0]); toast('🎉 +' + (tt ? (tt.level === 'C' ? 6 : tt.level === 'B' ? 4 : 2) : 2) + ' 🪙 (x2) · +' + money(tt ? tt.pay : 0)); }
+            if (OME.loaded && newOnes.length) { var tt = taskById(newOnes[0]); toast('🎉 +' + (tt ? (tt.level === 'C' ? 6 : tt.level === 'B' ? 4 : 2) : 2) + ' ' + COIN + ' (x2) · +' + money(tt ? tt.pay : 0), true); }
             var sv = OME.solved; d.ome.solved.forEach(function (id) { if (sv.indexOf(id) < 0) { sv.push(id); } });
             if (OME.loaded && OME.pkg && !OME.pkg.finished && d.ome.pkg && d.ome.pkg.finished) { toast('🎁 ' + TXT.pkg_paid); }
             OME = {money: d.ome.money, coins: d.ome.coins, today: d.ome.today, solved: sv, loaded: true, pkg: d.ome.pkg, bonus: d.ome.bonus};
@@ -978,7 +980,7 @@
         box.innerHTML = botConv.map(function (m) { return '<div class="m' + (m.bot ? ' bot' : ' mine') + '">' + esc(m.text) + (m.extra || '') + '</div>'; }).join('');
         box.scrollTop = box.scrollHeight;
     }
-    var BOTQ = [['x2', '🪙'], ['cab', '🚪'], ['top', '🏆'], ['earn', '💰'], ['advice', '🎯'], ['theory', '📖'], ['rules', '❓']];
+    var BOTQ = [['x2', COIN], ['cab', '🚪'], ['top', '🏆'], ['earn', '💰'], ['advice', '🎯'], ['theory', '📖'], ['rules', '❓']];
     function openBot(id) {
         botWith = id; chatWith = null;
         var p = people[id]; p.route = []; p.act = TXT.bot_talk;
