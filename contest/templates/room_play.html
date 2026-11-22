@@ -166,12 +166,6 @@
         {% endif %}
         {% if office %}
         <div id="tasks"></div>
-        {% if teacher %}{# ученикам задачи даёт руководитель кабинета; общий список — только учителю, посмотреть условия #}
-        <h4 style="margin-top:10px">📚 <span data-tr="Задачи">{% t "Задачи" %}</span></h4>
-        <div id="otags" class="otags"></div>
-        <input id="osearch" class="osearch" data-trp="Поиск задачи" placeholder="{% t "Поиск задачи" %}">
-        <div id="olist" class="olist"></div>
-        {% endif %}
         <h4 style="margin-top:14px">🏆 <span data-tr="Топ параллели сегодня">{% t "Топ параллели сегодня" %}</span></h4>
         <div class="hint"><span data-tr="В 20:00 топ-3 получают по 20 монет">{% t "В 20:00 топ-3 получают по 20 монет" %}</span></div>
         <div id="stats"></div>
