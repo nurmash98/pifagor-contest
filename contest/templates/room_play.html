@@ -148,7 +148,7 @@
         <canvas id="map"></canvas>
         <div id="labels"></div>
         {% if office %}<div id="earned"><div class="l">💰 <span id="earned-l">{% t "Офис заработал сегодня" %}</span></div><div class="v" id="earned-v">0 ₸</div></div>
-        <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к руководителю своего кабинета — он даст 3 задачи. Сядьте за стол и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
+        <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к руководителю (👔 в коридоре: 5–8 и 9–11 классы) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к руководителю (👔 в коридоре: 5–8 и 9–11 классы) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
         {% else %}<div id="help">🖱 <span data-tr="Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор.">{% t "Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>{% endif %}
         <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
@@ -1016,7 +1016,7 @@
         else if (q === 'advice') {
             if (TEACHER) { botSay(TXT.bot_teacher); return; }
             if (MGRS.length) {                                     // задачи даёт руководитель кабинета
-                var mi = -1; MGRS.forEach(function (m, k) { if (m.grade === MY_GRADE) { mi = k; } });
+                var mi = -1; MGRS.forEach(function (m, k) { if (mgrMine(m)) { mi = k; } });
                 botSay(TXT.bot_to_mgr, mi >= 0 ? ' <button class="go" type="button" data-act="mgr" data-id="' + (-100 - mi) + '">👔 ' + esc(TXT.bot_lead) + '</button>' : '');
                 return;
             }
@@ -1082,6 +1082,7 @@
         setTarget(p, m.x, m.y, null); p.act = '';
     });
     function mgrById(id) { return MGRS[-100 - id]; }
+    function mgrMine(m) { return (m.grades || [m.grade]).indexOf(MY_GRADE) >= 0; }
     var MGR_PROP = {report: '📋', files: '🗂', watch: '', phone: '📱', coffee: '☕', laptop: '💻'};
     function mgrDo(k, sp) {                                   // руководитель идёт на место и занимается делом
         var p = people[-100 - k]; if (!p) { return; }
@@ -1115,10 +1116,10 @@
             return;
         }
         openBotShell(id); people[id].act = TXT.bot_talk; people[id].prop = '';
-        if (m.grade !== MY_GRADE) { botSay(TXT.mgr_other.replace('{g}', m.grade).replace('{my}', MY_GRADE)); return; }
+        if (!mgrMine(m)) { var mm = MGRS.filter(mgrMine)[0]; botSay(TXT.mgr_other.replace('{g}', m.grade).replace('{other}', mm ? mm.name : '—')); return; }
         var pk = OME.pkg;
         if (pk && !pk.finished) { botSay(TXT.mgr_busy.replace('{n}', pk.tasks.length - pk.done.length), pkgButtons(pk.tasks)); return; }
-        botSay((pk && pk.finished ? TXT.mgr_again : TXT.mgr_hello).replace('{name}', m.name));
+        botSay((pk && pk.finished ? TXT.mgr_again : TXT.mgr_hello).replace('{name}', m.name).replace('{g}', m.grade));
         fetch(U2.bot + '?q=topics', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
             if (!d.topics.length) { botSay(TXT.mgr_all); return; }
             $('chat-quick').innerHTML = d.topics.map(function (t) {

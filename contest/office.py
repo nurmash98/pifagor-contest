@@ -63,6 +63,7 @@ def layout(grade_list):
     W = 1 + per_row * COL + 6                       # +6 — лаунж в конце коридора
     H = 19
     objs, seats, block, managers = [], [], set(), []
+    cabs = {}                                       # grade -> (ox, row) для размещения руководителей
 
     def put(kind, x, y, w=1, d=1, solid=True, **kw):
         objs.append(dict(kw, t=kind, x=x, y=y, w=w, d=d))
@@ -87,12 +88,10 @@ def layout(grade_list):
             put('glass', ox + CAB_W, y, axis='y')
         put('sign', ox + 4, door_y, 1, 1, solid=False, text='Администрация' if admin else f'{g} класс', icon='👔' if admin else '🏢', grade='' if admin else g)
         put('plant', ox + (CAB_W - 1 if row == 0 else 0), oy if row == 0 else oy + 5)
-        if g != ADMIN:                                # руководитель кабинета: пост у входа + места, где он работает
-            back, front, mid = (1, 6, 3) if row == 0 else (17, 12, 14)
+        if g != ADMIN:
+            back = 1 if row == 0 else 17
             put('shelf', ox + 1, back, 3, 1)            # шкаф с папками у дальней стены
-            managers.append({'grade': g, 'x': ox + 5, 'y': front, 'name': MANAGER_NAMES[k % len(MANAGER_NAMES)],
-                             'spots': [[ox + 5, front, 'report'], [ox + 4, back, 'files'], [ox + 4, mid, 'watch'],
-                                       [ox + 7, back, 'phone'], [ox + 8, mid + 1, 'coffee'], [ox + 1, front, 'laptop']]})
+            cabs[g] = (ox, row)
         sid = 0
         if admin:                                    # учительская: 4 больших стола, кресла лицом к двери
             dy = a + 1
@@ -128,16 +127,45 @@ def layout(grade_list):
     put('cooler', lx + 4, 15)
     for (px, py) in ((lx + 4, 1), (lx, 17), (lx + 4, 17)):
         put('plant', px, py)
+    # два руководителя на весь офис: 5–8 и 9–11 классы; пост — в коридоре у своих кабинетов, обходят свои кабинеты
+    for gi, (label, name) in enumerate(MANAGER_GROUPS):
+        mine = [g for g in grade_list if g in cabs and group_of(g) == gi]
+        if not mine:
+            continue
+        rows = [cabs[g][1] for g in mine]
+        row = 0 if rows.count(0) >= rows.count(1) else 1
+        xs = sorted(cabs[g][0] + 4 for g in mine)
+        px, py = xs[len(xs) // 2] + 2 if len(xs) > 1 else xs[0] + 2, 8 if row == 0 else 10
+        spots = [[px, py, 'report']]
+        acts = ['watch', 'laptop', 'files', 'phone']
+        for i, g in enumerate(mine):
+            ox, r = cabs[g]
+            back, front, mid = (1, 6, 3) if r == 0 else (17, 12, 14)
+            a = acts[i % len(acts)]
+            spot = {'watch': [ox + 4, mid], 'laptop': [ox + 1, front], 'files': [ox + 4, back], 'phone': [ox + 7, back]}[a]
+            spots.append(spot + [a])
+            if i % 2:
+                spots.append([px, py, 'report'])
+        spots.append([lx + 2, 2, 'coffee'])          # за кофе — в лаунж
+        managers.append({'grade': label, 'grades': mine, 'x': px, 'y': py, 'name': name, 'spots': spots})
     return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [], 'managers': managers}
 
 
-MANAGER_NAMES = ['Ерлан', 'Динара', 'Бауыржан', 'Айгерім', 'Нұрлан', 'Жанар', 'Серік', 'Мадина', 'Тимур', 'Әсел']
+MANAGER_GROUPS = [('5–8', 'Динара'), ('9–11', 'Ерлан')]
+
+
+def group_of(grade):
+    """0 — младшие (5–8), 1 — старшие (9–11)."""
+    try:
+        return 0 if int(str(grade).rstrip('АБВГДЕЖЗИКЛМНОПРСТ')) <= 8 else 1
+    except ValueError:
+        return 1
 PACKAGE_SIZE = 3
 PACKAGE_BONUS = 10000            # премия руководителя за все 3 задачи, ₸
 
 
 def manager_of(grade):
-    return next((m for m in layout(grades())['managers'] if m['grade'] == grade), None)
+    return next((m for m in layout(grades())['managers'] if grade in m['grades']), None)
 
 
 def near_manager(presence, grade):
