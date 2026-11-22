@@ -47,6 +47,14 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 # На сервере задайте DJANGO_ALLOWED_HOSTS, например: "1.2.3.4,pifagor.example.com"
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
+# За HTTPS-прокси (Cloudflare Tunnel, nginx): сайт открывают по https://, а gunicorn получает http.
+# DJANGO_HTTPS_PROXY=True — доверять заголовку X-Forwarded-Proto; адреса из ALLOWED_HOSTS
+# становятся доверенными для форм (CSRF), иначе вход и отправка решений дали бы ошибку 403.
+if os.environ.get('DJANGO_HTTPS_PROXY', 'False') == 'True':
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()] or \
+    [f'https://{h.lstrip(".")}' for h in ALLOWED_HOSTS if h != '*' and not h[0].isdigit()]
+
 
 # Application definition
 
@@ -117,6 +125,20 @@ WSGI_APPLICATION = 'pifagor_contest.wsgi.application'
 # На сервере задайте DJANGO_DB_ENGINE=postgres и остальные POSTGRES_* переменные,
 # чтобы использовать PostgreSQL (нужен пакет psycopg2-binary из req.txt).
 
+# DATABASE_URL (как в Neon: postgresql://user:pass@host/db?sslmode=require) — одна строка вместо POSTGRES_*.
+_DB_URL = os.environ.get('DATABASE_URL', '').strip()
+if _DB_URL:
+    from urllib.parse import parse_qs, unquote, urlsplit
+    _u = urlsplit(_DB_URL)
+    _q = {k: v[-1] for k, v in parse_qs(_u.query).items()}
+    os.environ.setdefault('DJANGO_DB_ENGINE', 'postgres')
+    os.environ.setdefault('POSTGRES_DB', _u.path.lstrip('/'))
+    os.environ.setdefault('POSTGRES_USER', unquote(_u.username or ''))
+    os.environ.setdefault('POSTGRES_PASSWORD', unquote(_u.password or ''))
+    os.environ.setdefault('POSTGRES_HOST', _u.hostname or 'localhost')
+    os.environ.setdefault('POSTGRES_PORT', str(_u.port or 5432))
+    os.environ.setdefault('POSTGRES_SSLMODE', _q.get('sslmode', 'require'))
+
 if os.environ.get('DJANGO_DB_ENGINE') == 'postgres':
     DATABASES = {
         'default': {
@@ -151,6 +173,8 @@ if _CACHE_DIR:
 TRUST_X_REAL_IP = os.environ.get('TRUST_X_REAL_IP', 'False') == 'True'
 AUTOTEST_SANDBOX_USER = os.environ.get('AUTOTEST_SANDBOX_USER', '').strip()
 AUTOTEST_SANDBOX_PYTHON = os.environ.get('AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3').strip()
+# Папка для файлов с кодом учеников: на macOS личная временная папка закрыта от пользователя песочницы.
+AUTOTEST_TMP_DIR = os.environ.get('AUTOTEST_TMP_DIR', '').strip()
 
 
 # Password validation

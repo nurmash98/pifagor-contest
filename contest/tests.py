@@ -1989,6 +1989,10 @@ class AutotestSandboxTests(TestCase):
         self.assertIn('/usr/bin/prlimit', argv); self.assertIn('/usr/bin/timeout', argv)
         self.assertEqual(argv[-2:], ['-I', '/tmp/x.py']); self.assertFalse(pre); self.assertGreater(wall, autotest.WALL_CLOCK_TIMEOUT)
         self.assertEqual(autotest.build_command('/tmp/x.py')[0][1], '/tmp/x.py')
+        with mock.patch('contest.autotest._is_mac', return_value=True):        # macOS: без prlimit — свой лаунчер
+            margv, _, mpre = autotest.build_command('/tmp/x.py', 'pifagorbox')
+            self.assertEqual(margv[:5], ['sudo', '-n', '-u', 'pifagorbox', '--']); self.assertNotIn('/usr/bin/prlimit', margv)
+            self.assertIn(autotest.MAC_LAUNCHER, margv); self.assertEqual(margv[-2:], ['-I', '/tmp/x.py']); self.assertFalse(mpre)
         import subprocess
         def fake(rc, err=''):
             return mock.patch('contest.autotest.subprocess.run', return_value=subprocess.CompletedProcess([], rc, '', err))

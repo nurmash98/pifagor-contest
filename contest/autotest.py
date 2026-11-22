@@ -88,6 +88,44 @@ def _safe_env():
     return env
 
 
+def _tmp_dir():
+    from django.conf import settings
+    d = getattr(settings, 'AUTOTEST_TMP_DIR', '') or ''
+    if d:
+        os.makedirs(d, exist_ok=True)
+        return d
+    return tempfile.gettempdir()
+
+
+# macOS: нет prlimit/timeout. Пользователь песочницы запускает свой Python, который выставляет
+# лимиты (CPU, размер файлов, процессы, память по возможности), заводит будильник на «настенное»
+# время (SIGALRM переживает exec) и заменяет себя программой ученика.
+MAC_LAUNCHER = (
+    'import os,sys,resource,signal\n'
+    'c,f,m,w=int(sys.argv[1]),int(sys.argv[2]),int(sys.argv[3]),int(float(sys.argv[4]))+1\n'
+    'for r,v in ((resource.RLIMIT_CPU,c),(resource.RLIMIT_FSIZE,f),(resource.RLIMIT_CORE,0),'
+    '(resource.RLIMIT_NPROC,64),(resource.RLIMIT_DATA,m)):\n'
+    '    try: resource.setrlimit(r,(v,v))\n'
+    '    except Exception: pass\n'
+    'signal.alarm(w)\n'
+    'os.execv(sys.argv[5],sys.argv[5:])\n')
+
+
+def _is_mac():
+    return sys.platform == 'darwin'
+
+
+def _sandbox_prefix(user, cpu, mem, fsize, wall):
+    """Начало команды: запуск под пользователем песочницы с лимитами (Linux — prlimit+timeout, macOS — лаунчер)."""
+    from django.conf import settings
+    if _is_mac():
+        py = getattr(settings, 'AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3') or '/usr/bin/python3'
+        return ['sudo', '-n', '-u', user, '--', py, '-I', '-c', MAC_LAUNCHER, str(cpu), str(fsize), str(mem), str(wall)]
+    return ['sudo', '-n', '-u', user, '--', '/usr/bin/prlimit',
+            f'--cpu={cpu}', f'--as={mem}', '--nproc=64', f'--fsize={fsize}', '--core=0',
+            '/usr/bin/timeout', '-s', 'KILL', str(wall)]
+
+
 def _sandbox_user():
     from django.conf import settings
     return getattr(settings, 'AUTOTEST_SANDBOX_USER', '') or ''
@@ -105,9 +143,7 @@ def build_command(tmp_path, sandbox_user=None, time_limit=None, target=None):
         return (target or [sys.executable, tmp_path]), wall_clock, True
     from django.conf import settings
     py = getattr(settings, 'AUTOTEST_SANDBOX_PYTHON', '/usr/bin/python3') or '/usr/bin/python3'
-    argv = ['sudo', '-n', '-u', sandbox_user, '--', '/usr/bin/prlimit',
-            f'--cpu={cpu}', f'--as={MEMORY_LIMIT_BYTES}', '--nproc=64', f'--fsize={10 * 1024 * 1024}', '--core=0',
-            '/usr/bin/timeout', '-s', 'KILL', str(wall_clock)] + (target or [py, '-I', tmp_path])
+    argv = _sandbox_prefix(sandbox_user, cpu, MEMORY_LIMIT_BYTES, 10 * 1024 * 1024, wall_clock) + (target or [py, '-I', tmp_path])
     return argv, wall_clock + 2.5, False
 
 
@@ -119,7 +155,7 @@ def _run_one(code, stdin_text, time_limit=None, exe=None):
     if exe:
         tmp_path = None
     else:
-        with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile('w', suffix='.py', delete=False, dir=_tmp_dir()) as f:
             f.write(code)
             tmp_path = f.name
 
@@ -136,7 +172,7 @@ def _run_one(code, stdin_text, time_limit=None, exe=None):
             text=True,
             timeout=wall,
             env=_safe_env(),
-            cwd=tempfile.gettempdir(),
+            cwd=_tmp_dir(),
             preexec_fn=(lambda: _limit_resources(cpu)) if (HAS_RESOURCE and use_preexec) else None,
         )
     except subprocess.TimeoutExpired:
@@ -154,7 +190,7 @@ def _run_one(code, stdin_text, time_limit=None, exe=None):
         stderr_text = proc.stderr or ''
         # SIGKILL/SIGXCPU — процесс убит ядром за превышение лимита CPU-времени
         # (RLIMIT_CPU c одинаковым soft/hard лимитом убивает почти сразу).
-        if proc.returncode in (-9, -24, 137, 152):   # 137/152 — то же через sudo/timeout (128 + сигнал)
+        if proc.returncode in (-9, -14, -24, 137, 142, 152):   # 137/142/152 — то же через sudo/timeout (128 + сигнал; 14 — будильник на macOS)
             return '', 'timeout'
         # RLIMIT_AS обычно приводит к обычному MemoryError внутри интерпретатора
         # (malloc не смог выделить память), а не к убийству процесса ядром.
@@ -177,7 +213,7 @@ COMPILE_ERROR_LIMIT = 1500
 
 def cpp_available():
     import shutil
-    return shutil.which('g++') is not None
+    return (shutil.which('g++') or shutil.which('clang++')) is not None
 
 
 def compile_cpp(code):
@@ -185,19 +221,17 @@ def compile_cpp(code):
     На сервере с песочницей компиляция идёт под её пользователем: #include "/путь/к/секрету"
     не покажет чужие файлы в сообщении об ошибке."""
     import shutil
-    workdir = tempfile.mkdtemp(prefix='cpp-')
+    workdir = tempfile.mkdtemp(prefix='cpp-', dir=_tmp_dir())
     os.chmod(workdir, 0o777)
     src, exe = os.path.join(workdir, 'main.cpp'), os.path.join(workdir, 'main')
     with open(src, 'w') as f:
         f.write(code)
     os.chmod(src, 0o644)
-    gxx = shutil.which('g++') or '/usr/bin/g++'
+    gxx = shutil.which('g++') or shutil.which('clang++') or '/usr/bin/g++'
     cmd = [gxx, '-O2', '-std=c++17', '-pipe', '-o', exe, src]
     user = _sandbox_user()
     if user:
-        cmd = ['sudo', '-n', '-u', user, '--', '/usr/bin/prlimit', f'--cpu={COMPILE_CPU_SECONDS}',
-               f'--as={COMPILE_MEMORY_BYTES}', '--nproc=64', f'--fsize={64 * 1024 * 1024}', '--core=0',
-               '/usr/bin/timeout', '-s', 'KILL', str(COMPILE_CPU_SECONDS + 5)] + cmd
+        cmd = _sandbox_prefix(user, COMPILE_CPU_SECONDS, COMPILE_MEMORY_BYTES, 64 * 1024 * 1024, COMPILE_CPU_SECONDS + 5) + cmd
 
     def limits():
         if HAS_RESOURCE:
