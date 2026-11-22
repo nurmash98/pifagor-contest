@@ -151,7 +151,7 @@ def layout(grade_list):
     return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [], 'managers': managers}
 
 
-MANAGER_GROUPS = [('5–8', 'Динара'), ('9–11', 'Ерлан')]
+MANAGER_GROUPS = [('5–8', 'Сэм Альтман'), ('9–11', 'Илон Маск')]
 
 
 def group_of(grade):
