@@ -104,6 +104,7 @@
         .plab.me { cursor: default; }
         .plab .pboss { zoom: .8; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #111827; font-weight: 900; letter-spacing: .08em;
                        padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+        .plab .pagai { background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pbot { background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pact { display: block; text-align: center; font-size: 10px; font-weight: 700; color: #0f766e; background: rgba(255,255,255,.85); border-radius: 6px; padding: 1px 6px; margin-top: 2px; }
         #chat-quick { display: none; flex-wrap: wrap; gap: 5px; padding: 8px; border-top: 1px solid var(--line); max-height: 40%; overflow-y: auto; }
@@ -468,6 +469,11 @@
             return (p.msg ? '<div class="pmsg" style="background:rgba(30,58,138,.95)">' + esc(p.msg) + '</div>' : '') +
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pmgr">👔 ' + esc(p.name) + ' · ' + esc(TXT.mgr_role.replace('{g}', p.grade)) + '</span>' +
                    (p.act ? '<span class="pact" style="color:#1e3a8a">' + esc(p.act) + '</span>' : '') + '</div>';
+        }
+        if (p.agai) {
+            return (p.msg ? '<div class="pmsg t">' + esc(p.msg) + '</div>' : '') +
+                   '<div class="pname" style="flex-direction:column;gap:0"><span class="pagai">👨‍🏫 ' + esc(p.name) + ' · ' + esc(TXT.agai_role) + '</span>' +
+                   (p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
         }
         if (p.bot) {
             return (p.msg ? '<div class="pmsg" style="background:rgba(15,118,110,.92)">' + esc(p.msg) + '</div>' : '') +
@@ -887,6 +893,7 @@
     function openChat(uid) {
         uid = +uid; if (!uid || uid === ME || !people[uid]) { return; }
         if (uid <= -100) { openManager(uid); return; }
+        if (uid <= -50) { agaiTalk(uid); return; }
         if (uid < 0) { openBot(uid); return; }
         $('chat-quick').style.display = 'none'; $('chat-form').style.display = 'flex';
         chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 BOSS · ' : '') + people[uid].name;
@@ -967,6 +974,53 @@
                 setTimeout(function () { var p = people[-1]; if (p) { p.msg = TXT.bot_hello; setTimeout(function () { p.msg = ''; }, 9000); } }, 1500);
             }
         } catch (e) {}
+    }
+    // ---------------- преподаватели (ағайлар): ходят по офису, заглядывают в кабинеты, дают советы ----------------
+    var AGAI = OFFICE ? [
+        {name: 'Нұрмаш ағай', ai: "{% static 'avatars/nurmash-agai.webp' %}", color: '#7c2d12'},
+        {name: 'Ернар ағай', ai: "{% static 'avatars/ernar-agai.webp' %}", color: '#14532d'},
+        {name: 'Нұрбол ағай', ai: "{% static 'avatars/nurbol-agai.webp' %}", color: '#4c1d95'},
+        {name: 'Тілек ағай', ai: "{% static 'avatars/tilek-agai.webp' %}", color: '#7f1d1d'}
+    ] : [];
+    if (AGAI.length) {
+        var pool = [], seenCab = {};
+        L.seats.forEach(function (st) {                                // в каждом кабинете — по 2 места «посмотреть, как решают»
+            seenCab[st.grade] = (seenCab[st.grade] || 0) + 1;
+            if (seenCab[st.grade] % 6 !== 1) { return; }
+            var f = freeNear(st.x, st.y); if (f) { pool.push([f[0], f[1], 'watch']); }
+        });
+        for (var ax = 3; ax < W - 8; ax += 7) { pool.push([ax, 9, 'walk']); }
+        L.objs.forEach(function (o) {
+            if (o.t === 'counter') { pool.push([o.x + 1, o.y + 1, 'tea']); }
+            if (o.t === 'tdesk') { var f = freeNear(o.x, o.y); if (f) { pool.push([f[0], f[1], 'talk']); } }
+        });
+        pool = pool.filter(function (w) { return free(w[0], w[1]); });
+        AGAI.forEach(function (a, k) {
+            var p = person(-50 - k); p.agai = true; p.bot = true; p.name = a.name; p.ai = a.ai; p.color = a.color; p.c = 0;
+            a.cur = -1;
+        });
+        var agaiStep = function () {
+            var now = Date.now() / 1000;
+            AGAI.forEach(function (a, k) {
+                if (!pool.length) { return; }
+                var slot = Math.floor((now + k * 4) / (9 + k * 2));
+                var i = (slot * (k * 2 + 3) + k * 7) % pool.length;   // у каждого свой маршрут
+                if (i === a.cur) { return; }
+                a.cur = i; var w = pool[i], p = people[-50 - k];
+                setTarget(p, w[0], w[1], null, true); p.act = TXT['agai_act_' + w[2]] || '';
+                if (Math.random() < .25) { agaiSayTip(p, 2500 + Math.random() * 3000); }
+            });
+        };
+        agaiStep(); setInterval(agaiStep, 1000);
+    }
+    function agaiSayTip(p, delay) {
+        setTimeout(function () {
+            var tip = TXT['agai_tip' + (1 + Math.floor(Math.random() * 8))]; p.msg = tip;
+            setTimeout(function () { if (p.msg === tip) { p.msg = ''; } }, 6000);
+        }, delay || 0);
+    }
+    function agaiTalk(id) {                                           // нажали на ағая — он подсказывает
+        var p = people[id]; if (p) { agaiSayTip(p, 0); }
     }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
     function renderBot() {
