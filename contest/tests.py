@@ -2133,7 +2133,7 @@ class SubtopicTasksTests(TestCase):
         self.assertContains(r, 'Вложенные условия')
         self.assertContains(r, 'Задача подтемы 1')
         self.assertNotContains(r, 'Задача подтемы 2')
-        self.assertNotContains(r, 'data-part="tasks"')   # без раскрывающегося блока задач темы
+        self.assertContains(r, 'data-part="tasks"', count=1)   # у подтемы свой раскрывающийся список задач, у темы — нет
 
     def test_topic_without_subtopics_shows_own_tasks(self):
         self.sub.delete()
