@@ -5346,6 +5346,14 @@ class WeekendOfficeTests(TestCase):
             # ответ ученику, которого сейчас нет в офисе
             self.assertEqual(self.client.post(reverse('office_act'), {'a': 'dm', 'to': st.user_id, 'text': 'Ответ'}).json()['ok'], True)
 
+    def test_special_tags_hidden_from_lists_but_count_for_rewards(self):
+        gta = Tag.objects.create(name='GTA VI')
+        t = make_task('Неон', 'A', gta)
+        self.assertNotIn(gta, list(Tag.visible()))
+        from . import banners
+        Submission.objects.create(student=self.sts[0], task=t, status='DONE', is_graded=True, score=10)
+        self.assertEqual(banners.progress(self.sts[0], 'GTA VI'), 1)            # челлендж по-прежнему считает
+
     def test_open_hours(self):
         from . import office
         self.assertTrue(office.is_open(self.sat))

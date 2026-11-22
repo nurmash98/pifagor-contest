@@ -152,7 +152,8 @@ def room_manage(request):
     tasks = list(Task.objects.filter(hidden=False).prefetch_related('tags').order_by('level', 'title'))
     from collections import Counter
     from .models import Topic
-    tag_count = Counter(g for t in tasks for g in t.tags.all())
+    from .models import SPECIAL_TAGS
+    tag_count = Counter(g for t in tasks for g in t.tags.all() if g.name not in SPECIAL_TAGS)
     tags = sorted(tag_count.items(), key=lambda kv: kv[0].name.lower())
     topics = []
     for tp in Topic.objects.select_related('course').prefetch_related('tasks', 'subtopics').order_by('course__name', 'order', 'name'):

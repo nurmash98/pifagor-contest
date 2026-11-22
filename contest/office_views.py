@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from . import office as of
 from . import room as rm
-from .models import Student, Task
+from .models import SPECIAL_TAGS, Student, Task
 from .room_views import COLORS, _label, _lang, _texts
 
 
@@ -160,7 +160,8 @@ def _tasks(lang):
         for t in Task.objects.filter(hidden=False).prefetch_related('tags').order_by('level', 'id'):
             ids = []
             for g in t.tags.all():
-                tags[g.id] = g.name
+                if g.name not in SPECIAL_TAGS:
+                    tags[g.id] = g.name
                 ids.append(g.id)
             out.append({'id': t.id, 'title': t.get_display_title(lang), 'level': t.level, 'url': reverse('task_detail', args=[t.id]),
                         'pay': rm.PAY.get(t.level, rm.PAY['A']), 'tags': ids})

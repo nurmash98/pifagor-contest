@@ -58,14 +58,18 @@ class Student(models.Model):
         return f"{self.full_name} ({self.school_class})"
 
 
+# Теги челленджей/праздников: по ним считаются награды (баннеры, челлендж GTA VI), но в фильтрах и выборе тем их не показываем
+SPECIAL_TAGS = ('GTA VI', 'Республика күні')
+
+
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True, verbose_name="Название тега")
 
     @classmethod
     def visible(cls):
-        """Теги без олимпиадных: тег, у которого все задачи скрытые (олимпиадные), нигде не показываем."""
+        """Теги для фильтров и выбора тем: без олимпиадных (все задачи скрытые) и без тегов челленджей/праздников."""
         olymp_only = cls.objects.filter(tasks__hidden=True).exclude(tasks__hidden=False).values('id')
-        return cls.objects.exclude(id__in=olymp_only)
+        return cls.objects.exclude(id__in=olymp_only).exclude(name__in=SPECIAL_TAGS)
 
     class Meta:
         verbose_name = "Тег"

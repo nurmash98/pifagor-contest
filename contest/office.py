@@ -15,6 +15,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from . import room as rm
+from .models import SPECIAL_TAGS
 
 OPEN_DAYS = (5, 6)                   # суббота, воскресенье
 OPEN_FROM, OPEN_TO = dtime(9, 0), dtime(20, 0)
@@ -190,7 +191,8 @@ def topics_for(student):
     by_tag = {}
     for t in Task.objects.filter(hidden=False).prefetch_related('tags').only('id', 'level'):
         for g in t.tags.all():
-            by_tag.setdefault((g.id, g.name), []).append(t)
+            if g.name not in SPECIAL_TAGS:
+                by_tag.setdefault((g.id, g.name), []).append(t)
     out = []
     for (gid, name), ts in sorted(by_tag.items(), key=lambda kv: kv[0][1].lower()):
         free = [t for t in ts if t.id not in solved]
