@@ -474,7 +474,7 @@
         }
         if (p.agai) {
             return (p.msg ? '<div class="pmsg t">' + esc(p.msg) + '</div>' : '') + (UNREAD[p.id] ? '<span class="pdm">💬' + UNREAD[p.id] + '</span>' : '') +
-                   '<div class="pname" style="flex-direction:column;gap:0"><span class="pagai">👨‍🏫 ' + esc(p.name) + ' · ' + esc(TXT.agai_role) + '</span>' +
+                   '<div class="pname" style="flex-direction:column;gap:0"><span class="pagai">👨‍🏫 ' + esc(p.name) + '</span>' +
                    (p.id > 0 ? '<span class="pact">🟢 ' + esc(TXT.agai_here) + '</span>' : p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
         }
         if (p.bot) {
@@ -1066,7 +1066,7 @@
             return;
         }
         botWith = -50 - k; chatWith = null; if (!AGON[a.key]) { p.route = []; }
-        $('chat-name').textContent = '👨‍🏫 ' + a.name + ' · ' + TXT.agai_role;
+        $('chat-name').textContent = '👨‍🏫 ' + a.name;
         $('chat-form').style.display = 'none'; $('chat-quick').style.display = 'flex'; $('chat-quick').innerHTML = '';
         $('chat').style.display = 'flex'; botConv = [];
         var ask = a.uid ? ' <button class="go" type="button" data-act="ask" data-id="' + k + '">✉️ ' + esc(TXT.agai_ask) + '</button>' : '';
