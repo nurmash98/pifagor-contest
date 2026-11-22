@@ -182,13 +182,13 @@ def log(rid):
 
 
 def public(rid, now=None):
-    """Для браузера: [[uid, имя, x, y, место, сообщение, рука, учитель, цвет, html-плашка с баннером, картинка аватара]]."""
+    """Для браузера: [[uid, имя, x, y, место, сообщение, рука, учитель, цвет, html-плашка с баннером, картинка аватара, ағай]]."""
     now = now or time.time()
     out = []
     for u, p in people(rid, now).items():
         msg = p.get('msg', '') if now - p.get('mt', 0) < BUBBLE else ''
         out.append([u, p.get('n', ''), p.get('x'), p.get('y'), p.get('seat'), msg, bool(p.get('hand')),
-                    bool(p.get('teacher')), p.get('c', 0), p.get('h', ''), p.get('ai', '')])
+                    bool(p.get('teacher')), p.get('c', 0), p.get('h', ''), p.get('ai', ''), p.get('ag', '')])
     return out
 
 
@@ -287,12 +287,13 @@ def _pair(rid, a, b):
     return f'room:{rid}:dm:{a}-{b}'
 
 
-def dm_send(rid, frm, to, text):
-    """Ошибка или None. Писать можно только тому, кто сейчас в зале/офисе."""
+def dm_send(rid, frm, to, text, absent_ok=False):
+    """Ошибка или None. Писать можно только тому, кто сейчас в зале/офисе
+    (absent_ok — в офисе: вопрос своему преподавателю / его ответ, даже если адресата сейчас нет)."""
     text = ' '.join((text or '').split())[:DM_MAX]
     if not text:
         return 'empty'
-    if int(to) == int(frm) or int(to) not in people(rid):
+    if int(to) == int(frm) or (not absent_ok and int(to) not in people(rid)):
         return 'gone'
     if not cache.add(f'room:{rid}:dmsay:{frm}', 1, DM_EVERY):
         return 'wait'

@@ -151,6 +151,45 @@ def layout(grade_list):
     return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [], 'managers': managers}
 
 
+# Преподаватели (ағайлар): если учитель зашёл в офис своим аккаунтом — он и есть этот ағай (не новый человек).
+# Пока его нет — по офису ходит его персонаж. Ученики его классов могут задать ему вопрос (личное сообщение).
+AGAI = [
+    {'key': 'nurmash', 'username': 'nurmash', 'name': 'Нұрмаш ағай', 'av': 'avatars/nurmash-agai.webp',
+     'classes': '7A, 7B, 7C, 7E, 7K, 7F, 6N'},
+    {'key': 'ernar', 'username': 'yereke', 'name': 'Ернар ағай', 'av': 'avatars/ernar-agai.webp',
+     'classes': '10A, 10B, 10C, 11A, 11B, 8G, 8H, 8K, 9A, 9B, 9C, 9E'},
+    {'key': 'nurbol', 'username': 'nurgazy.nurbol', 'name': 'Нұрбол ағай', 'av': 'avatars/nurbol-agai.webp',
+     'classes': '6A, 6J, 6B, 6C, 5A, 5B, 5C, 5J, 5Q'},
+    {'key': 'tilek', 'username': 'tagbwoi', 'name': 'Тілек ағай', 'av': 'avatars/tilek-agai.webp',
+     'classes': '8A, 8B, 8C, 5K, 5L, 5M, 5N, 6D, 6E, 6K, 6L, 6M'},
+]
+
+
+def agai_classes(a):
+    from .models import normalize_school_class
+    return {normalize_school_class(c) for c in a['classes'].split(',') if c.strip()}
+
+
+def agai_by_username(username):
+    return next((a for a in AGAI if a['username'].lower() == (username or '').lower()), None)
+
+
+def agai_list(school_class=''):
+    """Для страницы: [{key, name, ai, uid, mine}] — uid учителя (для личных сообщений), mine — ведёт класс ученика."""
+    from django.contrib.auth.models import User
+    from django.templatetags.static import static
+    from .models import normalize_school_class
+    key = 'office:agai:uids'
+    uids = cache.get(key)
+    if uids is None:
+        found = {u.lower(): i for u, i in User.objects.filter(username__in=[a['username'] for a in AGAI]).values_list('username', 'id')}
+        uids = {a['key']: found.get(a['username'].lower()) for a in AGAI}
+        cache.set(key, uids, 600)
+    cls = normalize_school_class(school_class)
+    return [{'key': a['key'], 'name': a['name'], 'ai': static(a['av']), 'uid': uids.get(a['key']),
+             'mine': bool(cls) and cls in agai_classes(a)} for a in AGAI]
+
+
 MANAGER_GROUPS = [('5–8', 'Сэм Альтман'), ('9–11', 'Илон Маск')]
 
 

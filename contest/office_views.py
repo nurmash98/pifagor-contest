@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -35,8 +36,10 @@ def _who(request):
 def _base(request, st, grade, teacher):
     def make():
         if teacher:
-            return {'n': request.user.get_full_name() or request.user.username, 'teacher': True, 'c': -1, 'g': of.ADMIN,
-                    'x': of.SPAWN[0], 'y': of.SPAWN[1], 'j': timezone.now().timestamp()}
+            ag = of.agai_by_username(request.user.username)          # наш преподаватель — заходит «собой»-ағаем
+            extra = {'n': ag['name'], 'ai': static(ag['av']), 'ag': ag['key']} if ag else {}
+            return dict({'n': request.user.get_full_name() or request.user.username, 'teacher': True, 'c': -1, 'g': of.ADMIN,
+                         'x': of.SPAWN[0], 'y': of.SPAWN[1], 'j': timezone.now().timestamp()}, **extra)
         return dict({'n': st.full_name, 'teacher': False, 'c': st.id % len(COLORS), 'sid': st.id, 'g': grade,
                      'x': of.SPAWN[0] + request.user.id % 8, 'y': of.SPAWN[1], 'j': timezone.now().timestamp()}, **_label(st))
     return make
@@ -55,6 +58,11 @@ def _office_texts(lang):
 
 
 BOT_TEXTS = {
+    'agai_not_mine': 'Я веду другие классы. Ваш преподаватель — {name}, подойдите к нему.',
+    'agai_away': 'сейчас не в офисе',
+    'agai_ask_hint': 'Задайте вопрос преподавателю — он ответит здесь. Если его нет в офисе, он увидит вопрос, когда зайдёт.',
+    'agai_here': 'в офисе',
+
     'agai_role': 'преподаватель',
     'agai_act_watch': '👀 смотрит, как решают',
     'agai_act_walk': '🚶 обходит офис',
@@ -183,6 +191,7 @@ def office_play(request):
         'layout': json.dumps(of.layout(of.grades())), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
         'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved), 'grades_json': json.dumps(of.grades()),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_office_texts(lang), ensure_ascii=False),
+        'agai_json': json.dumps(of.agai_list(st.school_class if st else ''), ensure_ascii=False),
     })
 
 
@@ -195,6 +204,31 @@ def _class_names(grade):
                  if grade_of(c) == grade}
         cache.set(key, names, 300)
     return names
+
+
+def _inbox(unread, online):
+    """Непрочитанные от тех, кого сейчас нет в офисе: [[uid, имя, сколько]] — чтобы можно было открыть и ответить."""
+    away = [int(u) for u in unread if int(u) not in online]
+    if not away:
+        return []
+    from django.contrib.auth.models import User
+    ag = {a['username'].lower(): a['name'] for a in of.AGAI}
+    names = {s.user_id: s.full_name for s in Student.objects.filter(user_id__in=away)}
+    for u in User.objects.filter(id__in=[i for i in away if i not in names]):
+        names[u.id] = ag.get(u.username.lower()) or u.get_full_name() or u.username
+    return [[u, names.get(u, '?'), unread[str(u)]] for u in away if u in names]
+
+
+def _dm_allowed_absent(request, teacher, st, to):
+    """Можно ли писать тому, кого сейчас нет: ученик — своему преподавателю-ағаю; ағай — любому ученику (ответ)."""
+    try:
+        to = int(to)
+    except (TypeError, ValueError):
+        return False
+    lst = of.agai_list(st.school_class if st else '')
+    if teacher:
+        return of.agai_by_username(request.user.username) is not None and Student.objects.filter(user_id=to).exists()
+    return any(a['uid'] == to and a['mine'] for a in lst)
 
 
 @login_required
@@ -218,6 +252,7 @@ def office_state(request):
            'left': max(0, int((of.closes_at() - timezone.now()).total_seconds())) if open_ else None}
     from .room_views import _dm_state
     _dm_state(request, r, out)
+    out['inbox'] = _inbox(out.get('unread') or {}, online)
     if st is not None:
         key = f'office:me:{day}:{st.id}'
         mine = None if request.GET.get('fresh') == '1' else cache.get(key)
@@ -267,7 +302,8 @@ def office_act(request):
         return JsonResponse({'ok': True})
     if act == 'dm':
         rm.touch(r, me, base)
-        err = rm.dm_send(r, me, request.POST.get('to') or 0, request.POST.get('text'))
+        to = request.POST.get('to') or 0
+        err = rm.dm_send(r, me, to, request.POST.get('text'), absent_ok=_dm_allowed_absent(request, teacher, st, to))
         return JsonResponse({'error': err} if err else {'ok': True, 'conv': rm.dm_get(r, me, request.POST.get('to'))})
     if act == 'say':
         rm.touch(r, me, base)

@@ -104,6 +104,7 @@
         .plab.me { cursor: default; }
         .plab .pboss { zoom: .8; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #111827; font-weight: 900; letter-spacing: .08em;
                        padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+        .ibx { border: 1px solid var(--line, #e5e7ef); background: var(--card, #fff); color: inherit; border-radius: 999px; padding: 4px 12px; font-weight: 700; cursor: pointer; }
         .plab .pagai { background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pbot { background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pact { display: block; text-align: center; font-size: 10px; font-weight: 700; color: #0f766e; background: rgba(255,255,255,.85); border-radius: 6px; padding: 1px 6px; margin-top: 2px; }
@@ -163,6 +164,7 @@
     <aside id="side">
         {% if teacher %}
         <h4>✋ <span data-tr="Поднятые руки">{% t "Поднятые руки" %}</span></h4><div id="hands" class="hint">—</div>
+        {% if office %}<div id="inbox-box" style="display:none"><h4 style="margin-top:14px">📨 <span data-tr="Новые сообщения">{% t "Новые сообщения" %}</span></h4><div id="inbox" class="otags"></div></div>{% endif %}
         <h4 style="margin-top:14px">💬 <span data-tr="Сообщения">{% t "Сообщения" %}</span></h4><div id="log" class="hint" style="max-height:180px;overflow-y:auto">—</div>
         {% endif %}
         {% if office %}
@@ -275,7 +277,7 @@
         Object.keys(people).forEach(function (k) {
             var p = people[k];
             if (!p.route.length || p.rx === null) { return; }
-            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = (OFFICE ? 5.5 : 3.6) * dt;
+            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = (p.bot ? 1.3 : OFFICE ? 5.5 : 3.6) * dt;   // персонажи ходят спокойно
             if (d <= sp) { p.rx = t[0]; p.ry = t[1]; p.route.shift(); if (!p.route.length && p.id === ME) { arrived(); } }
             else { p.rx += dx / d * sp; p.ry += dy / d * sp; p.walk = (p.walk || 0) + dt * 10; }
         });
@@ -471,9 +473,9 @@
                    (p.act ? '<span class="pact" style="color:#1e3a8a">' + esc(p.act) + '</span>' : '') + '</div>';
         }
         if (p.agai) {
-            return (p.msg ? '<div class="pmsg t">' + esc(p.msg) + '</div>' : '') +
+            return (p.msg ? '<div class="pmsg t">' + esc(p.msg) + '</div>' : '') + (UNREAD[p.id] ? '<span class="pdm">💬' + UNREAD[p.id] + '</span>' : '') +
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pagai">👨‍🏫 ' + esc(p.name) + ' · ' + esc(TXT.agai_role) + '</span>' +
-                   (p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
+                   (p.id > 0 ? '<span class="pact">🟢 ' + esc(TXT.agai_here) + '</span>' : p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
         }
         if (p.bot) {
             return (p.msg ? '<div class="pmsg" style="background:rgba(15,118,110,.92)">' + esc(p.msg) + '</div>' : '') +
@@ -776,14 +778,21 @@
     function apply(d) {
         applyDm(d);
         if (!d.open && !TEACHER) { $('closed').style.display = 'flex'; }
-        var seen = {};
+        var seen = {}, agOn = {};
         d.people.forEach(function (r) {
             var p = person(r[0]); seen[r[0]] = true;
             p.name = r[1]; p.msg = r[5]; p.hand = r[6]; p.teacher = r[7]; p.c = r[8]; p.h = r[9] || ''; p.ai = r[10] || '';
+            p.agai = !!r[11]; if (r[11]) { agOn[r[11]] = r[0]; }
             if (r[0] === ME) { if (p.rx === null) { setTarget(p, r[2], r[3], r[4]); seated = !!r[4]; tasksPanel(); } handUp = r[6]; paintHand(); }
             else { setTarget(p, r[2], r[3], r[4]); }
         });
         Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME && +k > 0) { delete people[k]; } });
+        if (window.agaiSync) { agaiSync(agOn); }
+        if ($('inbox')) {                                               // вопросы/ответы от тех, кого сейчас нет в офисе
+            var ib = d.inbox || [];
+            $('inbox-box').style.display = ib.length ? '' : 'none';
+            $('inbox').innerHTML = ib.map(function (r) { return '<button type="button" class="ibx" data-uid="' + r[0] + '" data-n="' + esc(r[1]) + '">💬 ' + esc(r[1]) + ' <b>' + r[2] + '</b></button>'; }).join('');
+        }
         lastStats = d.stats || [];
         if (OFFICE && d.total !== undefined) { earnedTo(d.total); GEARN = d.by_grade || {}; }
         $('online').textContent = d.people.length;
@@ -890,13 +899,16 @@
 
     // ---------------- личные сообщения: нажал на человека — пишешь ему ----------------
     var UNREAD = {}, chatWith = null, lastUnreadSig = '';
-    function openChat(uid) {
-        uid = +uid; if (!uid || uid === ME || !people[uid]) { return; }
+    var CHATNAME = {};
+    function openChat(uid, nameIfAway) {
+        uid = +uid; if (nameIfAway) { CHATNAME[uid] = nameIfAway; }
+        if (!uid || uid === ME || (!people[uid] && !CHATNAME[uid])) { return; }
         if (uid <= -100) { openManager(uid); return; }
         if (uid <= -50) { agaiTalk(uid); return; }
         if (uid < 0) { openBot(uid); return; }
         $('chat-quick').style.display = 'none'; $('chat-form').style.display = 'flex';
-        chatWith = uid; $('chat-name').textContent = (people[uid].teacher ? '👔 BOSS · ' : '') + people[uid].name;
+        var who = people[uid], ag = agaiOf(uid);
+        chatWith = uid; $('chat-name').textContent = ag ? '👨‍🏫 ' + ag.name + (who ? '' : ' · ' + TXT.agai_away) : (who ? (who.teacher ? '👔 BOSS · ' : '') + who.name : CHATNAME[uid]);
         $('chat').style.display = 'flex'; $('chat-msgs').innerHTML = ''; $('chat-in').focus(); poll();
     }
     function renderConv(conv) {
@@ -904,9 +916,10 @@
         box.innerHTML = conv.map(function (m) {
             var t = new Date(m[2] * 1000);
             return '<div class="m' + (m[0] === ME ? ' mine' : '') + '">' + esc(m[1]) + '<small>' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + '</small></div>';
-        }).join('') || '<div class="hint" style="text-align:center">' + TXT.dm_hint + '</div>';
+        }).join('') || '<div class="hint" style="text-align:center">' + (agaiOf(chatWith) && !TEACHER ? TXT.agai_ask_hint : TXT.dm_hint) + '</div>';
         if (atBottom || conv.length && conv[conv.length - 1][0] === ME) { box.scrollTop = box.scrollHeight; }
     }
+    if ($('inbox')) { $('inbox').addEventListener('click', function (e) { var b = e.target.closest('[data-uid]'); if (b) { openChat(b.getAttribute('data-uid'), b.getAttribute('data-n')); } }); }
     $('labels').addEventListener('click', function (e) { var el = e.target.closest('.plab'); if (el) { openChat(el.getAttribute('data-uid')); } });
     $('chat-x').addEventListener('click', function () { chatWith = null; botWith = null; $('chat').style.display = 'none'; });
     $('chat-form').addEventListener('submit', function (e) {
@@ -948,8 +961,8 @@
         for (var cx = 2; cx < W - 6; cx += 6) { corridor.push([cx, 9, TXT.bot_walk]); }
         var reception = counter ? [counter[0], counter[1] + 1, TXT.bot_desk] : [W - 4, 9, TXT.bot_desk];
         BOTS = [
-            {id: -1, name: TXT.bot1, color: '#0d9488', wps: [reception, counter || reception, reception, cooler || reception].filter(Boolean), every: 16, off: 0},
-            {id: -2, name: TXT.bot2, color: '#0284c7', wps: plants.concat(corridor).filter(Boolean), every: 11, off: 5}
+            {id: -1, name: TXT.bot1, color: '#0d9488', wps: [reception, counter || reception, reception, cooler || reception].filter(Boolean), every: 45, off: 0},
+            {id: -2, name: TXT.bot2, color: '#0284c7', wps: plants.concat(corridor).filter(Boolean), every: 35, off: 17}
         ];
         BOTS.forEach(function (b) {
             if (!b.wps.length) { return; }
@@ -976,12 +989,7 @@
         } catch (e) {}
     }
     // ---------------- преподаватели (ағайлар): ходят по офису, заглядывают в кабинеты, дают советы ----------------
-    var AGAI = OFFICE ? [
-        {name: 'Нұрмаш ағай', ai: "{% static 'avatars/nurmash-agai.webp' %}", color: '#7c2d12'},
-        {name: 'Ернар ағай', ai: "{% static 'avatars/ernar-agai.webp' %}", color: '#14532d'},
-        {name: 'Нұрбол ағай', ai: "{% static 'avatars/nurbol-agai.webp' %}", color: '#4c1d95'},
-        {name: 'Тілек ағай', ai: "{% static 'avatars/tilek-agai.webp' %}", color: '#7f1d1d'}
-    ] : [];
+    var AGAI = OFFICE ? ({{ agai_json|default:'[]'|safe }}) : [], AGON = {};   // AGON: ключ ағая -> uid, если он сам сейчас в офисе
     if (AGAI.length) {
         var pool = [], seenCab = {};
         L.seats.forEach(function (st) {                                // в каждом кабинете — по 2 места «посмотреть, как решают»
@@ -995,20 +1003,30 @@
             if (o.t === 'tdesk') { var f = freeNear(o.x, o.y); if (f) { pool.push([f[0], f[1], 'talk']); } }
         });
         pool = pool.filter(function (w) { return free(w[0], w[1]); });
-        AGAI.forEach(function (a, k) {
-            var p = person(-50 - k); p.agai = true; p.bot = true; p.name = a.name; p.ai = a.ai; p.color = a.color; p.c = 0;
-            a.cur = -1;
-        });
+        var AG_COLORS = ['#7c2d12', '#14532d', '#4c1d95', '#7f1d1d'];
+        var agaiNpc = function (k) {
+            var a = AGAI[k], p = person(-50 - k); p.agai = true; p.bot = true; p.name = a.name; p.ai = a.ai; p.color = AG_COLORS[k % 4]; p.c = 0;
+            if (p.rx === null && pool.length) { var w0 = pool[(k * 5) % pool.length]; setTarget(p, w0[0], w0[1], null); p.act = TXT['agai_act_' + w0[2]] || ''; }
+            return p;
+        };
+        AGAI.forEach(function (a, k) { agaiNpc(k); a.cur = -1; });
+        window.agaiSync = function (on) {                               // сам учитель в офисе — его персонаж-двойник исчезает
+            AGON = on;
+            AGAI.forEach(function (a, k) {
+                if (on[a.key]) { delete people[-50 - k]; a.cur = -1; }
+                else if (!people[-50 - k]) { agaiNpc(k); }
+            });
+        };
         var agaiStep = function () {
             var now = Date.now() / 1000;
             AGAI.forEach(function (a, k) {
-                if (!pool.length) { return; }
-                var slot = Math.floor((now + k * 4) / (9 + k * 2));
+                if (!pool.length || AGON[a.key] || chatWith === a.uid) { return; }
+                var slot = Math.floor((now + k * 11) / (40 + k * 7));          // спокойно: новое место раз в 40–60 с
                 var i = (slot * (k * 2 + 3) + k * 7) % pool.length;   // у каждого свой маршрут
                 if (i === a.cur) { return; }
                 a.cur = i; var w = pool[i], p = people[-50 - k];
                 setTarget(p, w[0], w[1], null, true); p.act = TXT['agai_act_' + w[2]] || '';
-                if (Math.random() < .25) { agaiSayTip(p, 2500 + Math.random() * 3000); }
+                if (Math.random() < .15) { agaiSayTip(p, 4000 + Math.random() * 4000); }
             });
         };
         agaiStep(); setInterval(agaiStep, 1000);
@@ -1019,9 +1037,17 @@
             setTimeout(function () { if (p.msg === tip) { p.msg = ''; } }, 6000);
         }, delay || 0);
     }
-    function agaiTalk(id) {                                           // нажали на ағая — он подсказывает
-        var p = people[id]; if (p) { agaiSayTip(p, 0); }
+    function agaiTalk(id) {                                           // нажали на ағая
+        var a = AGAI[-50 - id], p = people[id]; if (!a || !p) { return; }
+        if (!TEACHER && a.mine && a.uid) { openChat(a.uid, a.name); return; }   // свой преподаватель — можно задать вопрос
+        if (!TEACHER) {
+            var my = AGAI.filter(function (x) { return x.mine; })[0];
+            p.msg = my ? TXT.agai_not_mine.replace('{name}', my.name) : TXT['agai_tip' + (1 + Math.floor(Math.random() * 8))];
+            var t = p.msg; setTimeout(function () { if (p.msg === t) { p.msg = ''; } }, 6000); return;
+        }
+        agaiSayTip(p, 0);
     }
+    function agaiOf(uid) { return AGAI.filter(function (a) { return a.uid === +uid; })[0]; }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
     function renderBot() {
         var box = $('chat-msgs');
@@ -1146,7 +1172,7 @@
         var now = Date.now() / 1000;
         MGRS.forEach(function (m, k) {
             if (!m.spots || !m.spots.length || mgrHeld(k)) { return; }
-            var i = (Math.floor((now + k * 7) / (10 + (k * 3) % 5)) + k) % m.spots.length;   // у каждого свой ритм и сдвиг
+            var i = (Math.floor((now + k * 13) / (35 + k * 9)) + k) % m.spots.length;   // у каждого свой ритм и сдвиг
             if (i === m.cur) { return; }
             m.cur = i; mgrDo(k, m.spots[i]);
         });

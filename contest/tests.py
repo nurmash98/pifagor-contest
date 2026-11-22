@@ -5307,6 +5307,37 @@ class WeekendOfficeTests(TestCase):
         from unittest import mock
         return mock.patch('django.utils.timezone.now', return_value=dt)
 
+    def test_agai_teacher_is_himself_and_answers_own_classes(self):
+        """Учитель-ағай заходит «собой» (не новым человеком); ученик пишет своему ағаю даже без него, чужому — нет."""
+        from django.core.cache import cache
+        from . import room as rm, office
+        tilek = User.objects.create_user('tagbwoi', password='p', is_staff=True)       # ведёт 8A
+        User.objects.create_user('yereke', password='p', is_staff=True)                 # ведёт 10–11, не 8A
+        cache.clear()
+        st = self.sts[0]
+        with self._at(self.sat):
+            self.client.force_login(st.user)
+            page = self.client.get(reverse('office_play')).content.decode()
+            self.assertIn('"mine": true', page)
+            mine = [a for a in office.agai_list('8A') if a['mine']]
+            self.assertEqual([a['key'] for a in mine], ['tilek'])
+            ernar = next(a for a in office.agai_list('8A') if a['key'] == 'ernar')
+            # своему — можно, хотя его нет в офисе; чужому — нельзя
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'dm', 'to': tilek.id, 'text': 'Ағай, вопрос'}).json()['ok'], True)
+            cache.delete(f'room:{office.rid(self.sat.date())}:dmsay:{st.user_id}')
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'dm', 'to': ernar['uid'], 'text': 'Привет'}).json()['error'], 'gone')
+            # учитель заходит — он и есть «Тілек ағай», а вопрос ученика — во «входящих»
+            self.client.force_login(tilek)
+            self.client.get(reverse('office_play'))
+            d = self.client.get(reverse('office_state')).json()
+            me = next(r for r in d['people'] if r[0] == tilek.id)
+            self.assertEqual((me[1], me[11]), ('Тілек ағай', 'tilek'))
+            self.assertEqual(d['unread'], {str(st.user_id): 1})
+            from .office_views import _inbox
+            self.assertEqual(_inbox(d['unread'], set()), [[st.user_id, st.full_name, 1]])   # если ученика уже нет в офисе
+            # ответ ученику, которого сейчас нет в офисе
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'dm', 'to': st.user_id, 'text': 'Ответ'}).json()['ok'], True)
+
     def test_open_hours(self):
         from . import office
         self.assertTrue(office.is_open(self.sat))
