@@ -5332,6 +5332,14 @@ class WeekendOfficeTests(TestCase):
             d = self.client.get(reverse('office_state')).json()
             me = next(r for r in d['people'] if r[0] == tilek.id)
             self.assertEqual((me[1], me[11]), ('Тілек ағай', 'tilek'))
+            self.assertIn("var MY_AG = 'tilek'", self.client.get(reverse('office_play')).content.decode())
+            # вошёл ещё до обновления (без «ағая» в присутствии) — при входе на страницу всё равно становится им
+            r_ = office.rid(self.sat.date())
+            p_ = rm.get(r_, tilek.id); p_.pop('ag'); p_['n'] = 'Tilek Amankosov'
+            from django.core.cache import cache as c_
+            c_.set(rm._key(r_, tilek.id), p_, rm.TTL)
+            self.client.get(reverse('office_play'))
+            self.assertEqual(rm.get(r_, tilek.id)['ag'], 'tilek')
             self.assertEqual(d['unread'], {str(st.user_id): 1})
             from .office_views import _inbox
             self.assertEqual(_inbox(d['unread'], set()), [[st.user_id, st.full_name, 1]])   # если ученика уже нет в офисе
@@ -5393,7 +5401,7 @@ class WeekendOfficeTests(TestCase):
         office.finalize_due(self.sat.replace(hour=21))                                         # второй раз — ничего
         self.assertEqual(CoinTransaction.objects.filter(key__startswith='officetop:').count(), 3)
 
-    def test_manager_gives_3_tasks_where_stopped_and_bonus(self):
+    def test_teacher_gives_3_tasks_where_stopped_and_bonus(self):
         from . import office
         from .models import OfficePackage
         tag = Tag.objects.get(name='Циклы')
@@ -5401,17 +5409,15 @@ class WeekendOfficeTests(TestCase):
         st = self.sts[0]
         Submission.objects.create(student=st, task=self.tA, status='DONE', is_graded=True, score=10)   # A1 уже решена
         Submission.objects.filter(student=st, task=self.tA).update(updated_at=self.sat - timedelta(hours=1))
-        m = office.manager_of('8')
         with self._at(self.sat):
             self.client.force_login(st.user)
             page = self.client.get(reverse('office_play')).content.decode()
-            self.assertNotIn('id="olist"', page)                                  # свободного списка задач нет — задачи даёт руководитель
+            self.assertNotIn('id="olist"', page)                                  # свободного списка задач нет — задачи даёт преподаватель
             topics = self.client.get(reverse('office_bot') + '?q=topics').json()['topics']
             t = [x for x in topics if x['name'] == 'Циклы'][0]
             self.assertEqual(t['level'], 'A')
             act = reverse('office_act')
-            self.assertEqual(self.client.post(act, {'a': 'package', 'tag': tag.id}).json()['error'], 'far_manager')
-            self.client.post(act, {'a': 'move', 'x': m['x'] - 1, 'y': m['y']})
+            self.assertEqual(office.layout(office.grades())['managers'], [])         # руководителей больше нет
             r = self.client.post(act, {'a': 'package', 'tag': tag.id}).json()
             self.assertEqual(r['tasks'], [x.id for x in extra])                   # следующие 3 нерешённые на уровне A
             self.assertEqual(self.client.post(act, {'a': 'package', 'tag': tag.id}).json()['error'], 'pkg_busy')

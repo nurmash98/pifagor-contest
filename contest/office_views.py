@@ -58,6 +58,9 @@ def _office_texts(lang):
 
 
 BOT_TEXTS = {
+    'agai_ask': 'Задать вопрос',
+    'agai_act_desk': '💻 работает за столом',
+
     'agai_not_mine': 'Я веду другие классы. Ваш преподаватель — {name}, подойдите к нему.',
     'agai_away': 'сейчас не в офисе',
     'agai_ask_hint': 'Задайте вопрос преподавателю — он ответит здесь. Если его нет в офисе, он увидит вопрос, когда зайдёт.',
@@ -90,23 +93,23 @@ BOT_TEXTS = {
     'mgr_say_watch': 'Отлично идёте, так держать!',
     'mgr_say_coffee': 'Кофе — топливо программиста ☕',
 
-    'bot_to_mgr': 'Задачи в офисе дают руководители: Сэм Альтман — 5–8 классы, Илон Маск — 9–11 классы. Подойдите к своему, выберите тему — он даст 3 задачи и премию 10 000 ₸ за все три.',
-    'pick_task': 'Вы за столом — откройте задание руководителя справа',
+    'bot_to_mgr': 'Задачи в офисе дают преподаватели: подойдите к своему ағаю (Нұрмаш, Ернар, Нұрбол или Тілек), выберите тему — он даст 3 задачи и премию 10 000 ₸ за все три.',
+    'pick_task': 'Вы за столом — откройте задание преподавателя справа',
     'mgr_role': 'руководитель {g} кл.',
-    'mgr_going': 'Идёте к руководителю…',
-    'mgr_hello': 'Здравствуйте! Я {name}, руководитель {g} классов. Какую тему вы сейчас проходите? Выберите ниже — дам 3 задачи там, где вы остановились.',
+    'mgr_going': 'Идёте к преподавателю…',
+    'mgr_hello': 'Здравствуйте! Я {name}, ваш преподаватель. Какую тему вы сейчас проходите? Выберите ниже — дам 3 задачи там, где вы остановились. Есть вопрос — нажмите «Задать вопрос».',
     'mgr_again': 'Отличная работа, премия ваша! Готовы к новому заданию? Выберите тему ниже.',
     'mgr_other': 'Я руководитель {g} классов. Ваш руководитель — {other}, он ходит у кабинетов своих классов.',
     'mgr_busy': 'У вас уже есть моё задание — осталось решить: {n}. Сначала закончите его, потом дам новое.',
     'mgr_gave': 'Вот ваше задание по теме «{tag}» (уровень {l}). Решите все три — получите премию 10 000 ₸!',
     'mgr_all': 'Вы решили все задачи по всем темам — я в восторге! 🏆',
-    'pkg_title': 'Задание руководителя',
+    'pkg_title': 'Задание преподавателя',
     'pkg_bonus': 'Решено {n} из 3 — за все три премия 10 000 ₸',
-    'pkg_go': 'Подойдите к своему руководителю — он даст 3 задачи и премию 10 000 ₸ за их решение.',
-    'pkg_more': 'Премия получена! Руководитель даст новое задание.',
-    'pkg_paid': 'Задание руководителя выполнено! Премия +10 000 ₸',
+    'pkg_go': 'Подойдите к своему преподавателю — он даст 3 задачи и премию 10 000 ₸ за их решение.',
+    'pkg_more': 'Премия получена! Преподаватель даст новое задание.',
+    'pkg_paid': 'Задание преподавателя выполнено! Премия +10 000 ₸',
     'far_manager': 'Подойдите ближе к руководителю',
-    'pkg_busy': 'Сначала закончите текущее задание руководителя',
+    'pkg_busy': 'Сначала закончите текущее задание преподавателя',
     'pkg_none': 'По этой теме вы всё решили — выберите другую',
     'pkg_bad': 'Тема не найдена',
     'bot_role': 'администратор',
@@ -180,6 +183,9 @@ def office_play(request):
     rm.touch(r, request.user.id, _base(request, st, grade, teacher))
     if st is not None:
         rm.touch(r, request.user.id, {}, **_label(st))
+    my_ag = of.agai_by_username(request.user.username) if teacher else None
+    if my_ag:                                   # вошёл раньше (до обновления) — всё равно он этот ағай
+        rm.touch(r, request.user.id, {}, n=my_ag['name'], ai=static(my_ag['av']), ag=my_ag['key'])
     lang = _lang(request)
     tasks, tags = _tasks(lang)
     from .models import Submission
@@ -191,7 +197,7 @@ def office_play(request):
         'layout': json.dumps(of.layout(of.grades())), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
         'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved), 'grades_json': json.dumps(of.grades()),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_office_texts(lang), ensure_ascii=False),
-        'agai_json': json.dumps(of.agai_list(st.school_class if st else ''), ensure_ascii=False),
+        'agai_json': json.dumps(of.agai_list(st.school_class if st else ''), ensure_ascii=False), 'my_ag': my_ag['key'] if my_ag else '',
     })
 
 
@@ -237,7 +243,7 @@ def office_state(request):
     day = timezone.localdate()
     r = of.rid(day)
     open_ = of.is_open()
-    if open_ and (teacher or grade):
+    if teacher or (open_ and grade):            # учитель может быть в офисе и в нерабочее время
         rm.touch(r, request.user.id, _base(request, st, grade, teacher))
     ppl = rm.public(r)
     if open_:
@@ -314,8 +320,6 @@ def office_act(request):
         rm.touch(r, me, base, hand=not p.get('hand'))
         return JsonResponse({'ok': True})
     if act == 'package' and not teacher:
-        if not of.near_manager(rm.get(r, me), grade):
-            return JsonResponse({'error': 'far_manager'})
         pkg, err = of.give_package(st, grade, request.POST.get('tag'), timezone.localdate())
         if err:
             return JsonResponse({'error': 'pkg_' + err})

@@ -151,7 +151,7 @@
         <canvas id="map"></canvas>
         <div id="labels"></div>
         {% if office %}<div id="earned"><div class="l">💰 <span id="earned-l">{% t "Офис заработал сегодня" %}</span></div><div class="v" id="earned-v">0 ₸</div></div>
-        <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к руководителю (👔 в коридоре: 5–8 и 9–11 классы) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к руководителю (👔 в коридоре: 5–8 и 9–11 классы) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
+        <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к своему преподавателю (👨‍🏫 ағай) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к своему преподавателю (👨‍🏫 ағай) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
         {% else %}<div id="help">🖱 <span data-tr="Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор.">{% t "Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>{% endif %}
         <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
@@ -787,6 +787,7 @@
             else { setTarget(p, r[2], r[3], r[4]); }
         });
         Object.keys(people).forEach(function (k) { if (!seen[k] && +k !== ME && +k > 0) { delete people[k]; } });
+        if (MY_AG) { agOn[MY_AG] = ME; if (people[ME]) { people[ME].agai = true; } }   // я сам этот ағай — двойника быть не должно
         if (window.agaiSync) { agaiSync(agOn); }
         if ($('inbox')) {                                               // вопросы/ответы от тех, кого сейчас нет в офисе
             var ib = d.inbox || [];
@@ -906,6 +907,9 @@
         if (uid <= -100) { openManager(uid); return; }
         if (uid <= -50) { agaiTalk(uid); return; }
         if (uid < 0) { openBot(uid); return; }
+        if (!TEACHER && people[uid] && people[uid].agai) {                 // сам преподаватель в офисе — он тоже даёт задание
+            for (var ki = 0; ki < AGAI.length; ki++) { if (AGON[AGAI[ki].key] === uid && (AGAI[ki].mine || !AGAI.some(function (x) { return x.mine; }))) { openAgai(ki); return; } }
+        }
         $('chat-quick').style.display = 'none'; $('chat-form').style.display = 'flex';
         var who = people[uid], ag = agaiOf(uid);
         chatWith = uid; $('chat-name').textContent = ag ? '👨‍🏫 ' + ag.name + (who ? '' : ' · ' + TXT.agai_away) : (who ? (who.teacher ? '👔 BOSS · ' : '') + who.name : CHATNAME[uid]);
@@ -961,8 +965,8 @@
         for (var cx = 2; cx < W - 6; cx += 6) { corridor.push([cx, 9, TXT.bot_walk]); }
         var reception = counter ? [counter[0], counter[1] + 1, TXT.bot_desk] : [W - 4, 9, TXT.bot_desk];
         BOTS = [
-            {id: -1, name: TXT.bot1, color: '#0d9488', wps: [reception, counter || reception, reception, cooler || reception].filter(Boolean), every: 45, off: 0},
-            {id: -2, name: TXT.bot2, color: '#0284c7', wps: plants.concat(corridor).filter(Boolean), every: 35, off: 17}
+            {id: -1, name: TXT.bot1, color: '#0d9488', wps: [reception, counter || reception, reception, cooler || reception].filter(Boolean), every: 90, off: 0},
+            {id: -2, name: TXT.bot2, color: '#0284c7', wps: plants.concat(corridor).filter(Boolean), every: 100, off: 37}
         ];
         BOTS.forEach(function (b) {
             if (!b.wps.length) { return; }
@@ -973,7 +977,8 @@
             var now = Date.now() / 1000;
             BOTS.forEach(function (b) {
                 if (!b.wps.length) { return; }
-                var i = Math.floor((now + b.off) / b.every) % b.wps.length;
+                var sl = Math.floor((now + b.off) / b.every), i = sl % 3 ? 0 : 1 + (Math.floor(sl / 3) % Math.max(1, b.wps.length - 1));   // в основном на своём месте, иногда отходит
+                if (i >= b.wps.length) { i = 0; }
                 if (i === b.cur) { return; }
                 b.cur = i; var w = b.wps[i], p = people[b.id];
                 if (botWith === b.id) { return; }                       // пока разговаривает — стоит на месте
@@ -989,6 +994,7 @@
         } catch (e) {}
     }
     // ---------------- преподаватели (ағайлар): ходят по офису, заглядывают в кабинеты, дают советы ----------------
+    var MY_AG = '{{ my_ag|default:"" }}';
     var AGAI = OFFICE ? ({{ agai_json|default:'[]'|safe }}) : [], AGON = {};   // AGON: ключ ағая -> uid, если он сам сейчас в офисе
     if (AGAI.length) {
         var pool = [], seenCab = {};
@@ -1003,13 +1009,15 @@
             if (o.t === 'tdesk') { var f = freeNear(o.x, o.y); if (f) { pool.push([f[0], f[1], 'talk']); } }
         });
         pool = pool.filter(function (w) { return free(w[0], w[1]); });
+        var homes = L.seats.filter(function (st) { return st.grade === 'adm'; }).reverse();   // свои столы в «Администрации» (с конца — первые места для учителей)
         var AG_COLORS = ['#7c2d12', '#14532d', '#4c1d95', '#7f1d1d'];
         var agaiNpc = function (k) {
             var a = AGAI[k], p = person(-50 - k); p.agai = true; p.bot = true; p.name = a.name; p.ai = a.ai; p.color = AG_COLORS[k % 4]; p.c = 0;
-            if (p.rx === null && pool.length) { var w0 = pool[(k * 5) % pool.length]; setTarget(p, w0[0], w0[1], null); p.act = TXT['agai_act_' + w0[2]] || ''; }
+            if (p.rx === null) { var h0 = homes[k % Math.max(1, homes.length)]; if (h0) { setTarget(p, h0.x, h0.y, h0.id); p.act = TXT.agai_act_desk; } else if (pool.length) { var w0 = pool[(k * 5) % pool.length]; setTarget(p, w0[0], w0[1], null); p.act = TXT['agai_act_' + w0[2]] || ''; } }
             return p;
         };
-        AGAI.forEach(function (a, k) { agaiNpc(k); a.cur = -1; });
+        if (MY_AG) { AGON[MY_AG] = ME; }
+        AGAI.forEach(function (a, k) { a.cur = -1; if (!AGON[a.key]) { agaiNpc(k); } });
         window.agaiSync = function (on) {                               // сам учитель в офисе — его персонаж-двойник исчезает
             AGON = on;
             AGAI.forEach(function (a, k) {
@@ -1020,12 +1028,14 @@
         var agaiStep = function () {
             var now = Date.now() / 1000;
             AGAI.forEach(function (a, k) {
-                if (!pool.length || AGON[a.key] || chatWith === a.uid) { return; }
-                var slot = Math.floor((now + k * 11) / (40 + k * 7));          // спокойно: новое место раз в 40–60 с
-                var i = (slot * (k * 2 + 3) + k * 7) % pool.length;   // у каждого свой маршрут
+                if (!pool.length || AGON[a.key] || chatWith === a.uid || botWith === -50 - k || pendingAg === k) { return; }
+                var slot = Math.floor((now + k * 53) / (120 + k * 25));        // раз в 2–3 минуты
+                var home = homes[k % Math.max(1, homes.length)];
+                var i = (slot % 3 || !home) ? -1 : (slot * (k * 2 + 3) + k * 7) % pool.length;   // 2 из 3 раз — сидит за своим столом
                 if (i === a.cur) { return; }
-                a.cur = i; var w = pool[i], p = people[-50 - k];
-                setTarget(p, w[0], w[1], null, true); p.act = TXT['agai_act_' + w[2]] || '';
+                a.cur = i; var p = people[-50 - k];
+                if (i < 0 && home) { setTarget(p, home.x, home.y, home.id, true); p.act = TXT.agai_act_desk; return; }
+                var w = pool[i]; setTarget(p, w[0], w[1], null, true); p.act = TXT['agai_act_' + w[2]] || '';
                 if (Math.random() < .15) { agaiSayTip(p, 4000 + Math.random() * 4000); }
             });
         };
@@ -1037,15 +1047,37 @@
             setTimeout(function () { if (p.msg === tip) { p.msg = ''; } }, 6000);
         }, delay || 0);
     }
-    function agaiTalk(id) {                                           // нажали на ағая
+    function agaiTalk(id) {                                           // нажали на ағая (персонажа)
         var a = AGAI[-50 - id], p = people[id]; if (!a || !p) { return; }
-        if (!TEACHER && a.mine && a.uid) { openChat(a.uid, a.name); return; }   // свой преподаватель — можно задать вопрос
+        if (!TEACHER && (a.mine || !AGAI.some(function (x) { return x.mine; }))) { openAgai(-50 - id); return; }   // свой преподаватель: задание и вопросы
         if (!TEACHER) {
             var my = AGAI.filter(function (x) { return x.mine; })[0];
             p.msg = my ? TXT.agai_not_mine.replace('{name}', my.name) : TXT['agai_tip' + (1 + Math.floor(Math.random() * 8))];
             var t = p.msg; setTimeout(function () { if (p.msg === t) { p.msg = ''; } }, 6000); return;
         }
         agaiSayTip(p, 0);
+    }
+    var pendingAg = null;
+    function agaiPerson(k) { var a = AGAI[k]; return AGON[a.key] ? people[AGON[a.key]] : people[-50 - k]; }
+    function openAgai(k) {                                            // преподаватель даёт задание (3 задачи + премия) и отвечает на вопросы
+        var a = AGAI[k], p = agaiPerson(k), me = people[ME]; if (!a || !p || !me) { return; }
+        if (Math.abs(Math.round(me.rx) - Math.round(p.rx)) > 2 || Math.abs(Math.round(me.ry) - Math.round(p.ry)) > 2) {   // сначала подойти
+            var f = freeNear(Math.round(p.rx), Math.round(p.ry)); if (f) { pendingAg = k; goTo(f[0], f[1], null); toast('🚶 ' + TXT.mgr_going); }
+            return;
+        }
+        botWith = -50 - k; chatWith = null; if (!AGON[a.key]) { p.route = []; }
+        $('chat-name').textContent = '👨‍🏫 ' + a.name + ' · ' + TXT.agai_role;
+        $('chat-form').style.display = 'none'; $('chat-quick').style.display = 'flex'; $('chat-quick').innerHTML = '';
+        $('chat').style.display = 'flex'; botConv = [];
+        var ask = a.uid ? ' <button class="go" type="button" data-act="ask" data-id="' + k + '">✉️ ' + esc(TXT.agai_ask) + '</button>' : '';
+        var pk = OME.pkg;
+        if (pk && !pk.finished) { botSay(TXT.mgr_busy.replace('{n}', pk.tasks.length - pk.done.length), pkgButtons(pk.tasks) + ask); return; }
+        botSay((pk && pk.finished ? TXT.mgr_again : TXT.mgr_hello).replace('{name}', a.name), ask);
+        fetch(U2.bot + '?q=topics', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.topics.length) { botSay(TXT.mgr_all); return; }
+            $('chat-quick').innerHTML = d.topics.map(function (t) {
+                return '<button type="button" data-tag="' + t.id + '">' + esc(t.name) + ' · ' + t.level + ' <span style="opacity:.6">(' + t.left + ')</span></button>'; }).join('');
+        });
     }
     function agaiOf(uid) { return AGAI.filter(function (a) { return a.uid === +uid; })[0]; }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
@@ -1091,7 +1123,12 @@
         }
         else if (q === 'advice') {
             if (TEACHER) { botSay(TXT.bot_teacher); return; }
-            if (MGRS.length) {                                     // задачи даёт руководитель кабинета
+            if (AGAI.length) {                                     // задачи даёт свой преподаватель
+                var ka = -1; AGAI.forEach(function (x, i) { if (x.mine) { ka = i; } });
+                botSay(TXT.bot_to_mgr, ka >= 0 ? ' <button class="go" type="button" data-act="agai" data-id="' + ka + '">👨‍🏫 ' + esc(AGAI[ka].name) + '</button>' : '');
+                return;
+            }
+            if (MGRS.length) {
                 var mi = -1; MGRS.forEach(function (m, k) { if (mgrMine(m)) { mi = k; } });
                 botSay(TXT.bot_to_mgr, mi >= 0 ? ' <button class="go" type="button" data-act="mgr" data-id="' + (-100 - mi) + '">👔 ' + esc(TXT.bot_lead) + '</button>' : '');
                 return;
@@ -1116,6 +1153,8 @@
         var b = e.target.closest('[data-act]'); if (!b) { return; }
         var a = b.getAttribute('data-act');
         if (a === 'lead') { goMyCabinet(); botSay(TXT.bot_follow); }
+        if (a === 'agai') { $('chat').style.display = 'none'; botWith = null; openAgai(+b.getAttribute('data-id')); return; }
+        if (a === 'ask') { var ag = AGAI[+b.getAttribute('data-id')]; botWith = null; openChat(ag.uid, ag.name); return; }
         if (a === 'mgr') { $('chat').style.display = 'none'; botWith = null; openManager(+b.getAttribute('data-id')); }
         if (a === 'open') {
             var t = taskById(+b.getAttribute('data-id'));
@@ -1172,7 +1211,7 @@
         var now = Date.now() / 1000;
         MGRS.forEach(function (m, k) {
             if (!m.spots || !m.spots.length || mgrHeld(k)) { return; }
-            var i = (Math.floor((now + k * 13) / (35 + k * 9)) + k) % m.spots.length;   // у каждого свой ритм и сдвиг
+            var sl = Math.floor((now + k * 41) / (100 + k * 20)), i = sl % 3 ? 0 : 1 + ((Math.floor(sl / 3) + k) % (m.spots.length - 1));   // чаще на посту   // у каждого свой ритм и сдвиг
             if (i === m.cur) { return; }
             m.cur = i; mgrDo(k, m.spots[i]);
         });
@@ -1213,7 +1252,7 @@
         return ids.map(function (id) { var t = taskById(id); return t ? ' <button class="go" type="button" data-act="open" data-id="' + id + '">▶ ' + esc(t.title) + ' (' + t.level + ')</button>' : ''; }).join('');
     }
     $('chat-quick').addEventListener('click', function (e) {
-        var b = e.target.closest('[data-tag]'); if (!b || !botWith || botWith > -100) { return; }
+        var b = e.target.closest('[data-tag]'); if (!b || !botWith || botWith > -50) { return; }
         e.stopImmediatePropagation();
         botConv.push({bot: false, text: b.textContent}); renderBot();
         post({a: 'package', tag: b.getAttribute('data-tag')}).then(function (d) {
@@ -1225,7 +1264,8 @@
         });
     }, true);
     var _arrived = arrived;
-    arrived = function () { _arrived(); if (pendingMgr !== null) { var id = pendingMgr; pendingMgr = null; openManager(id); } };
+    arrived = function () { _arrived(); if (pendingMgr !== null) { var id = pendingMgr; pendingMgr = null; openManager(id); }
+                            if (pendingAg !== null) { var k = pendingAg; pendingAg = null; openAgai(k); } };
 
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();

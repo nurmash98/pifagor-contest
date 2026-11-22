@@ -127,27 +127,7 @@ def layout(grade_list):
     put('cooler', lx + 4, 15)
     for (px, py) in ((lx + 4, 1), (lx, 17), (lx + 4, 17)):
         put('plant', px, py)
-    # два руководителя на весь офис: 5–8 и 9–11 классы; пост — в коридоре у своих кабинетов, обходят свои кабинеты
-    for gi, (label, name) in enumerate(MANAGER_GROUPS):
-        mine = [g for g in grade_list if g in cabs and group_of(g) == gi]
-        if not mine:
-            continue
-        rows = [cabs[g][1] for g in mine]
-        row = 0 if rows.count(0) >= rows.count(1) else 1
-        xs = sorted(cabs[g][0] + 4 for g in mine)
-        px, py = xs[len(xs) // 2] + 2 if len(xs) > 1 else xs[0] + 2, 8 if row == 0 else 10
-        spots = [[px, py, 'report']]
-        acts = ['watch', 'laptop', 'files', 'phone']
-        for i, g in enumerate(mine):
-            ox, r = cabs[g]
-            back, front, mid = (1, 6, 3) if r == 0 else (17, 12, 14)
-            a = acts[i % len(acts)]
-            spot = {'watch': [ox + 4, mid], 'laptop': [ox + 1, front], 'files': [ox + 4, back], 'phone': [ox + 7, back]}[a]
-            spots.append(spot + [a])
-            if i % 2:
-                spots.append([px, py, 'report'])
-        spots.append([lx + 2, 2, 'coffee'])          # за кофе — в лаунж
-        managers.append({'grade': label, 'grades': mine, 'x': px, 'y': py, 'name': name, 'spots': spots})
+    # руководителей больше нет: задания (3 задачи + премию) дают преподаватели-ағайлар
     return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [], 'managers': managers}
 
 
@@ -200,18 +180,7 @@ def group_of(grade):
     except ValueError:
         return 1
 PACKAGE_SIZE = 3
-PACKAGE_BONUS = 10000            # премия руководителя за все 3 задачи, ₸
-
-
-def manager_of(grade):
-    return next((m for m in layout(grades())['managers'] if grade in m['grades']), None)
-
-
-def near_manager(presence, grade):
-    m = manager_of(grade)
-    if not m or not presence:
-        return False
-    return abs(round(presence.get('x', -9)) - m['x']) <= 2 and abs(round(presence.get('y', -9)) - m['y']) <= 2
+PACKAGE_BONUS = 10000            # премия преподавателя за все 3 задачи, ₸
 
 
 def topics_for(student):
