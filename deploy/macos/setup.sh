@@ -48,7 +48,11 @@ step "4/9 Настройки ($PIFAGOR_ENV)"
 if [ ! -f "$PIFAGOR_ENV" ]; then
   echo "Вставьте строку подключения Neon (Neon → Connect → Connection string, вида postgresql://...)."
   echo "Ввод скрыт — после вставки просто нажмите Enter."
-  read -rs -p "DATABASE_URL: " DBURL; echo
+  if [ -f "$PIFAGOR_DATA/neon_url.txt" ]; then
+    DBURL="$(tr -d '[:space:]' < "$PIFAGOR_DATA/neon_url.txt")"; echo "DATABASE_URL взят из $PIFAGOR_DATA/neon_url.txt"
+  else
+    read -rs -p "DATABASE_URL: " DBURL; echo
+  fi
   case "$DBURL" in postgres://*|postgresql://*) ;; *) echo "Это не похоже на строку Neon. Запустите скрипт снова."; exit 1 ;; esac
   echo "Вставьте DJANGO_SECRET_KEY из Render (Environment) — тогда никого не выкинет из аккаунтов."
   read -rs -p "DJANGO_SECRET_KEY (Enter — создать новый): " SKEY; echo
@@ -71,6 +75,7 @@ AUTOTEST_TMP_DIR=$RUNDIR
 # DUELS_ADMIN_USERNAMES=nurmash
 ENV
   umask 022
+  rm -f "$PIFAGOR_DATA/neon_url.txt"
   echo "Сохранено. Изменить можно позже: open -e $PIFAGOR_ENV"
 fi
 load_env "$PIFAGOR_ENV"
