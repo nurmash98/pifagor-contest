@@ -100,9 +100,19 @@ def _base(request, st, teacher):
 def _base_plain(request, st, teacher):
     if teacher:
         name = request.user.get_full_name() or request.user.username
-        return {'n': name, 'teacher': True, 'c': -1, 'x': rm.TEACHER_SPOT[0], 'y': rm.TEACHER_SPOT[1], 'seat': 't'}   # руководитель — в своём кабинете
+        base = {'n': name, 'teacher': True, 'c': -1, 'x': rm.TEACHER_SPOT[0], 'y': rm.TEACHER_SPOT[1], 'seat': 't'}   # руководитель — в своём кабинете
+        return dict(base, **_teacher_look(request))
     return {'n': st.full_name or request.user.username, 'teacher': False, 'c': st.id % len(COLORS),
             'x': 9 + request.user.id % 10, 'y': rm.SPAWN_Y}                              # входят в коридор офиса
+
+
+def _teacher_look(request):
+    """Наш учитель — как в офисе выходного дня: имя «… ағай» и его аватар."""
+    from django.templatetags.static import static
+    from . import office as of
+    ag = of.agai_by_username(request.user.username)
+    return {'n': ag['name'], 'ai': static(ag['av'])} if ag else {}
+
 
 
 # ------------------------------------------------------------------ учитель
@@ -346,6 +356,8 @@ def room_play(request, room_id):
     rm.touch(room.id, me, _base_lazy(request, st, teacher))
     if st is not None:
         rm.touch(room.id, me, {}, **_label(st))          # баннер/аватар могли смениться — обновляем при входе
+    elif teacher and _teacher_look(request):
+        rm.touch(room.id, me, {}, **_teacher_look(request))
     return render(request, 'room_play.html', {
         'room': room, 'teacher': teacher, 'me': me, 'office': False, 'co_name': room.school_class,
         'state_url': reverse('room_state', args=[room.id]), 'act_url': reverse('room_act', args=[room.id]),

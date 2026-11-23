@@ -5226,6 +5226,12 @@ class StudyRoomTests(TestCase):
         self.client.force_login(a.user)
         html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
         self.assertIn("var CO_NAME = '8A'", html)
+        self.tu.username = 'nurmash'; self.tu.save()                                  # наш учитель — с аватаром ағая
+        self.client.force_login(self.tu)
+        self.client.get(reverse('room_play', args=[room.id]))
+        boss = next(r for r in self.client.get(reverse('room_state', args=[room.id])).json()['people'] if r[0] == self.tu.id)
+        self.assertEqual(boss[1], 'Нұрмаш ағай'); self.assertIn('nurmash-agai', boss[10])
+        self.client.force_login(a.user)
         self.assertIn('"assistants"', html)
         act = reverse('room_act', args=[room.id])
         self.assertEqual(self.client.post(act, {'a': 'hint'}).json()['error'], 'no_task')
