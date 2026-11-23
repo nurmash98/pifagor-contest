@@ -22,7 +22,7 @@ case "$NEON_URL" in *neon.tech*) ;; *) echo "В pifagor.env DATABASE_URL уже 
 
 step "1/7 Локальный PostgreSQL"
 psql -h /tmp -d postgres -tAc "SELECT version()" >/dev/null || { echo "!! Локальный PostgreSQL (infosabaq) не отвечает"; exit 1; }
-PW=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+PW=$(openssl rand -hex 16)  # (tr | head падал из-за pipefail)
 psql -h /tmp -d postgres -v ON_ERROR_STOP=1 -qc "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='pifagor') THEN CREATE ROLE pifagor LOGIN PASSWORD '$PW'; ELSE ALTER ROLE pifagor PASSWORD '$PW'; END IF; END \$\$;"
 psql -h /tmp -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='pifagor'" | grep -q 1 || createdb -h /tmp -O pifagor -E UTF8 pifagor
 LOCAL_URL="postgresql://pifagor:$PW@127.0.0.1:5432/pifagor?sslmode=disable"
