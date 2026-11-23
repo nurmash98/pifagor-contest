@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect
@@ -151,3 +152,45 @@ font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f5fb;col
 <p><b>Идут технические работы.</b> Сайт временно недоступен.</p>
 <p>Попробуйте зайти после <b>{until}</b>.</p>
 <p style="margin-top:14px">Кіру уақытша жабық — техникалық жұмыстар жүргізілуде.<br>{until} кейін кіріңіз.</p></div></body></html>"""
+
+
+class MovedNoticeMiddleware:
+    """Старый адрес (MOVED_NOTICE_HOSTS, например pifagor-contest.onrender.com): 3 секунды показываем
+    «Сайт переехал на …» и переходим на ту же страницу нового сайта (MOVED_NOTICE_TO)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.target = (getattr(settings, 'MOVED_NOTICE_TO', '') or '').rstrip('/')
+        self.hosts = {h.strip().lower() for h in getattr(settings, 'MOVED_NOTICE_HOSTS', ()) if h.strip()}
+
+    def __call__(self, request):
+        host = request.get_host().split(':')[0].lower()
+        if self.target and host in self.hosts and not request.path.startswith('/static/'):
+            import html
+            from django.http import HttpResponse
+            url = self.target + request.get_full_path()
+            domain = self.target.split('://', 1)[-1]
+            page = (MOVED_HTML.replace('{url_attr}', html.escape(url, quote=True))
+                    .replace('{url_js}', json.dumps(url)).replace('{domain}', html.escape(domain)))
+            resp = HttpResponse(page)
+            resp['Cache-Control'] = 'no-store'
+            return resp
+        return self.get_response(request)
+
+
+MOVED_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="3;url={url_attr}"><title>Сайт переехал</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f5fb;color:#1a1a4b;padding:16px}
+.box{max-width:480px;text-align:center;background:#fff;border-radius:20px;padding:36px 28px;box-shadow:0 8px 30px rgba(26,26,75,.12)}
+.ic{font-size:56px}h1{font-size:25px;margin:12px 0 8px}p{color:#555;font-size:16px;line-height:1.5;margin:6px 0}
+.dom{display:inline-block;margin:10px 0 4px;font-size:22px;font-weight:700;color:#2e7d4f}
+a.btn{display:inline-block;margin-top:14px;background:#1a1a4b;color:#fff;text-decoration:none;padding:11px 22px;border-radius:999px;font-weight:600}</style></head>
+<body><div class="box"><div class="ic">🚚</div><h1>Сайт переехал</h1>
+<p>Новый адрес — запомните его:</p><div class="dom">{domain}</div>
+<p>Сайт көшті, жаңа мекенжай: <b>{domain}</b></p>
+<p style="color:#888;font-size:14px">Переходим через <span id="s">3</span> с…</p>
+<a class="btn" href="{url_attr}">Перейти сейчас →</a></div>
+<script>var n=3,u={url_js};setInterval(function(){n--;if(n>=0)document.getElementById('s').textContent=n;if(n<=0)location.replace(u);},1000);</script>
+</body></html>"""
