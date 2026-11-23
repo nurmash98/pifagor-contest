@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import redirect
 
@@ -102,3 +103,51 @@ class MovedSiteMiddleware:
             from django.http import HttpResponsePermanentRedirect
             return HttpResponsePermanentRedirect(self.target + request.get_full_path())
         return self.get_response(request)
+
+
+class MaintenanceMiddleware:
+    """«Вход воспрещён — технические неполадки»: до MAINTENANCE_UNTIL (UTC, ISO) на хостах MAINTENANCE_HOSTS
+    все страницы, кроме входа, отдают 503 с сообщением. Учителя (staff) работают как обычно.
+    После указанного времени сайт открывается сам — код можно не трогать."""
+
+    def __init__(self, get_response):
+        from datetime import datetime
+        self.get_response = get_response
+        until = (getattr(settings, 'MAINTENANCE_UNTIL', '') or '').strip()
+        self.until = datetime.fromisoformat(until) if until else None
+        self.hosts = {h.strip().lower() for h in getattr(settings, 'MAINTENANCE_HOSTS', ()) if h.strip()}
+
+    def __call__(self, request):
+        if self.until is not None and self._applies(request):
+            from django.http import HttpResponse
+            from django.utils import timezone
+            now = timezone.now()
+            if now < self.until:
+                local = timezone.localtime(self.until).strftime('%H:%M')
+                html = MAINTENANCE_HTML.replace('{until}', local)
+                resp = HttpResponse(html, status=503)
+                resp['Retry-After'] = str(int((self.until - now).total_seconds()) + 1)
+                return resp
+        return self.get_response(request)
+
+    def _applies(self, request):
+        host = request.get_host().split(':')[0].lower()
+        if self.hosts and host not in self.hosts:
+            return False
+        path = request.path
+        if path.startswith('/login') or path.startswith('/logout') or path.startswith('/static/') or path.startswith('/admin'):
+            return False
+        user = getattr(request, 'user', None)
+        return not (user is not None and user.is_authenticated and user.is_staff)
+
+
+MAINTENANCE_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Технические неполадки</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f5fb;color:#1a1a4b;padding:16px}
+.box{max-width:460px;text-align:center;background:#fff;border-radius:20px;padding:36px 28px;box-shadow:0 8px 30px rgba(26,26,75,.12)}
+.ic{font-size:56px}h1{font-size:26px;margin:12px 0 8px}p{color:#555;font-size:16px;line-height:1.5;margin:6px 0}</style></head>
+<body><div class="box"><div class="ic">🚧</div><h1>Вход воспрещён</h1>
+<p><b>Технические неполадки.</b> Сайт временно недоступен.</p>
+<p>Попробуйте зайти после <b>{until}</b>.</p>
+<p style="margin-top:14px">Кіру уақытша жабық — техникалық ақаулар.<br>{until} кейін кіріңіз.</p></div></body></html>"""

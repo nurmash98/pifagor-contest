@@ -72,6 +72,11 @@ INSTALLED_APPS = [
 # все страницы будут перенаправляться туда (тот же путь).
 SITE_MOVED_TO = os.environ.get('SITE_MOVED_TO', '').strip()
 
+# Временное закрытие сайта: «Вход воспрещён — технические неполадки» (кроме входа и учителей).
+# Время в UTC; после него сайт открывается сам. Только на перечисленных хостах.
+MAINTENANCE_UNTIL = os.environ.get('MAINTENANCE_UNTIL', '2026-11-23T15:45:00+00:00')
+MAINTENANCE_HOSTS = [h for h in os.environ.get('MAINTENANCE_HOSTS', 'pifagor-contest.onrender.com').split(',') if h]
+
 MIDDLEWARE = [
     'contest.middleware.MovedSiteMiddleware',
     # Настоящий IP ученика за nginx (только при TRUST_X_REAL_IP=True — см. deploy/DEPLOY_HOME.md)
@@ -89,6 +94,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Пока ученик пишет СОР/СОЧ — Курсы и Все задачи для него закрыты.
     'contest.middleware.ExamLockMiddleware',
+    # «Вход воспрещён — технические неполадки» до MAINTENANCE_UNTIL (см. ниже)
+    'contest.middleware.MaintenanceMiddleware',
 ]
 
 ROOT_URLCONF = 'pifagor_contest.urls'
