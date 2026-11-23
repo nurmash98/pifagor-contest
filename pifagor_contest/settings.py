@@ -74,7 +74,7 @@ SITE_MOVED_TO = os.environ.get('SITE_MOVED_TO', '').strip()
 
 # Временное закрытие сайта: «Вход воспрещён — технические неполадки» (кроме входа и учителей).
 # Время в UTC; после него сайт открывается сам. Только на перечисленных хостах.
-MAINTENANCE_UNTIL = os.environ.get('MAINTENANCE_UNTIL', '2026-11-23T16:15:00+00:00')
+MAINTENANCE_UNTIL = os.environ.get('MAINTENANCE_UNTIL', '2026-11-23T17:00:00+00:00')
 MAINTENANCE_HOSTS = [h for h in os.environ.get('MAINTENANCE_HOSTS', 'pifagor-contest.onrender.com').split(',') if h]
 
 MIDDLEWARE = [
