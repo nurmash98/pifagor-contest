@@ -100,15 +100,14 @@ def notices(request):
 
 
 def olympiads_visible(request):
-    """Пункт «Олимпиада» в меню: учителю — всегда, ученику — если учитель добавил его хоть в одну олимпиаду или есть тренировочные."""
+    """Пункт «Олимпиада» в меню: учителю — всегда, ученику — если учитель добавил его хоть в одну олимпиаду."""
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated:
         return {'olympiads_visible': False}
     if user.is_staff:
         return {'olympiads_visible': True}
     from .models import Exam
-    from django.db.models import Q     # тренировочные олимпиады («Подготовка к районным») открыты всем
-    return {'olympiads_visible': Exam.objects.filter(Q(practice=True) | Q(participants__user=user), kind='OLYM').exists()}
+    return {'olympiads_visible': Exam.objects.filter(kind='OLYM', participants__user=user).exists()}
 
 
 def junior(request):

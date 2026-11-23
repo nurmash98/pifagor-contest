@@ -800,10 +800,7 @@ def exam_results(request, exam_id, retake_id=None):
         state = retake.status(now)
         per_student = True
     elif exam.is_olympiad:
-        if exam.practice:     # тренировка: в таблице — все, кто решал задачи
-            students = sort_students(Student.objects.filter(upsolve_answers__exam=exam).distinct().select_related('user'))
-        else:
-            students = sort_students(exam.participants.select_related('user'))
+        students = sort_students(exam.participants.select_related('user'))
         merged, extra_of, pending = dict(exam_attempts), {}, {}
         for rt in exam.retakes.prefetch_related('students', 'attempts__answers'):
             by_student = {a.student_id: a for a in rt.attempts.all()}
@@ -1067,15 +1064,15 @@ def olympiad_participants(request, exam_id):
 def olympiad_list(request):
     now = timezone.now()
     if request.user.is_staff:
-        olymps = list(Exam.objects.filter(kind='OLYM', practice=False).prefetch_related('tasks'))
+        olymps = list(Exam.objects.filter(kind='OLYM').prefetch_related('tasks'))
         for o in olymps:
             o.state = o.status(now)
             o.participant_count = o.participants.count()
             o.task_count = len(o.tasks.all())
             o.upsolve_open = upsolve_open(o, now)
-        return render(request, 'olympiads_teacher.html', {'olympiads': olymps, 'practice': _practice_list(None)})
+        return render(request, 'olympiads_teacher.html', {'olympiads': olymps})
     student = get_object_or_404(Student, user=request.user)
-    olymps = list(Exam.objects.filter(kind='OLYM', participants=student, practice=False).prefetch_related('tasks'))
+    olymps = list(Exam.objects.filter(kind='OLYM', participants=student).prefetch_related('tasks'))
     attempts = {a.exam_id: a for a in ExamAttempt.objects.filter(student=student, exam__in=olymps, retake__isnull=True)
                 .prefetch_related('answers')}
     active, upcoming, finished = [], [], []
@@ -1093,31 +1090,7 @@ def olympiad_list(request):
         o.upsolve_open = o.state == 'finished' and upsolve_open(o, now)
         {'active': active, 'upcoming': upcoming}.get(o.state, finished).append(o)
     upcoming.sort(key=lambda e: e.window.start_at)
-    return render(request, 'olympiads_student.html', {'active': active, 'upcoming': upcoming, 'finished': finished,
-                                                      'practice': _practice_list(student)})
-
-
-def _practice_list(student):
-    """«Подготовка к районным олимпиадам»: тренировочные олимпиады. Ученику — его баллы и решённые задачи,
-    учителю (student=None) — сколько учеников решали."""
-    from .models import UpsolveAnswer
-    from django.db.models import Count
-    exams = list(Exam.objects.filter(kind='OLYM', practice=True).annotate(n_tasks=Count('tasks', distinct=True)))
-    if student is not None:
-        mine = {}
-        for u in UpsolveAnswer.objects.filter(student=student, exam__in=exams).only('exam_id', 'best_score'):
-            mine.setdefault(u.exam_id, []).append(u.best_score)
-        for e in exams:
-            scores = mine.get(e.id, [])
-            e.my_total, e.my_solved = sum(scores), sum(1 for x in scores if x == 100)
-    else:
-        solvers = dict(UpsolveAnswer.objects.filter(exam__in=exams).values('exam_id')
-                       .annotate(n=Count('student', distinct=True)).values_list('exam_id', 'n'))
-        for e in exams:
-            e.solvers = solvers.get(e.id, 0)
-    for e in exams:
-        e.max_total = 100 * e.n_tasks
-    return exams
+    return render(request, 'olympiads_student.html', {'active': active, 'upcoming': upcoming, 'finished': finished})
 
 
 @staff_member_required
@@ -1314,8 +1287,6 @@ def upsolve_open(exam, now=None):
     Пока у кого-то идёт или впереди доп. время — закрыто (чтобы решения не утекли)."""
     if not exam.is_olympiad or not exam.upsolve:
         return False
-    if exam.practice:                 # тренировка (прошлые олимпиады) — открыта всегда
-        return True
     now = now or timezone.now()
     if exam.status(now) != 'finished':
         return False
@@ -1326,7 +1297,7 @@ def _upsolve_student(request, exam_id):
     """(ученик, олимпиада) или (None, олимпиада) с сообщением, если дорешивать нельзя."""
     exam = get_object_or_404(Exam, id=exam_id, kind='OLYM')
     student = Student.objects.filter(user=request.user).first()
-    if student is None or (not exam.practice and not exam.participants.filter(id=student.id).exists()):
+    if student is None or not exam.participants.filter(id=student.id).exists():
         messages.error(request, 'Вас не добавили в эту олимпиаду.')
         return None, exam
     if not upsolve_open(exam):
