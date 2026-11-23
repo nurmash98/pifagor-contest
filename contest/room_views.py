@@ -118,8 +118,15 @@ def room_manage(request):
         if cls not in mine:
             messages.error(request, 'Выберите свой класс.')
             return redirect('room_manage')
+        from .models import Subtopic, Topic
+        sub = Subtopic.objects.select_related('topic').filter(id=request.POST.get('subtopic') or 0).first()
+        topic = sub.topic if sub else Topic.objects.filter(id=request.POST.get('topic') or 0).first()
         ids = [int(x) for x in request.POST.getlist('tasks') if x.isdigit()]
-        tasks = list(Task.objects.filter(id__in=ids, hidden=False))
+        if ids:                                            # старый способ: задачи отмечены вручную
+            tasks = list(Task.objects.filter(id__in=ids, hidden=False))
+        else:                                              # задачи подтемы (или темы) курса
+            src = sub or topic
+            tasks = list(src.tasks.filter(hidden=False)) if src else []
         if not tasks:
             messages.error(request, 'Выберите хотя бы одну задачу на урок.')
             return redirect('room_manage')
@@ -129,10 +136,11 @@ def room_manage(request):
             minutes = 45
         now = timezone.now()
         StudyRoom.objects.filter(school_class=cls, closed_at__isnull=True).update(closed_at=now)   # один зал на класс
-        from .models import Topic
-        topic = Topic.objects.filter(id=request.POST.get('theory_topic') or 0).first()
-        room = StudyRoom.objects.create(school_class=cls, owner=request.user, title=(request.POST.get('title') or '').strip()[:120],
-                                        ends_at=now + timedelta(minutes=minutes), theory_topic=topic,
+        if topic is None:
+            topic = Topic.objects.filter(id=request.POST.get('theory_topic') or 0).first()
+        title = (request.POST.get('title') or '').strip()[:120] or (sub.name if sub else topic.name if topic else '')
+        room = StudyRoom.objects.create(school_class=cls, owner=request.user, title=title[:120],
+                                        ends_at=now + timedelta(minutes=minutes), theory_topic=topic, theory_subtopic=sub,
                                         theory_text=(request.POST.get('theory_text') or '').strip()[:20000])
         room.tasks.set(tasks)
         valid = {t.id for t in tasks}
@@ -160,8 +168,22 @@ def room_manage(request):
         has = bool(tp.theory_html or tp.theory_video_url or any(st.theory_html for st in tp.subtopics.all()))
         if has:
             topics.append({'id': tp.id, 'title': f'{tp.course.name} — {tp.name}', 'tasks': [t.id for t in tp.tasks.all()]})
+    from .models import Course
+    tree = []                                          # курс → темы → подтемы (только с задачами)
+    for c in Course.objects.prefetch_related('topics__tasks', 'topics__subtopics__tasks').order_by('name'):
+        tps = []
+        for tp in c.topics.all():
+            subs = [{'id': st.id, 'name': st.name, 'n': sum(1 for t in st.tasks.all() if not t.hidden),
+                     'lv': ''.join(sorted({t.level for t in st.tasks.all() if not t.hidden}))} for st in tp.subtopics.all()]
+            subs = [x for x in subs if x['n']]
+            n = sum(1 for t in tp.tasks.all() if not t.hidden)
+            if subs or n:
+                tps.append({'id': tp.id, 'name': tp.name, 'n': n, 'subs': subs})
+        if tps:
+            tree.append({'id': c.id, 'name': c.name, 'topics': tps})
     return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'tasks': tasks, 'tags': tags,
-                                                'topics': topics, 'topics_json': json.dumps({t['id']: t['tasks'] for t in topics})})
+                                                'topics': topics, 'topics_json': json.dumps({t['id']: t['tasks'] for t in topics}),
+                                                'tree_json': json.dumps(tree, ensure_ascii=False)})
 
 
 @staff_member_required
@@ -200,7 +222,13 @@ def _theory_items(room):
     if room.theory_text:
         out.append({'title': 'Заметки учителя', 'url': reverse('room_theory', args=[room.id, 'text', 0]), 'kind': 'text'})
     tp = room.theory_topic
-    if tp is not None:
+    sub = room.theory_subtopic
+    if sub is not None:
+        if sub.theory_html:
+            out.append({'title': sub.name, 'url': reverse('room_theory', args=[room.id, 'sub', sub.id]), 'kind': 'html'})
+        if tp is not None and tp.theory_html:
+            out.append({'title': tp.name, 'url': reverse('room_theory', args=[room.id, 'topic', tp.id]), 'kind': 'html'})
+    elif tp is not None:
         if tp.theory_html:
             out.append({'title': tp.name, 'url': reverse('room_theory', args=[room.id, 'topic', tp.id]), 'kind': 'html'})
         for st in tp.subtopics.all():
@@ -240,7 +268,7 @@ ROOM_TEXTS = {
     'fs_back': 'Вернуться в полноэкранный режим', 'exits': 'Выходов из полного экрана / на другие вкладки',
     'notes': 'Объяснение учителя',
     'far': 'Подойдите к столу руководителя', 'busy': 'Сначала закончите текущее задание', 'all_done': 'Все задания выполнены — отличная работа!',
-    'got': 'Руководитель дал задание', 'go_boss': 'Подойдите к руководителю за заданием', 'cur': 'Текущее задание',
+    'got': 'Ассистент дал задание', 'go_boss': 'Подойдите к ассистенту (🧑‍💼 в коридоре) за заданием', 'cur': 'Текущее задание',
     'in_work': 'в работе', 'done': 'выполнено', 'salary': 'Зарплата', 'to_boss': 'К руководителю', 'paid': 'Задание выполнено! Зарплата',
     'boss': 'Руководитель', 'tenge': '₸', 'no_task': 'нет задания',
     'earned': 'Заработано сегодня', 'coins_x2': 'монет (x2)', 'sit_own': 'Сядьте за стол в кабинете своей параллели',
@@ -248,6 +276,28 @@ ROOM_TEXTS = {
     'admin_only': 'Это администрация — здесь сидят учителя. Можно зайти и задать вопрос',
     'admin_hint': 'Вы в администрации. Топ какой параллели показать:',
     'dm_hint': 'Напишите вопрос — его увидит только этот человек', 'dm_new': 'новое сообщение (нажмите на него)',
+    'asst_role': 'ассистент',
+    'asst_hi': 'Здравствуйте! Я {name}, ассистент руководителя. Выдаю задания и помогаю с ними.',
+    'asst_take': 'Получить задание',
+    'asst_hint': 'Подсказка',
+    'asst_theory': 'Теория',
+    'asst_open': 'Открыть задание',
+    'asst_got': 'Держите задание: «{t}» (уровень {l}, зарплата {m}). Сядьте за свободный стол и откройте его справа.',
+    'asst_busy': 'Сейчас у вас задание «{t}». Решите его — потом дам следующее. Нужна подсказка?',
+    'asst_tip': 'Совет по теме:',
+    'asst_ex': 'Разберите пример из условия: ввод {i} → вывод {o}. Проверьте свой код на этом примере.',
+    'asst_fail': 'Ваше последнее решение: пройдено {p} из {n} тестов. Не проходит тест №{k}',
+    'asst_fail_in': 'ввод:',
+    'asst_ok': 'Ваше последнее решение прошло {p} из {n} тестов.',
+    'asst_nosub': 'Вы ещё не отправляли решение. Отправьте — и я подскажу, на каком тесте ошибка.',
+    'asst_more': 'Ещё подсказка',
+    'asst_th_none': 'К этому уроку теории нет — спросите руководителя.',
+    'asst_go': 'Иду к ассистенту…',
+    'go_asst': 'Подойдите к ассистенту (🧑\u200d💼 в коридоре) — он даст задание',
+    'to_asst': 'К ассистенту',
+    'boss_chill': 'чилит 😎',
+    'co_earned': 'Компания заработала сегодня',
+    'company': 'Компания',
     'dm_gone': 'Этот человек уже вышел', 'dm_wait': 'Не так быстро', 'dm_empty': 'Напишите текст', 'pick_task': 'Вы за столом — выберите задачу справа',
 }
 
@@ -297,11 +347,11 @@ def room_play(request, room_id):
     if st is not None:
         rm.touch(room.id, me, {}, **_label(st))          # баннер/аватар могли смениться — обновляем при входе
     return render(request, 'room_play.html', {
-        'room': room, 'teacher': teacher, 'me': me, 'office': False,
+        'room': room, 'teacher': teacher, 'me': me, 'office': False, 'co_name': room.school_class,
         'state_url': reverse('room_state', args=[room.id]), 'act_url': reverse('room_act', args=[room.id]),
         'lang_url': reverse('room_lang', args=[room.id]),
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
-        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': json.dumps(_theory_items(room), ensure_ascii=False), 'texts': json.dumps(_texts(lang), ensure_ascii=False),
+        'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': json.dumps(_theory_items(room), ensure_ascii=False), 'texts': json.dumps(dict(_texts(lang), fs_title=f'{_texts(lang)["company"]} «{room.school_class}»'), ensure_ascii=False),
     })
 
 
@@ -335,7 +385,8 @@ def room_state(request, room_id):
     online = {p[0] for p in ppl}
     out = {'open': room.is_open(), 'people': ppl,
            'left': max(0, int((room.ends_at - timezone.now()).total_seconds())) if room.ends_at else None,
-           'stats': _stats_rows(room, co, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count()}
+           'stats': _stats_rows(room, co, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count(),
+           'total': sum(d.get('salary', 0) for d in co.values())}
     if st is not None:
         mine = co.get(st.id, {})
         out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0)}
@@ -394,6 +445,12 @@ def room_act(request, room_id):
             return JsonResponse({'error': err})
         rm.log_event(room.id, st.full_name, f'📋 взял задание «{task.title}» ({task.level})')
         return JsonResponse({'ok': True, 'task': task.id})
+    if act == 'hint' and not teacher:
+        cur = rm.company(room).get(st.id, {}).get('cur')
+        task = room.tasks.filter(id=cur).prefetch_related('tags').first() if cur else None
+        if task is None:
+            return JsonResponse({'error': 'no_task'})
+        return JsonResponse(dict(rm.hint(task, st, _lang(request)), task=task.id))
     if act == 'exit' and not teacher:
         rm.add_exit(room.id, me)
         return JsonResponse({'ok': True})

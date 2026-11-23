@@ -105,6 +105,8 @@
         .plab .pboss { zoom: .8; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #111827; font-weight: 900; letter-spacing: .08em;
                        padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
         .ibx { border: 1px solid var(--line, #e5e7ef); background: var(--card, #fff); color: inherit; border-radius: 999px; padding: 4px 12px; font-weight: 700; cursor: pointer; }
+        #chat-msgs .m.bot { white-space: pre-line; }
+        .plab .passt { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pagai { background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pbot { background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pact { display: block; text-align: center; font-size: 10px; font-weight: 700; color: #0f766e; background: rgba(255,255,255,.85); border-radius: 6px; padding: 1px 6px; margin-top: 2px; }
@@ -134,7 +136,7 @@
 <div id="bar">
     <a href="{% if teacher and not office %}{% url 'room_manage' %}{% else %}{% url 'codegames' %}{% endif %}" class="btn ghost" title="{% t "Выйти" %}">←</a>
     {% if office %}<span class="ttl">🏢 <span data-tr="Офис выходного дня">{% t "Офис выходного дня" %}</span> · <span style="color:#16a34a">x2 <img class="coinico" src="{% static 'icons/coin-64.png' %}" alt=""></span></span>
-    {% else %}<span class="ttl">🏢 <span data-tr="Компания Пифагор">{% t "Компания Пифагор" %}</span> · {{ room.school_class }}{% if room.title %} · {{ room.title }}{% endif %}</span>{% endif %}
+    {% else %}<span class="ttl">🏢 <span data-tr="Компания">{% t "Компания" %}</span> «{{ room.school_class }}»{% if room.title %} · {{ room.title }}{% endif %}</span>{% endif %}
     <span class="sp"></span>
     <span class="chip" title="{% t "В зале" %}">👥 <span id="online">0</span></span>
     <span class="chip" id="tchip">⏱ <span id="timer">--:--</span></span>
@@ -150,9 +152,10 @@
     <div id="stage">
         <canvas id="map"></canvas>
         <div id="labels"></div>
-        {% if office %}<div id="earned"><div class="l">💰 <span id="earned-l">{% t "Офис заработал сегодня" %}</span></div><div class="v" id="earned-v">0 ₸</div></div>
+        <div id="earned"><div class="l">💰 <span id="earned-l">{% if office %}{% t "Офис заработал сегодня" %}{% else %}{% t "Компания заработала сегодня" %}{% endif %}</span></div><div class="v" id="earned-v">0 ₸</div></div>
+        {% if office %}
         <div id="help" style="top:84px">🖱 <span data-tr="Подойдите к своему преподавателю (👨‍🏫 ағай) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет.">{% t "Подойдите к своему преподавателю (👨‍🏫 ағай) — он даст 3 задачи. Сядьте за стол в кабинете своего класса и решайте: монеты x2, зарплата и премия 10 000 ₸. В 20:00 топ-3 каждой параллели получают по 20 монет." %}</span></div>
-        {% else %}<div id="help">🖱 <span data-tr="Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор.">{% t "Подойдите к столу руководителя (жёлтые клетки) — получите задание. Сядьте за свободный стол и выполните его. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>{% endif %}
+        {% else %}<div id="help">🖱 <span data-tr="Нажмите на ассистента (🧑‍💼 в коридоре) — он даст задание и подскажет. Сядьте за свободный стол и решайте. Колёсико — масштаб, перетаскивание — обзор.">{% t "Нажмите на ассистента (🧑‍💼 в коридоре) — он даст задание и подскажет. Сядьте за свободный стол и решайте. Колёсико — масштаб, перетаскивание — обзор." %}</span></div>{% endif %}
         <div id="zoom"><button type="button" data-z="1.2">+</button><button type="button" data-z="0.83">−</button></div>
         <form id="say" autocomplete="off"><input id="say-in" maxlength="{{ say_max }}" data-trp="Сообщение над головой (Enter)" placeholder="{% t "Сообщение над головой (Enter)" %}"><button class="btn" type="submit">➤</button></form>
         <div id="chat"><div class="hd">💬 <span id="chat-name" style="flex:1"></span><button class="btn ghost" id="chat-x" type="button" style="padding:4px 10px">✕</button></div>
@@ -200,6 +203,7 @@
     var U = {state: '{{ state_url }}', act: '{{ act_url }}'};
     var TXT = {{ texts|safe }};
     var U2 = {lang: '{{ lang_url }}', bot: '{% if office %}{% url "office_bot" %}{% endif %}'};
+    var CO_NAME = '{{ co_name|default:""|escapejs }}';
     var OFFICE = {{ office|yesno:"true,false" }}, MY_GRADE = '{{ my_grade|default:"" }}', OTAGS = {{ tags_json|default:"[]"|safe }};
     var $ = function (id) { return document.getElementById(id); };
     var csrf = document.querySelector('#csrf input').value;
@@ -249,7 +253,7 @@
     var GEARN = {}, earnShown = null, earnAnim = null;          // общий заработок офиса за день — крупно сверху, по кабинетам — на табличках
     function earnedTo(v) {
         var box = $('earned'); if (!box) { return; }
-        $('earned-l').textContent = TXT.earned_today;
+        $('earned-l').textContent = OFFICE ? TXT.earned_today : TXT.co_earned;
         if (earnShown === null) { earnShown = v; $('earned-v').textContent = money(v); return; }
         if (v === earnShown) { return; }
         var from = earnShown, t0 = performance.now(); earnShown = v; cancelAnimationFrame(earnAnim);
@@ -375,7 +379,7 @@
         },
         logo: function (o) {
             poly([[o.x, .02, .7], [o.x + o.w, .02, .7], [o.x + o.w, .02, 2.1], [o.x, .02, 2.1]], NIGHT ? '#0f172a' : '#111827');
-            wallText(o.x, o.x + o.w, 1.55, 'PIFAGOR', '#22c55e', 30);
+            wallText(o.x, o.x + o.w, 1.55, CO_NAME ? CO_NAME : 'PIFAGOR', '#22c55e', 30);
             wallText(o.x, o.x + o.w, 1.05, 'IT COMPANY', '#e5e7eb', 12);
         },
         tv: function (o) {
@@ -402,6 +406,13 @@
             var sc = NIGHT ? '#64748b' : '#475569', sb = NIGHT ? '#94a3b8' : '#334155';
             box(o.x + .05, o.y + .1, o.w - .1, .8, 0, .28, sc);
             if (o.face === 'down') { box(o.x + .05, o.y + .1, o.w - .1, .22, .28, .32, sb); } else { box(o.x + .05, o.y + .68, o.w - .1, .22, .28, .32, sb); }
+        },
+        help: function (o) {                                            // стойка ассистента
+            box(o.x + .1, o.y + .2, .8, .6, 0, .75, '#0ea5e9', {top: NIGHT ? '#0c4a6e' : '#e0f2fe'});
+            var s = scr(o.x + .5, o.y + .5, 1.3); ctx.save();
+            ctx.font = '800 ' + Math.round(11 * zoom) + 'px Montserrat, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            var t = '❓ ' + TXT.asst_role, w = ctx.measureText(t).width + 12 * zoom;
+            rr(s[0] - w / 2, s[1] - 9 * zoom, w, 18 * zoom, 6 * zoom); ctx.fillStyle = '#0369a1'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(t, s[0], s[1]); ctx.restore();
         },
         table: function (o) { box(o.x + .15, o.y + .15, .7, .7, 0, .3, '#f5f5f4'); ellipse(o.x + .45, o.y + .45, .33, 5, 3, '#fb923c'); },
         bean: function (o) { ellipse(o.x + .5, o.y + .5, .15, 20, 12, o.x % 4 ? '#f472b6' : '#facc15'); ellipse(o.x + .5, o.y + .45, .3, 15, 9, o.x % 4 ? '#f9a8d4' : '#fde047'); }
@@ -472,6 +483,11 @@
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pmgr">👔 ' + esc(p.name) + ' · ' + esc(TXT.mgr_role.replace('{g}', p.grade)) + '</span>' +
                    (p.act ? '<span class="pact" style="color:#1e3a8a">' + esc(p.act) + '</span>' : '') + '</div>';
         }
+        if (p.asst) {
+            return (p.msg ? '<div class="pmsg" style="background:rgba(3,105,161,.95)">' + esc(p.msg) + '</div>' : '') +
+                   '<div class="pname" style="flex-direction:column;gap:0"><span class="passt">🧑‍💼 ' + esc(p.name) + ' · ' + esc(TXT.asst_role) + '</span>' +
+                   (p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
+        }
         if (p.agai) {
             return (p.msg ? '<div class="pmsg t">' + esc(p.msg) + '</div>' : '') + (UNREAD[p.id] ? '<span class="pdm">💬' + UNREAD[p.id] + '</span>' : '') +
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pagai">👨‍🏫 ' + esc(p.name) + '</span>' +
@@ -482,7 +498,7 @@
                    '<div class="pname" style="flex-direction:column;gap:0"><span class="pbot">🤖 ' + esc(p.name) + ' · ' + esc(TXT.bot_role) + '</span>' +
                    (p.act ? '<span class="pact">' + esc(p.act) + '</span>' : '') + '</div>';
         }
-        var name = p.h ? p.h : (p.teacher ? '<span class="pboss">👔 BOSS</span>' : '') + '<span class="plain' + (p.teacher ? ' t' : '') + '">' + esc(p.name) + '</span>';
+        var name = p.h ? p.h : (p.teacher ? '<span class="pboss">👔 BOSS' + (!OFFICE && p.seat === 't' ? ' · ' + esc(TXT.boss_chill) : '') + '</span>' : '') + '<span class="plain' + (p.teacher ? ' t' : '') + '">' + esc(p.name) + '</span>';
         var done = statsBy[p.id];
         return (p.msg ? '<div class="pmsg' + (p.teacher ? ' t' : '') + '">' + esc(p.msg) + '</div>' : '') +
                '<div class="pname">' + (UNREAD[p.id] ? '<span class="pdm">💬' + UNREAD[p.id] + '</span>' : '') + (p.hand ? '<span class="phand">✋</span>' : '') + name + (done ? '<span class="pok">💰 ' + money(done) + '</span>' : '') + '</div>';
@@ -619,6 +635,11 @@
     }
     function goBoss() {
         var me = people[ME]; if (!me || me.rx === null) { return; }
+        if (ASST.length) {                                        // задания выдают ассистенты — к ближайшему
+            var bk = 0, bdd = 1e9;
+            ASST.forEach(function (a, k) { var d = Math.abs(a.x - me.rx) + Math.abs(a.y - me.ry); if (d < bdd) { bdd = d; bk = k; } });
+            openAsst(bk); return;
+        }
         var best = null, bd = 1e9;
         (L.boss || []).forEach(function (b) {
             if (!free(b[0], b[1])) { return; }
@@ -795,7 +816,7 @@
             $('inbox').innerHTML = ib.map(function (r) { return '<button type="button" class="ibx" data-uid="' + r[0] + '" data-n="' + esc(r[1]) + '">💬 ' + esc(r[1]) + ' <b>' + r[2] + '</b></button>'; }).join('');
         }
         lastStats = d.stats || [];
-        if (OFFICE && d.total !== undefined) { earnedTo(d.total); GEARN = d.by_grade || {}; }
+        if (d.total !== undefined) { earnedTo(d.total); GEARN = d.by_grade || {}; }
         $('online').textContent = d.people.length;
         statsBy = {};
         d.stats.forEach(function (r) { statsBy[r[0]] = r[2]; });
@@ -904,6 +925,7 @@
     function openChat(uid, nameIfAway) {
         uid = +uid; if (nameIfAway) { CHATNAME[uid] = nameIfAway; }
         if (!uid || uid === ME || (!people[uid] && !CHATNAME[uid])) { return; }
+        if (uid <= -70 && uid > -80) { openAsst(-70 - uid); return; }
         if (uid <= -100) { openManager(uid); return; }
         if (uid <= -50) { agaiTalk(uid); return; }
         if (uid < 0) { openBot(uid); return; }
@@ -1079,6 +1101,65 @@
                 return '<button type="button" data-tag="' + t.id + '">' + esc(t.name) + ' · ' + t.level + ' <span style="opacity:.6">(' + t.left + ')</span></button>'; }).join('');
         });
     }
+    // ---------------- ассистенты руководителя (компания): выдают задания по порядку и подсказывают ----------------
+    var ASST = OFFICE ? [] : (L.assistants || []), pendingAsst = null;
+    ASST.forEach(function (a, k) {
+        var p = person(-70 - k); p.bot = true; p.asst = true; p.name = a.name; p.color = k ? '#0369a1' : '#0891b2'; p.c = 0;
+        setTarget(p, a.x, a.y, null); p.act = '📋 ' + TXT.asst_take.toLowerCase();
+    });
+    function openAsst(k) {
+        var a = ASST[k], p = people[-70 - k], me = people[ME]; if (!a || !p || !me) { return; }
+        if (TEACHER) { p.msg = TXT.boss_chill; setTimeout(function () { p.msg = ''; }, 3000); return; }
+        if (Math.abs(Math.round(me.rx) - a.x) > 1 || Math.abs(Math.round(me.ry) - a.y) > 1) {
+            var f = freeNear(a.x, a.y); if (f) { pendingAsst = k; goTo(f[0], f[1], null); toast('🚶 ' + TXT.asst_go); }
+            return;
+        }
+        botWith = -70 - k; chatWith = null;
+        $('chat-name').textContent = '🧑‍💼 ' + a.name + ' · ' + TXT.asst_role;
+        $('chat-form').style.display = 'none'; $('chat-quick').style.display = 'none'; $('chat-quick').innerHTML = '';
+        $('chat').style.display = 'flex'; botConv = [];
+        botSay(TXT.asst_hi.replace('{name}', a.name));
+        asstNext();
+    }
+    function asstBtn(act, label) { return ' <button class="go" type="button" data-act="' + act + '">' + label + '</button>'; }
+    function asstNext() {
+        var cur = CO.cur ? taskById(CO.cur) : null;
+        if (cur) { botSay(TXT.asst_busy.replace('{t}', cur.title), asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)) + asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + (THEORY.length ? asstBtn('ath', '📖 ' + esc(TXT.asst_theory)) : '')); return; }
+        if (allDone) { botSay('🏆 ' + TXT.all_done); return; }
+        botSay('👇', asstBtn('atake', '📋 ' + esc(TXT.asst_take)));
+    }
+    var hintStep = {};
+    $('chat-msgs').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-act]'); if (!b || botWith === null || botWith > -70 || botWith <= -80) { return; }
+        var act = b.getAttribute('data-act');
+        if (act === 'atake') {
+            post({a: 'take'}).then(function (d) {
+                if (d.error) { if (d.error === 'all_done') { allDone = true; } botSay((d.error === 'all_done' ? '🏆 ' : '') + (TXT[d.error] || d.error)); tasksPanel(); return; }
+                CO.cur = d.task; var t = taskById(d.task); tasksPanel(); poll(true);
+                botSay(TXT.asst_got.replace('{t}', t ? t.title : '').replace('{l}', t ? t.level : '').replace('{m}', t ? money(t.pay) : ''),
+                       asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)));
+            });
+        }
+        if (act === 'aopen') { var t = CO.cur ? taskById(CO.cur) : null; if (!t) { return; } if (!seated) { botSay(TXT.sit_first + ' 🪑'); return; } $('chat').style.display = 'none'; botWith = null; openTask(t); }
+        if (act === 'ath') {
+            if (!THEORY.length) { botSay(TXT.asst_th_none); return; }
+            botSay('📖', THEORY.map(function (it, i) { return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.kind === 'text' ? TXT.notes : it.title) + '</button>'; }).join(''));
+        }
+        if (act === 'ahint') {
+            post({a: 'hint'}).then(function (d) {
+                if (d.error) { botSay(TXT.go_boss); return; }
+                var n = hintStep[d.task] = ((hintStep[d.task] || 0) % 3) + 1, more = asstBtn('ahint', '💡 ' + esc(TXT.asst_more));
+                if (n === 1) { botSay((d.tip ? TXT.asst_tip + ' ' + d.tip + '\n\n' : '') + TXT.asst_ex.replace('{i}', '«' + d.ex_in.replace(/\n/g, ' ⏎ ') + '»').replace('{o}', '«' + d.ex_out.replace(/\n/g, ' ⏎ ') + '»'), more); }
+                else if (n === 2) {
+                    var f = d.fail;
+                    if (!f) { botSay(TXT.asst_nosub, more); }
+                    else if (!f.n) { botSay(TXT.asst_ok.replace('{p}', f.passed).replace('{n}', f.total), more); }
+                    else { botSay(TXT.asst_fail.replace('{p}', f.passed).replace('{n}', f.total).replace('{k}', f.n) + (f.input ? ' (' + TXT.asst_fail_in + ' «' + f.input.replace(/\n/g, ' ⏎ ') + '»)' : '') + '. ' + f.why, more); }
+                }
+                else { botSay('📖 ' + TXT.asst_theory + ':', THEORY.length ? THEORY.map(function (it) { return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.kind === 'text' ? TXT.notes : it.title) + '</button>'; }).join('') : ' ' + TXT.asst_th_none); }
+            });
+        }
+    });
     function agaiOf(uid) { return AGAI.filter(function (a) { return a.uid === +uid; })[0]; }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
     function renderBot() {
@@ -1166,7 +1247,7 @@
 
     // ---------------- музыка: бесконечный lo-fi, генерируется в браузере (static/js/lofi.js) ----------------
     (function () {
-        var KEY = OFFICE ? 'office-music' : 'room-music', want = OFFICE, vol = 50;
+        var KEY = OFFICE ? 'office-music' : 'room-music', want = true, vol = 50;
         try { var v = localStorage.getItem(KEY); if (v) { want = v === 'on'; } vol = +(localStorage.getItem('room-music-vol') || 50); } catch (e) {}
         $('music-vol').value = vol;
         if (!window.LoFi) { $('music-box').style.display = 'none'; return; }
@@ -1265,7 +1346,8 @@
     }, true);
     var _arrived = arrived;
     arrived = function () { _arrived(); if (pendingMgr !== null) { var id = pendingMgr; pendingMgr = null; openManager(id); }
-                            if (pendingAg !== null) { var k = pendingAg; pendingAg = null; openAgai(k); } };
+                            if (pendingAg !== null) { var k = pendingAg; pendingAg = null; openAgai(k); }
+                            if (pendingAsst !== null) { var ka = pendingAsst; pendingAsst = null; openAsst(ka); } };
 
     window.roomView = {screenOf: function (x, y) { return scr(x + .5, y + .5, 0); }, debug: function () { var m = people[ME]; return m ? {rx: m.rx, ry: m.ry, seat: m.seat, route: m.route.length, seated: seated} : null; }};   // для автотестов: где на экране клетка
     tasksPanel(); fit();

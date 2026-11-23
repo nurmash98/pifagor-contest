@@ -5191,8 +5191,6 @@ class StudyRoomTests(TestCase):
         self.client.force_login(a.user)
         self.client.get(reverse('room_play', args=[room.id]))
         self.client.post(act, {'a': 'move', 'x': 3, 'y': 8, 'seat': 's1'})
-        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'far')      # надо подойти к столу руководителя
-        self.client.post(act, {'a': 'move', 'x': 3, 'y': 4})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json(), {'ok': True, 'task': b.id})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'busy')     # пока не выполнил — нового нет
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
@@ -5207,6 +5205,38 @@ class StudyRoomTests(TestCase):
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['task'], self.tasks[0].id)
         self.client.force_login(self.tu)
         self.assertIn('взял задание', self.client.get(reverse('room_state', args=[room.id])).json()['log'][-1][2])
+
+    def test_company_from_course_subtopic_assistants_and_hints(self):
+        """Учитель выбирает курс → тему → подтему: задачи подтемы, название компании — класс, ассистенты подсказывают."""
+        from .models import Course, Subtopic, Topic
+        c = Course.objects.create(name='Python')
+        tp = Topic.objects.create(course=c, name='Цикл for')
+        sub = Subtopic.objects.create(topic=tp, name='range()', theory_html='<p>range</p>')
+        b = make_task('Шаги', 'B', Tag.objects.get(name='Циклы'))
+        sub.tasks.set([b, self.tasks[0]])
+        self.client.force_login(self.tu)
+        page = self.client.get(reverse('room_manage')).content.decode()
+        self.assertIn('"name": "range()"', page)
+        self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'course': c.id, 'topic': tp.id, 'subtopic': sub.id})
+        room = StudyRoom.objects.get()
+        self.assertEqual((room.title, room.theory_subtopic_id), ('range()', sub.id))
+        self.assertEqual(set(room.tasks.all()), {b, self.tasks[0]})
+        self.assertEqual(room.task_order[0], self.tasks[0].id if self.tasks[0].level < 'B' else b.id)     # A → B → C
+        a = self.sts[0]
+        self.client.force_login(a.user)
+        html = self.client.get(reverse('room_play', args=[room.id])).content.decode()
+        self.assertIn("var CO_NAME = '8A'", html)
+        self.assertIn('"assistants"', html)
+        act = reverse('room_act', args=[room.id])
+        self.assertEqual(self.client.post(act, {'a': 'hint'}).json()['error'], 'no_task')
+        tid = self.client.post(act, {'a': 'take'}).json()['task']                     # подходить к руководителю не нужно
+        h = self.client.post(act, {'a': 'hint'}).json()
+        self.assertEqual(h['task'], tid); self.assertIsNone(h['fail'])
+        t = Task.objects.get(id=tid)
+        Submission.objects.create(student=a, task=t, status='DONE', autotest_passed=1, autotest_total=2,
+                                  autotest_results=[{'ok': True}, {'ok': False, 'error': 'NameError: name x', 'input': '5'}])
+        f = self.client.post(act, {'a': 'hint'}).json()['fail']
+        self.assertEqual((f['n'], f['input'], f['passed']), (2, '5', 1)); self.assertIn('переменная', f['why'])
 
     def test_company_skips_tasks_solved_before_and_all_done(self):
         a = self.sts[0]

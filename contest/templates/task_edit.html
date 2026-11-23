@@ -73,6 +73,16 @@
                     <p class="text-muted small mt-2 mb-0">Если поле пустое — ученикам с языком KZ показывается русский текст.</p>
                 </div>
             </details>
+            <details class="mt-3"{% if v.hint or v.hint_kk %} open{% endif %}>
+                <summary class="fw-semibold">💡 Подсказка для ассистента в «Компании» (необязательно)</summary>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-6"><label class="form-label small">RU</label>
+                        <textarea name="hint" class="form-control" rows="2" placeholder="Например: начните с s = 0 и прибавляйте i в цикле">{{ v.hint }}</textarea></div>
+                    <div class="col-md-6"><label class="form-label small">KZ</label>
+                        <textarea name="hint_kk" class="form-control" rows="2">{{ v.hint_kk }}</textarea></div>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Ассистент покажет её ученику по кнопке «Подсказка». Если пусто — общий совет по теме задачи и разбор примера.</p>
+            </details>
         </div>
 
         <!-- Теги -->

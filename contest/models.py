@@ -115,6 +115,8 @@ class Task(models.Model):
     description_kk = models.TextField(blank=True, verbose_name="Сипаттамасы (қазақша)")
     input_example_kk = models.TextField(blank=True, verbose_name="Кіріс мысалы (қазақша)")
     output_example_kk = models.TextField(blank=True, verbose_name="Шығыс мысалы (қазақша)")
+    hint = models.TextField(blank=True, verbose_name="Подсказка (ассистент в «Компании»)")
+    hint_kk = models.TextField(blank=True, verbose_name="Кеңес (қазақша)")
 
     def get_display_title(self, lang='ru'):
         return self.title_kk if lang == 'kk' and self.title_kk else self.title
@@ -633,6 +635,7 @@ class StudyRoom(models.Model):
     title = models.CharField(max_length=120, blank=True, verbose_name="Тема урока")
     tasks = models.ManyToManyField('Task', blank=True, verbose_name="Задачи урока")
     theory_topic = models.ForeignKey('Topic', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Теория из курса")
+    theory_subtopic = models.ForeignKey('Subtopic', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Подтема курса")
     theory_text = models.TextField(blank=True, verbose_name="Теория / заметки учителя")
     task_order = models.JSONField(default=list, blank=True, verbose_name="Порядок выдачи задач (id)")
     started_at = models.DateTimeField(auto_now_add=True)

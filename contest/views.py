@@ -1775,7 +1775,7 @@ def _tests_from_post(post):
 
 
 TASK_TEXT_FIELDS = ['title', 'description', 'input_example', 'output_example',
-                    'title_kk', 'description_kk', 'input_example_kk', 'output_example_kk']
+                    'title_kk', 'description_kk', 'input_example_kk', 'output_example_kk', 'hint', 'hint_kk']
 TASK_REQUIRED_FIELDS = {'title': 'Название', 'description': 'Условие',
                         'input_example': 'Пример ввода', 'output_example': 'Пример вывода'}
 TASK_LEVELS = ('A', 'B', 'C')

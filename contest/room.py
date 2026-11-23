@@ -21,6 +21,7 @@ PER_ROW = 12           # мест в ряду (3 блока по 4 стола)
 BOSS = {(x, y) for x in range(2, 6) for y in (4, 5)}          # приёмная в кабинете руководителя: сюда подходят за заданием
 TEACHER_SPOT = (4, 2)                                            # кресло руководителя
 SPAWN_Y = 7                                                      # коридор между кабинетами и open space
+ASSISTANTS = [(9, 'Аружан'), (18, 'Данияр')]                       # x стойки ассистента в коридоре (y = 7)
 
 
 def layout(n_students):
@@ -97,7 +98,11 @@ def layout(n_students):
                 put('chair', x, y0 + 3, solid=False, face='up')
     for (px, py) in ((1, H - 2), (W - 2, H - 2), (1, 8), (W - 2, 8)):
         put('plant', px, py)
-    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': sorted(BOSS)}
+    # ассистенты руководителя — стойки в коридоре: выдают задания и подсказывают (руководитель отдыхает)
+    for i, (ax, name) in enumerate(ASSISTANTS):
+        put('help', ax - 1, 7)
+    return {'W': W, 'H': H, 'objs': objs, 'seats': seats, 'block': sorted(block), 'boss': [],
+            'assistants': [{'x': ax, 'y': 7, 'name': name} for ax, name in ASSISTANTS]}
 
 
 # ------------------------------------------------------------------ присутствие
@@ -241,11 +246,9 @@ def company(room, fresh=False):
 
 
 def take(room, student, presence):
-    """Ученик подошёл к руководителю — выдать следующее задание из списка.
-    Возвращает (task, None) или (None, ошибка): far / busy / all_done."""
+    """Ученик подошёл к ассистенту — выдать следующее задание из списка.
+    Возвращает (task, None) или (None, ошибка): busy / all_done."""
     from .models import RoomAssignment, Submission, Task
-    if not near_boss(presence):
-        return None, 'far'
     mine = company(room, fresh=True).get(student.id, {})
     if mine.get('cur'):
         return None, 'busy'
@@ -319,3 +322,61 @@ def dm_get(rid, me, other):
 
 def dm_unread(rid, me):
     return cache.get(f'room:{rid}:unread:{int(me)}') or {}
+
+
+# ------------------------------------------------------------------ подсказки ассистента (без ИИ)
+
+TAG_TIPS = {
+    'for': 'Подумайте, сколько раз нужно повторить действие, и запишите это в range(...). Конец в range не входит.',
+    'while': 'Цикл while повторяет, пока условие верно. Не забудьте менять переменную внутри цикла — иначе он не закончится.',
+    'if/else': 'Выпишите все случаи из условия и для каждого — свою ветку if / elif / else. Проверьте граничные значения.',
+    'string': 'Строку удобно перебирать: for ch in s. Длина — len(s), символ по номеру — s[i] (нумерация с 0).',
+    'list': 'Список читают так: a = list(map(int, input().split())). Индексы идут с 0, последний — a[-1].',
+    'list-methods': 'Вспомните методы списка: append, insert, pop, remove, sort, count, index.',
+    'input/output': 'Каждый input() читает одну строку. Числа переводите через int(...). Выводите ровно то, что просят.',
+    'indexing': 'Индексы начинаются с 0; отрицательные считают с конца: s[-1] — последний.',
+}
+ERROR_TIPS = [
+    ('timeout', 'Программа работает слишком долго — возможно, бесконечный цикл или слишком много повторений.'),
+    ('memory', 'Программа использует слишком много памяти.'),
+    ('compile', 'Код не компилируется — проверьте ошибки компиляции.'),
+    ('SyntaxError', 'Синтаксическая ошибка: проверьте двоеточия, скобки и кавычки.'),
+    ('IndentationError', 'Ошибка отступов: тело цикла/условия должно быть сдвинуто на 4 пробела.'),
+    ('NameError', 'Используется переменная или функция, которой нет (опечатка в имени?).'),
+    ('ValueError', 'Неверное преобразование: например int() от строки с пробелами — проверьте, как читаете ввод.'),
+    ('ZeroDivisionError', 'Деление на ноль — проверьте, может ли делитель быть 0.'),
+    ('IndexError', 'Выход за границы: индекс больше длины строки/списка.'),
+    ('TypeError', 'Смешаны разные типы, например число и строка — переведите через int() или str().'),
+    ('EOFError', 'Программа читает больше строк ввода, чем дано.'),
+]
+
+
+def hint(task, student, lang='ru'):
+    """Подсказка по заданию: совет по теме, пример из условия, на каком тесте падает последнее решение."""
+    from .models import Submission
+    own = (task.hint_kk if lang == 'kk' and task.hint_kk else task.hint).strip()   # подсказка, которую учитель написал к задаче
+    tip = next((TAG_TIPS[g.name] for g in task.tags.all() if g.name in TAG_TIPS), None)
+    sub = (Submission.objects.filter(student=student, task=task).exclude(autotest_total=None)
+           .order_by('-updated_at').only('autotest_results', 'autotest_passed', 'autotest_total').first())
+    fail = None
+    if sub is not None:
+        for n, r in enumerate(sub.autotest_results or [], 1):
+            if not r.get('ok'):
+                err = str(r.get('error') or '')
+                why = next((t for key, t in ERROR_TIPS if key in err), None) or (
+                    'Неверный ответ на этом тесте — сравните свой вывод с условием.' if not err else err[:160])
+                fail = {'n': n, 'input': str(r.get('input') or '')[:200], 'why': why,
+                        'passed': sub.autotest_passed, 'total': sub.autotest_total}
+                break
+        if fail is None:
+            fail = {'n': 0, 'passed': sub.autotest_passed, 'total': sub.autotest_total}
+    if lang == 'kk':
+        from .templatetags.ui_i18n import UI_TRANSLATIONS as TR
+        tip = TR.get(tip, tip) if tip else tip
+        if fail and fail.get('why'):
+            fail['why'] = TR.get(fail['why'], fail['why'])
+    if own:
+        tip = own
+    return {'tip': tip, 'ex_in': task.get_display_input_example(lang)[:300],
+            'ex_out': (task.output_example_kk if lang == 'kk' and task.output_example_kk else task.output_example)[:300],
+            'fail': fail}

@@ -16,8 +16,8 @@
 </style>
 <div class="mb-3"><a href="{% url 'games_hub' %}" class="text-decoration-none text-muted small">← Игры</a></div>
 <h2 class="fw-bold mb-1" style="color:#1a1a4b">🏢 Компания «Пифагор»</h2>
-<p class="text-muted">Класс — сотрудники компании, вы — руководитель. Ученики ходят по 3D-офису, подходят к вашему столу и <b>сами</b> получают
-следующее задание из вашего списка (вам ничего нажимать не нужно). Пока задание не выполнено — нового не дают.
+<p class="text-muted">Класс — сотрудники компании «7B» (по названию класса), вы — руководитель и просто отдыхаете 😎. Выберите курс, тему и подтему —
+двое <b>ассистентов</b> сами раздают ученикам задачи этой подтемы по порядку (A → B → C) и дают подсказки. Пока задание не выполнено — нового не дают.
 За выполненное задание растёт зарплата: <b>A — 10 000 ₸</b>, <b>B — 20 000 ₸</b>, <b>C — 30 000 ₸</b>.
 Справа вы видите, кто над чем работает и у кого какая зарплата, поднятые руки ✋ и сообщения.</p>
 
@@ -44,12 +44,20 @@
     <div class="row g-3 mb-3">
         <div class="col-md-3"><label class="form-label small fw-semibold">Класс</label>
             <select name="school_class" class="form-select rounded-3" required>{% for c, n in classes %}<option value="{{ c }}">{{ c }} ({{ n }} уч.)</option>{% endfor %}</select></div>
-        <div class="col-md-6"><label class="form-label small fw-semibold">Тема урока</label>
-            <input name="title" class="form-control rounded-3" maxlength="120" placeholder="Например: Циклы while"></div>
+        <div class="col-md-6"><label class="form-label small fw-semibold">Название урока <span class="text-muted fw-normal">(необязательно — возьмём из подтемы)</span></label>
+            <input name="title" class="form-control rounded-3" maxlength="120" placeholder="Например: Циклы for"></div>
         <div class="col-md-3"><label class="form-label small fw-semibold">Длительность, минут</label>
             <input name="minutes" type="number" min="5" max="240" value="45" class="form-control rounded-3"></div>
     </div>
-    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <h6 class="fw-bold mt-1 mb-2">📚 Задачи из курса</h6>
+    <div class="row g-3 mb-2">
+        <div class="col-md-4"><label class="form-label small fw-semibold">Курс</label><select name="course" id="c-course" class="form-select rounded-3"></select></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Тема</label><select name="topic" id="c-topic" class="form-select rounded-3"></select></div>
+        <div class="col-md-4" id="c-sub-box"><label class="form-label small fw-semibold">Подтема</label><select name="subtopic" id="c-sub" class="form-select rounded-3"></select></div>
+    </div>
+    <div class="small text-muted mb-3" id="c-info"></div>
+    <details class="mb-3"><summary class="small fw-semibold" style="cursor:pointer">✋ Или выбрать задачи вручную</summary>
+    <div class="d-flex align-items-center gap-2 mb-2 mt-2 flex-wrap">
         <label class="form-label small fw-semibold mb-0">Задания</label>
         <span class="badge bg-primary rounded-pill" id="picked">0</span>
         <input id="tsearch" class="form-control form-control-sm rounded-pill ms-auto" style="max-width:280px" placeholder="🔍 Поиск по названию или теме">
@@ -78,9 +86,10 @@
         <ol id="olist" class="list-group list-group-numbered small"></ol>
         <div class="text-muted small" id="oempty">Отметьте задания в списке выше.</div>
     </div>
-    <h6 class="fw-bold mt-2 mb-2">📖 Теория на урок <span class="text-muted fw-normal small">(необязательно)</span></h6>
+    </details>
+    <h6 class="fw-bold mt-2 mb-2">📖 Теория <span class="text-muted fw-normal small">(теория подтемы откроется сама; здесь — дополнительно)</span></h6>
     <div class="row g-3 mb-3">
-        <div class="col-md-6">
+        <div class="col-md-6" style="display:none">
             <label class="form-label small fw-semibold">Теория из курса</label>
             <select name="theory_topic" id="theory-topic" class="form-select rounded-3">
                 <option value="">— без теории из курса —</option>
@@ -149,6 +158,27 @@
         (TOPICS[tsel.value] || []).forEach(function (id) { var i = list.querySelector('input[value="' + id + '"]'); if (i) { i.checked = true; } }); count(); filter();
     });
     list.addEventListener('change', count);
+    // курс → тема → подтема
+    var TREE = {{ tree_json|default:"[]"|safe }}, cs = document.getElementById('c-course'), ts = document.getElementById('c-topic'),
+        ss = document.getElementById('c-sub'), sbox = document.getElementById('c-sub-box'), info = document.getElementById('c-info');
+    function opt(v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; return o; }
+    function fillCourses() { cs.innerHTML = ''; if (!TREE.length) { cs.appendChild(opt('', '— в курсах нет задач —')); } TREE.forEach(function (c) { cs.appendChild(opt(c.id, c.name)); }); fillTopics(); }
+    function course() { return TREE.filter(function (c) { return String(c.id) === cs.value; })[0]; }
+    function topic() { var c = course(); return c ? c.topics.filter(function (t) { return String(t.id) === ts.value; })[0] : null; }
+    function fillTopics() { ts.innerHTML = ''; var c = course(); (c ? c.topics : []).forEach(function (t) { ts.appendChild(opt(t.id, t.name)); }); fillSubs(); }
+    function fillSubs() {
+        ss.innerHTML = ''; var t = topic();
+        if (!t || !t.subs.length) { sbox.style.display = 'none'; ss.appendChild(opt('', '')); }
+        else { sbox.style.display = ''; t.subs.forEach(function (x) { ss.appendChild(opt(x.id, x.name + ' (' + x.n + ')')); }); if (t.n) { ss.appendChild(opt('', '— вся тема (' + t.n + ') —')); } }
+        showInfo();
+    }
+    function showInfo() {
+        var t = topic(); if (!t) { info.textContent = ''; return; }
+        var x = t.subs.filter(function (y) { return String(y.id) === ss.value; })[0];
+        info.textContent = x ? '✓ Задач в подтеме: ' + x.n + ' (уровни ' + x.lv.split('').join(', ') + '). Ассистенты выдадут их по порядку A → B → C.' : '✓ Задач в теме: ' + t.n + '.';
+    }
+    cs.addEventListener('change', fillTopics); ts.addEventListener('change', fillSubs); ss.addEventListener('change', showInfo);
+    fillCourses();
 })();
 </script>
 {% endblock %}
