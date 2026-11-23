@@ -15,5 +15,6 @@ class Migration(migrations.Migration):
     dependencies = [('contest', '0077_district_olympiads')]
     operations = [
         migrations.RunPython(forwards, migrations.RunPython.noop),
-        migrations.RemoveField(model_name='exam', name='practice'),
+        # RemoveField — отдельной миграцией 0079: в PostgreSQL нельзя ALTER TABLE в той же транзакции,
+        # где удаление строк оставило отложенные проверки (pending trigger events).
     ]
