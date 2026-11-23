@@ -3214,7 +3214,8 @@ class OlympiadTests(RetakeTestBase):
         self.client.force_login(self.out_student.user)                  # одноклассник без приглашения — нет
         page = self.client.get(reverse('olympiad_list'))
         self.assertNotContains(page, 'Школьная олимпиада')
-        self.assertNotContains(self.client.get(reverse('all_tasks')), reverse('olympiad_list'))   # и пункта меню нет
+        # пункт меню «Олимпиада» есть у всех — там «Подготовка к районным олимпиадам» (открыта всем)
+        self.assertContains(self.client.get(reverse('all_tasks')), reverse('olympiad_list'))
         r = self.client.get(reverse('exam_detail', args=[self.olymp.id]))
         self.assertRedirects(r, reverse('exam_list'))
         self.client.post(reverse('exam_start', args=[self.olymp.id]))
@@ -3341,6 +3342,46 @@ class OlympiadUpsolveTests(RetakeTestBase):
         self.olymp.upsolve = True; self.olymp.save()
         self.client.force_login(self.students[1].user)                       # не участник
         self.assertRedirects(self.client.get(reverse('olympiad_upsolve', args=[self.olymp.id])), reverse('olympiad_list'))
+
+
+class DistrictPracticeTests(RetakeTestBase):
+    """«Подготовка к районным олимпиадам»: 10 прошлых олимпиад (из миграции) открыты всем ученикам без участников."""
+
+    def test_loaded_from_migration(self):
+        practice = Exam.objects.filter(kind='OLYM', practice=True)
+        self.assertEqual(practice.count(), 10)
+        tasks = Task.objects.filter(exams__in=practice).distinct()
+        self.assertEqual(tasks.count(), 31)
+        for t in tasks:
+            self.assertTrue(t.hidden)
+            self.assertEqual(len(t.test_cases), 10, t.title)
+            for ex in t.examples:     # примеры из условия — первые тесты
+                self.assertIn({'input': ex['input'] + '\n', 'output': ex['output']}, t.test_cases[:len(t.examples)])
+        from .district_olympiads import load
+        load(Exam, Task)              # повторная загрузка ничего не дублирует
+        self.assertEqual(Exam.objects.filter(practice=True).count(), 10)
+        self.assertEqual(Task.objects.filter(exams__practice=True).distinct().count(), 31)
+
+    def test_any_student_solves_without_participation(self):
+        exam = Exam.objects.get(practice=True, title='Районная олимпиада 2020-2021')
+        task = exam.tasks.get(title__startswith='A. Олимпиада')
+        st = self.students[0]
+        self.assertFalse(exam.participants.exists())
+        self.client.force_login(st.user)
+        html = self.client.get(reverse('olympiad_list')).content.decode()
+        self.assertIn('Подготовка к районным олимпиадам', html)
+        self.assertIn(reverse('olympiad_upsolve', args=[exam.id]), html)
+        self.assertContains(self.client.get(reverse('olympiad_upsolve', args=[exam.id])), 'A. Олимпиада')
+        url = reverse('olympiad_upsolve_task', args=[exam.id, task.id])
+        self.assertContains(self.client.get(url), 'Ограничение времени на тест')
+        self.client.post(url, {'code': 'a, b, c, d = map(int, input().split())\nprint(a * b * c * d)', 'language': 'python'})
+        from .models import UpsolveAnswer
+        self.assertEqual(UpsolveAnswer.objects.get(exam=exam, student=st, task=task).best_score, 100)
+        self.assertContains(self.client.get(reverse('olympiad_list')), '100 / 300')
+        self.client.force_login(self.teacher_user)
+        html = self.client.get(reverse('olympiad_list')).content.decode()
+        self.assertIn('тренировка', html)
+        self.assertContains(self.client.get(reverse('exam_results', args=[exam.id])), st.full_name)
 
 
 class OlympiadGroupScoringTests(RetakeTestBase):

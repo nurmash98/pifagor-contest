@@ -1,17 +1,18 @@
 {% extends 'base.html' %}
 {% load ui_i18n %}
 
-{% block title %}{{ task.display_title }} · {% t "Дорешивание" %} - {{ exam.title }}{% endblock %}
+{% block title %}{{ task.display_title }} · {% if exam.practice %}{% t "Подготовка к районным олимпиадам" %}{% else %}{% t "Дорешивание" %}{% endif %} - {{ exam.title }}{% endblock %}
 
 {% block content %}
 <div class="mb-3 d-flex justify-content-between align-items-center">
-    <a href="{% url 'olympiad_upsolve' exam.id %}" class="text-decoration-none text-muted small">← 🔁 {% t "Дорешивание" %}: {{ exam.title }}</a>
+    <a href="{% url 'olympiad_upsolve' exam.id %}" class="text-decoration-none text-muted small">← {% if exam.practice %}📚 {{ exam.title }}{% else %}🔁 {% t "Дорешивание" %}: {{ exam.title }}{% endif %}</a>
 </div>
 
 <div class="row g-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm rounded-4 p-4">
-            <h4 class="fw-bold mb-3" style="color: #1a1a4b;">{{ task.display_title }}</h4>
+            <h4 class="fw-bold mb-1" style="color: #1a1a4b;">{{ task.display_title }}</h4>
+            <div class="text-muted small mb-3">⏱ {% t "Ограничение времени на тест" %}: {{ task.time_limit }} {% t "с" %}</div>
             <p class="lh-lg">{{ task.display_description|linebreaksbr }}</p>
             {% include 'task_examples.html' %}
         </div>

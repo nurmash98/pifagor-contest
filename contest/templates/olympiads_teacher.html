@@ -44,4 +44,25 @@
         {% endfor %}
     </ul>
 </div>
+
+{% if practice %}
+<h5 class="fw-bold mt-4 mb-1" style="color: #1a1a4b;">📚 Подготовка к районным олимпиадам</h5>
+<p class="text-muted small">Прошлые районные олимпиады (2-й этап РО, 2019–2026) с тестами. Открыты <b>всем ученикам</b> всегда — участников добавлять не нужно, решают без ограничения времени.</p>
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <ul class="list-group list-group-flush">
+        {% for o in practice %}
+        <li class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <strong style="color: #1a1a4b;">{{ o.title }}</strong> <span class="badge bg-success-subtle text-success border ms-1">тренировка</span>
+                <div class="text-muted small">задач: {{ o.n_tasks }} · решали: {{ o.solvers }} учен.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'exam_preview' o.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Условия задач">👁 Задачи</a>
+                <a href="{% url 'exam_results' o.id %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">Результаты</a>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 {% endblock %}

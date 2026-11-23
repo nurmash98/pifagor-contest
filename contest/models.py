@@ -444,6 +444,9 @@ class Exam(models.Model):
     # Олимпиада: после окончания (и всего доп. времени) участники могут дорешивать задачи без ограничения времени.
     # Баллы дорешивания хранятся отдельно (UpsolveAnswer) и на места не влияют.
     upsolve = models.BooleanField(default=True, verbose_name="Дорешивание после окончания")
+    # Тренировка («Подготовка к районным олимпиадам»): прошлые олимпиады, задачи открыты всем ученикам
+    # всегда, без участников и без времени — решают как в дорешивании.
+    practice = models.BooleanField(default=False, verbose_name="Тренировка (открыта всем ученикам)")
     created_by = models.ForeignKey('Teacher', null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name='exams', verbose_name="Кто создал")
     created_at = models.DateTimeField(auto_now_add=True)
