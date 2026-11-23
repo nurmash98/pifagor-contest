@@ -150,6 +150,10 @@ if os.environ.get('DJANGO_DB_ENGINE') == 'postgres':
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
             # Некоторые бесплатные Postgres-хостинги (например, Neon) требуют SSL.
             'OPTIONS': {'sslmode': os.environ.get('POSTGRES_SSLMODE', 'prefer')},
+            # Держать соединение открытым между запросами: до Neon (Франкфурт) каждое новое
+            # SSL-соединение — это ~0,3–0,5 с на каждый запрос.
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', 60)),
+            'CONN_HEALTH_CHECKS': True,
         }
     }
 else:
