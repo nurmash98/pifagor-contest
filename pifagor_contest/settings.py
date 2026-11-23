@@ -68,7 +68,12 @@ INSTALLED_APPS = [
     'contest',
 ]
 
+# Сайт переехал: на старом хостинге задайте SITE_MOVED_TO=https://pifagor.infosabaq.kz —
+# все страницы будут перенаправляться туда (тот же путь).
+SITE_MOVED_TO = os.environ.get('SITE_MOVED_TO', '').strip()
+
 MIDDLEWARE = [
+    'contest.middleware.MovedSiteMiddleware',
     # Настоящий IP ученика за nginx (только при TRUST_X_REAL_IP=True — см. deploy/DEPLOY_HOME.md)
     'contest.middleware.RealIPMiddleware',
     'django.middleware.security.SecurityMiddleware',

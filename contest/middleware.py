@@ -86,3 +86,19 @@ class PollingSessionMiddleware(SessionMiddleware):
             if not cache.add(f'sess:touch:{session.session_key}', 1, 300):
                 return response
         return super().process_response(request, response)
+
+
+class MovedSiteMiddleware:
+    """Сайт переехал: если задан SITE_MOVED_TO (например, на старом Render —
+    https://pifagor.infosabaq.kz), любой адрес отправляется туда же на ту же страницу (301)."""
+
+    def __init__(self, get_response):
+        from django.conf import settings
+        self.get_response = get_response
+        self.target = (getattr(settings, 'SITE_MOVED_TO', '') or '').rstrip('/')
+
+    def __call__(self, request):
+        if self.target:
+            from django.http import HttpResponsePermanentRedirect
+            return HttpResponsePermanentRedirect(self.target + request.get_full_path())
+        return self.get_response(request)
