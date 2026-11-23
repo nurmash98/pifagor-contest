@@ -87,8 +87,10 @@
                     {% if holiday %}<span class="me-2 d-inline-flex">{% include "holiday_flag.html" with uid="nav" h=40 %}</span>{% else %}
                     <img src="{% static 'icons/logo-tree.png' %}" alt="" height="42" class="me-2 logo-light">
                     <img src="{% static 'icons/logo-tree-dark.png' %}" alt="" height="42" class="me-2 logo-dark">{% endif %}
-                    <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
-                    <span style="color: #008b42; font-size: 1.5rem;" class="ms-1">CONTEST</span>
+                    <div class="d-flex flex-column lh-1">
+                        <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
+                        <div class="brand-sub" style="color: #008b42;">Информатика</div>
+                    </div>
                 </a>
                 <!-- Ночной / дневной режим -->
                 {% include "theme_toggle.html" %}

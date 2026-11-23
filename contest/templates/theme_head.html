@@ -67,9 +67,12 @@
     [data-bs-theme="dark"] .btn-outline-success { --bs-btn-color: #4fd18b; --bs-btn-border-color: #34a86a; }
     [data-bs-theme="dark"] .text-muted { color: rgba(228, 231, 240, .62) !important; }
     [data-bs-theme="dark"] input[type="date"], [data-bs-theme="dark"] input[type="datetime-local"], [data-bs-theme="dark"] input[type="time"] { color-scheme: dark; }
+    .brand-sub { font-size: .72rem; font-weight: 600; letter-spacing: .04em; margin-top: .2rem; }
+    [data-bs-theme="dark"] .brand-sub { color: #4fd18b !important; }
     /* телефон: логотип и кнопка меню в одной строке, без лишней полоски у имени */
     @media (max-width: 575.98px) {
         .navbar-brand span { font-size: 1.12rem !important; }
+        .brand-sub { font-size: .6rem; margin-top: .1rem; }
         .navbar-brand img, .navbar-brand svg { height: 30px !important; width: auto; }
         .navbar > .container > .d-flex { gap: .5rem !important; }
         .kz-holiday .container { gap: .5rem !important; flex-wrap: wrap; font-size: .85rem; text-align: center; }
