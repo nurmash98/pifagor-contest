@@ -142,12 +142,12 @@ class MaintenanceMiddleware:
 
 
 MAINTENANCE_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Технические неполадки</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Технические работы</title>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
 font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f3f5fb;color:#1a1a4b;padding:16px}
 .box{max-width:460px;text-align:center;background:#fff;border-radius:20px;padding:36px 28px;box-shadow:0 8px 30px rgba(26,26,75,.12)}
 .ic{font-size:56px}h1{font-size:26px;margin:12px 0 8px}p{color:#555;font-size:16px;line-height:1.5;margin:6px 0}</style></head>
 <body><div class="box"><div class="ic">🚧</div><h1>Вход воспрещён</h1>
-<p><b>Технические неполадки.</b> Сайт временно недоступен.</p>
+<p><b>Идут технические работы.</b> Сайт временно недоступен.</p>
 <p>Попробуйте зайти после <b>{until}</b>.</p>
-<p style="margin-top:14px">Кіру уақытша жабық — техникалық ақаулар.<br>{until} кейін кіріңіз.</p></div></body></html>"""
+<p style="margin-top:14px">Кіру уақытша жабық — техникалық жұмыстар жүргізілуде.<br>{until} кейін кіріңіз.</p></div></body></html>"""
