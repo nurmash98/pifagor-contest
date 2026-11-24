@@ -70,6 +70,8 @@ def layout(n_students):
     put('bean', 15, 4)
     put('bean', 17, 4)
     put('plant', 9, 1)
+    for (cx, cy) in ((13, 3), (16, 3), (13, 5)):     # котики в лаунже — рядом с ними снижается стресс
+        put('cat', cx, cy, solid=False)
     # --- переговорная: x 20..26, y 1..6; стекло по y=7 (дверь x=23) и по x=19
     put('zone', 20, 1, 7, 6, solid=False, c='wood')
     for x in (20, 21, 22, 24, 25, 26):
@@ -451,3 +453,12 @@ def award_top(room):
         r.save(update_fields=['top_awarded'])
     room.top_awarded = True
     return winners
+
+
+RAIN_COINS, RAIN_WINDOW = 50, 60     # последняя минута урока — дождь из монет: всего 50 монет на класс
+
+
+def rain_taken(rid):
+    """Номера уже пойманных монет дождя."""
+    got = cache.get_many([f'room:{rid}:rain:{n}' for n in range(RAIN_COINS)])
+    return sorted(int(k.rsplit(':', 1)[1]) for k in got)

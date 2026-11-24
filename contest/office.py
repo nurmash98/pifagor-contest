@@ -126,6 +126,8 @@ def layout(grade_list):
     put('bean', lx + 1, 13)
     put('bean', lx + 3, 13)
     put('cooler', lx + 4, 15)
+    for (cx, cy) in ((lx + 2, 9), (lx + 1, 11), (lx + 3, 11)):     # котики: рядом с ними снижается стресс
+        put('cat', cx, cy, solid=False)
     for (px, py) in ((lx + 4, 1), (lx, 17), (lx + 4, 17)):
         put('plant', px, py)
     # руководителей больше нет: задания (3 задачи + премию) дают преподаватели-ағайлар

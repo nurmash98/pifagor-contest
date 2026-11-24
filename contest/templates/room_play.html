@@ -48,6 +48,19 @@
         .log { font-size: 12px; padding: 4px 0; border-bottom: 1px dashed var(--cardline); } .log b { color: #4338ca; } .log.t b { color: #b45309; }
         .handrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(251,191,36,.25); border-radius: 10px; margin-bottom: 5px; font-weight: 600; cursor: pointer; }
         #say, #zoom button, #help, #chat { border: 1px solid var(--cardline); }
+        #stress { display: inline-flex; align-items: center; gap: 6px; }
+        #stress .sbar { width: 70px; height: 8px; border-radius: 6px; background: var(--cardline); overflow: hidden; }
+        #stress .sbar i { display: block; height: 100%; width: 0; background: #22c55e; transition: width .6s, background .6s; }
+        #chat-top { position: relative; } #chat-badge { position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 6px; font-weight: 800; }
+        #chat-top.ping { animation: cping 1s ease-in-out 3; } @keyframes cping { 50% { transform: scale(1.15); box-shadow: 0 0 0 4px rgba(239,68,68,.35); } }
+        #chat-list { position: absolute; top: 8px; right: 60px; z-index: 30; width: min(300px, calc(100% - 80px)); max-height: 60%; overflow-y: auto; display: none; background: var(--card); border: 1px solid var(--cardline); border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.25); padding: 6px; }
+        #chat-list .crow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit; font-weight: 600; cursor: pointer; }
+        #chat-list .crow:hover { background: rgba(99,102,241,.12); } #chat-list .crow b { margin-left: auto; background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; }
+        #fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+        #fx.storm { animation: fx-storm 2.6s steps(1) infinite; } @keyframes fx-storm { 0%,100% { background: rgba(15,23,42,.45); } 8% { background: rgba(255,255,255,.55); } 12% { background: rgba(15,23,42,.55); } 15% { background: rgba(255,255,255,.4); } 20% { background: rgba(15,23,42,.45); } }
+        #fx .fl { position: absolute; top: -40px; animation: fx-fall linear infinite; } @keyframes fx-fall { to { transform: translate(-60px, 110vh) rotate(200deg); } }
+        #fx .cat { position: absolute; font-size: 34px; animation: fx-fly linear infinite; filter: drop-shadow(0 0 6px #f0abfc); } @keyframes fx-fly { from { transform: translateX(-80px); } to { transform: translateX(110vw); } }
+        #fx .cat::after { content: ""; position: absolute; right: 100%; top: 45%; width: 70px; height: 10px; border-radius: 6px; background: linear-gradient(90deg, transparent, #f87171, #facc15, #4ade80, #60a5fa, #c084fc); }
         #say { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; background: var(--panel); padding: 6px; border-radius: 999px; box-shadow: 0 6px 20px rgba(15,23,42,.15); width: min(520px, calc(100% - 24px)); }
         #say input { flex: 1; border: 0; outline: 0; padding: 6px 12px; font-size: 14px; background: transparent; min-width: 0; color: var(--fg); }
         #zoom { position: absolute; right: 12px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
@@ -140,6 +153,8 @@
     <span class="sp"></span>
     <span class="chip" title="{% t "В зале" %}">👥 <span id="online">0</span></span>
     <span class="chip" id="tchip">⏱ <span id="timer">--:--</span></span>
+    {% if not teacher %}<span class="chip" id="stress" title="{% t "Стресс" %}">😰 <span class="sbar"><i id="stress-v"></i></span></span>{% endif %}
+    <button class="btn ghost" id="chat-top" type="button">💬 <span data-tr="Чат">{% t "Чат" %}</span><b id="chat-badge" style="display:none">0</b></button>
     {% if not teacher %}<button class="btn hand" id="hand" type="button">✋ <span data-tr="Поднять руку">{% t "Поднять руку" %}</span></button>{% endif %}
     <span id="lang" class="chip"><button type="button" data-l="ru" class="{% if content_lang != 'kk' %}on{% endif %}">RU</button><button type="button" data-l="kk" class="{% if content_lang == 'kk' %}on{% endif %}">KZ</button></span>
     <span class="chip" id="music-box" style="padding:3px 8px 3px 3px"><button class="btn ghost" id="music" type="button" title="Музыка" style="padding:5px 10px">🎵</button><input id="music-vol" type="range" min="0" max="100" value="50" title="Громкость" style="width:70px"></span>
@@ -162,6 +177,7 @@
             <div class="msgs" id="chat-msgs"></div>
             <div id="chat-quick"></div>
             <form id="chat-form" autocomplete="off"><input id="chat-in" maxlength="200" data-trp="Написать сообщение…" placeholder="{% t "Написать сообщение…" %}"><button class="btn" type="submit">➤</button></form></div>
+        <div id="fx"></div><div id="chat-list"></div>
         <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><iframe id="d-frame"></iframe></div>
     </div>
     <aside id="side">
@@ -281,7 +297,7 @@
         Object.keys(people).forEach(function (k) {
             var p = people[k];
             if (!p.route.length || p.rx === null) { return; }
-            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = (p.bot ? 1.3 : OFFICE ? 5.5 : 3.6) * dt;   // персонажи ходят спокойно
+            var t = p.route[0], dx = t[0] - p.rx, dy = t[1] - p.ry, d = Math.sqrt(dx * dx + dy * dy), sp = (p.bot ? 1.3 : OFFICE ? 5.5 : 3.6) * dt * (p.id === ME ? myMul() : 1);   // персонажи ходят спокойно
             if (d <= sp) { p.rx = t[0]; p.ry = t[1]; p.route.shift(); if (!p.route.length && p.id === ME) { arrived(); } }
             else { p.rx += dx / d * sp; p.ry += dy / d * sp; p.walk = (p.walk || 0) + dt * 10; }
         });
@@ -415,6 +431,11 @@
             rr(s[0] - w / 2, s[1] - 9 * zoom, w, 18 * zoom, 6 * zoom); ctx.fillStyle = '#0369a1'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(t, s[0], s[1]); ctx.restore();
         },
         table: function (o) { box(o.x + .15, o.y + .15, .7, .7, 0, .3, '#f5f5f4'); ellipse(o.x + .45, o.y + .45, .33, 5, 3, '#fb923c'); },
+        cat: function (o) {
+            var b = Math.abs(Math.sin(performance.now() / 600 + o.x)) * .08, s = scr(o.x + .5, o.y + .5, .1 + b);
+            ellipse(o.x + .5, o.y + .5, .01, 16, 8, 'rgba(0,0,0,.12)');
+            ctx.font = Math.round(26 * zoom) + 'px serif'; ctx.textAlign = 'center'; ctx.fillText(o.x % 2 ? '🐈' : '🐈‍⬛', s[0], s[1]); ctx.textAlign = 'start';
+        },
         bean: function (o) { ellipse(o.x + .5, o.y + .5, .15, 20, 12, o.x % 4 ? '#f472b6' : '#facc15'); ellipse(o.x + .5, o.y + .45, .3, 15, 9, o.x % 4 ? '#f9a8d4' : '#fde047'); }
     };
     var ZONE = {wood: ['#e8d5bc', '#e2cdb2'], lounge: ['#dcfce7', '#d1fae5'], carpet: ['#e2e8f0', '#dde3ec']};
@@ -525,12 +546,14 @@
         var w = cv.clientWidth, h = cv.clientHeight;
         if (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR)) { cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR); }
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        if (EV && EV.k === 'quake') { ctx.translate((Math.random() - .5) * 14, (Math.random() - .5) * 9); }
         var g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, P.sky1); g.addColorStop(1, P.sky2); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
         occupied = {}; Object.keys(people).forEach(function (k) { var p = people[k]; if (p.seat && !p.route.length && seatById[p.seat]) { occupied[seatById[p.seat].x + ',' + seatById[p.seat].y] = true; } });
         drawFloor();
         var items = [];
         L.objs.forEach(function (o) { if (DRAW[o.t]) { items.push({k: o.t === 'logo' || o.t === 'tv' ? -100 : o.t === 'sign' ? o.x + o.y + 2.5 : o.x + o.w / 2 + o.y + o.d / 2 + (o.t === 'chair' ? .05 : 0), f: DRAW[o.t], o: o}); } });
         Object.keys(people).forEach(function (k) { var p = people[k]; if (p.rx !== null) { items.push({k: p.rx + p.ry + 1.2, p: p}); } });
+        rainCoins().forEach(function (c) { items.push({k: c.x + c.y + 1.1, f: drawCoin, o: c}); });
         items.sort(function (a, b) { return a.k - b.k; });
         items.forEach(function (it) { if (it.p) { drawPerson(it.p); } else { it.f(it.o); } });
         updateLabels();
@@ -618,6 +641,7 @@
         var me = people[ME]; if (!me || me.rx === null) { return; }
         var m = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0]}[e.key];
         if (!m) { return; }
+        if (!TEACHER && STRESS >= 85) { m = [-m[0], -m[1]]; }                 // стресс: клавиши путаются (только ходьба)
         e.preventDefault();
         var bx = me.route.length ? me.route[me.route.length - 1][0] : Math.round(me.rx), by = me.route.length ? me.route[me.route.length - 1][1] : Math.round(me.ry);
         var nx = bx + m[0], ny = by + m[1];
@@ -816,6 +840,137 @@
     }
     function paintHand() { var b = $('hand'); if (!b) { return; } b.classList.toggle('on', handUp); b.textContent = '✋ ' + (handUp ? TXT.hand_up : TXT.hand); }
 
+    // ---------------- стресс, кофе, котики, события, дождь из монет, чат ----------------
+    var SKEY = 'pf-stress:' + U.act, STRESS = 0, coffeeAt = 0, nearSince = 0, srvOff = 0, EV = null, evShown = null;
+    var catMsg = false, coffeeMsg = false, hiWarned = false, RAIN_TAKEN = {}, rainPend = {}, rainToast = false;
+    try { var sv = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (sv) { STRESS = +sv[0] || 0; coffeeAt = +sv[1] || 0; } } catch (e) {}
+    function nowS() { return Date.now() / 1000 + srvOff; }
+    var COFFEE = L.objs.filter(function (o) { return o.t === 'coffee'; }), CATS = L.objs.filter(function (o) { return o.t === 'cat'; });
+    function near(list, me) { var b = 1e9; list.forEach(function (o) { var dx = o.x + .5 - me.rx, dy = o.y + .5 - me.ry; b = Math.min(b, Math.sqrt(dx * dx + dy * dy)); }); return b; }
+    function myMul() { return (TEACHER ? 1 : STRESS >= 85 ? .5 : STRESS >= 60 ? .7 : 1) * (EV && EV.k === 'snow' ? .6 : 1); }
+    function paintStress() {
+        if (!$('stress-v')) { return; }
+        $('stress-v').style.width = Math.round(STRESS) + '%';
+        $('stress-v').style.background = STRESS >= 85 ? '#ef4444' : STRESS >= 60 ? '#f59e0b' : '#22c55e';
+        $('stress').title = TXT.stress + ': ' + Math.round(STRESS) + '%';
+    }
+    setInterval(function () {
+        if (TEACHER) { return; }
+        var me = people[ME]; if (!me || me.rx === null) { return; }
+        var t = nowS(), calm = EV && EV.k === 'cats';
+        if (seated && !calm) { STRESS = Math.min(100, STRESS + 1 / 6); }      // ~10 минут за столом — шкала полная
+        if (near(CATS, me) <= 2.2) { STRESS = Math.max(0, STRESS - 4); if (!catMsg) { toast('🐈 ' + TXT.cats_pet); catMsg = true; } } else { catMsg = false; }
+        if (near(COFFEE, me) <= 2.4 && !me.route.length) {
+            nearSince = nearSince || t;
+            if (t - nearSince >= 2) {
+                if (t - coffeeAt >= 120) { coffeeAt = t; STRESS = Math.max(0, STRESS - 40); toast('☕ ' + TXT.coffee_ok); }
+                else if (!coffeeMsg) { toast('☕ ' + TXT.coffee_wait.replace('{s}', Math.ceil(120 - (t - coffeeAt)))); coffeeMsg = true; }
+            }
+        } else { nearSince = 0; coffeeMsg = false; }
+        if (STRESS >= 85 && !hiWarned) { toast('😵 ' + TXT.stress_hi); hiWarned = true; } if (STRESS < 70) { hiWarned = false; }
+        try { localStorage.setItem(SKEY, JSON.stringify([Math.round(STRESS * 10) / 10, coffeeAt])); } catch (e) {}
+        paintStress();
+    }, 1000);
+    paintStress();
+
+    // события: у всех в зале одинаковые (по часам сервера и номеру зала)
+    function hashStr(x) { var h = 7; for (var i = 0; i < x.length; i++) { h = (h * 31 + x.charCodeAt(i)) | 0; } return Math.abs(h); }
+    function rng(seed) { seed = seed % 2147483647 || 1; return function () { seed = seed * 16807 % 2147483647; return (seed - 1) / 2147483646; }; }
+    var EVK = [['quake', 7], ['storm', 25], ['snow', 30], ['cats', 60]];
+    function eventAt(t) {
+        var slot = Math.floor(t / 300), r = rng(hashStr(U.act) + slot * 7919);
+        r(); if (r() > .6) { return null; }                                  // в 60% пятиминуток что-то случается
+        var e = EVK[Math.floor(r() * EVK.length)], st = slot * 300 + 30 + Math.floor(r() * 200);
+        return t >= st && t < st + e[1] ? {k: e[0], id: slot} : null;
+    }
+    function fxPaint() {
+        var fx = $('fx'), k = EV ? EV.k : '';
+        fx.className = k === 'storm' ? 'storm' : '';
+        if (k === 'snow' || k === 'storm') {
+            var ch = k === 'snow' ? '❄' : '💧', h = '';
+            for (var i = 0; i < 40; i++) { h += '<span class="fl" style="left:' + (Math.random() * 110) + '%;font-size:' + (10 + Math.random() * 14) + 'px;animation-duration:' + (2 + Math.random() * 3) + 's;animation-delay:-' + (Math.random() * 4) + 's;opacity:' + (.5 + Math.random() * .5) + '">' + ch + '</span>'; }
+            fx.innerHTML = h;
+        } else if (k === 'cats') {
+            var c = '';
+            for (var j = 0; j < 7; j++) { c += '<span class="cat" style="top:' + (8 + j * 12) + '%;animation-duration:' + (6 + Math.random() * 6) + 's;animation-delay:-' + (Math.random() * 8) + 's">' + (j % 2 ? '🐈' : '🐱') + '🪽</span>'; }
+            fx.innerHTML = c;
+        } else { fx.innerHTML = ''; }
+    }
+    setInterval(function () {
+        var e = eventAt(nowS()), sig = e ? e.k + e.id : null;
+        if (sig !== evShown) { EV = e; evShown = sig; fxPaint(); if (e) { toast({quake: '🌍 ', storm: '⚡ ', snow: '❄️ ', cats: '🌈 '}[e.k] + TXT['ev_' + e.k]); } }
+    }, 500);
+
+    // дождь из монет: последняя минута урока, всего 50 монет на класс
+    var RAIN_N = 50, RAIN_W = 60;
+    function rainEnd() { return timerLeft == null ? null : timerAt / 1000 + srvOff + timerLeft; }
+    function rainCoins() {
+        if (OFFICE) { return []; }
+        var end = rainEnd(); if (end === null) { return []; }
+        var t = nowS(), since = t - (end - RAIN_W); if (since < 0 || t > end + 2) { return []; }
+        var out = [];
+        for (var n = 0; n < RAIN_N; n++) {
+            var at = n * RAIN_W / RAIN_N; if (at > since) { break; }
+            if (RAIN_TAKEN[n]) { continue; }
+            var r = rng(hashStr(U.act) + n * 104729 + 13), x, y, k = 0;
+            do { x = Math.floor(r() * W); y = Math.floor(r() * H); k++; } while (!free(x, y) && k < 60);
+            if (!free(x, y)) { continue; }
+            out.push({n: n, x: x, y: y, z: Math.max(0, 3 - (since - at) * 3)});
+        }
+        return out;
+    }
+    function drawCoin(c) {
+        if (!c.z) { ellipse(c.x + .5, c.y + .5, .01, 10, 5, 'rgba(0,0,0,.18)'); }
+        var b = Math.sin(performance.now() / 250 + c.n) * .03;
+        ellipse(c.x + .5, c.y + .5, .25 + c.z + b, 9, 9, '#ca8a04'); ellipse(c.x + .5, c.y + .5, .26 + c.z + b, 7, 7, '#facc15');
+    }
+    setInterval(function () {
+        var cs = rainCoins();
+        if (cs.length && !rainToast) { rainToast = true; toast('🪙 ' + TXT.rain); }
+        if (TEACHER) { return; }
+        var me = people[ME]; if (!me || me.rx === null) { return; }
+        cs.forEach(function (c) {
+            if (c.z || rainPend[c.n]) { return; }
+            var dx = c.x + .5 - (me.rx + .5), dy = c.y + .5 - (me.ry + .5);
+            if (Math.sqrt(dx * dx + dy * dy) > .9) { return; }
+            rainPend[c.n] = true; RAIN_TAKEN[c.n] = true;
+            post({a: 'coin', n: c.n}).then(function (d) { if (d.ok) { toast('🪙 +1 · ' + TXT.rain_got); } });
+        });
+    }, 200);
+
+    // чат сверху: кто написал (даже если уже ушёл) и с кем недавно переписывались
+    var CKEY = 'pf-chats:' + U.act, RECENT = [];
+    try { RECENT = JSON.parse(localStorage.getItem(CKEY) || '[]') || []; } catch (e) {}
+    function rememberChat(uid, name) {
+        if (!uid || uid < 0 || !name) { return; }
+        RECENT = [[uid, name]].concat(RECENT.filter(function (r) { return r[0] !== uid; })).slice(0, 12);
+        try { localStorage.setItem(CKEY, JSON.stringify(RECENT)); } catch (e) {}
+    }
+    function paintChatBadge() {
+        var n = 0; Object.keys(UNREAD).forEach(function (k) { n += UNREAD[k]; });
+        $('chat-badge').style.display = n ? '' : 'none'; $('chat-badge').textContent = n;
+        if ($('chat-list').style.display === 'block') { chatListPaint(); }
+    }
+    function pingChat() { var b = $('chat-top'); b.classList.remove('ping'); void b.offsetWidth; b.classList.add('ping'); }
+    function nameOf(uid) { return people[uid] ? people[uid].name : CHATNAME[uid] || ''; }
+    function chatListPaint() {
+        var rows = [], seen = {};
+        Object.keys(UNREAD).sort(function (a, b) { return UNREAD[b] - UNREAD[a]; }).forEach(function (k) {
+            if (+k > 0 && nameOf(k)) { rows.push([+k, nameOf(k), UNREAD[k]]); seen[k] = true; }
+        });
+        RECENT.forEach(function (r) { if (!seen[r[0]]) { rows.push([r[0], nameOf(r[0]) || r[1], 0]); seen[r[0]] = true; } });
+        $('chat-list').innerHTML = rows.length ? rows.map(function (r) {
+            return '<button type="button" class="crow" data-uid="' + r[0] + '" data-n="' + esc(r[1]) + '">' + (people[r[0]] ? '🟢' : '⚪') + ' ' + esc(r[1]) + (r[2] ? '<b>' + r[2] + '</b>' : '') + '</button>';
+        }).join('') : '<div class="hint" style="padding:10px">' + TXT.chat_empty + '</div>';
+    }
+    $('chat-top').addEventListener('click', function () {
+        var l = $('chat-list'); if (l.style.display === 'block') { l.style.display = 'none'; return; }
+        chatListPaint(); l.style.display = 'block';
+    });
+    $('chat-list').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-uid]'); if (b) { openChat(b.getAttribute('data-uid'), b.getAttribute('data-n')); }
+    });
+
     // ---------------- опрос сервера ----------------
     var timerLeft = null, timerAt = 0;
     function poll(fresh) {
@@ -823,6 +978,9 @@
         fetch(U.state + (qs === '?' ? '' : qs), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(apply).catch(function () {});
     }
     function apply(d) {
+        if (d.now) { srvOff = d.now - Date.now() / 1000; }
+        if (d.rain) { d.rain.forEach(function (n) { RAIN_TAKEN[n] = true; }); }
+        if (d.names) { Object.keys(d.names).forEach(function (k) { CHATNAME[k] = d.names[k]; }); }
         applyDm(d);
         if (!d.open && !TEACHER) { $('closed').style.display = 'flex'; }
         var seen = {}, agOn = {};
@@ -966,6 +1124,7 @@
         var who = people[uid], ag = agaiOf(uid);
         chatWith = uid; $('chat-name').textContent = ag ? '👨‍🏫 ' + ag.name + (who ? '' : ' · ' + TXT.agai_away) : (who ? (who.teacher ? '👔 BOSS · ' : '') + who.name : CHATNAME[uid]);
         $('chat').style.display = 'flex'; $('chat-msgs').innerHTML = ''; $('chat-in').focus(); poll();
+        rememberChat(uid, who ? who.name : CHATNAME[uid]); $('chat-list').style.display = 'none';
     }
     function renderConv(conv) {
         var box = $('chat-msgs'), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
@@ -989,10 +1148,11 @@
         UNREAD = {}; Object.keys(d.unread || {}).forEach(function (k) { UNREAD[k] = d.unread[k]; });
         if (d.conv && chatWith === d.conv[0]) { renderConv(d.conv[1]); delete UNREAD[chatWith]; }
         var sig = JSON.stringify(UNREAD);
+        paintChatBadge();
         if (sig !== lastUnreadSig) {
             Object.keys(UNREAD).forEach(function (k) {
                 var was = (JSON.parse(lastUnreadSig || '{}'))[k] || 0;
-                if (UNREAD[k] > was && people[k]) { toast('💬 ' + people[k].name + ' — ' + TXT.dm_new); }
+                if (UNREAD[k] > was && (people[k] || CHATNAME[k])) { toast('💬 ' + (people[k] ? people[k].name : CHATNAME[k]) + ' — ' + TXT.dm_new); pingChat(); }
             });
             lastUnreadSig = sig;
         }

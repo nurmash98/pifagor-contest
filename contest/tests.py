@@ -5225,6 +5225,42 @@ class StudyRoomTests(TestCase):
         self.client.post(reverse('room_close', args=[room.id]))             # повторно — без новых монет
         self.assertEqual(CoinTransaction.objects.filter(key=f'roomtop:{room.id}').count(), 3)
 
+    def test_coin_rain_last_minute_50_total(self):
+        from datetime import timedelta
+        from django.core.cache import cache
+        from .models import CoinTransaction
+        room = self._post_open([self.tasks[0]], [self.tasks[0]])
+        a, b = self.sts[0], self.sts[1]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.assertEqual(self.client.post(act, {'a': 'coin', 'n': 0}).json()['error'], 'bad')        # ещё не последняя минута
+        StudyRoom.objects.filter(pk=room.pk).update(ends_at=timezone.now() + timedelta(seconds=30))
+        cache.delete(f'room:obj:{room.id}')
+        self.assertEqual(self.client.post(act, {'a': 'coin', 'n': 3}).json(), {'ok': True})
+        self.assertEqual(self.client.post(act, {'a': 'coin', 'n': 49}).json()['error'], 'bad')       # эта монета ещё не упала
+        self.assertEqual(self.client.post(act, {'a': 'coin', 'n': 50}).json()['error'], 'bad')
+        self.client.force_login(b.user)
+        self.assertEqual(self.client.post(act, {'a': 'coin', 'n': 3}).json()['error'], 'taken')      # одну монету — один ученик
+        self.assertEqual(CoinTransaction.objects.filter(key__startswith=f'rain:{room.id}:').count(), 1)
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertEqual(st['rain'], [3])
+        self.assertIn('now', st)
+
+    def test_dm_sender_name_shown_even_if_left(self):
+        room = self._post_open([self.tasks[0]], [self.tasks[0]])
+        a, b = self.sts[0], self.sts[1]
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.get(reverse('room_state', args=[room.id]))
+        self.client.force_login(b.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.get(reverse('room_state', args=[room.id]))
+        self.assertEqual(self.client.post(reverse('room_act', args=[room.id]), {'a': 'dm', 'to': a.user_id, 'text': 'привет'}).json().get('error'), None)
+        self.client.force_login(a.user)
+        st = self.client.get(reverse('room_state', args=[room.id])).json()
+        self.assertEqual(st['unread'], {str(b.user_id): 1})
+        self.assertEqual(st['names'], {str(b.user_id): b.full_name})
+
     def test_company_tasks_from_boss_in_order_and_salary(self):
         from django.core.cache import cache
         from .models import RoomAssignment

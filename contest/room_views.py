@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """3D-коворкинг класса: учитель открывает зал на урок и выбирает задачи, ученики садятся за столы и решают."""
 import json
+import time
 from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -291,6 +293,12 @@ ROOM_TEXTS = {
     'swapped': 'Новое задание',
     'fine': 'Штраф', 'fine_q': 'Штраф для {name}: сколько тенге вычесть из зарплаты?', 'fine_why': 'За что? (можно оставить пустым)',
     'fined': 'Руководитель выписал штраф',
+    'stress': 'Стресс', 'stress_hi': 'Стресс зашкаливает — клавиши путаются! Выпейте кофе ☕ или посидите с котиками 🐈',
+    'coffee_ok': 'Кофе! Стресс −40', 'coffee_wait': 'Кофемашина ещё готовит — через {s} с',
+    'cats_pet': 'Котики мурлычут — стресс уходит', 'ev_quake': 'Землетрясение! Держитесь за столы',
+    'ev_storm': 'Гроза! В офисе мигает свет', 'ev_snow': 'Метель! Все ходят медленнее',
+    'ev_cats': 'Радужные котики прилетели — стресс не растёт!', 'rain': 'Дождь из монет! Ходите по монетам и ловите',
+    'rain_got': 'Поймал монету', 'chat': 'Чат', 'chat_empty': 'Сообщений пока нет. Нажмите на человека в офисе, чтобы написать ему.',
     'earned': 'Заработано сегодня', 'coins_x2': 'монет (x2)', 'sit_own': 'Сядьте за стол в кабинете своей параллели',
     'other_grade': 'Это кабинет другой параллели — садиться можно только в своём',
     'admin_only': 'Это администрация — здесь сидят учителя. Можно зайти и задать вопрос',
@@ -418,6 +426,8 @@ def room_state(request, room_id):
                      'fines': mine.get('fines', 0), 'fine_last': mine.get('fine_last')}
     if teacher:
         out['log'] = rm.log(room.id)[-30:]
+    if room.ends_at and out['left'] is not None and out['left'] <= rm.RAIN_WINDOW + 2:
+        out['rain'] = rm.rain_taken(room.id)
     _dm_state(request, room.id, out)
     return JsonResponse(out)
 
@@ -429,6 +439,17 @@ def _dm_state(request, rid, out):
     if other and other.isdigit():
         out['conv'] = [int(other), rm.dm_get(rid, me, other)]
     out['unread'] = rm.dm_unread(rid, me)
+    out['now'] = round(time.time(), 1)                      # часы сервера — события в офисе у всех одновременно
+    ids = [int(k) for k in out['unread'] if str(k).lstrip('-').isdigit() and int(k) > 0]
+    if ids:                                                 # имена тех, кто написал (даже если уже ушёл)
+        key = 'room:names:' + ','.join(map(str, sorted(ids)))
+        names = cache.get(key)
+        if names is None:
+            names = {str(s.user_id): s.full_name for s in Student.objects.filter(user_id__in=ids).only('user_id', 'full_name')}
+            for u in User.objects.filter(id__in=[i for i in ids if str(i) not in names]).only('id', 'first_name', 'last_name', 'username'):
+                names[str(u.id)] = (u.get_full_name() or u.username)
+            cache.set(key, names, 300)
+        out['names'] = names
 
 
 @login_required
@@ -471,6 +492,21 @@ def room_act(request, room_id):
             return JsonResponse({'error': err})
         rm.log_event(room.id, st.full_name, f'📋 взял задание «{task.title}» ({task.level})')
         return JsonResponse({'ok': True, 'task': task.id})
+    if act == 'coin' and st is not None:                   # дождь из монет в последнюю минуту урока
+        from .models import CoinTransaction
+        try:
+            n = int(request.POST.get('n'))
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'bad'})
+        left = (room.ends_at - timezone.now()).total_seconds() if room.ends_at else 1e9
+        since = rm.RAIN_WINDOW - left                       # сколько секунд идёт дождь
+        if not (0 <= n < rm.RAIN_COINS) or since < -3 or left < -3 or n * rm.RAIN_WINDOW / rm.RAIN_COINS > since + 3:
+            return JsonResponse({'error': 'bad'})
+        if not cache.add(f'room:{room.id}:rain:{n}', me, 3600):
+            return JsonResponse({'error': 'taken'})
+        CoinTransaction.objects.get_or_create(student=st, key=f'rain:{room.id}:{n}',
+                                              defaults=dict(kind='game', amount=1, note='Дождь из монет', at=timezone.now()))
+        return JsonResponse({'ok': True})
     if act == 'swap' and not teacher:
         old_cur = rm.company(room, fresh=True).get(st.id, {}).get('cur')
         task, err = rm.swap(room, st)
