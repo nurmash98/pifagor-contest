@@ -100,6 +100,7 @@
                 <div class="spinner-border text-success mx-auto mb-3" role="status"></div>
                 <h5 class="fw-bold mb-1">{% t "Ищем соперника…" %}</h5>
                 <p class="text-muted small mb-3">{% t "Подбираем игрока с близким рейтингом. Не закрывайте страницу." %}</p>
+                {% if queue_target %}<p class="small mb-3">🎯 {% t "Ищем соперника из параллели" %} <b>{{ queue_target }}</b></p>{% endif %}
                 <form method="post" action="{% url 'duels_leave' %}">{% csrf_token %}
                     <button class="btn btn-outline-secondary btn-sm rounded-pill px-4">{% t "Отменить поиск" %}</button>
                 </form>
@@ -118,8 +119,15 @@
             })();
             </script>
         {% else %}
-            <form method="post" action="{% url 'duels_find' %}" class="mb-4">{% csrf_token %}
-                <button type="submit" class="btn btn-pifagor-green btn-lg rounded-pill px-5 py-3 fw-bold">⚔️ {% t "Найти игру" %}</button>
+            <form method="post" action="{% url 'duels_find' %}" class="mb-4 d-flex flex-wrap align-items-center gap-3">{% csrf_token %}
+                <div>
+                    <label class="form-label small fw-semibold mb-1" for="duel-target">{% t "С кем играть" %}</label>
+                    <select name="target" id="duel-target" class="form-select rounded-pill" style="min-width:220px">
+                        <option value="">{% t "Своя параллель" %}{% if my_group %} ({{ my_group }}){% endif %}</option>
+                        {% for g in target_grades %}<option value="{{ g }}">{{ g }} {% t "класс" %} — {% t "старше" %}</option>{% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-pifagor-green btn-lg rounded-pill px-5 py-3 fw-bold align-self-end">⚔️ {% t "Найти игру" %}</button>
             </form>
         {% endif %}
 

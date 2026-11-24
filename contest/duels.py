@@ -15,6 +15,7 @@
   побеждает тот, у кого больше очков (поровну — ничья).
 """
 import random
+import re
 from datetime import timedelta
 
 from django.db import transaction
@@ -102,12 +103,34 @@ def active_duel_for(student):
 
 
 # ------------------------------------------------------------------ очередь и подбор
-def join_queue(student):
-    entry, _ = DuelQueueEntry.objects.get_or_create(student=student, defaults={'rating': student.duel_rating})
-    if entry.rating != student.duel_rating:
-        entry.rating = student.duel_rating
-        entry.save(update_fields=['rating'])
+def join_queue(student, target_class=''):
+    """target_class — старшая параллель соперника («8», «9», …); пусто — своя параллель."""
+    target = (target_class or '').strip()
+    entry, _ = DuelQueueEntry.objects.get_or_create(student=student, defaults={'rating': student.duel_rating, 'target_class': target})
+    if entry.rating != student.duel_rating or entry.target_class != target:
+        entry.rating, entry.target_class = student.duel_rating, target
+        entry.save(update_fields=['rating', 'target_class'])
     return entry
+
+
+def grade_num(student):
+    m = re.match(r'\d+', normalize_school_class(student.school_class) or '')
+    return int(m.group()) if m else 0
+
+
+def target_grades(student):
+    """Старшие параллели, которые ученик может выбрать соперниками (7 класс → 8, 9, 10, 11)."""
+    g = grade_num(student)
+    return [str(x) for x in range(g + 1, 12)] if g else []
+
+
+def accepts(entry, other_entry):
+    """Подходят ли друг другу: ученик из entry и соперник из other_entry.
+    Выбрал параллель — только она; иначе своя параллель или младший, который выбрал именно нас."""
+    other = other_entry.student
+    if entry.target_class:
+        return str(grade_num(other)) == entry.target_class
+    return grade_group(other) == grade_group(entry.student) or other_entry.target_class == str(grade_num(entry.student))
 
 
 def leave_queue(student):
@@ -127,8 +150,8 @@ def try_match(student):
         window = 100 + 10 * waited
         others = list(DuelQueueEntry.objects.select_for_update()
                       .exclude(student=student).select_related('student'))
-        mygroup = grade_group(student)                         # встречаются только свои параллели (5–6, 7, 8–9, 10–11)
-        others = [o for o in others if grade_group(o.student) == mygroup and abs(o.rating - mine.rating) <= max(
+        # по умолчанию — своя параллель (5–6, 7, 8–9, 10–11); ученик может выбрать старшую параллель
+        others = [o for o in others if accepts(mine, o) and accepts(o, mine) and abs(o.rating - mine.rating) <= max(
             window, 100 + 10 * (now - o.joined_at).total_seconds())]
         if not others:
             return None
@@ -154,7 +177,6 @@ GROUPS = [('5-6', '5–6 классы'), ('7', '7 классы'), ('8-9', '8–9
 
 def grade_group(student):
     """5–6, 7, 8–9, 10–11 (или сам номер параллели, если вне этих групп)."""
-    import re
     m = re.match(r'\d+', normalize_school_class(student.school_class) or '')
     g = m.group() if m else ''
     return GRADE_GROUPS.get(g, g)
@@ -176,6 +198,8 @@ def allowed_tags(a, b):
         if own:                                                 # учитель задал теги классу
             return set(own)
         return set(groups.get(grade_group(s)) or [])            # иначе — темы параллели (задаёт админ)
+    if grade_group(a) != grade_group(b):                         # разные параллели — темы старшего
+        return tags_of(max((a, b), key=grade_num))
     sets = [tags_of(s) for s in (a, b)]
     sets = [x for x in sets if x]
     if not sets:

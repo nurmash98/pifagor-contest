@@ -90,6 +90,9 @@ def duels_home(request):
         ctx.update({
             'can_play': allowed, 'cant_reason': reason, 'history': history,
             'in_queue': DuelQueueEntry.objects.filter(student=student).exists(),
+            'queue_target': DuelQueueEntry.objects.filter(student=student).values_list('target_class', flat=True).first() or '',
+            'target_grades': duels.target_grades(student),
+            'my_group': dict(duels.GROUPS).get(duels.grade_group(student), ''),
             'place': better + 1 if student.duel_games else None,
         })
     return render(request, 'duels_home.html', ctx)
@@ -113,7 +116,10 @@ def duels_find(request):
     active = duels.active_duel_for(student)
     if active is not None:
         return redirect('duel_match', duel_id=active.id)
-    duels.join_queue(student)
+    target = (request.POST.get('target') or '').strip()
+    if target not in duels.target_grades(student):
+        target = ''
+    duels.join_queue(student, target)
     duel = duels.try_match(student)
     if duel is not None:
         return redirect('duel_match', duel_id=duel.id)

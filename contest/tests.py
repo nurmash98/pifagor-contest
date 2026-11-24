@@ -1426,6 +1426,28 @@ class DuelClassTagsTests(TestCase):
         DuelQueueEntry.objects.create(student=self.b, rating=800)
         self.assertIsNotNone(duels.try_match(self.a))         # 7F — 7-й параллели: встречаются
 
+    def test_student_picks_older_grade_topics_of_older(self):
+        from . import duels
+        from .models import DuelQueueEntry, DuelTask, SiteSettings, Tag
+        io, st = Tag.objects.create(name='input/output'), Tag.objects.create(name='string')
+        tc = self.loops[0].test_cases
+        seven, eight = [], []
+        for j in range(3):
+            t = Task.objects.create(title=f'IO{j}', description='d', level='A', test_cases=tc); t.tags.add(io); seven.append(t.id)
+            t = Task.objects.create(title=f'ST{j}', description='d', level='A', test_cases=tc); t.tags.add(st); eight.append(t.id)
+        ss = SiteSettings.get(); ss.duels_group_tags = {'7': [io.id], '8-9': [st.id]}; ss.save()
+        self.assertEqual(duels.target_grades(self.a), ['8', '9', '10', '11'])
+        e8 = Student.objects.create(user=User.objects.create_user('e8', password='x'), full_name='Восьмой', school_class='8A')
+        self.assertNotIn('7', duels.target_grades(e8))                     # младших выбирать нельзя
+        duels.join_queue(e8)                                               # 8A ждёт как обычно
+        duels.join_queue(self.a)                                           # 7F — своя параллель: не встретятся
+        self.assertIsNone(duels.try_match(self.a))
+        duels.join_queue(self.a, '8')                                      # 7F выбрал 8 класс — встретились
+        duel = duels.try_match(self.a)
+        self.assertIsNotNone(duel)
+        self.assertEqual(set(DuelTask.objects.filter(duel=duel).values_list('task_id', flat=True)), set(eight))  # темы старшего
+        self.assertFalse(DuelQueueEntry.objects.exists())
+
     def test_too_few_tagged_tasks_falls_back(self):
         from . import duels
         for t in self.loops[1:]:

@@ -798,6 +798,8 @@ class DuelQueueEntry(models.Model):
     """Ученик, который ждёт соперника в очереди «Найти игру»."""
     student = models.OneToOneField(Student, on_delete=models.CASCADE, related_name='duel_queue')
     rating = models.IntegerField()
+    # С кем хочет играть: пусто — своя параллель; иначе старшая параллель (например, «8»)
+    target_class = models.CharField(max_length=20, blank=True, default='')
     joined_at = models.DateTimeField(auto_now_add=True)
 
 
