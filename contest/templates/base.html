@@ -22,7 +22,7 @@
     <!-- Подключение шрифта Montserrat -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 
     <!-- Глобальные стили проекта -->
     <style>
@@ -85,11 +85,10 @@
             <div class="d-flex align-items-center gap-3">
                 <a class="navbar-brand fw-bold d-flex align-items-center me-0" href="/">
                     {% if holiday %}<span class="me-2 d-inline-flex">{% include "holiday_flag.html" with uid="nav" h=40 %}</span>{% else %}
-                    <img src="{% static 'icons/logo-tree.png' %}" alt="" height="42" class="me-2 logo-light">
-                    <img src="{% static 'icons/logo-tree-dark.png' %}" alt="" height="42" class="me-2 logo-dark">{% endif %}
+                    <img src="{% static 'img/pifagor-mark.svg' %}" alt="" height="44" width="44" class="me-2 brand-mark">{% endif %}
                     <div class="d-flex flex-column lh-1">
-                        <span style="color: #1a1a4b; font-size: 1.5rem;">PIFAGOR</span>
-                        <div class="brand-sub" style="color: #008b42;">Информатика</div>
+                        <span class="brand-name">PIFAGOR</span>
+                        <div class="brand-sub"><span class="brand-gt">&gt;</span> Информатика</div>
                     </div>
                 </a>
                 <!-- Ночной / дневной режим -->

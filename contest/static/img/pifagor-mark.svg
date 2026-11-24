@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="2" y="2" width="96" height="96" rx="28" fill="#1e2133" stroke="#2f3452" stroke-width="2"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 31 L15 47.5 L27 64" stroke="#c4bfff" stroke-width="7"/>
+    <path d="M73 31 L85 47.5 L73 64" stroke="#c4bfff" stroke-width="7"/>
+    <path d="M50 27 L42 44 L38 62 M42 44 L46 62 M50 27 L58 44 L62 62" stroke="#7ddc8a" stroke-width="3.6"/>
+  </g>
+  <g fill="#7ddc8a"><circle cx="42" cy="44" r="4.6"/><circle cx="58" cy="44" r="4.6"/>
+    <circle cx="38" cy="62" r="4.2"/><circle cx="46" cy="62" r="4.2"/><circle cx="62" cy="62" r="4.2"/></g>
+  <circle cx="50" cy="24" r="10" fill="#c4bfff"/>
+  <text x="50" y="29" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="14.5" fill="#1e2133">π</text>
+</svg>

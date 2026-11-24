@@ -67,12 +67,19 @@
     [data-bs-theme="dark"] .btn-outline-success { --bs-btn-color: #4fd18b; --bs-btn-border-color: #34a86a; }
     [data-bs-theme="dark"] .text-muted { color: rgba(228, 231, 240, .62) !important; }
     [data-bs-theme="dark"] input[type="date"], [data-bs-theme="dark"] input[type="datetime-local"], [data-bs-theme="dark"] input[type="time"] { color-scheme: dark; }
-    .brand-sub { font-size: .72rem; font-weight: 600; letter-spacing: .04em; margin-top: .2rem; }
-    [data-bs-theme="dark"] .brand-sub { color: #4fd18b !important; }
+    /* логотип PIFAGOR > Информатика */
+    .brand-name { font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 900; font-size: 1.5rem; letter-spacing: .02em; color: #1e2133; transform: scaleX(1.12); transform-origin: left; display: inline-block; }
+    .brand-sub { font-family: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace; font-size: .8rem; font-weight: 700; margin-top: .25rem; color: #1f8a3a; }
+    .brand-gt { color: #6b7194; margin-right: .2rem; }
+    .brand-mark { border-radius: 12px; }
+    [data-bs-theme="dark"] .brand-name { color: #c4bfff !important; }
+    [data-bs-theme="dark"] .brand-sub { color: #7ddc8a !important; }
+    [data-bs-theme="dark"] .brand-gt { color: #8a8fb3; }
     /* телефон: логотип и кнопка меню в одной строке, без лишней полоски у имени */
     @media (max-width: 575.98px) {
-        .navbar-brand span { font-size: 1.12rem !important; }
-        .brand-sub { font-size: .6rem; margin-top: .1rem; }
+        .navbar-brand .brand-name { font-size: 1.12rem !important; }
+        .brand-sub { font-size: .62rem; margin-top: .12rem; }
+        .brand-mark { height: 34px; width: 34px; }
         .navbar-brand img, .navbar-brand svg { height: 30px !important; width: auto; }
         .navbar > .container > .d-flex { gap: .5rem !important; }
         .kz-holiday .container { gap: .5rem !important; flex-wrap: wrap; font-size: .85rem; text-align: center; }
