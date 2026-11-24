@@ -194,3 +194,38 @@ a.btn{display:inline-block;margin-top:14px;background:#1a1a4b;color:#fff;text-de
 <a class="btn" href="{url_attr}">Перейти сейчас →</a></div>
 <script>var n=3,u={url_js};setInterval(function(){n--;if(n>=0)document.getElementById('s').textContent=n;if(n<=0)location.replace(u);},1000);</script>
 </body></html>"""
+
+
+class DailyVisitCoinMiddleware:
+    """+1 монета ученику за вход на сайт — один раз в день (по времени Алматы).
+    Считается любой открытый ученицей/учеником страница сайта (не опросы игр и не статика)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        try:
+            self._award(request)
+        except Exception:          # монета не должна ломать страницу
+            pass
+        return response
+
+    def _award(self, request):
+        from django.conf import settings
+        if not getattr(settings, 'DAILY_VISIT_COIN', True):
+            return
+        user = getattr(request, 'user', None)
+        if not (user and user.is_authenticated) or request.method != 'GET' or is_polling(request.path):
+            return
+        from django.core.cache import cache
+        from django.utils import timezone
+        day = timezone.localdate().isoformat()
+        if not cache.add(f'visitcoin:{user.id}:{day}', 1, 26 * 3600):
+            return
+        from .models import CoinTransaction, Student
+        st = Student.objects.filter(user=user).only('id').first()
+        if st is None:
+            return
+        CoinTransaction.objects.get_or_create(student=st, key=f'visit:{day}',
+                                              defaults=dict(kind='login', amount=1, note='Вход на сайт', at=timezone.now()))

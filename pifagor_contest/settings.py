@@ -72,6 +72,10 @@ INSTALLED_APPS = [
 # все страницы будут перенаправляться туда (тот же путь).
 SITE_MOVED_TO = os.environ.get('SITE_MOVED_TO', '').strip()
 
+# +1 монета за вход раз в день (в автотестах выключено — там считают монеты точно)
+import sys as _sys
+DAILY_VISIT_COIN = not (len(_sys.argv) > 1 and _sys.argv[1] == 'test')
+
 # Временное закрытие сайта: «Вход воспрещён — технические неполадки» (кроме входа и учителей).
 # Время в UTC; после него сайт открывается сам. Только на перечисленных хостах.
 MAINTENANCE_UNTIL = os.environ.get('MAINTENANCE_UNTIL', '')
@@ -95,6 +99,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'contest.middleware.DailyVisitCoinMiddleware',   # +1 монета за вход, раз в день
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Пока ученик пишет СОР/СОЧ — Курсы и Все задачи для него закрыты.
     'contest.middleware.ExamLockMiddleware',

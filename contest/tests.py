@@ -5604,3 +5604,22 @@ class RoomPresenceSelfHealTests(TestCase):
         self.assertNotIn(5, rm.people(9901, now=1002.0))
         rm.touch(9901, 5, {'name': 'A'}, now=1010.0)          # следующий опрос ученика
         self.assertIn(5, rm.people(9901, now=1011.0))
+
+
+from django.test import override_settings as _ovs  # noqa: E402
+
+
+@_ovs(DAILY_VISIT_COIN=True)
+class DailyVisitCoinTests(TestCase):
+    def test_one_coin_per_day(self):
+        from django.core.cache import cache
+        from .models import CoinTransaction
+        u = User.objects.create_user('vis', password='p')
+        st = Student.objects.create(user=u, full_name='В', school_class='7A')
+        cache.clear()
+        self.client.force_login(u)
+        self.client.get('/')
+        self.client.get('/')
+        cache.clear()                       # даже если кеш очистился — второй монеты за день нет
+        self.client.get('/profile/')
+        self.assertEqual(list(CoinTransaction.objects.filter(student=st, kind='login').values_list('amount', flat=True)), [1])
