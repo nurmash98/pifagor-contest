@@ -13,6 +13,8 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 cd "$PROJECT" || exit 1
+# состояние питания (батарея/сеть) — раз в минуту, чтобы видеть его удалённо
+/usr/bin/pmset -g batt > "$PIFAGOR_DATA/power.txt" 2>/dev/null || true
 # раз в сутки, после 3:00 — резервная копия базы. Синхронно: фоновый процесс launchd убивает
 # вместе с этим заданием. Неудачная попытка повторяется через час.
 if [ "$(date +%H)" -ge 3 ] && [ "$(cat "$PIFAGOR_DATA/backup.last" 2>/dev/null)" != "$(date +%F)" ] \
