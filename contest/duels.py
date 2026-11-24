@@ -119,18 +119,28 @@ def grade_num(student):
 
 
 def target_grades(student):
-    """Старшие параллели, которые ученик может выбрать соперниками (7 класс → 8, 9, 10, 11)."""
+    """Что ученик может выбрать: «N+» — своя и все старшие параллели, и каждую старшую отдельно
+    (7 класс → «7+», «8», «9», «10», «11»)."""
     g = grade_num(student)
-    return [str(x) for x in range(g + 1, 12)] if g else []
+    return ([f'{g}+'] + [str(x) for x in range(g + 1, 12)]) if g else []
+
+
+def _fits(target, student):
+    """Подходит ли ученик под выбор target («8» — только 8 класс, «7+» — 7 класс и старше)."""
+    if not target:
+        return False
+    if target.endswith('+'):
+        return target[:-1].isdigit() and grade_num(student) >= int(target[:-1])
+    return str(grade_num(student)) == target
 
 
 def accepts(entry, other_entry):
     """Подходят ли друг другу: ученик из entry и соперник из other_entry.
-    Выбрал параллель — только она; иначе своя параллель или младший, который выбрал именно нас."""
+    Выбрал параллели — только они; иначе своя параллель или младший, который выбрал нас."""
     other = other_entry.student
     if entry.target_class:
-        return str(grade_num(other)) == entry.target_class
-    return grade_group(other) == grade_group(entry.student) or other_entry.target_class == str(grade_num(entry.student))
+        return _fits(entry.target_class, other)
+    return grade_group(other) == grade_group(entry.student) or _fits(other_entry.target_class, entry.student)
 
 
 def leave_queue(student):
@@ -191,13 +201,10 @@ def allowed_tags(a, b):
     """Теги, из которых берутся задачи дуэли (id), или пустое множество — любые. Учитель задаёт
     теги для класса; у двух игроков — пересечение их тегов (если оно пустое — объединение)."""
     obj = SiteSettings.get()
-    data, groups = obj.duels_class_tags or {}, obj.duels_group_tags or {}
+    groups = obj.duels_group_tags or {}
 
     def tags_of(s):
-        own = data.get(normalize_school_class(s.school_class))
-        if own:                                                 # учитель задал теги классу
-            return set(own)
-        return set(groups.get(grade_group(s)) or [])            # иначе — темы параллели (задаёт админ)
+        return set(groups.get(grade_group(s)) or [])            # темы параллели (задаёт админ)
     if grade_group(a) != grade_group(b):                         # разные параллели — темы старшего
         return tags_of(max((a, b), key=grade_num))
     sets = [tags_of(s) for s in (a, b)]
@@ -417,3 +424,16 @@ def close_if_inactive(duel):
             locked = Duel.objects.select_for_update().get(pk=duel.pk)
             if locked.status == 'ACTIVE':
                 _finish(locked, _leader(locked), 'inactive')
+
+
+def sweep_stale():
+    """Закрывает зависшие дуэли (все задачи просрочены или 20 минут без действий), даже если игроки
+    больше не заходили. Не чаще раза в 30 секунд."""
+    from django.core.cache import cache
+    if not cache.add('duels:sweep', 1, 30):
+        return
+    for duel in Duel.objects.filter(status='ACTIVE'):
+        try:
+            close_if_inactive(duel)
+        except Exception:
+            pass

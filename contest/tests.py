@@ -1377,8 +1377,9 @@ class DuelClassTagsTests(TestCase):
             t = Task.objects.create(title=f'S{i}', description='d', level='A', test_cases=tc); t.tags.add(self.t_str); self.strs.append(t)
 
     def set_tags(self, tag_ids, cls='7F'):
-        self.client.login(username='tg', password='x')
-        return self.client.post(reverse('duels_class_tags'), {'school_class': cls, 'tags': tag_ids})
+        """Темы теперь задаются параллели (у 7F — параллель «7»)."""
+        from .models import SiteSettings
+        ss = SiteSettings.get(); ss.duels_group_tags = {'7': list(tag_ids)} if tag_ids else {}; ss.save()
 
     def test_duel_tasks_only_from_chosen_tags(self):
         from . import duels
@@ -1436,7 +1437,7 @@ class DuelClassTagsTests(TestCase):
             t = Task.objects.create(title=f'IO{j}', description='d', level='A', test_cases=tc); t.tags.add(io); seven.append(t.id)
             t = Task.objects.create(title=f'ST{j}', description='d', level='A', test_cases=tc); t.tags.add(st); eight.append(t.id)
         ss = SiteSettings.get(); ss.duels_group_tags = {'7': [io.id], '8-9': [st.id]}; ss.save()
-        self.assertEqual(duels.target_grades(self.a), ['8', '9', '10', '11'])
+        self.assertEqual(duels.target_grades(self.a), ['7+', '8', '9', '10', '11'])
         e8 = Student.objects.create(user=User.objects.create_user('e8', password='x'), full_name='Восьмой', school_class='8A')
         self.assertNotIn('7', duels.target_grades(e8))                     # младших выбирать нельзя
         duels.join_queue(e8)                                               # 8A ждёт как обычно
@@ -1447,6 +1448,26 @@ class DuelClassTagsTests(TestCase):
         self.assertIsNotNone(duel)
         self.assertEqual(set(DuelTask.objects.filter(duel=duel).values_list('task_id', flat=True)), set(eight))  # темы старшего
         self.assertFalse(DuelQueueEntry.objects.exists())
+        # «7 класс и старше»: подходит и свой 7-й, и 8-й
+        e8b = Student.objects.create(user=User.objects.create_user('e8b', password='x'), full_name='Ещё восьмой', school_class='8B')
+        duels.join_queue(e8b)
+        duels.join_queue(self.b, '7+')
+        self.assertIsNotNone(duels.try_match(self.b))
+
+    def test_stale_duels_closed_on_page_view(self):
+        from datetime import timedelta
+        from django.core.cache import cache
+        from . import duels
+        from .models import Duel
+        duels.join_queue(self.a); duels.join_queue(self.b)
+        duel = duels.try_match(self.a)
+        Duel.objects.filter(pk=duel.pk).update(created_at=timezone.now() - timedelta(minutes=30),
+                                               last_activity=timezone.now() - timedelta(minutes=30))
+        duel.duel_tasks.update(opened_at=None)
+        cache.delete('duels:sweep')
+        self.client.login(username='tg', password='x')
+        self.client.get(reverse('duels'))
+        self.assertEqual(Duel.objects.get(pk=duel.pk).status, 'FINISHED')
 
     def test_too_few_tagged_tasks_falls_back(self):
         from . import duels
@@ -1455,16 +1476,13 @@ class DuelClassTagsTests(TestCase):
         self.set_tags([self.t_loop.id])
         self.assertEqual(len(duels.pick_tasks(self.a, self.b)), 3)
 
-    def test_cannot_set_tags_for_foreign_class(self):
-        from .models import SiteSettings
-        self.set_tags([self.t_loop.id], cls='9Z')
-        self.assertNotIn('9Z', SiteSettings.get().duels_class_tags)
-
-    def test_overview_lists_tags(self):
+    def test_overview_lists_group_tags(self):
         self.set_tags([self.t_loop.id])
+        self.client.login(username='tg', password='x')
         html = self.client.get(reverse('duels')).content.decode()
-        self.assertIn('Теги задач: 1', html)
-        self.assertIn('#циклы-тест', html)
+        self.assertIn('Параллели', html)
+        self.assertIn('циклы-тест', html)
+        self.assertNotIn('Теги задач:', html)               # теги по классам больше не настраиваются
 
 
 class DuelNoRepeatTests(TestCase):

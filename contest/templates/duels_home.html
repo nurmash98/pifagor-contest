@@ -32,7 +32,7 @@
                 <p class="text-muted small mb-2">Откройте дуэли классам, которым хотите: ученики этих классов увидят пункт «Дуэли» и смогут играть.</p>
                 <div class="border rounded-3 p-2 mb-3">
                     <div class="fw-semibold small mb-1">🏷 Параллели</div>
-                    <div class="small text-muted mb-2">Ученики встречаются только со своей параллелью: 5–6, 7, 8–9, 10–11 классы. Темы задач — у каждой параллели свои (ничего не отмечено — все темы). Если отметить теги у отдельного класса ниже — для него будут они.</div>
+                    <div class="small text-muted mb-2">Ученики встречаются только со своей параллелью: 5–6, 7, 8–9, 10–11 классы. Темы задач — у каждой параллели свои (ничего не отмечено — все темы).</div>
                     {% for g in group_rows %}
                     <div class="d-flex flex-wrap align-items-center gap-2 py-1">
                         <span class="fw-semibold small" style="min-width:110px">{{ g.label }}</span>
@@ -66,21 +66,7 @@
                                 <button type="submit" class="btn btn-sm rounded-pill px-3 {% if row.open %}btn-success{% else %}btn-outline-secondary{% endif %}" title="{{ row.students }} уч. Нажмите, чтобы {% if row.open %}закрыть{% else %}открыть{% endif %}">{% if row.open %}✓ {% else %}🔒 {% endif %}{{ row.name }}</button>
                             </form>
                             <span class="small text-muted">{{ row.students }} уч.</span>
-                            <button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#tags-{{ forloop.counter }}">🏷 Теги задач: {% if row.tag_count %}{{ row.tag_count }}{% else %}как у параллели{% endif %}</button>
-                        </div>
-                        <div class="collapse mt-2" id="tags-{{ forloop.counter }}">
-                            <form method="post" action="{% url 'duels_class_tags' %}">{% csrf_token %}
-                                <input type="hidden" name="school_class" value="{{ row.name }}">
-                                <div class="small text-muted mb-1">Какие темы выпадают в дуэлях класса {{ row.name }}. Если ничего не отмечено — темы параллели (см. выше).</div>
-                                <div class="d-flex flex-wrap gap-2 mb-2">
-                                    {% for tag, on in row.tag_options %}
-                                    <label class="form-check-label small border rounded-pill px-2 py-1" style="cursor:pointer;">
-                                        <input type="checkbox" name="tags" value="{{ tag.id }}" class="form-check-input me-1" {% if on %}checked{% endif %}>#{{ tag.name }}
-                                    </label>
-                                    {% empty %}<span class="text-muted small">Тегов пока нет.</span>{% endfor %}
-                                </div>
-                                <button type="submit" class="btn btn-pifagor-blue btn-sm px-3">Сохранить теги</button>
-                            </form>
+
                         </div>
                     </div>
                     {% empty %}<span class="text-muted small">Нет доступных классов.</span>{% endfor %}
@@ -100,7 +86,7 @@
                 <div class="spinner-border text-success mx-auto mb-3" role="status"></div>
                 <h5 class="fw-bold mb-1">{% t "Ищем соперника…" %}</h5>
                 <p class="text-muted small mb-3">{% t "Подбираем игрока с близким рейтингом. Не закрывайте страницу." %}</p>
-                {% if queue_target %}<p class="small mb-3">🎯 {% t "Ищем соперника из параллели" %} <b>{{ queue_target }}</b></p>{% endif %}
+                {% if queue_target %}<p class="small mb-3">🎯 {% t "Ищем соперника:" %} <b>{% if '+' in queue_target %}{{ queue_target|slice:":-1" }} {% t "класс и старше" %}{% else %}{{ queue_target }} {% t "класс" %}{% endif %}</b></p>{% endif %}
                 <form method="post" action="{% url 'duels_leave' %}">{% csrf_token %}
                     <button class="btn btn-outline-secondary btn-sm rounded-pill px-4">{% t "Отменить поиск" %}</button>
                 </form>
@@ -124,7 +110,7 @@
                     <label class="form-label small fw-semibold mb-1" for="duel-target">{% t "С кем играть" %}</label>
                     <select name="target" id="duel-target" class="form-select rounded-pill" style="min-width:220px">
                         <option value="">{% t "Своя параллель" %}{% if my_group %} ({{ my_group }}){% endif %}</option>
-                        {% for g in target_grades %}<option value="{{ g }}">{{ g }} {% t "класс" %} — {% t "старше" %}</option>{% endfor %}
+                        {% for g in target_grades %}<option value="{{ g }}">{% if '+' in g %}{{ g|slice:":-1" }} {% t "класс и старше" %}{% else %}{{ g }} {% t "класс" %}{% endif %}</option>{% endfor %}
                     </select>
                 </div>
                 <button type="submit" class="btn btn-pifagor-green btn-lg rounded-pill px-5 py-3 fw-bold align-self-end">⚔️ {% t "Найти игру" %}</button>

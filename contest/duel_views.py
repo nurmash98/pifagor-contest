@@ -55,6 +55,7 @@ def _group_rows():
 
 @login_required
 def duels_home(request):
+    duels.sweep_stale()                       # зависшие «0 : 0» закрываются сами
     student = _student(request)
     if student is not None and not duels.visible_to(student):
         return redirect('all_tasks')          # дуэли скрыты от этого ученика
@@ -138,6 +139,7 @@ def duels_leave(request):
 @login_required
 def duels_status(request):
     """Опрос из браузера пока игрок ждёт соперника: подбирает пару и сообщает, началась ли дуэль."""
+    duels.sweep_stale()
     student = _student(request)
     if student is None or not duels.visible_to(student):
         return JsonResponse({'state': 'idle'})
