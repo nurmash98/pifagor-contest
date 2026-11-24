@@ -5209,6 +5209,22 @@ class StudyRoomTests(TestCase):
         me = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()['me']
         self.assertEqual((me['salary'], me['fines'], me['fine_last']), (25000, 5000, [5000, 'шум']))
 
+    def test_company_places_get_10_9_8_coins_once(self):
+        from .models import CoinTransaction, RoomAssignment, RoomFine
+        room = self._post_open([self.tasks[0]], [self.tasks[0]])
+        a, b, c = self.sts[:3]
+        for st, pay in ((a, 30000), (b, 20000), (c, 10000)):
+            RoomAssignment.objects.create(room=room, student=st, task=self.tasks[0], pay=pay, done_at=timezone.now())
+        RoomFine.objects.create(room=room, student=a, amount=25000)          # 30000 − 25000 = 5000 → последнее место
+        self.client.force_login(self.tu)
+        self.client.post(reverse('room_close', args=[room.id]))
+        room.refresh_from_db()
+        self.assertTrue(room.top_awarded)
+        got = dict(CoinTransaction.objects.filter(key=f'roomtop:{room.id}').values_list('student_id', 'amount'))
+        self.assertEqual(got, {b.id: 10, c.id: 9, a.id: 8})
+        self.client.post(reverse('room_close', args=[room.id]))             # повторно — без новых монет
+        self.assertEqual(CoinTransaction.objects.filter(key=f'roomtop:{room.id}').count(), 3)
+
     def test_company_tasks_from_boss_in_order_and_salary(self):
         from django.core.cache import cache
         from .models import RoomAssignment

@@ -201,7 +201,8 @@ def public(rid, now=None):
 # ------------------------------------------------------------------ компания: задания и зарплата
 
 PAY = {'A': 10000, 'B': 20000, 'C': 30000}
-SWAP_MAX = 2          # сколько раз за урок ученик может поменять задание          # ₸ за лёгкую / среднюю / сложную задачу
+SWAP_MAX = 2          # сколько раз за урок ученик может поменять задание
+TOP_N = 10   # после рабочего дня места по зарплате: 1 место — 10 монет, 2 — 9, … 10 — 1          # ₸ за лёгкую / среднюю / сложную задачу
 
 
 def near_boss(p):
@@ -422,3 +423,31 @@ def hint(task, student, lang='ru'):
     return {'tip': tip, 'ex_in': task.get_display_input_example(lang)[:300],
             'ex_out': (task.output_example_kk if lang == 'kk' and task.output_example_kk else task.output_example)[:300],
             'fail': fail}
+
+
+def award_top(room):
+    """Рабочий день окончен: места по зарплате (с учётом штрафов, только с зарплатой > 0):
+    1 место — 10 монет, 2 — 9, … 10 место — 1.
+    Один раз на урок (StudyRoom.top_awarded). Возвращает [(место, student_id)]."""
+    from django.db import transaction
+    from django.utils import timezone
+    from .models import CoinTransaction, StudyRoom
+    if room.top_awarded or room.is_open():
+        return []
+    with transaction.atomic():
+        r = StudyRoom.objects.select_for_update().get(pk=room.pk)
+        if r.top_awarded:
+            return []
+        co = company(r, fresh=True)
+        ranked = sorted(((d.get('salary', 0), len(d.get('done', [])), sid) for sid, d in co.items()), reverse=True)
+        winners = [(i, sid) for i, (sal, _n, sid) in enumerate([x for x in ranked if x[0] > 0][:TOP_N], 1)]
+        when = r.closed_at or r.ends_at or timezone.now()
+        for place, sid in winners:
+            CoinTransaction.objects.get_or_create(
+                student_id=sid, key=f'roomtop:{r.id}',
+                defaults=dict(kind='game', amount=TOP_N + 1 - place, at=when,
+                              note=f'Компания «Пифагор» {r.school_class}: {place} место'))
+        r.top_awarded = True
+        r.save(update_fields=['top_awarded'])
+    room.top_awarded = True
+    return winners

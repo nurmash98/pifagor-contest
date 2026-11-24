@@ -644,6 +644,7 @@ class StudyRoom(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     ends_at = models.DateTimeField(null=True, blank=True, verbose_name="Закрыть автоматически")
     closed_at = models.DateTimeField(null=True, blank=True)
+    top_awarded = models.BooleanField(default=False, verbose_name="Места награждены монетами")
 
     class Meta:
         verbose_name = "Коворкинг (урок)"

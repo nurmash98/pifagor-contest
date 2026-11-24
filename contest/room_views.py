@@ -146,6 +146,8 @@ def room_manage(request):
             minutes = 45
         now = timezone.now()
         StudyRoom.objects.filter(school_class=cls, closed_at__isnull=True).update(closed_at=now)   # один зал на класс
+        for prev in StudyRoom.objects.filter(school_class=cls, top_awarded=False, closed_at__isnull=False)[:5]:
+            rm.award_top(prev)
         if topic is None:
             topic = Topic.objects.filter(id=request.POST.get('theory_topic') or 0).first()
         title = (request.POST.get('title') or '').strip()[:120] or (sub.name if sub else topic.name if topic else '')
@@ -167,6 +169,8 @@ def room_manage(request):
     for r in rooms:
         r.open_now = r.is_open(now)
         r.online = len(rm.people(r.id)) if r.open_now else 0
+        if not r.open_now and not r.top_awarded:
+            rm.award_top(r)
     tasks = list(Task.objects.filter(hidden=False).prefetch_related('tags').order_by('level', 'title'))
     from collections import Counter
     from .models import Topic
@@ -205,6 +209,7 @@ def room_close(request, room_id):
     if room.closed_at is None:
         room.closed_at = timezone.now()
         room.save(update_fields=['closed_at'])
+    rm.award_top(room)
     _forget_open(room.school_class)
     cache.delete(f'room:obj:{room.id}')
     messages.success(request, f'Рабочий день в компании ({room.school_class}) закончен.')
@@ -400,6 +405,9 @@ def room_state(request, room_id):
     ppl = rm.public(room.id)
     co = rm.company(room, fresh=fresh)
     online = {p[0] for p in ppl}
+    if not room.is_open() and not room.top_awarded:      # время вышло — награды топ-3 (один раз)
+        rm.award_top(StudyRoom.objects.get(pk=room.pk))
+        cache.delete(f'room:obj:{room.id}')
     out = {'open': room.is_open(), 'people': ppl,
            'left': max(0, int((room.ends_at - timezone.now()).total_seconds())) if room.ends_at else None,
            'stats': _stats_rows(room, co, online, rm.exits(room.id) if teacher else None), 'n_tasks': getattr(room, 'n_tasks', None) or room.tasks.count(),
