@@ -6,6 +6,10 @@
 {% block content %}
 <div class="mb-3">
     <a href="{% url 'courses' %}" class="text-decoration-none text-muted small">← {% t "Назад к курсам" %}</a>
+    {% if can_manage %}<span class="float-end d-flex gap-2">
+        <a href="{% url 'course_analytics' course.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">📊 Анализ курса</a>
+        <a href="{% url 'course_manage' course.id %}" class="btn btn-pifagor-blue btn-sm rounded-pill px-3">✏️ Редактировать</a>
+    </span>{% endif %}
 </div>
 
 <div class="d-flex justify-content-between align-items-start mb-2">

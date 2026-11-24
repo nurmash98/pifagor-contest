@@ -3,8 +3,10 @@
 {% block title %}Анализ курса: {{ course.name }} - Pifagor Contest{% endblock %}
 
 {% block content %}
-<div class="mb-3">
-    <a href="{% url 'course_manage' course.id %}" class="text-decoration-none text-muted small">← Назад к курсу</a>
+<div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+    <a href="{% url 'courses' %}" class="text-decoration-none text-muted small me-auto">← Все курсы</a>
+    <a href="{% url 'course_detail' course.id %}?view=1" class="btn btn-outline-secondary btn-sm rounded-pill px-3">👁 Как видят ученики</a>
+    <a href="{% url 'course_manage' course.id %}" class="btn btn-pifagor-blue btn-sm rounded-pill px-3">✏️ Редактировать курс</a>
 </div>
 
 <div class="row mb-4 align-items-end">

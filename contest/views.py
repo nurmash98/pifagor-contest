@@ -1332,6 +1332,10 @@ def course_detail(request, course_id):
     if not _course_open_for(request.user, course):
         messages.warning(request, 'Этот курс пока недоступен.')
         return redirect('courses')
+    # Учитель своего курса (и админ) сразу видит анализ курса и кнопку «Редактировать»;
+    # ?view=1 — посмотреть курс глазами ученика.
+    if request.user.is_staff and request.GET.get('view') != '1' and _get_owned_course_or_none(request, course_id) is not None:
+        return redirect('course_analytics', course_id=course.id)
 
     # theory_html (до 2 МБ на тему) на странице курса не нужен — только признак, что он есть.
     topics = course.topics.prefetch_related(
@@ -1359,7 +1363,8 @@ def course_detail(request, course_id):
                     for task in sub.tasks.all():
                         task.user_sub = user_submissions.get(task.id)
 
-    return render(request, 'course_detail.html', {'course': course, 'topics': topics})
+    can_manage = request.user.is_staff and _get_owned_course_or_none(request, course_id) is not None
+    return render(request, 'course_detail.html', {'course': course, 'topics': topics, 'can_manage': can_manage})
 
 
 def _teacher_or_none(request):
