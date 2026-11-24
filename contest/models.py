@@ -775,6 +775,8 @@ class SiteSettings(models.Model):
 
     # Теги задач для дуэлей по классам: {"7F": [tag_id, ...]}. Нет записи или пусто — задачи любых тегов.
     duels_class_tags = models.JSONField(default=dict, blank=True, verbose_name="Теги дуэлей по классам")
+    # Темы дуэлей по параллелям (5-6, 7, 8-9, 10-11): {"7": [tag_id, ...]}. Пусто — все темы. Задаёт админ дуэлей.
+    duels_group_tags = models.JSONField(default=dict, blank=True, verbose_name="Темы дуэлей по параллелям")
 
     def duel_class_list(self):
         return [normalize_school_class(c) for c in self.duels_classes.split(',') if c.strip()]

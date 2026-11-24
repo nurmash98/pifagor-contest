@@ -42,6 +42,17 @@ def _class_rows(user):
     return rows
 
 
+def _group_rows():
+    data = SiteSettings.get().duels_group_tags or {}
+    all_tags = list(Tag.visible().order_by('name'))
+    rows = []
+    for key, label in duels.GROUPS:
+        chosen = set(data.get(key) or [])
+        rows.append({'key': key, 'label': label, 'names': [t.name for t in all_tags if t.id in chosen],
+                     'tag_options': [(t, t.id in chosen) for t in all_tags]})
+    return rows
+
+
 @login_required
 def duels_home(request):
     student = _student(request)
@@ -59,6 +70,7 @@ def duels_home(request):
         ctx.update({
             'mode': duels.duels_mode(),
             'class_rows': _class_rows(request.user),
+            'group_rows': _group_rows(),
             'active_duels': list(Duel.objects.filter(status='ACTIVE').select_related('player1', 'player2')),
             'recent_duels': list(Duel.objects.filter(status='FINISHED').select_related('player1', 'player2', 'winner')
                                  .order_by('-finished_at')[:10]),
@@ -271,6 +283,32 @@ def duels_class_toggle(request):
         messages.success(request, f'Дуэли для класса {name} открыты.')
     obj.set_duel_classes(current)
     obj.save(update_fields=['duels_classes'])
+    return redirect('duels')
+
+
+@staff_member_required
+@require_POST
+def duels_group_tags(request):
+    """Админ дуэлей выбирает темы задач для параллели (5–6, 7, 8–9, 10–11). Пусто — все темы."""
+    if not duels.is_duels_admin(request.user):
+        messages.error(request, 'Темы параллелей может менять только администратор дуэлей.')
+        return redirect('duels')
+    group = request.POST.get('group', '')
+    labels = dict(duels.GROUPS)
+    if group not in labels:
+        return redirect('duels')
+    valid = set(Tag.objects.values_list('id', flat=True))
+    chosen = sorted({int(t) for t in request.POST.getlist('tags') if t.isdigit() and int(t) in valid})
+    obj = SiteSettings.get()
+    data = dict(obj.duels_group_tags or {})
+    if chosen:
+        data[group] = chosen
+        messages.success(request, f'{labels[group]}: в дуэлях будут задачи выбранных тем ({len(chosen)}).')
+    else:
+        data.pop(group, None)
+        messages.success(request, f'{labels[group]}: в дуэлях будут задачи всех тем.')
+    obj.duels_group_tags = data
+    obj.save(update_fields=['duels_group_tags'])
     return redirect('duels')
 
 

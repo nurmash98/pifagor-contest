@@ -30,6 +30,32 @@
                 {% if mode == 'off' %}<div class="alert alert-secondary py-2 small">Дуэли выключены администратором — классы ниже откроются, когда их включат.</div>{% endif %}
                 <div class="fw-semibold mb-1">Доступ по классам</div>
                 <p class="text-muted small mb-2">Откройте дуэли классам, которым хотите: ученики этих классов увидят пункт «Дуэли» и смогут играть.</p>
+                <div class="border rounded-3 p-2 mb-3">
+                    <div class="fw-semibold small mb-1">🏷 Параллели</div>
+                    <div class="small text-muted mb-2">Ученики встречаются только со своей параллелью: 5–6, 7, 8–9, 10–11 классы. Темы задач — у каждой параллели свои (ничего не отмечено — все темы). Если отметить теги у отдельного класса ниже — для него будут они.</div>
+                    {% for g in group_rows %}
+                    <div class="d-flex flex-wrap align-items-center gap-2 py-1">
+                        <span class="fw-semibold small" style="min-width:110px">{{ g.label }}</span>
+                        <span class="small">{% for n in g.names %}<code>{{ n }}</code>{% if not forloop.last %}, {% endif %}{% empty %}все темы{% endfor %}</span>
+                        {% if duels_admin %}<button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#gtags-{{ forloop.counter }}">Изменить</button>{% endif %}
+                    </div>
+                    {% if duels_admin %}
+                    <div class="collapse" id="gtags-{{ forloop.counter }}">
+                        <form method="post" action="{% url 'duels_group_tags' %}" class="mb-2">{% csrf_token %}
+                            <input type="hidden" name="group" value="{{ g.key }}">
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                {% for tag, on in g.tag_options %}
+                                <label class="form-check-label small border rounded-pill px-2 py-1" style="cursor:pointer;">
+                                    <input type="checkbox" name="tags" value="{{ tag.id }}" class="form-check-input me-1" {% if on %}checked{% endif %}>#{{ tag.name }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <button type="submit" class="btn btn-pifagor-blue btn-sm px-3">Сохранить темы {{ g.label }}</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
                 <div class="mb-3">
                     {% for row in class_rows %}
                     <div class="border rounded-3 p-2 mb-2">
@@ -40,12 +66,12 @@
                                 <button type="submit" class="btn btn-sm rounded-pill px-3 {% if row.open %}btn-success{% else %}btn-outline-secondary{% endif %}" title="{{ row.students }} уч. Нажмите, чтобы {% if row.open %}закрыть{% else %}открыть{% endif %}">{% if row.open %}✓ {% else %}🔒 {% endif %}{{ row.name }}</button>
                             </form>
                             <span class="small text-muted">{{ row.students }} уч.</span>
-                            <button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#tags-{{ forloop.counter }}">🏷 Теги задач: {% if row.tag_count %}{{ row.tag_count }}{% else %}любые{% endif %}</button>
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-auto" data-bs-toggle="collapse" data-bs-target="#tags-{{ forloop.counter }}">🏷 Теги задач: {% if row.tag_count %}{{ row.tag_count }}{% else %}как у параллели{% endif %}</button>
                         </div>
                         <div class="collapse mt-2" id="tags-{{ forloop.counter }}">
                             <form method="post" action="{% url 'duels_class_tags' %}">{% csrf_token %}
                                 <input type="hidden" name="school_class" value="{{ row.name }}">
-                                <div class="small text-muted mb-1">Какие темы выпадают в дуэлях класса {{ row.name }}. Если ничего не отмечено — задачи любых тем.</div>
+                                <div class="small text-muted mb-1">Какие темы выпадают в дуэлях класса {{ row.name }}. Если ничего не отмечено — темы параллели (см. выше).</div>
                                 <div class="d-flex flex-wrap gap-2 mb-2">
                                     {% for tag, on in row.tag_options %}
                                     <label class="form-check-label small border rounded-pill px-2 py-1" style="cursor:pointer;">

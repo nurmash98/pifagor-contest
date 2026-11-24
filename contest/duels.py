@@ -127,7 +127,8 @@ def try_match(student):
         window = 100 + 10 * waited
         others = list(DuelQueueEntry.objects.select_for_update()
                       .exclude(student=student).select_related('student'))
-        others = [o for o in others if abs(o.rating - mine.rating) <= max(
+        mygroup = grade_group(student)                         # встречаются только свои параллели (5–6, 7, 8–9, 10–11)
+        others = [o for o in others if grade_group(o.student) == mygroup and abs(o.rating - mine.rating) <= max(
             window, 100 + 10 * (now - o.joined_at).total_seconds())]
         if not others:
             return None
@@ -145,6 +146,20 @@ def try_match(student):
         return duel
 
 
+# Параллели: кто с кем встречается в дуэлях и какие темы выпадают (если учитель не задал теги классу)
+GRADE_GROUPS = {'5': '5-6', '6': '5-6', '7': '7', '8': '8-9', '9': '8-9', '10': '10-11', '11': '10-11'}
+GROUPS = [('5-6', '5–6 классы'), ('7', '7 классы'), ('8-9', '8–9 классы'), ('10-11', '10–11 классы')]
+# темы параллели задаёт админ дуэлей (SiteSettings.duels_group_tags); пусто — все темы
+
+
+def grade_group(student):
+    """5–6, 7, 8–9, 10–11 (или сам номер параллели, если вне этих групп)."""
+    import re
+    m = re.match(r'\d+', normalize_school_class(student.school_class) or '')
+    g = m.group() if m else ''
+    return GRADE_GROUPS.get(g, g)
+
+
 def levels_for(avg_rating):
     """Уровни задач в дуэлях: только A и B (сложные C не выпадают) при любом рейтинге."""
     return ['A', 'B']
@@ -153,8 +168,15 @@ def levels_for(avg_rating):
 def allowed_tags(a, b):
     """Теги, из которых берутся задачи дуэли (id), или пустое множество — любые. Учитель задаёт
     теги для класса; у двух игроков — пересечение их тегов (если оно пустое — объединение)."""
-    data = SiteSettings.get().duels_class_tags or {}
-    sets = [set(data.get(normalize_school_class(s.school_class)) or []) for s in (a, b)]
+    obj = SiteSettings.get()
+    data, groups = obj.duels_class_tags or {}, obj.duels_group_tags or {}
+
+    def tags_of(s):
+        own = data.get(normalize_school_class(s.school_class))
+        if own:                                                 # учитель задал теги классу
+            return set(own)
+        return set(groups.get(grade_group(s)) or [])            # иначе — темы параллели (задаёт админ)
+    sets = [tags_of(s) for s in (a, b)]
     sets = [x for x in sets if x]
     if not sets:
         return set()

@@ -1396,6 +1396,36 @@ class DuelClassTagsTests(TestCase):
             seen |= {t.id for t in duels.pick_tasks(self.a, self.b)}
         self.assertTrue(seen & {t.id for t in self.loops} and seen & {t.id for t in self.strs})
 
+    def test_grade_groups_topics_and_matching(self):
+        from . import duels
+        from .models import DuelQueueEntry, Tag
+        io, cond, loop = (Tag.objects.create(name=n) for n in ('input/output', 'if/else', 'for'))
+        tc = self.loops[0].test_cases
+        mine = []
+        for i, tg in enumerate((io, cond, loop)):
+            for j in range(2):
+                t = Task.objects.create(title=f'G{i}{j}', description='d', level='A', test_cases=tc); t.tags.add(tg); mine.append(t.id)
+        from .models import SiteSettings
+        u_adm = User.objects.create_superuser('dadm', password='x')
+        self.client.force_login(u_adm)
+        self.client.post(reverse('duels_group_tags'), {'group': '7', 'tags': [io.id, cond.id, loop.id]})
+        self.assertEqual(SiteSettings.get().duels_group_tags, {'7': sorted([io.id, cond.id, loop.id])})
+        for _ in range(10):                                   # 7 классы: только input/output, if/else, for
+            self.assertTrue({t.id for t in duels.pick_tasks(self.a, self.b)} <= set(mine))
+        self.client.login(username='tg', password='x')         # обычный учитель темы параллели менять не может
+        self.client.post(reverse('duels_group_tags'), {'group': '7', 'tags': []})
+        self.assertIn('7', SiteSettings.get().duels_group_tags)
+        self.assertEqual((duels.grade_group(self.a), duels.grade_group(Student(school_class='6B')),
+                          duels.grade_group(Student(school_class='9A')), duels.grade_group(Student(school_class='11C'))),
+                         ('7', '5-6', '8-9', '10-11'))
+        u = User.objects.create_user('g9', password='x')
+        nine = Student.objects.create(user=u, full_name='Девятый', school_class='9A')
+        DuelQueueEntry.objects.create(student=self.a, rating=800)
+        DuelQueueEntry.objects.create(student=nine, rating=800)
+        self.assertIsNone(duels.try_match(self.a))            # 7 класс не встречается с 9-м
+        DuelQueueEntry.objects.create(student=self.b, rating=800)
+        self.assertIsNotNone(duels.try_match(self.a))         # 7F — 7-й параллели: встречаются
+
     def test_too_few_tagged_tasks_falls_back(self):
         from . import duels
         for t in self.loops[1:]:
