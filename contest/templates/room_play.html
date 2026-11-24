@@ -57,6 +57,10 @@
         #chat-list .crow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit; font-weight: 600; cursor: pointer; }
         #chat-list .crow:hover { background: rgba(99,102,241,.12); } #chat-list .crow b { margin-left: auto; background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; }
         #fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+        #rain { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+        #rain .rc { position: absolute; top: -70px; width: 54px; height: 54px; pointer-events: auto; cursor: pointer; animation: rc-fall linear forwards; filter: drop-shadow(0 4px 6px rgba(0,0,0,.3)); user-select: none; -webkit-user-drag: none; }
+        @keyframes rc-fall { from { transform: translateY(0) rotate(0); } to { transform: translateY(calc(100vh + 80px)) rotate(360deg); } }
+        #rain .rc.got { animation: rc-got .35s ease-out forwards; } @keyframes rc-got { to { transform: scale(1.8); opacity: 0; } }
         #fx.storm { animation: fx-storm 2.6s steps(1) infinite; } @keyframes fx-storm { 0%,100% { background: rgba(15,23,42,.45); } 8% { background: rgba(255,255,255,.55); } 12% { background: rgba(15,23,42,.55); } 15% { background: rgba(255,255,255,.4); } 20% { background: rgba(15,23,42,.45); } }
         #fx .fl { position: absolute; top: -40px; animation: fx-fall linear infinite; } @keyframes fx-fall { to { transform: translate(-60px, 110vh) rotate(200deg); } }
         #fx .cat { position: absolute; font-size: 34px; animation: fx-fly linear infinite; filter: drop-shadow(0 0 6px #f0abfc); } @keyframes fx-fly { from { transform: translateX(-80px); } to { transform: translateX(110vw); } }
@@ -177,7 +181,7 @@
             <div class="msgs" id="chat-msgs"></div>
             <div id="chat-quick"></div>
             <form id="chat-form" autocomplete="off"><input id="chat-in" maxlength="200" data-trp="Написать сообщение…" placeholder="{% t "Написать сообщение…" %}"><button class="btn" type="submit">➤</button></form></div>
-        <div id="fx"></div><div id="chat-list"></div>
+        <div id="fx"></div><div id="rain"></div><div id="chat-list"></div>
         <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><iframe id="d-frame"></iframe></div>
     </div>
     <aside id="side">
@@ -553,7 +557,6 @@
         var items = [];
         L.objs.forEach(function (o) { if (DRAW[o.t]) { items.push({k: o.t === 'logo' || o.t === 'tv' ? -100 : o.t === 'sign' ? o.x + o.y + 2.5 : o.x + o.w / 2 + o.y + o.d / 2 + (o.t === 'chair' ? .05 : 0), f: DRAW[o.t], o: o}); } });
         Object.keys(people).forEach(function (k) { var p = people[k]; if (p.rx !== null) { items.push({k: p.rx + p.ry + 1.2, p: p}); } });
-        rainCoins().forEach(function (c) { items.push({k: c.x + c.y + 1.1, f: drawCoin, o: c}); });
         items.sort(function (a, b) { return a.k - b.k; });
         items.forEach(function (it) { if (it.p) { drawPerson(it.p); } else { it.f(it.o); } });
         updateLabels();
@@ -654,7 +657,7 @@
     function arrived() {
         var me = people[ME]; seated = !!me.seat; tasksPanel();
         if (TEACHER) { return; }
-        if (BOSS[Math.round(me.rx) + ',' + Math.round(me.ry)]) { takeTask(); return; }
+        if (BOSS[Math.round(me.rx) + ',' + Math.round(me.ry)]) { if (wantSwap && CO.cur) { doSwap(function (m) { toast(m); }); } else { takeTask(); } return; }
         if (seated) { toast('📝 ' + (OFFICE ? TXT.pick_task : (CO.cur ? TXT.at_desk : TXT.go_boss))); }
     }
     function goBoss() {
@@ -671,7 +674,7 @@
             if (d < bd) { bd = d; best = b; }
         });
         if (!best) { return; }
-        if (Math.round(me.rx) === best[0] && Math.round(me.ry) === best[1] && !me.route.length) { takeTask(); return; }
+        if (Math.round(me.rx) === best[0] && Math.round(me.ry) === best[1] && !me.route.length) { if (wantSwap && CO.cur) { doSwap(function (m) { toast(m); }); } else { takeTask(); } return; }
         goTo(best[0], best[1], null);
     }
     var taking = false;
@@ -688,15 +691,15 @@
             });
         });
     }
-    function swapTask() {
-        if (!confirm(TXT.swap_q)) { return; }
-        var b = $('swap-task'); if (b) { b.disabled = true; }
+    var wantSwap = false;
+    function swapTask() { wantSwap = true; toast('🚶 ' + TXT.swap_go); goBoss(); }      // новое задание даёт ассистент
+    function doSwap(say) {
+        wantSwap = false;
         post({a: 'swap'}).then(function (d) {
-            if (b) { b.disabled = false; }
-            if (d.error) { toast(TXT[d.error] || d.error); return; }
-            CO.cur = d.task; var t = taskById(d.task);
-            toast('🔄 ' + TXT.swapped + (t ? ': ' + t.title : ''));
-            tasksPanel(); if (seated && t) { openTask(t); }
+            if (d.error) { say(TXT[d.error] || d.error); return; }
+            CO.cur = d.task; var t = taskById(d.task); tasksPanel(); poll(true);
+            say('🔄 ' + TXT.asst_got.replace('{t}', t ? t.title : '').replace('{l}', t ? t.level : '').replace('{m}', t ? money(t.pay) : ''),
+                asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)));
         });
     }
     function takeTask() {
@@ -786,7 +789,7 @@
         h += '<div class="lbl hint" style="font-weight:700">' + TXT.cur + '</div>';
         if (cur) {
             h += '<div class="task cur" data-id="' + cur.id + '"><span class="lv lv-' + cur.level + '">' + cur.level + '</span><span class="nm">' + esc(cur.title) + '<span class="hint" style="display:block;margin:0">' + TXT.in_work + (seated ? '' : ' · ' + TXT.sit_first) + '</span></span><span class="pay">+' + money(cur.pay) + '</span></div>';
-            if (!OFFICE) { h += '<button class="btn ghost" id="swap-task" type="button" style="width:100%;justify-content:center;margin:-4px 0 10px">🔄 ' + TXT.swap + '</button>'; }
+            if (!OFFICE) { h += '<button class="btn ghost" id="swap-task" type="button" style="width:100%;justify-content:center;margin:-4px 0 10px">🔄 ' + TXT.swap + '</button>'; }   // идёт к ассистенту
         } else {
             h += '<div class="hint">' + (allDone ? '🏆 ' + TXT.all_done : TXT.go_boss) + '</div>';
             if (!allDone) { h += '<button class="btn" id="go-boss" type="button" style="width:100%;justify-content:center;margin-bottom:10px">📋 ' + TXT.to_boss + '</button>'; }
@@ -901,42 +904,38 @@
         if (sig !== evShown) { EV = e; evShown = sig; fxPaint(); if (e) { toast({quake: '🌍 ', storm: '⚡ ', snow: '❄️ ', cats: '🌈 '}[e.k] + TXT['ev_' + e.k]); } }
     }, 500);
 
-    // дождь из монет: последняя минута урока, всего 50 монет на класс
-    var RAIN_N = 50, RAIN_W = 60;
+    // дождь из монет: последняя минута урока, всего 50 монет на класс; монеты падают сверху вниз — нажми, чтобы забрать
+    var RAIN_N = 50, RAIN_W = 60, RAIN_FALL = 7, COIN_SRC = '{% static 'icons/coin-64.png' %}', rainEls = {};
     function rainEnd() { return timerLeft == null ? null : timerAt / 1000 + srvOff + timerLeft; }
-    function rainCoins() {
-        if (OFFICE) { return []; }
-        var end = rainEnd(); if (end === null) { return []; }
-        var t = nowS(), since = t - (end - RAIN_W); if (since < 0 || t > end + 2) { return []; }
-        var out = [];
+    function rainTick() {
+        if (OFFICE) { return; }
+        var end = rainEnd(); if (end === null) { return; }
+        var t = nowS(), since = t - (end - RAIN_W);
+        if (since < 0 || since > RAIN_W + RAIN_FALL) { return; }
+        if (!rainToast) { rainToast = true; toast('🪙 ' + TXT.rain); }
         for (var n = 0; n < RAIN_N; n++) {
-            var at = n * RAIN_W / RAIN_N; if (at > since) { break; }
-            if (RAIN_TAKEN[n]) { continue; }
-            var r = rng(hashStr(U.act) + n * 104729 + 13), x, y, k = 0;
-            do { x = Math.floor(r() * W); y = Math.floor(r() * H); k++; } while (!free(x, y) && k < 60);
-            if (!free(x, y)) { continue; }
-            out.push({n: n, x: x, y: y, z: Math.max(0, 3 - (since - at) * 3)});
+            var at = n * RAIN_W / RAIN_N, age = since - at;
+            if (age < 0) { break; }
+            if (RAIN_TAKEN[n] || rainEls[n] || age > RAIN_FALL) { if (rainEls[n] && RAIN_TAKEN[n] && !rainEls[n].classList.contains('got')) { rainEls[n].remove(); } continue; }
+            var r = rng(hashStr(U.act) + n * 104729 + 13), el = document.createElement('img');
+            el.className = 'rc'; el.src = COIN_SRC; el.alt = ''; el.draggable = false; el.setAttribute('data-n', n);
+            el.style.left = (3 + r() * 88) + '%';
+            el.style.animationDuration = RAIN_FALL + 's'; el.style.animationDelay = (-age) + 's';
+            el.addEventListener('animationend', function (e) { var x = e.target; if (!x.classList.contains('got')) { x.remove(); } });
+            $('rain').appendChild(el); rainEls[n] = el;
         }
-        return out;
     }
-    function drawCoin(c) {
-        if (!c.z) { ellipse(c.x + .5, c.y + .5, .01, 10, 5, 'rgba(0,0,0,.18)'); }
-        var b = Math.sin(performance.now() / 250 + c.n) * .03;
-        ellipse(c.x + .5, c.y + .5, .25 + c.z + b, 9, 9, '#ca8a04'); ellipse(c.x + .5, c.y + .5, .26 + c.z + b, 7, 7, '#facc15');
-    }
-    setInterval(function () {
-        var cs = rainCoins();
-        if (cs.length && !rainToast) { rainToast = true; toast('🪙 ' + TXT.rain); }
+    setInterval(rainTick, 250);
+    $('rain').addEventListener('pointerdown', function (e) {
+        var el = e.target.closest('.rc'); if (!el) { return; }
+        e.preventDefault();
         if (TEACHER) { return; }
-        var me = people[ME]; if (!me || me.rx === null) { return; }
-        cs.forEach(function (c) {
-            if (c.z || rainPend[c.n]) { return; }
-            var dx = c.x + .5 - (me.rx + .5), dy = c.y + .5 - (me.ry + .5);
-            if (Math.sqrt(dx * dx + dy * dy) > .9) { return; }
-            rainPend[c.n] = true; RAIN_TAKEN[c.n] = true;
-            post({a: 'coin', n: c.n}).then(function (d) { if (d.ok) { toast('🪙 +1 · ' + TXT.rain_got); } });
-        });
-    }, 200);
+        var n = +el.getAttribute('data-n'); if (rainPend[n]) { return; }
+        rainPend[n] = true; RAIN_TAKEN[n] = true;
+        var tr = getComputedStyle(el).transform; el.style.transform = tr; el.classList.add('got');
+        setTimeout(function () { el.remove(); }, 400);
+        post({a: 'coin', n: n}).then(function (d) { toast(d.ok ? '🪙 +1 · ' + TXT.rain_got : (d.error === 'taken' ? TXT.rain_taken : '')); });
+    });
 
     // чат сверху: кто написал (даже если уже ушёл) и с кем недавно переписывались
     var CKEY = 'pf-chats:' + U.act, RECENT = [];
@@ -1314,7 +1313,8 @@
     function asstBtn(act, label) { return ' <button class="go" type="button" data-act="' + act + '">' + label + '</button>'; }
     function asstNext() {
         var cur = CO.cur ? taskById(CO.cur) : null;
-        if (cur) { botSay(TXT.asst_busy.replace('{t}', cur.title), asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)) + asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + (THEORY.length ? asstBtn('ath', '📖 ' + esc(TXT.asst_theory)) : '')); return; }
+        if (cur && wantSwap) { doSwap(botSay); return; }                 // пришёл поменять задание — ассистент сразу даёт новое
+        if (cur) { botSay(TXT.asst_busy.replace('{t}', cur.title), asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)) + asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + asstBtn('aswap', '🔄 ' + esc(TXT.swap)) + (THEORY.length ? asstBtn('ath', '📖 ' + esc(TXT.asst_theory)) : '')); return; }
         if (allDone) { botSay('🏆 ' + TXT.all_done); return; }
         botSay('👇', asstBtn('atake', '📋 ' + esc(TXT.asst_take)));
     }
@@ -1330,6 +1330,7 @@
                        asstBtn('aopen', '▶ ' + esc(TXT.asst_open)) + asstBtn('ahint', '💡 ' + esc(TXT.asst_hint)));
             });
         }
+        if (act === 'aswap') { doSwap(botSay); return; }
         if (act === 'aopen') { var t = CO.cur ? taskById(CO.cur) : null; if (!t) { return; } if (!seated) { botSay(TXT.sit_first + ' 🪑'); return; } $('chat').style.display = 'none'; botWith = null; openTask(t); }
         if (act === 'ath') {
             if (!THEORY.length) { botSay(TXT.asst_th_none); return; }
