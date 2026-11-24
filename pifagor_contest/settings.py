@@ -186,7 +186,10 @@ else:
 # отставать после проверки работы. Если задан DJANGO_CACHE_DIR — кэш лежит в общей папке на диске.
 _CACHE_DIR = os.environ.get('DJANGO_CACHE_DIR', '').strip()
 if _CACHE_DIR:
-    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache', 'LOCATION': _CACHE_DIR}}
+    # MAX_ENTRIES: по умолчанию 300 — при переполнении Django стирает случайную треть кеша, и из
+    # «Компании Пифагор» пропадали ученики (стирался список присутствующих).
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache', 'LOCATION': _CACHE_DIR,
+                          'OPTIONS': {'MAX_ENTRIES': 200000}}}
 
 # Запуск кода учеников (автотесты, дуэли, СОР/СОЧ) под отдельным пользователем без доступа к
 # файлам приложения и к сети — см. contest/autotest.py и deploy/DEPLOY_HOME.md.

@@ -145,10 +145,11 @@ def touch(rid, uid, base, now=None, **changes):
     p.update(changes)
     p['ts'] = now
     cache.set(k, p, TTL)
-    if fresh:
-        ids = cache.get(_ids_key(rid)) or []
-        if uid not in ids:
-            cache.set(_ids_key(rid), ids + [uid], TTL)
+    # Проверяем при каждой записи, а не только при первом входе: список мог потеряться
+    # (одновременная запись из разных воркеров, очистка кеша) — тогда ученик «исчезал» из зала навсегда.
+    ids = cache.get(_ids_key(rid)) or []
+    if uid not in ids:
+        cache.set(_ids_key(rid), ids + [uid], TTL)
     return p
 
 

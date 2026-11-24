@@ -5545,3 +5545,17 @@ class RoomDmTests(TestCase):
         self.client.get(reverse('room_play', args=[room.id]))
         self.assertNotIn('conv', self.client.get(state).json())
         self.assertEqual(self.client.get(state + f'?dm={self.a.user_id}').json()['conv'][1], [])   # чужую переписку не видно
+
+
+class RoomPresenceSelfHealTests(TestCase):
+    """Ученик не должен «пропадать» из зала, если список присутствующих потерялся в кеше."""
+
+    def test_lost_ids_list_is_restored(self):
+        from django.core.cache import cache
+        from . import room as rm
+        rm.touch(9901, 5, {'name': 'A'}, now=1000.0)
+        self.assertIn(5, rm.people(9901, now=1001.0))
+        cache.delete(rm._ids_key(9901))                       # список потерялся
+        self.assertNotIn(5, rm.people(9901, now=1002.0))
+        rm.touch(9901, 5, {'name': 'A'}, now=1010.0)          # следующий опрос ученика
+        self.assertIn(5, rm.people(9901, now=1011.0))
