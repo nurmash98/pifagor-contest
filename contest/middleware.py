@@ -229,3 +229,25 @@ class DailyVisitCoinMiddleware:
             return
         CoinTransaction.objects.get_or_create(student=st, key=f'visit:{day}',
                                               defaults=dict(kind='login', amount=1, note='Вход на сайт', at=timezone.now()))
+
+
+class OnlineMiddleware:
+    """Отмечает, когда ученик последний раз был на сайте (не чаще раза в минуту) — для счётчика
+    «онлайн сейчас» у учителей. Опросы игр тоже считаются: ученик в игре — он онлайн."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_authenticated and not user.is_staff:
+            try:
+                from django.core.cache import cache
+                if cache.add(f'seen:{user.id}', 1, 60):
+                    from django.utils import timezone
+                    from .models import Student
+                    Student.objects.filter(user_id=user.id).update(last_seen=timezone.now())
+            except Exception:
+                pass
+        return response

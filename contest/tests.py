@@ -1017,7 +1017,7 @@ class DuelTests(TestCase):
         for _ in range(3):
             self.client.post(reverse('duels_toggle'))
             seen.append(SiteSettings.get().duels_mode)
-        self.assertEqual(seen, ['all', 'off', 'testers'])
+        self.assertEqual(seen, ['all', 'off', 'all'])        # включены для всех / выключены
 
     # --- страницы
     def test_pages_and_full_flow_over_http(self):
@@ -1056,7 +1056,7 @@ class DuelsTeacherViewTests(TestCase):
         self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         page = self.client.get(reverse('duels')).content.decode()
         self.assertIn('Для преподавателя', page)
-        self.assertIn('по классам', page)
+        self.assertIn('Параллели', page)
         self.client.login(username='sv', password='x')
         self.assertNotIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertRedirects(self.client.get(reverse('duels')), reverse('all_tasks'))
@@ -1182,7 +1182,7 @@ class DuelsAdminOnlyTests(TestCase):
         self.assertIn('/duels/', self.client.get(reverse('all_tasks')).content.decode())
         self.assertEqual(self.client.get(reverse('duels')).status_code, 200)
         self.assertNotIn('Дуэли:', self.client.get(reverse('teacher_dashboard')).content.decode())   # кнопки в кабинете больше нет
-        self.assertIn('Переключить режим', self.client.get(reverse('duels')).content.decode())        # переключатель — на странице «Дуэли»
+        self.assertIn('Включить дуэли', self.client.get(reverse('duels')).content.decode())        # переключатель — на странице «Дуэли»
         self.client.post(reverse('duels_toggle'))
         self.assertEqual(SiteSettings.get().duels_mode, 'all')
 
@@ -1352,12 +1352,11 @@ class DuelsClassAccessTests(TestCase):
         self.settings.duels_mode = 'off'; self.settings.save()
         self.assertFalse(duels.visible_to(self.s7))
 
-    def test_overview_shows_class_buttons(self):
+    def test_overview_has_no_class_buttons(self):
         self.open_class('7F')
         html = self.client.get(reverse('duels')).content.decode()
-        self.assertIn('Доступ по классам', html)
-        self.assertIn('✓ 7F', html)
-        self.assertNotIn('name="school_class" value="8A"', html)
+        self.assertNotIn('Доступ по классам', html)
+        self.assertNotIn('✓ 7F', html)
 
 
 class DuelClassTagsTests(TestCase):
@@ -5729,3 +5728,22 @@ class DailyVisitCoinTests(TestCase):
         cache.clear()                       # даже если кеш очистился — второй монеты за день нет
         self.client.get('/profile/')
         self.assertEqual(list(CoinTransaction.objects.filter(student=st, kind='login').values_list('amount', flat=True)), [1])
+
+
+class OnlineNowTests(TestCase):
+    def test_teacher_sees_online_students(self):
+        from django.core.cache import cache
+        from .models import Teacher
+        cache.clear()
+        st = Student.objects.create(user=User.objects.create_user('on1', password='p'), full_name='Онлайн', school_class='7A')
+        Student.objects.create(user=User.objects.create_user('on2', password='p'), full_name='Оффлайн', school_class='7A')
+        tu = User.objects.create_user('ont', password='p', is_staff=True)
+        Teacher.objects.create(user=tu, full_name='Учитель', classes='7A')
+        self.client.force_login(st.user)
+        self.client.get('/')
+        st.refresh_from_db()
+        self.assertIsNotNone(st.last_seen)
+        self.client.force_login(tu)
+        html = self.client.get('/').content.decode()
+        self.assertIn('1 онлайн', html)
+        self.assertIn('7A: 1', html)

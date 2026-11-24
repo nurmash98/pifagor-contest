@@ -33,6 +33,7 @@ class Student(models.Model):
     blocked_until = models.DateTimeField(null=True, blank=True, verbose_name="Заблокирован до")
     # Рейтинг дуэлей (Эло). Все начинают с 800.
     duel_rating = models.IntegerField(default=800, verbose_name="Рейтинг дуэлей")
+    last_seen = models.DateTimeField(null=True, blank=True, db_index=True, verbose_name="Последний раз на сайте")
     duel_games = models.PositiveIntegerField(default=0, verbose_name="Сыграно дуэлей")
     # Тестер дуэлей: пока режим «только тестеры», дуэли видят и могут играть только они.
     duel_tester = models.BooleanField(default=False, verbose_name="Тестер дуэлей")

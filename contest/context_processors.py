@@ -165,3 +165,31 @@ def room_open(request):
     g = grade_of(cls or '')
     office_open = bool(office.is_open() and g.isdigit() and int(g) >= 5 and not (m and m.url_name and m.url_name.startswith('office_')))
     return {'room_open': open_room_for_class(cls), 'office_open': office_open, 'office_ok': g.isdigit() and int(g) >= 5}
+
+
+ONLINE_MINUTES = 5
+
+
+def online_now(request):
+    """Учителю — сколько его учеников сейчас на сайте (были за последние 5 минут); админу — всех."""
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated or not user.is_staff:
+        return {}
+    from django.core.cache import cache
+    key = f'online:t:{user.id}'
+    data = cache.get(key)
+    if data is None:
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Student, Teacher
+        qs = Student.objects.filter(last_seen__gte=timezone.now() - timedelta(minutes=ONLINE_MINUTES))
+        teacher = None if user.is_superuser else Teacher.objects.filter(user=user).first()
+        if teacher is not None:
+            qs = qs.filter(school_class__in=teacher.class_list())
+        by_class = {}
+        for c in qs.values_list('school_class', flat=True):
+            by_class[c] = by_class.get(c, 0) + 1
+        data = {'n': sum(by_class.values()),
+                'title': ', '.join(f'{c}: {n}' for c, n in sorted(by_class.items())) or 'никого'}
+        cache.set(key, data, 30)
+    return {'online_count': data['n'], 'online_title': data['title']}

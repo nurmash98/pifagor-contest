@@ -70,7 +70,6 @@ def duels_home(request):
         # Обзор для преподавателя: режим, идущие и недавние дуэли (только просмотр)
         ctx.update({
             'mode': duels.duels_mode(),
-            'class_rows': _class_rows(request.user),
             'group_rows': _group_rows(),
             'active_duels': list(Duel.objects.filter(status='ACTIVE').select_related('player1', 'player2')),
             'recent_duels': list(Duel.objects.filter(status='FINISHED').select_related('player1', 'player2', 'winner')
@@ -266,7 +265,7 @@ def duels_toggle(request):
         return redirect('teacher_dashboard')
     order = ['off', 'testers', 'all']
     settings_obj = SiteSettings.get()
-    settings_obj.duels_mode = order[(order.index(settings_obj.duels_mode) + 1) % len(order)]
+    settings_obj.duels_mode = 'off' if settings_obj.duels_mode == 'all' else 'all'   # включены для всех / выключены
     settings_obj.save()
     labels = {'off': 'Дуэли выключены.', 'testers': 'Дуэли видят только открытые классы.', 'all': 'Дуэли открыты для всех.'}
     messages.success(request, labels[settings_obj.duels_mode])

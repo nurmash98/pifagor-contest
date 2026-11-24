@@ -20,16 +20,13 @@
             {% if mode %}
             <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
                 <h5 class="fw-bold mb-2" style="color:#1a1a4b;">👨‍🏫 Для преподавателя</h5>
-                <p class="mb-2">Режим: <strong>{% if mode == 'all' %}для всех{% elif mode == 'testers' %}по классам{% else %}выключены{% endif %}</strong>
-                    <span class="text-muted small">(классы ниже работают в режиме «по классам», а при «для всех» дуэли видят все)</span></p>
+                <p class="mb-2">Дуэли: <strong>{% if mode == 'all' %}включены для всех учеников{% else %}выключены{% endif %}</strong></p>
                 {% if duels_admin %}
                 <form method="post" action="{% url 'duels_toggle' %}" class="mb-3">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}">
-                    <button type="submit" class="btn btn-sm rounded-pill px-3 {% if mode == 'all' %}btn-success{% elif mode == 'testers' %}btn-warning{% else %}btn-outline-secondary{% endif %}" title="Нажмите, чтобы переключить: выключены → по классам → для всех">⚔️ Переключить режим: {% if mode == 'all' %}для всех{% elif mode == 'testers' %}по классам{% else %}выключены{% endif %}</button>
+                    <button type="submit" class="btn btn-sm rounded-pill px-3 {% if mode == 'all' %}btn-outline-secondary{% else %}btn-success{% endif %}" title="Включить или выключить дуэли для всех">⚔️ {% if mode == 'all' %}Выключить дуэли{% else %}Включить дуэли{% endif %}</button>
                 </form>
                 {% endif %}
-                {% if mode == 'off' %}<div class="alert alert-secondary py-2 small">Дуэли выключены администратором — классы ниже откроются, когда их включат.</div>{% endif %}
-                <div class="fw-semibold mb-1">Доступ по классам</div>
-                <p class="text-muted small mb-2">Откройте дуэли классам, которым хотите: ученики этих классов увидят пункт «Дуэли» и смогут играть.</p>
+                {% if mode == 'off' %}<div class="alert alert-secondary py-2 small">Дуэли выключены администратором.</div>{% endif %}
                 <div class="border rounded-3 p-2 mb-3">
                     <div class="fw-semibold small mb-1">🏷 Параллели</div>
                     <div class="small text-muted mb-2">Ученики встречаются только со своей параллелью: 5–6, 7, 8–9, 10–11 классы. Темы задач — у каждой параллели свои (ничего не отмечено — все темы).</div>
@@ -55,21 +52,6 @@
                     </div>
                     {% endif %}
                     {% endfor %}
-                </div>
-                <div class="mb-3">
-                    {% for row in class_rows %}
-                    <div class="border rounded-3 p-2 mb-2">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <form method="post" action="{% url 'duels_class_toggle' %}" class="d-inline">{% csrf_token %}
-                                <input type="hidden" name="school_class" value="{{ row.name }}">
-                                <input type="hidden" name="action" value="{% if row.open %}close{% else %}open{% endif %}">
-                                <button type="submit" class="btn btn-sm rounded-pill px-3 {% if row.open %}btn-success{% else %}btn-outline-secondary{% endif %}" title="{{ row.students }} уч. Нажмите, чтобы {% if row.open %}закрыть{% else %}открыть{% endif %}">{% if row.open %}✓ {% else %}🔒 {% endif %}{{ row.name }}</button>
-                            </form>
-                            <span class="small text-muted">{{ row.students }} уч.</span>
-
-                        </div>
-                    </div>
-                    {% empty %}<span class="text-muted small">Нет доступных классов.</span>{% endfor %}
                 </div>
                 <div class="small fw-semibold mt-3">Идут сейчас: {{ active_duels|length }}</div>
                 {% for d in active_duels %}<div class="small">{{ d.player1.full_name }} <strong>{{ d.p1_points }} : {{ d.p2_points }}</strong> {{ d.player2.full_name }}</div>{% endfor %}

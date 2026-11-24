@@ -100,6 +100,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'contest.middleware.DailyVisitCoinMiddleware',   # +1 монета за вход, раз в день
+    'contest.middleware.OnlineMiddleware',           # «онлайн сейчас» для учителей
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Пока ученик пишет СОР/СОЧ — Курсы и Все задачи для него закрыты.
     'contest.middleware.ExamLockMiddleware',
@@ -131,6 +132,7 @@ TEMPLATES = [
                 'contest.context_processors.junior',
                 'contest.context_processors.challenge_promo',
                 'contest.context_processors.room_open',
+                'contest.context_processors.online_now',
             ],
         },
     },
