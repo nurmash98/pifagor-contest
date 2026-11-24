@@ -5744,6 +5744,8 @@ class OnlineNowTests(TestCase):
         st.refresh_from_db()
         self.assertIsNotNone(st.last_seen)
         self.client.force_login(tu)
-        html = self.client.get('/').content.decode()
+        self.assertNotIn('1 онлайн', self.client.get('/').content.decode())       # в меню нет
+        html = self.client.get(reverse('teacher_dashboard')).content.decode()
         self.assertIn('1 онлайн', html)
         self.assertIn('7A: 1', html)
+        self.assertIn('Онлайн', html)

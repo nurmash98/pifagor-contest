@@ -176,7 +176,7 @@ def online_now(request):
     if user is None or not user.is_authenticated or not user.is_staff:
         return {}
     from django.core.cache import cache
-    key = f'online:t:{user.id}'
+    key = f'online:t2:{user.id}'
     data = cache.get(key)
     if data is None:
         from datetime import timedelta
@@ -187,9 +187,10 @@ def online_now(request):
         if teacher is not None:
             qs = qs.filter(school_class__in=teacher.class_list())
         by_class = {}
-        for c in qs.values_list('school_class', flat=True):
-            by_class[c] = by_class.get(c, 0) + 1
-        data = {'n': sum(by_class.values()),
-                'title': ', '.join(f'{c}: {n}' for c, n in sorted(by_class.items())) or 'никого'}
+        for c, name in qs.order_by('full_name').values_list('school_class', 'full_name'):
+            by_class.setdefault(c, []).append(name)
+        data = {'n': sum(len(v) for v in by_class.values()),
+                'title': ', '.join(f'{c}: {len(v)}' for c, v in sorted(by_class.items())) or 'никого',
+                'classes': sorted(by_class.items())}
         cache.set(key, data, 30)
-    return {'online_count': data['n'], 'online_title': data['title']}
+    return {'online_count': data['n'], 'online_title': data['title'], 'online_classes': data.get('classes', [])}

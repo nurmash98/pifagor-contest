@@ -94,7 +94,6 @@
                 </a>
                 <!-- Ночной / дневной режим -->
                 {% include "theme_toggle.html" %}
-                {% if online_count is not None %}<span class="badge rounded-pill text-bg-light border fw-semibold" title="Онлайн за последние 5 минут — {{ online_title }}" style="cursor:help"><span style="color:#22c55e">●</span> {{ online_count }} онлайн</span>{% endif %}
             </div>
 
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
