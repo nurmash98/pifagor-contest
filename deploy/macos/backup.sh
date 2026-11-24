@@ -20,9 +20,9 @@ trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 case "${DATABASE_URL:-}" in *neon.tech*|'') log "пропуск: сайт работает не с локальной базой"; exit 0 ;; esac
 F="$B/pifagor-$(date +%F).dump"
 if pg_dump -Fc --no-owner --no-privileges "$DATABASE_URL" -f "$F.tmp" 2>>"$LOG"; then
-  mv "$F.tmp" "$F"; log "копия на Маке: $F ($(du -h "$F" | cut -f1))"
+  mv "$F.tmp" "$F"; date +%F > "$PIFAGOR_DATA/backup.last"; log "копия на Маке: $F ($(du -h "$F" | cut -f1))"
 else
-  rm -f "$F.tmp"; log "ОШИБКА pg_dump"; notify "Резервная копия базы не сделана (pg_dump)"; exit 1
+  rm -f "$F.tmp"; log "ОШИБКА pg_dump (повтор через час)"; notify "Резервная копия базы не сделана (pg_dump)"; exit 1
 fi
 find "$B" -name 'pifagor-*.dump' -mtime +14 -delete
 

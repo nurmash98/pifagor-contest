@@ -13,10 +13,12 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 cd "$PROJECT" || exit 1
-# раз в сутки, после 3:00 — резервная копия базы (в фоне, у неё свой замок)
-if [ "$(date +%H)" -ge 3 ] && [ "$(cat "$PIFAGOR_DATA/backup.last" 2>/dev/null)" != "$(date +%F)" ]; then
-  date +%F > "$PIFAGOR_DATA/backup.last"
-  nohup /bin/bash "$PROJECT/deploy/macos/backup.sh" >/dev/null 2>&1 &
+# раз в сутки, после 3:00 — резервная копия базы. Синхронно: фоновый процесс launchd убивает
+# вместе с этим заданием. Неудачная попытка повторяется через час.
+if [ "$(date +%H)" -ge 3 ] && [ "$(cat "$PIFAGOR_DATA/backup.last" 2>/dev/null)" != "$(date +%F)" ] \
+   && [ -z "$(find "$PIFAGOR_DATA/backup.try" -mmin -60 2>/dev/null)" ]; then
+  touch "$PIFAGOR_DATA/backup.try"
+  /bin/bash "$PROJECT/deploy/macos/backup.sh" >/dev/null 2>&1
 fi
 BRANCH="${DEPLOY_BRANCH:-feature/tags-and-courses}"
 git fetch -q origin "$BRANCH" 2>>"$LOG" || exit 0
