@@ -285,6 +285,28 @@
         cm.setSize('100%', ta.getAttribute('data-height') || 280);
         if (ta.disabled) { cm.setOption('readOnly', 'nocursor'); }
         cm.on('change', function () { cm.save(); });
+        // Черновик: набранный код сам сохраняется на сервере (через 1,5 с после набора и при уходе
+        // со страницы) — вышел из игры/закрыл вкладку, открыл снова — код на месте.
+        var draftUrl = ta.getAttribute('data-draft-url');
+        if (draftUrl && !ta.disabled) {
+            var saved = cm.getValue(), dTimer = null;
+            var tokEl = document.querySelector('input[name=csrfmiddlewaretoken]');
+            var saveDraft = function (beacon) {
+                clearTimeout(dTimer);
+                var v = cm.getValue();
+                if (v === saved) { return; }
+                var fd = new FormData(); fd.append('code', v);
+                if (tokEl) { fd.append('csrfmiddlewaretoken', tokEl.value); }
+                if (beacon && navigator.sendBeacon) { if (navigator.sendBeacon(draftUrl, fd)) { saved = v; } return; }
+                fetch(draftUrl, {method: 'POST', body: fd, credentials: 'same-origin', keepalive: true})
+                    .then(function (r) { if (r.ok) { saved = v; } }).catch(function () {});
+            };
+            cm.on('change', function () { clearTimeout(dTimer); dTimer = setTimeout(function () { saveDraft(false); }, 1500); });
+            window.addEventListener('pagehide', function () { saveDraft(true); });
+            document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { saveDraft(true); } });
+            var form = ta.form;
+            if (form) { form.addEventListener('submit', function () { clearTimeout(dTimer); saved = cm.getValue(); }); }
+        }
         if (cm.showHint && !ta.disabled) {
             cm.on('inputRead', function (c, ch) {
                 if (ch.origin === '+input' && /^[A-Za-z_]$/.test(ch.text.join('')) && !c.state.completionActive) {

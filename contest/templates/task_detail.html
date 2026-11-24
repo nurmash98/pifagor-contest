@@ -149,9 +149,10 @@
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
                     <label class="form-label small text-muted fw-semibold">{% t "Вставьте ваш исходный код (Python):" %}</label>
                     <textarea name="code" class="form-control flex-grow-1 rounded-3 font-monospace p-3 code-editor" data-height="340" data-stdin="{{ task.display_input_example }}" data-expect="{{ task.display_output_example }}"
+                              data-draft-url="{% url 'task_draft' task.id %}"
                               autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
                               style="min-height: 320px; background-color: #272822; color: #f8f8f2;"
-                              placeholder="{% t '# Напишите ваш код здесь...' %}">{{ submission.code|default_if_none:'' }}</textarea>
+                              placeholder="{% t '# Напишите ваш код здесь...' %}">{{ editor_code }}</textarea>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center">

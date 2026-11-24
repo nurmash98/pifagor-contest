@@ -318,6 +318,9 @@ class Submission(models.Model):
     last_submitted_at = models.DateTimeField(
         null=True, blank=True, verbose_name="Последняя отправка на проверку"
     )
+    # Черновик: последний набранный, но ещё не отправленный код (сохраняется сам, пока ученик пишет)
+    draft_code = models.TextField(blank=True, null=True, verbose_name="Черновик кода")
+    draft_at = models.DateTimeField(null=True, blank=True, verbose_name="Черновик сохранён")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

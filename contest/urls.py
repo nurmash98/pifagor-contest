@@ -31,6 +31,7 @@ urlpatterns = [
 
     # Детальная страница задачи и отправка кода
     path('task/<int:task_id>/', views.task_detail, name='task_detail'),
+    path('task/<int:task_id>/draft/', views.task_draft, name='task_draft'),
 
 
     # Рейтинг и профиль

@@ -473,6 +473,7 @@ def task_detail(request, task_id):
         submission.code = code
         submission.status = 'TESTING'  # Отправляем на проверку преподавателю
         submission.last_submitted_at = timezone.now()
+        submission.draft_code, submission.draft_at = None, None  # отправлено — черновик больше не нужен
         submission.save()
         messages.success(request, _submit_attempt(
             submission, _count_param(request, 'key_count'), _count_param(request, 'pointer_count')))
@@ -500,8 +501,33 @@ def task_detail(request, task_id):
         'cooldown_seconds': int(cooldown.total_seconds()) + 1 if cooldown else 0,
         'back_url': back_url or reverse('all_tasks'),
         'readonly': False,
+        # в редакторе — последний набранный код: черновик, если он новее отправленного
+        'editor_code': submission.draft_code if (
+            submission.draft_code is not None and submission.draft_at and
+            (not submission.last_submitted_at or submission.draft_at > submission.last_submitted_at)
+        ) else (submission.code or ''),
     }
     return render(request, 'task_detail.html', context)
+
+
+@login_required
+def task_draft(request, task_id):
+    """Автосохранение черновика кода (POST code=...). Вызывается редактором, пока ученик пишет,
+    и при закрытии/уходе со страницы — чтобы набранный код не терялся."""
+    from django.http import HttpResponseNotAllowed, JsonResponse
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+    student = Student.objects.filter(user=request.user).first()
+    if student is None:
+        return JsonResponse({'ok': False}, status=403)
+    code = request.POST.get('code', '')[:100000]
+    sub = Submission.objects.filter(student=student, task_id=task_id).first()
+    if sub is None:
+        task = get_object_or_404(Task, id=task_id, hidden=False)
+        sub = Submission.objects.create(student=student, task=task, status='IN_PROGRESS')
+    if sub.draft_code != code:
+        Submission.objects.filter(pk=sub.pk).update(draft_code=code, draft_at=timezone.now())
+    return JsonResponse({'ok': True})
 
 
 @login_required
