@@ -651,6 +651,30 @@
         goTo(best[0], best[1], null);
     }
     var taking = false;
+    if (TEACHER && !OFFICE) {
+        $('stats').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-fine]'); if (!b) { return; }
+            var a = prompt(TXT.fine_q.replace('{name}', b.getAttribute('data-n')), '5000');
+            if (a === null) { return; }
+            a = parseInt(String(a).replace(/\D/g, ''), 10);
+            if (!a) { return; }
+            var why = prompt(TXT.fine_why, '') || '';
+            post({a: 'fine', uid: b.getAttribute('data-fine'), amount: a, reason: why}).then(function (d) {
+                toast(d.error ? (TXT[d.error] || d.error) : '💸 −' + money(a) + ' · ' + b.getAttribute('data-n'));
+            });
+        });
+    }
+    function swapTask() {
+        if (!confirm(TXT.swap_q)) { return; }
+        var b = $('swap-task'); if (b) { b.disabled = true; }
+        post({a: 'swap'}).then(function (d) {
+            if (b) { b.disabled = false; }
+            if (d.error) { toast(TXT[d.error] || d.error); return; }
+            CO.cur = d.task; var t = taskById(d.task);
+            toast('🔄 ' + TXT.swapped + (t ? ': ' + t.title : ''));
+            tasksPanel(); if (seated && t) { openTask(t); }
+        });
+    }
     function takeTask() {
         if (taking) { return; }
         if (CO.cur) { toast('⏳ ' + TXT.busy); return; }
@@ -738,6 +762,7 @@
         h += '<div class="lbl hint" style="font-weight:700">' + TXT.cur + '</div>';
         if (cur) {
             h += '<div class="task cur" data-id="' + cur.id + '"><span class="lv lv-' + cur.level + '">' + cur.level + '</span><span class="nm">' + esc(cur.title) + '<span class="hint" style="display:block;margin:0">' + TXT.in_work + (seated ? '' : ' · ' + TXT.sit_first) + '</span></span><span class="pay">+' + money(cur.pay) + '</span></div>';
+            if (!OFFICE) { h += '<button class="btn ghost" id="swap-task" type="button" style="width:100%;justify-content:center;margin:-4px 0 10px">🔄 ' + TXT.swap + '</button>'; }
         } else {
             h += '<div class="hint">' + (allDone ? '🏆 ' + TXT.all_done : TXT.go_boss) + '</div>';
             if (!allDone) { h += '<button class="btn" id="go-boss" type="button" style="width:100%;justify-content:center;margin-bottom:10px">📋 ' + TXT.to_boss + '</button>'; }
@@ -748,6 +773,7 @@
         }
         $('tasks').innerHTML = h;
         if ($('go-boss')) { $('go-boss').addEventListener('click', goBoss); }
+        if ($('swap-task')) { $('swap-task').addEventListener('click', swapTask); }
     }
     $('tasks').addEventListener('click', function (e) {
         var el = e.target.closest('.task'); if (!el) { return; }
@@ -824,7 +850,8 @@
             var cur = TEACHER && r[6] ? taskById(r[6]) : null;
             return '<div class="srow' + (r[0] === ME ? ' me' : '') + '">' + (OFFICE ? '<span style="width:20px;text-align:center">' + (['🥇', '🥈', '🥉'][i] || (i + 1)) + '</span>' : '') + '<span class="on-dot' + (r[4] ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><span class="nm" style="display:block">' + esc(r[1]) + (TEACHER && r[5] ? ' <span class="ex" title="' + TXT.exits + '">🚪' + r[5] + '</span>' : '') + '</span>' +
                    (TEACHER && !OFFICE ? '<span class="cur">' + (cur ? '📋 ' + esc(cur.title) : '— ' + TXT.no_task) + (r[3] ? ' · ✅' + r[3] : '') + '</span>' : '') +
-                   '</span><span class="ok">' + money(r[2]) + '</span></div>';
+                   '</span><span class="ok">' + money(r[2]) + '</span>' +
+                   (TEACHER && !OFFICE ? '<button class="btn ghost" type="button" data-fine="' + r[0] + '" data-n="' + esc(r[1]) + '" title="' + TXT.fine + '" style="padding:2px 7px;margin-left:4px">💸</button>' : '') + '</div>';
         }).join('') || '<div class="hint">' + TXT.none + '</div>';
         if (d.ome) {
             var newOnes = d.ome.today.filter(function (id) { return OME.today.indexOf(id) < 0; });
@@ -835,6 +862,9 @@
             officePanel();
         }
         if (d.me) {
+            if (CO.fines !== undefined && (d.me.fines || 0) > (CO.fines || 0) && d.me.fine_last) {
+                toast('💸 ' + TXT.fined + ': −' + money(d.me.fine_last[0]) + (d.me.fine_last[1] ? ' (' + d.me.fine_last[1] + ')' : ''));
+            }
             var prev = CO.cur, sig = JSON.stringify(CO);
             if (prev && !d.me.cur && d.me.done.indexOf(prev) >= 0) { var t = taskById(prev); toast('🎉 ' + TXT.paid + ' +' + money(t ? t.pay : 0)); }
             CO = d.me; if (CO.cur) { allDone = false; }

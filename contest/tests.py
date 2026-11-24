@@ -5180,6 +5180,35 @@ class StudyRoomTests(TestCase):
                                                   'order': ','.join(str(t.id) for t in order)})
         return StudyRoom.objects.get()
 
+    def test_company_swap_task_and_teacher_fine(self):
+        from .models import RoomAssignment, RoomFine
+        b = make_task('Средняя2', 'B', Tag.objects.get(name='Циклы'))
+        c = make_task('Сложная2', 'C', Tag.objects.get(name='Циклы'))
+        room = self._post_open([self.tasks[0], b, c], [self.tasks[0], b, c])
+        a = self.sts[0]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.assertEqual(self.client.post(act, {'a': 'swap'}).json()['error'], 'no_task')
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['task'], self.tasks[0].id)
+        self.assertEqual(self.client.post(act, {'a': 'swap'}).json(), {'ok': True, 'task': b.id})   # первая → в конец очереди
+        self.assertEqual(self.client.post(act, {'a': 'swap'}).json(), {'ok': True, 'task': c.id})
+        self.assertEqual(self.client.post(act, {'a': 'swap'}).json()['error'], 'swap_limit')       # не больше 2 раз
+        Submission.objects.create(student=a, task=c, status='DONE', is_graded=True, score=10)
+        st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
+        self.assertEqual(st['me']['salary'], 30000)
+        self.assertEqual(self.client.post(act, {'a': 'take'}).json()['task'], self.tasks[0].id)    # отложенные — снова, по порядку
+        # штраф: только учитель
+        self.assertEqual(self.client.post(act, {'a': 'fine', 'uid': a.user_id, 'amount': 5000}).json()['error'], 'bad')
+        self.client.force_login(self.tu)
+        self.assertEqual(self.client.post(act, {'a': 'fine', 'uid': a.user_id, 'amount': 5000, 'reason': 'шум'}).json(), {'ok': True})
+        self.assertEqual(RoomFine.objects.get().amount, 5000)
+        self.client.force_login(a.user)
+        from django.core.cache import cache
+        cache.delete(f'room:fresh:{a.user_id}')
+        me = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()['me']
+        self.assertEqual((me['salary'], me['fines'], me['fine_last']), (25000, 5000, [5000, 'шум']))
+
     def test_company_tasks_from_boss_in_order_and_salary(self):
         from django.core.cache import cache
         from .models import RoomAssignment
@@ -5194,11 +5223,11 @@ class StudyRoomTests(TestCase):
         self.assertEqual(self.client.post(act, {'a': 'take'}).json(), {'ok': True, 'task': b.id})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'busy')     # пока не выполнил — нового нет
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
-        self.assertEqual(st['me'], {'cur': b.id, 'done': [], 'salary': 0})
+        self.assertEqual(st['me'], {'cur': b.id, 'done': [], 'salary': 0, 'fines': 0, 'fine_last': None})
         Submission.objects.create(student=a, task=b, status='DONE', is_graded=True, score=10)
         cache.delete(f'room:fresh:{a.user_id}')
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
-        self.assertEqual(st['me'], {'cur': None, 'done': [b.id], 'salary': 20000})
+        self.assertEqual(st['me'], {'cur': None, 'done': [b.id], 'salary': 20000, 'fines': 0, 'fine_last': None})
         self.assertIsNotNone(RoomAssignment.objects.get(student=a, task=b).done_at)
         row = [r for r in st['stats'] if r[0] == a.user_id][0]
         self.assertEqual((row[2], row[3]), (20000, 1))

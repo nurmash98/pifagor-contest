@@ -281,6 +281,11 @@ ROOM_TEXTS = {
     'got': 'Ассистент дал задание', 'go_boss': 'Подойдите к ассистенту (🧑‍💼 в коридоре) за заданием', 'cur': 'Текущее задание',
     'in_work': 'в работе', 'done': 'выполнено', 'salary': 'Зарплата', 'to_boss': 'К руководителю', 'paid': 'Задание выполнено! Зарплата',
     'boss': 'Руководитель', 'tenge': '₸', 'no_task': 'нет задания',
+    'swap': 'Поменять задачу', 'swap_q': 'Поменять задачу? Она вернётся к вам позже, в конце очереди.',
+    'swap_limit': 'Поменять задачу можно не больше 2 раз за урок', 'no_other': 'Других задач нет — решите эту',
+    'swapped': 'Новое задание',
+    'fine': 'Штраф', 'fine_q': 'Штраф для {name}: сколько тенге вычесть из зарплаты?', 'fine_why': 'За что? (можно оставить пустым)',
+    'fined': 'Руководитель выписал штраф',
     'earned': 'Заработано сегодня', 'coins_x2': 'монет (x2)', 'sit_own': 'Сядьте за стол в кабинете своей параллели',
     'other_grade': 'Это кабинет другой параллели — садиться можно только в своём',
     'admin_only': 'Это администрация — здесь сидят учителя. Можно зайти и задать вопрос',
@@ -401,7 +406,8 @@ def room_state(request, room_id):
            'total': sum(d.get('salary', 0) for d in co.values())}
     if st is not None:
         mine = co.get(st.id, {})
-        out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0)}
+        out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0),
+                     'fines': mine.get('fines', 0), 'fine_last': mine.get('fine_last')}
     if teacher:
         out['log'] = rm.log(room.id)[-30:]
     _dm_state(request, room.id, out)
@@ -457,6 +463,14 @@ def room_act(request, room_id):
             return JsonResponse({'error': err})
         rm.log_event(room.id, st.full_name, f'📋 взял задание «{task.title}» ({task.level})')
         return JsonResponse({'ok': True, 'task': task.id})
+    if act == 'swap' and not teacher:
+        old_cur = rm.company(room, fresh=True).get(st.id, {}).get('cur')
+        task, err = rm.swap(room, st)
+        if err:
+            return JsonResponse({'error': err})
+        old_t = room.tasks.filter(id=old_cur).first()
+        rm.log_event(room.id, st.full_name, f'🔄 поменял задание «{old_t.title if old_t else "?"}» → «{task.title}» ({task.level})')
+        return JsonResponse({'ok': True, 'task': task.id})
     if act == 'hint' and not teacher:
         cur = rm.company(room).get(st.id, {}).get('cur')
         task = room.tasks.filter(id=cur).prefetch_related('tags').first() if cur else None
@@ -465,6 +479,22 @@ def room_act(request, room_id):
         return JsonResponse(dict(rm.hint(task, st, _lang(request)), task=task.id))
     if act == 'exit' and not teacher:
         rm.add_exit(room.id, me)
+        return JsonResponse({'ok': True})
+    if act == 'fine' and teacher:
+        from .models import RoomFine
+        try:
+            uid, amount = int(request.POST.get('uid')), int(request.POST.get('amount'))
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'bad'})
+        if not 0 < amount <= 1000000:
+            return JsonResponse({'error': 'bad'})
+        who = Student.objects.filter(user_id=uid, school_class=room.school_class).first()
+        if who is None:
+            return JsonResponse({'error': 'bad'})
+        reason = ' '.join((request.POST.get('reason') or '').split())[:100]
+        RoomFine.objects.create(room=room, student=who, amount=amount, reason=reason, by=request.user)
+        cache.delete(f'room:{room.id}:co')
+        rm.log_event(room.id, who.full_name, f'💸 штраф −{amount:,} ₸'.replace(',', ' ') + (f' ({reason})' if reason else ''))
         return JsonResponse({'ok': True})
     if act == 'lower' and teacher:
         try:

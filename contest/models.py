@@ -716,12 +716,30 @@ class RoomAssignment(models.Model):
     pay = models.PositiveIntegerField(default=0, verbose_name="Зарплата за задание, ₸")
     assigned_at = models.DateTimeField(auto_now_add=True)
     done_at = models.DateTimeField(null=True, blank=True)
+    # Ученик поменял задание: оно уходит в конец очереди (может попасться снова позже)
+    skipped_at = models.DateTimeField(null=True, blank=True, verbose_name="Отложено учеником")
+    skips = models.PositiveSmallIntegerField(default=0, verbose_name="Сколько раз меняли")
 
     class Meta:
         verbose_name = "Задание в компании"
         verbose_name_plural = "Задания в компании"
         unique_together = [('room', 'student', 'task')]
         ordering = ['assigned_at']
+
+
+class RoomFine(models.Model):
+    """«Компания Пифагор»: штраф, который руководитель (учитель) выписал сотруднику — вычитается из зарплаты."""
+    room = models.ForeignKey(StudyRoom, on_delete=models.CASCADE, related_name='fines')
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='room_fines')
+    amount = models.PositiveIntegerField(verbose_name="Штраф, ₸")
+    reason = models.CharField(max_length=100, blank=True, verbose_name="За что")
+    by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Штраф в компании"
+        verbose_name_plural = "Штрафы в компании"
+        ordering = ['at']
 
 
 class UpsolveAnswer(models.Model):

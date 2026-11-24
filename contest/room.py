@@ -200,7 +200,8 @@ def public(rid, now=None):
 
 # ------------------------------------------------------------------ компания: задания и зарплата
 
-PAY = {'A': 10000, 'B': 20000, 'C': 30000}          # ₸ за лёгкую / среднюю / сложную задачу
+PAY = {'A': 10000, 'B': 20000, 'C': 30000}
+SWAP_MAX = 2          # сколько раз за урок ученик может поменять задание          # ₸ за лёгкую / среднюю / сложную задачу
 
 
 def near_boss(p):
@@ -217,7 +218,8 @@ def company(room, fresh=False):
         return data
     from django.utils import timezone
     from .models import RoomAssignment, Submission
-    rows = list(RoomAssignment.objects.filter(room=room).values('id', 'student_id', 'task_id', 'pay', 'assigned_at', 'done_at'))
+    rows = list(RoomAssignment.objects.filter(room=room, skipped_at__isnull=True)
+                .values('id', 'student_id', 'task_id', 'pay', 'assigned_at', 'done_at'))
     open_ = [r for r in rows if r['done_at'] is None]
     if open_:
         since = min(r['assigned_at'] for r in open_)
@@ -234,7 +236,13 @@ def company(room, fresh=False):
             for r in rows:
                 if r['id'] in done_ids:
                     r['done_at'] = now
+    from .models import RoomFine
     data = {}
+    for f in RoomFine.objects.filter(room=room).values('student_id', 'amount', 'reason'):   # штрафы руководителя
+        d = data.setdefault(f['student_id'], {'salary': 0, 'done': [], 'cur': None})
+        d['salary'] -= f['amount']
+        d['fines'] = d.get('fines', 0) + f['amount']
+        d['fine_last'] = [f['amount'], f['reason']]
     for r in rows:
         d = data.setdefault(r['student_id'], {'salary': 0, 'done': [], 'cur': None})
         if r['done_at'] is None:
@@ -246,25 +254,58 @@ def company(room, fresh=False):
     return data
 
 
-def take(room, student, presence):
+def take(room, student, presence, avoid=None):
     """Ученик подошёл к ассистенту — выдать следующее задание из списка.
+    Отложенные (поменянные) задания идут в конец очереди. avoid — не выдавать эту задачу.
     Возвращает (task, None) или (None, ошибка): busy / all_done."""
-    from .models import RoomAssignment, Submission, Task
+    from django.utils import timezone
+    from .models import RoomAssignment, Submission
     mine = company(room, fresh=True).get(student.id, {})
     if mine.get('cur'):
         return None, 'busy'
     tasks = {t.id: t for t in room.tasks.all()}
     order = [i for i in (room.task_order or []) if i in tasks] + sorted((i for i in tasks if i not in (room.task_order or [])),
                                                                         key=lambda i: (tasks[i].level, i))
-    had = set(RoomAssignment.objects.filter(room=room, student=student).values_list('task_id', flat=True))
+    mine_rows = {r.task_id: r for r in RoomAssignment.objects.filter(room=room, student=student)}
+    skipped = sorted((r for r in mine_rows.values() if r.skipped_at), key=lambda r: r.skipped_at)
     solved = set(Submission.objects.filter(student=student, task_id__in=order, is_graded=True, score=10).values_list('task_id', flat=True))
-    nxt = next((i for i in order if i not in had and i not in solved), None)     # уже решённые раньше — не выдаём
+    queue = [i for i in order if i not in mine_rows and i not in solved] + \
+            [r.task_id for r in skipped if r.task_id not in solved]          # уже решённые раньше — не выдаём
+    nxt = next((i for i in queue if i != avoid), None)
     if nxt is None:
         return None, 'all_done'
     t = tasks[nxt]
-    RoomAssignment.objects.get_or_create(room=room, student=student, task=t, defaults={'pay': PAY.get(t.level, PAY['A'])})
+    row = mine_rows.get(nxt)
+    if row is not None:                       # отложенное раньше — выдаём заново
+        RoomAssignment.objects.filter(pk=row.pk).update(skipped_at=None, assigned_at=timezone.now())
+    else:
+        RoomAssignment.objects.get_or_create(room=room, student=student, task=t, defaults={'pay': PAY.get(t.level, PAY['A'])})
     cache.delete(f'room:{room.id}:co')
     return t, None
+
+
+def swap(room, student):
+    """Ученик меняет текущее задание: оно уходит в конец очереди, сразу выдаётся следующее.
+    Не больше SWAP_MAX раз за урок. Возвращает (task, None) или (None, ошибка):
+    no_task / swap_limit / no_other."""
+    from django.db.models import Sum
+    from django.utils import timezone
+    from .models import RoomAssignment
+    cur = company(room, fresh=True).get(student.id, {}).get('cur')
+    if not cur:
+        return None, 'no_task'
+    used = RoomAssignment.objects.filter(room=room, student=student).aggregate(n=Sum('skips'))['n'] or 0
+    if used >= SWAP_MAX:
+        return None, 'swap_limit'
+    row = RoomAssignment.objects.get(room=room, student=student, task_id=cur)
+    RoomAssignment.objects.filter(pk=row.pk).update(skipped_at=timezone.now(), skips=row.skips + 1)
+    cache.delete(f'room:{room.id}:co')
+    task, err = take(room, student, None, avoid=cur)
+    if err:                                   # других задач нет — возвращаем как было
+        RoomAssignment.objects.filter(pk=row.pk).update(skipped_at=None, skips=row.skips)
+        cache.delete(f'room:{room.id}:co')
+        return None, 'no_other'
+    return task, None
 
 
 def add_exit(rid, uid):
