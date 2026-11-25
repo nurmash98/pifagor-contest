@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ошибка{% endblock %} — Pifagor Contest</title>
+    {# Страница ошибки: без базы и без внешних файлов — должна открываться, даже когда сайт болеет #}
+    <style>
+        :root { --bg: #11131f; --card: #1b1e30; --line: #2c3150; --text: #e7e8f5; --muted: #8d92b5; --lav: #c4bfff; --green: #7ddc8a; --red: #ff7a8a; --amber: #ffcf6b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+               background: radial-gradient(1200px 600px at 20% -10%, #2a2560 0%, transparent 60%), radial-gradient(900px 500px at 110% 110%, #173a2a 0%, transparent 55%), var(--bg);
+               color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; overflow: hidden; }
+        .stars { position: fixed; inset: 0; pointer-events: none; background-image:
+                 radial-gradient(1px 1px at 10% 20%, #fff8 50%, transparent 51%), radial-gradient(1px 1px at 70% 30%, #fff6 50%, transparent 51%),
+                 radial-gradient(1.5px 1.5px at 40% 80%, #fff7 50%, transparent 51%), radial-gradient(1px 1px at 85% 75%, #fff5 50%, transparent 51%),
+                 radial-gradient(1px 1px at 25% 55%, #fff4 50%, transparent 51%), radial-gradient(1.5px 1.5px at 60% 12%, #fff6 50%, transparent 51%); animation: tw 6s ease-in-out infinite alternate; }
+        @keyframes tw { to { opacity: .45; } }
+        .wrap { position: relative; width: min(680px, 100%); text-align: center; }
+        .art { font-size: 96px; line-height: 1; height: 120px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 10px 25px rgba(0,0,0,.45)); }
+        .code { font: 900 clamp(64px, 14vw, 120px)/1 'Arial Black', Impact, sans-serif; letter-spacing: .04em;
+                background: linear-gradient(90deg, var(--lav), var(--green)); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 4px 0 6px; }
+        h1 { font-size: clamp(22px, 4.5vw, 30px); margin: 0 0 6px; }
+        .kk { color: var(--muted); font-size: 15px; margin: 0 0 18px; }
+        .term { text-align: left; background: #0b0d17; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin: 18px auto; box-shadow: 0 18px 50px rgba(0,0,0,.4); }
+        .term .bar { display: flex; gap: 6px; padding: 10px 12px; background: #151829; border-bottom: 1px solid var(--line); }
+        .term .bar i { width: 11px; height: 11px; border-radius: 50%; display: block; } .term .bar i:nth-child(1) { background: #ff5f57; } .term .bar i:nth-child(2) { background: #febc2e; } .term .bar i:nth-child(3) { background: #28c840; }
+        .term pre { margin: 0; padding: 14px 16px; font: 14px/1.6 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; white-space: pre-wrap; color: #cfd3f5; }
+        .term .p { color: var(--green); } .term .e { color: var(--red); font-weight: 700; } .term .c { color: var(--muted); } .term .k { color: var(--lav); }
+        .cursor { display: inline-block; width: 9px; height: 1.1em; background: var(--green); vertical-align: -2px; animation: bl 1s steps(1) infinite; } @keyframes bl { 50% { opacity: 0; } }
+        .tip { color: var(--muted); font-size: 15px; margin: 0 0 20px; }
+        .btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 15px; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--card); cursor: pointer; transition: transform .15s, box-shadow .15s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+        .btn.main { background: linear-gradient(90deg, #7c6cff, #4ec97a); border-color: transparent; color: #fff; }
+        .float { animation: fl 3.2s ease-in-out infinite; } @keyframes fl { 50% { transform: translateY(-14px) rotate(-6deg); } }
+        .shake { animation: sh 2.4s ease-in-out infinite; } @keyframes sh { 0%,100% { transform: rotate(0); } 10%,30% { transform: rotate(-9deg); } 20%,40% { transform: rotate(9deg); } 50% { transform: rotate(0); } }
+        .spin { animation: sp 6s linear infinite; } @keyframes sp { to { transform: rotate(360deg); } }
+        .pulse { animation: pu 1.6s ease-in-out infinite; } @keyframes pu { 50% { transform: scale(1.12); } }
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+{% include "net_guard.html" %}
+<div class="stars"></div>
+<div class="wrap">
+    <div class="art">{% block art %}🤖{% endblock %}</div>
+    <div class="code">{% block code %}ERR{% endblock %}</div>
+    <h1>{% block heading %}Что-то пошло не так{% endblock %}</h1>
+    <p class="kk">{% block heading_kk %}Бірдеңе дұрыс болмады{% endblock %}</p>
+    <div class="term"><div class="bar"><i></i><i></i><i></i></div><pre>{% block terminal %}{% endblock %}<span class="cursor"></span></pre></div>
+    <p class="tip">{% block tip %}{% endblock %}</p>
+    <div class="btns">{% block buttons %}<a class="btn main" href="/">🏠 На главную</a><a class="btn" href="javascript:history.back()">← Назад</a>{% endblock %}</div>
+</div>
+</body>
+</html>

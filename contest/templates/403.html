@@ -1,0 +1,11 @@
+{% extends "error_page.html" %}
+{% block title %}Доступ закрыт{% endblock %}
+{% block art %}<span class="pulse">🔐</span><span style="font-size:64px;margin-left:6px">😼</span>{% endblock %}
+{% block code %}403{% endblock %}
+{% block heading %}Сюда пускает только кот-охранник{% endblock %}
+{% block heading_kk %}Мұнда тек күзетші мысық кіргізеді{% endblock %}
+{% block terminal %}<span class="p">&gt;&gt;&gt;</span> <span class="k">enter</span>(room=<span class="c">"секретная"</span>)
+<span class="e">PermissionError</span>: [Errno 13] нет доступа к этой странице
+<span class="c"># войдите под другим аккаунтом или спросите учителя</span>
+<span class="p">&gt;&gt;&gt;</span> {% endblock %}
+{% block tip %}Эта страница не для вашего аккаунта — например, только для учителя.{% endblock %}

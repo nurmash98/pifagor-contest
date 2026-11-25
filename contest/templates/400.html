@@ -1,0 +1,11 @@
+{% extends "error_page.html" %}
+{% block title %}Странный запрос{% endblock %}
+{% block art %}<span class="shake">🧩</span>{% endblock %}
+{% block code %}400{% endblock %}
+{% block heading %}Сервер не понял, что вы имели в виду{% endblock %}
+{% block heading_kk %}Сервер не айтқыңыз келгенін түсінбеді{% endblock %}
+{% block terminal %}<span class="p">&gt;&gt;&gt;</span> print(<span class="c">"привет"</span>
+<span class="e">SyntaxError</span>: '(' was never closed — запрос пришёл неполным или испорченным
+<span class="p">&gt;&gt;&gt;</span> {% endblock %}
+{% block tip %}Обновите страницу и попробуйте ещё раз.{% endblock %}
+{% block buttons %}<a class="btn main" href="javascript:location.reload()">🔄 Обновить</a><a class="btn" href="/">🏠 На главную</a>{% endblock %}

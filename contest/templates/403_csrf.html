@@ -1,0 +1,12 @@
+{% extends "error_page.html" %}
+{% block title %}Страница устарела{% endblock %}
+{% block art %}<span class="pulse">⏳</span>{% endblock %}
+{% block code %}⌛{% endblock %}
+{% block heading %}Страница слишком долго была открыта{% endblock %}
+{% block heading_kk %}Бет тым ұзақ ашық тұрды{% endblock %}
+{% block terminal %}<span class="p">&gt;&gt;&gt;</span> submit(form)
+<span class="e">TimeoutError</span>: защитный ключ формы устарел (вы долго не обновляли страницу или вышли из аккаунта)
+<span class="c"># решение: обновите страницу и отправьте ещё раз</span>
+<span class="p">&gt;&gt;&gt;</span> {% endblock %}
+{% block tip %}Скопируйте свой код, если он не сохранился, затем вернитесь назад и обновите страницу.{% endblock %}
+{% block buttons %}<a class="btn main" href="javascript:history.back()">← Назад</a><a class="btn" href="/">🏠 На главную</a>{% endblock %}

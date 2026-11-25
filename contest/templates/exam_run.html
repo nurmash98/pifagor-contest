@@ -33,6 +33,7 @@
     </style>
 </head>
 <body>
+{% include "net_guard.html" %}
 <div id="bar">
     <span class="ttl">{% if exam.kind == 'SOR' %}{% t "СОР" %}{% elif exam.kind == 'OLYM' %}🏆 {% t "Олимпиада" %}{% else %}{% t "СОЧ" %}{% endif %} · {{ exam.title }}{% if retake %} ({% t "Пересдача" %}){% endif %}</span>
     <nav id="tabs">
@@ -84,7 +85,7 @@
             if (!d.ok) { showGate('🔒', TXT.other, '', '', true); exitFs(); return; }
             armed = true; state = 'in'; gate.style.display = 'none';
             if (!loaded) { loaded = true; frame.src = frameUrl; }
-        }).catch(function () { location.reload(); });
+        }).catch(function () { setTimeout(function () { location.reload(); }, 3000); });   // без связи — не чаще раза в 3 с
     }
     function resume() {
         if (state === 'done') { return; }
@@ -174,11 +175,23 @@
         }, true);
     }
     protect(document);
+    var bounces = [];                                                    // защита от зацикливания: страница работы не открывается
+    function bounceBack() {
+        var now = Date.now(); bounces = bounces.filter(function (t) { return now - t < 15000; }); bounces.push(now);
+        if (bounces.length > 3) {                                        // 4 раза за 15 с — работа недоступна (удалена/закрыта)
+            state = 'done'; exitFs(); frame.src = 'about:blank';
+            showGate('👻', TXT.gone || 'Работа недоступна', TXT.gone_text || 'Эту работу закрыли или удалили. Вернитесь к списку СОР/СОЧ.', '', true);
+            setTimeout(function () { location.href = '{% url "exam_list" %}'; }, 5000);
+            return;
+        }
+        frame.src = frameUrl;
+    }
     frame.addEventListener('load', function () {
         var win, doc;
-        try { win = frame.contentWindow; doc = frame.contentDocument; void doc.body; } catch (e) { frame.src = frameUrl; return; }
+        if (state === 'done') { return; }
+        try { win = frame.contentWindow; doc = frame.contentDocument; void doc.body; } catch (e) { bounceBack(); return; }
         var mark = doc.getElementById('exam-state');
-        if (!mark) { frame.src = frameUrl; return; }                    // ушли на другую страницу сайта — назад к работе
+        if (!mark) { bounceBack(); return; }                             // ушли на другую страницу сайта — назад к работе
         if (mark.getAttribute('data-active') !== '1') { finish(win.location.href); return; }   // работа завершена / время вышло
         markTab(win.location.pathname);
         paintTabs();

@@ -1,0 +1,79 @@
+{% comment %}
+Защита от «зависаний» во всём сайте:
+ • 10 запросов подряд к серверу не удались (нет связи, 5xx) — опросы останавливаются, показывается окно «Сайт не отвечает»,
+   раз в 15 секунд тихо проверяем, ожил ли сайт;
+ • 10 запросов подряд получили 404 — страница/матч/СОР исчезли: опросы останавливаются, окно «Этого больше нет»;
+ • страница перезагрузилась больше 10 раз за 20 секунд — это зацикливание: всё останавливается, окно «Страница зациклилась».
+{% endcomment %}
+<style>
+    #pf-guard { position: fixed; inset: 0; z-index: 2147483000; display: none; align-items: center; justify-content: center; padding: 20px;
+                background: rgba(9, 10, 20, .82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+    #pf-guard .g-card { width: min(460px, 100%); background: #1b1e30; color: #e7e8f5; border: 1px solid #2c3150; border-radius: 24px; padding: 28px 24px; text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,.55); animation: pfg-pop .35s cubic-bezier(.2,1.4,.4,1); }
+    #pf-guard .g-art { font-size: 72px; line-height: 1; } #pf-guard h3 { margin: 10px 0 4px; font-size: 22px; } #pf-guard .g-kk { color: #8d92b5; font-size: 14px; margin: 0 0 12px; }
+    #pf-guard pre { text-align: left; background: #0b0d17; border: 1px solid #2c3150; border-radius: 12px; padding: 10px 12px; margin: 10px 0 14px; color: #cfd3f5; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
+    #pf-guard pre b { color: #ff7a8a; } #pf-guard .g-st { color: #8d92b5; font-size: 13px; min-height: 18px; margin-bottom: 12px; }
+    #pf-guard button { border: 0; border-radius: 999px; padding: 11px 22px; font-weight: 700; font-size: 15px; cursor: pointer; color: #fff; background: linear-gradient(90deg, #7c6cff, #4ec97a); }
+    #pf-guard button.ghost { background: transparent; border: 1px solid #2c3150; color: #e7e8f5; margin-left: 6px; }
+    #pf-guard .g-anim { display: inline-block; animation: pfg-wob 2s ease-in-out infinite; }
+    @keyframes pfg-pop { from { transform: scale(.75); opacity: 0; } } @keyframes pfg-wob { 50% { transform: translateY(-8px) rotate(-8deg); } }
+</style>
+<div id="pf-guard" role="alertdialog" aria-live="assertive"><div class="g-card">
+    <div class="g-art"><span class="g-anim" id="pfg-art">🔌</span></div>
+    <h3 id="pfg-title"></h3><p class="g-kk" id="pfg-kk"></p>
+    <pre id="pfg-code"></pre><div class="g-st" id="pfg-st"></div>
+    <button type="button" id="pfg-btn">🔄 Обновить</button><button type="button" class="ghost" id="pfg-home">🏠 На главную</button>
+</div></div>
+<script>
+(function () {
+    if (window.__pfGuard) { return; } window.__pfGuard = true;
+    var LIMIT = 10, fails = 0, gone = 0, down = false, origFetch = window.fetch ? window.fetch.bind(window) : null, recheck = null;
+    var VIEWS = {
+        offline: {art: '🔌', t: 'Сайт сейчас не отвечает', kk: 'Сайт қазір жауап бермей тұр',
+                  code: '>>> requests.get("pifagor")\n<b>ConnectionError</b>: 10 попыток подряд — без ответа\n# проверьте интернет; мы проверяем сайт каждые 15 секунд'},
+        gone: {art: '👻', t: 'Этого здесь больше нет', kk: 'Бұл енді жоқ',
+               code: '>>> page.refresh()\n<b>LookupError</b>: страница, матч или работа уже закрыты или удалены\n# вернитесь назад или на главную'},
+        loop: {art: '🌀', t: 'Страница зациклилась — мы её остановили', kk: 'Бет тұйықталып қалды — біз оны тоқтаттық',
+               code: '>>> reload(reload(reload(...)))\n<b>RecursionError</b>: maximum recursion depth exceeded\n# страница перезагружалась снова и снова — остановили, чтобы не грузить сервер'}
+    };
+    function $(id) { return document.getElementById(id); }
+    function stopTimers() { var id = setTimeout(function () {}, 0); while (id > 0) { clearTimeout(id); clearInterval(id); id--; } }
+    function show(kind) {
+        if (down) { return; } down = true; stopTimers();
+        var v = VIEWS[kind], box = $('pf-guard');
+        if (!box) { return; }
+        $('pfg-art').textContent = v.art; $('pfg-title').textContent = v.t; $('pfg-kk').textContent = v.kk;
+        $('pfg-code').innerHTML = v.code.replace(/&(?!lt|gt|amp)/g, '&amp;'); $('pfg-st').textContent = '';
+        box.style.display = 'flex';
+        if (kind === 'offline' && origFetch) {
+            $('pfg-st').textContent = '⏳ Ждём, когда сайт снова ответит…';
+            recheck = setInterval(function () {
+                origFetch('/manifest.webmanifest?ping=' + Date.now(), {cache: 'no-store', credentials: 'same-origin'}).then(function (r) {
+                    if (r.ok) { clearInterval(recheck); $('pfg-art').textContent = '✅'; $('pfg-st').textContent = 'Сайт снова работает — нажмите «Обновить»'; }
+                }).catch(function () {});
+            }, 15000);
+        }
+    }
+    function home() { try { sessionStorage.removeItem(LKEY); } catch (e) {} location.href = '/'; }
+    // 1) зацикленные перезагрузки
+    var LKEY = 'pf-loads:' + location.pathname;
+    try {
+        var now = Date.now(), list = JSON.parse(sessionStorage.getItem(LKEY) || '[]').filter(function (t) { return now - t < 20000; });
+        list.push(now); sessionStorage.setItem(LKEY, JSON.stringify(list));
+        if (list.length > LIMIT) { show('loop'); try { window.stop(); } catch (e) {} }   // дальше страница не грузится — цикл разорван
+    } catch (e) {}
+    // 2) запросы, которые раз за разом не удаются
+    if (origFetch) {
+        window.fetch = function () {
+            if (down) { return Promise.reject(new Error('pf-guard: site paused')); }
+            return origFetch.apply(window, arguments).then(function (r) {
+                if (r.status >= 500) { if (++fails >= LIMIT) { show('offline'); } }
+                else if (r.status === 404) { if (++gone >= LIMIT) { show('gone'); } }
+                else { fails = 0; gone = 0; }
+                return r;
+            }, function (err) { if (++fails >= LIMIT) { show('offline'); } throw err; });
+        };
+    }
+    $('pfg-btn').addEventListener('click', function () { try { sessionStorage.removeItem(LKEY); } catch (e) {} location.reload(); });
+    $('pfg-home').addEventListener('click', home);
+})();
+</script>

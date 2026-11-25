@@ -54,6 +54,7 @@
     {% endfor %}
 {% endif %}
 
+<style>.tl-t{color:#1a1a4b}.tl-s{font-size:.75rem;font-weight:400}.tl-d{max-width:400px}</style>
 <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -70,55 +71,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for task in tasks %}
-                    <tr>
-                        <td class="px-4 text-muted fw-bold">{{ forloop.counter }}</td>
-                        <td class="py-3">
-                            <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="fw-bold text-decoration-none" style="color: #1a1a4b;">
-                                {{ task.display_title }}
-                            </a>
-                            <span class="text-muted ms-1" style="font-size: 0.75rem; font-weight: 400;">{% t "решили:" %} {{ task.solved_count }}</span>
-                            <div class="text-muted small text-truncate" style="max-width: 400px;">
-                                {{ task.display_description }}
-                            </div>
-                            {% if task.tags.all %}
-                            <div class="mt-1">
-                                {% for tag in task.tags.all %}
-                                <span class="badge bg-light text-dark border me-1">#{{ tag.name }}</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if task.level == 'A' %}
-                                <span class="badge badge-level-A px-3 py-1">{% t "Уровень A" %}</span>
-                            {% elif task.level == 'B' %}
-                                <span class="badge badge-level-B px-3 py-1">{% t "Уровень B" %}</span>
-                            {% else %}
-                                <span class="badge badge-level-C px-3 py-1">{% t "Уровень C" %}</span>
-                            {% endif %}
-                        </td>
-                        {% if not readonly %}
-                        <td class="text-center">
-                            {% if task.user_sub %}
-                                {% if task.user_sub.status == 'DONE' %}
-                                    <span class="badge bg-success px-3 py-2">{% t "Решено" %} ({{ task.user_sub.score }}/10)</span>
-                                {% elif task.user_sub.status == 'TESTING' %}
-                                    <span class="badge bg-warning text-dark px-3 py-2">{% t "На проверке" %}</span>
-                                {% else %}
-                                    <span class="badge bg-primary px-3 py-2">{% t "В работе" %}</span>
-                                {% endif %}
-                            {% else %}
-                                <span class="badge bg-light text-muted border px-3 py-2">{% t "Не начато" %}</span>
-                            {% endif %}
-                        </td>
-                        {% endif %}
-                        <td class="text-end px-4">
-                            <a href="{% url 'task_detail' task.id %}?back={{ request.get_full_path|urlencode }}" class="btn btn-pifagor-green btn-sm px-3">
-                                {% if readonly %}{% t "Просмотр" %}{% elif task.user_sub %}{% t "Просмотр / Решить" %}{% else %}{% t "Взять задачу" %}{% endif %}
-                            </a>
-                        </td>
-                    </tr>
+                    {% for task in tasks %}{% spaceless %}
+<tr><td class="px-4 text-muted fw-bold">{{ forloop.counter }}</td><td class="py-3"><a href="{% url 'task_detail' task.id %}" data-tl="1" class="fw-bold text-decoration-none tl-t">{{ task.display_title }}</a> <span class="text-muted ms-1 tl-s">{% t "решили:" %} {{ task.solved_count }}</span><div class="text-muted small text-truncate tl-d">{{ task.display_description|striptags|truncatechars:110 }}</div>{% if task.tags.all %}<div class="mt-1">{% for tag in task.tags.all %}<span class="badge bg-light text-dark border me-1">#{{ tag.name }}</span>{% endfor %}</div>{% endif %}</td>
+<td class="text-center"><span class="badge badge-level-{{ task.level }} px-3 py-1">{% if task.level == 'A' %}{% t "Уровень A" %}{% elif task.level == 'B' %}{% t "Уровень B" %}{% else %}{% t "Уровень C" %}{% endif %}</span></td>
+{% if not readonly %}<td class="text-center">{% if task.user_sub %}{% if task.user_sub.status == 'DONE' %}<span class="badge bg-success px-3 py-2">{% t "Решено" %} ({{ task.user_sub.score }}/10)</span>{% elif task.user_sub.status == 'TESTING' %}<span class="badge bg-warning text-dark px-3 py-2">{% t "На проверке" %}</span>{% else %}<span class="badge bg-primary px-3 py-2">{% t "В работе" %}</span>{% endif %}{% else %}<span class="badge bg-light text-muted border px-3 py-2">{% t "Не начато" %}</span>{% endif %}</td>{% endif %}
+<td class="text-end px-4"><a href="{% url 'task_detail' task.id %}" data-tl="1" class="btn btn-pifagor-green btn-sm px-3">{% if readonly %}{% t "Просмотр" %}{% elif task.user_sub %}{% t "Просмотр / Решить" %}{% else %}{% t "Взять задачу" %}{% endif %}</a></td></tr>
+{% endspaceless %}
                     {% empty %}
                     <tr>
                         <td colspan="{% if readonly %}4{% else %}5{% endif %}" class="text-center py-5 text-muted">{% t "Задачи не найдены." %}</td>
@@ -129,4 +87,13 @@
         </div>
     </div>
 </div>
+<script>
+// ?back= добавляем при клике, а не в каждую ссылку — страница в разы легче.
+document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[data-tl]');
+    if (a && a.href.indexOf('back=') < 0) {
+        a.href += (a.href.indexOf('?') < 0 ? '?' : '&') + 'back=' + encodeURIComponent(location.pathname + location.search);
+    }
+}, true);
+</script>
 {% endblock %}

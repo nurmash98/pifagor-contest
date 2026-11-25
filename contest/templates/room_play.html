@@ -152,6 +152,7 @@
     </style>
 </head>
 <body>
+{% include "net_guard.html" %}
 <div id="bar">
     <a href="{% if teacher and not office %}{% url 'room_manage' %}{% else %}{% url 'codegames' %}{% endif %}" class="btn ghost" title="{% t "Выйти" %}">←</a>
     {% if office %}<span class="ttl">🏢 <span data-tr="Офис выходного дня">{% t "Офис выходного дня" %}</span> · <span style="color:#16a34a">x2 <img class="coinico" src="{% static 'icons/coin-64.png' %}" alt=""></span></span>

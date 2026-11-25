@@ -1,0 +1,10 @@
+{% extends "error_page.html" %}
+{% block title %}Страница не найдена{% endblock %}
+{% block art %}<span class="float">🧑‍🚀</span>{% endblock %}
+{% block code %}404{% endblock %}
+{% block heading %}Эта страница улетела в космос{% endblock %}
+{% block heading_kk %}Бұл бет ғарышқа ұшып кетті{% endblock %}
+{% block terminal %}<span class="p">&gt;&gt;&gt;</span> <span class="k">open</span>(<span class="c">"{{ request_path|default:'/страница/' }}"</span>)
+<span class="e">FileNotFoundError</span>: такой страницы нет — возможно, её удалили или в адресе опечатка
+<span class="p">&gt;&gt;&gt;</span> {% endblock %}
+{% block tip %}Проверьте адрес или вернитесь туда, где всё работает 🚀{% endblock %}

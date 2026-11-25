@@ -76,6 +76,7 @@
     </style>
 </head>
 <body>
+{% include "net_guard.html" %}
 <div id="bar">
     <span class="ttl">{% if game.variant == 'empire' %}👑 <span data-tr="Империя">{% t "Империя" %}</span>{% else %}🏝️ <span data-tr="Битва за остров">{% t "Битва за остров" %}</span>{% endif %}</span>
     <span class="chip" id="my-team" style="display:none"><span class="dot" id="my-dot"></span><span id="my-name"></span> · <span id="my-score">0</span></span>

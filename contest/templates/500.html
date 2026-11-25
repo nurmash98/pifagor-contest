@@ -1,0 +1,14 @@
+{% extends "error_page.html" %}
+{% block title %}Ошибка сервера{% endblock %}
+{% block art %}<span class="shake">🤖</span><span class="spin" style="font-size:54px;margin-left:-14px">⚙️</span>{% endblock %}
+{% block code %}500{% endblock %}
+{% block heading %}Робот-сервер споткнулся о баг{% endblock %}
+{% block heading_kk %}Сервер-робот қатеге сүрінді{% endblock %}
+{% block terminal %}<span class="p">$</span> python server.py
+Traceback (most recent call last):
+  File <span class="c">"server.py"</span>, line <span class="k">500</span>, in <span class="k">answer</span>
+<span class="e">RuntimeError</span>: что-то сломалось у нас, не у вас
+<span class="c"># мы уже получили сигнал и чиним 🔧</span>
+<span class="p">$</span> {% endblock %}
+{% block tip %}Подождите минуту и попробуйте ещё раз. Ваши решения и монеты в безопасности.{% endblock %}
+{% block buttons %}<a class="btn main" href="javascript:location.reload()">🔄 Попробовать снова</a><a class="btn" href="/">🏠 На главную</a>{% endblock %}
