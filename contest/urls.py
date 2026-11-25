@@ -25,6 +25,7 @@ urlpatterns = [
     path('duels/<int:duel_id>/state/', duel_views.duel_state, name='duel_state'),
     path('duels/<int:duel_id>/leave/', duel_views.duel_leave, name='duel_leave'),
     path('duels/<int:duel_id>/resign/', duel_views.duel_resign, name='duel_resign'),
+    path('duels/<int:duel_id>/giveup/', duel_views.duel_giveup, name='duel_giveup'),
     path('duels/<int:duel_id>/task/<int:duel_task_id>/submit/', duel_views.duel_submit, name='duel_submit'),
 
     # Главная страница - каталог задач

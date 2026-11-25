@@ -37,6 +37,27 @@
         </div>
         <a href="{% url 'duels' %}" class="btn btn-pifagor-green rounded-pill px-4 mt-3">{% t "К дуэлям" %}</a>
     </div>
+    <div id="duel-end" class="duel-end" role="dialog" aria-modal="true">
+        <div class="duel-end-card {% if result == 'win' %}win{% elif result == 'loss' %}loss{% else %}draw{% endif %}">
+            <div class="duel-end-ico">{% if result == 'win' %}🏆{% elif result == 'loss' %}😔{% else %}🤝{% endif %}</div>
+            <div class="duel-end-title">{% if result == 'win' %}{% t "Вы выиграли!" %}{% elif result == 'loss' %}{% t "Вы проиграли" %}{% else %}{% t "Ничья" %}{% endif %}</div>
+            <div class="duel-end-score">{{ my_points }} : {{ opp_points }}</div>
+            <div class="duel-end-rating {% if my_change > 0 %}up{% elif my_change < 0 %}down{% endif %}">{% if my_change > 0 %}+{% endif %}{{ my_change }} {% t "к рейтингу" %} → {{ me.duel_rating }}</div>
+            <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+                <a href="{% url 'duels' %}" class="btn btn-pifagor-green rounded-pill px-4 fw-bold">⚔️ {% t "К дуэлям" %}</a>
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" onclick="document.getElementById('duel-end').remove()">{% t "Посмотреть задачи" %}</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .duel-end { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 12, 30, .7); display: flex; align-items: center; justify-content: center; padding: 16px; animation: de-in .25s ease-out; }
+        .duel-end-card { background: var(--bs-body-bg); border-radius: 24px; padding: 32px 28px; text-align: center; width: min(420px, 100%); box-shadow: 0 20px 60px rgba(0,0,0,.45); border-top: 8px solid #6c757d; animation: de-pop .35s cubic-bezier(.2,1.4,.4,1); }
+        .duel-end-card.win { border-top-color: #22c55e; } .duel-end-card.loss { border-top-color: #ef4444; }
+        .duel-end-ico { font-size: 64px; line-height: 1; } .duel-end-title { font-size: 1.9rem; font-weight: 800; margin-top: 8px; }
+        .duel-end-score { font-size: 1.3rem; font-weight: 700; opacity: .8; } .duel-end-rating { margin-top: 6px; font-weight: 700; }
+        .duel-end-rating.up { color: #16a34a; } .duel-end-rating.down { color: #dc2626; }
+        @keyframes de-in { from { opacity: 0; } } @keyframes de-pop { from { transform: scale(.7); opacity: 0; } }
+    </style>
     {% elif not enabled %}
     <div class="alert alert-secondary rounded-3">🔒 {% t "Дуэли выключены преподавателем — отправка кода временно недоступна." %}</div>
     {% endif %}
@@ -60,6 +81,7 @@
                     <strong style="color:#1a1a4b;">{% t "Задача" %} {{ forloop.counter }}: {{ dt.task.display_title }}</strong>
                     {% if dt.mine_won %}<span class="badge bg-success">✔ {% t "Очко ваше" %}</span>
                     {% elif dt.opp_won %}<span class="badge bg-danger">{% t "Очко у соперника" %}</span>
+                    {% elif dt.both_gave_up %}<span class="badge bg-secondary">🤷 {% t "Оба не знали — задача пропущена" %}</span>
                     {% elif dt.timed_out_flag %}<span class="badge bg-secondary">⏱ {% t "Время вышло" %}</span>
                     {% else %}<span class="badge bg-secondary">{% t "Закрыта: попытки кончились" %}</span>{% endif %}
                 </div>
@@ -86,6 +108,18 @@
                 </form>
                 {% elif not dt.my_left %}
                 <div class="alert alert-secondary rounded-3 mb-0">{% t "Ваши попытки закончились — ждём, пока соперник использует свои или решит задачу." %}</div>
+                {% endif %}
+                {% if enabled %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                    {% if dt.i_gave_up %}
+                    <span class="small text-muted">🤷 {% t "Вы нажали «Не знаю как решить». Если соперник тоже нажмёт — откроется следующая задача. Пока можно продолжать решать." %}</span>
+                    {% else %}
+                    <form method="post" action="{% url 'duel_giveup' duel.id %}">{% csrf_token %}
+                        <button class="btn btn-outline-secondary btn-sm rounded-pill px-3">🤷 {% t "Не знаю как решить" %}</button>
+                    </form>
+                    {% endif %}
+                    {% if dt.opp_gave_up and not dt.i_gave_up %}<span class="small text-muted">{% t "Соперник не знает, как решить эту задачу." %}</span>{% endif %}
+                </div>
                 {% endif %}
                 {% if dt.my_attempts %}
                 <div class="small text-muted mt-2">

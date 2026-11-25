@@ -850,6 +850,7 @@ class DuelTask(models.Model):
     opened_at = models.DateTimeField(null=True, blank=True)    # когда задача стала текущей
     closed_at = models.DateTimeField(null=True, blank=True)    # когда закрылась (очко, попытки или время)
     timed_out = models.BooleanField(default=False)             # закрыта по истечении времени
+    gave_up = models.JSONField(default=list, blank=True)       # id игроков, нажавших «Не знаю как решить»
 
     class Meta:
         ordering = ['order']

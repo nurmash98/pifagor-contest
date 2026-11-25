@@ -170,6 +170,9 @@ def _duel_context(duel, student, lang):
         dt.is_future = duel.status == 'ACTIVE' and not dt.closed and not dt.is_current
         dt.seconds_left = duels.seconds_left(dt) if dt.is_current else None
         dt.timed_out_flag = dt.timed_out and not dt.winner_id
+        gave = dt.gave_up or []
+        dt.i_gave_up, dt.opp_gave_up = student.id in gave, duel.opponent_of(student).id in gave
+        dt.both_gave_up = dt.i_gave_up and dt.opp_gave_up and not dt.winner_id
         tasks.append(dt)
     return tasks
 
@@ -200,8 +203,9 @@ def duel_match(request, duel_id):
         'enabled': duels.duels_enabled(),
         'points_to_win': duels.POINTS_TO_WIN, 'attempts_per_task': duels.ATTEMPTS_PER_TASK,
     }
-    ctx['signature'] = '{}-{}-{}'.format(duel.status, duel.p1_points + duel.p2_points,
-                                          ''.join('1' if t.closed else '0' for t in ctx['tasks']))
+    ctx['signature'] = '{}-{}-{}-{}'.format(duel.status, duel.p1_points + duel.p2_points,
+                                             ''.join('1' if t.closed else '0' for t in ctx['tasks']),
+                                             sum(len(t.gave_up or []) for t in ctx['tasks']))
     return render(request, 'duel_match.html', ctx)
 
 
@@ -214,8 +218,10 @@ def duel_state(request, duel_id):
         return JsonResponse({'signature': ''}, status=403)
     duels.close_if_inactive(duel)
     duel.refresh_from_db()
-    closed = ''.join('1' if duels.task_closed(dt, duel) else '0' for dt in duel.duel_tasks.all())
-    return JsonResponse({'signature': f'{duel.status}-{duel.p1_points + duel.p2_points}-{closed}'})
+    dts = list(duel.duel_tasks.all())
+    closed = ''.join('1' if duels.task_closed(dt, duel) else '0' for dt in dts)
+    gave = sum(len(dt.gave_up or []) for dt in dts)
+    return JsonResponse({'signature': f'{duel.status}-{duel.p1_points + duel.p2_points}-{closed}-{gave}'})
 
 
 @login_required
@@ -233,6 +239,17 @@ def duel_submit(request, duel_id, duel_task_id):
     ok, msg, _result = duels.submit_code(duel, student, duel_task, request.POST.get('code', ''))
     (messages.success if ok and 'Верно' in msg else messages.info if ok else messages.warning)(request, msg)
     return redirect(f'/duels/{duel.id}/#task-{duel_task.id}')
+
+
+@login_required
+@require_POST
+def duel_giveup(request, duel_id):
+    duel = get_object_or_404(Duel, id=duel_id)
+    student = _student(request)
+    if student is not None and duel.has_player(student):
+        ok, msg = duels.give_up(duel, student)
+        (messages.info if ok else messages.warning)(request, msg)
+    return redirect('duel_match', duel_id=duel.id)
 
 
 @login_required

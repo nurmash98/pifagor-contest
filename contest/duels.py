@@ -256,8 +256,10 @@ def attempts_left(duel_task, student):
 
 
 def task_closed(duel_task, duel):
-    """Задача закрыта: очко уже взято или у обоих кончились попытки."""
+    """Задача закрыта: очко уже взято, у обоих кончились попытки или оба нажали «не знаю»."""
     if duel_task.winner_id or duel_task.timed_out:
+        return True
+    if duel_task.gave_up and all(p.id in duel_task.gave_up for p in duel.players()):   # оба «не знаю»
         return True
     return all(attempts_left(duel_task, p) == 0 for p in duel.players())
 
@@ -274,6 +276,8 @@ def advance(duel, now=None):
             deadline = dt.opened_at + TASK_TIME_LIMIT
             if dt.winner_id:
                 dt.closed_at = dt.solved_at or now
+            elif all(p.id in (dt.gave_up or []) for p in duel.players()):   # оба «не знаю» — дальше
+                dt.closed_at = now
             elif all(attempts_left(dt, p) == 0 for p in duel.players()):
                 last = dt.attempts.order_by('-created_at').first()
                 dt.closed_at = last.created_at if last else now
@@ -437,3 +441,28 @@ def sweep_stale():
             close_if_inactive(duel)
         except Exception:
             pass
+
+
+def give_up(duel, student):
+    """«Не знаю как решить»: если оба игрока нажали — текущая задача закрывается без очка,
+    открывается следующая. Возвращает (ok, сообщение)."""
+    with transaction.atomic():
+        locked = Duel.objects.select_for_update().get(pk=duel.pk)
+        if locked.status != 'ACTIVE':
+            return False, 'Матч уже окончен.'
+        cur = advance(locked)
+        if cur is None:
+            return False, 'Сейчас нет открытой задачи.'
+        ids = list(cur.gave_up or [])
+        if student.id not in ids:
+            ids.append(student.id)
+            cur.gave_up = ids
+            cur.save(update_fields=['gave_up'])
+        both = all(p.id in ids for p in locked.players())
+        if both:
+            locked.last_activity = timezone.now()
+            locked.save(update_fields=['last_activity'])
+            advance(locked)
+            _maybe_finish(locked)
+            return True, 'Оба не знают, как решить, — переходим к следующей задаче.'
+        return True, 'Ждём соперника: если он тоже нажмёт «Не знаю как решить», откроется следующая задача.'

@@ -1073,6 +1073,25 @@ class DuelSequentialAndLeaveTests(DuelTests):
         self.assertEqual(self.duels.current_task(duel).id, t2.id)       # решили — сразу следующая
         self.assertTrue(self.duels.submit_code(duel, self.st[1], t2, self.bad)[0])
 
+    def test_both_dont_know_skips_task_and_end_window(self):
+        duel = self.start()
+        t1, t2, t3 = list(duel.duel_tasks.all())
+        self.assertTrue(self.duels.give_up(duel, self.st[0])[0])
+        self.assertEqual(self.duels.current_task(duel).id, t1.id)       # один нажал — задача ещё открыта
+        self.duels.give_up(duel, self.st[0])                              # повторно — без изменений
+        self.assertEqual(Duel.objects.get(pk=duel.pk).duel_tasks.get(pk=t1.pk).gave_up, [self.st[0].id])
+        self.duels.give_up(duel, self.st[1])
+        self.assertEqual(self.duels.current_task(duel).id, t2.id)       # оба — следующая задача
+        for t in (t2, t3):
+            self.duels.give_up(duel, self.st[0]); self.duels.give_up(duel, self.st[1])
+        duel.refresh_from_db()
+        self.assertEqual((duel.status, duel.winner_id), ('FINISHED', None))   # ничья
+        self.client.force_login(self.st[0].user)
+        html = self.client.get(reverse('duel_match', args=[duel.id])).content.decode()
+        self.assertIn('id="duel-end"', html)
+        self.assertIn('Ничья', html)
+        self.assertIn('Оба не знали', html)
+
     def test_next_task_opens_when_attempts_exhausted(self):
         duel = self.start()
         t1, t2, _t3 = list(duel.duel_tasks.all())
