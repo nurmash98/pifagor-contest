@@ -2223,6 +2223,21 @@ def _pending_queue(user):
     return pending.order_by('updated_at')
 
 
+ERROR_PREVIEWS = {'404': '404.html', '500': '500.html', '403': '403.html', '400': '400.html', 'csrf': '403_csrf.html'}
+
+
+@staff_member_required
+def error_preview(request, kind=''):
+    """Только для админа: посмотреть страницы ошибок и окна «сайт не отвечает», пока сайт работает."""
+    if not request.user.is_superuser:
+        raise Http404
+    if kind in ERROR_PREVIEWS:
+        return render(request, ERROR_PREVIEWS[kind], {'request_path': '/пример/несуществующей/страницы/'})
+    return render(request, 'error_preview.html', {'kinds': [('404', '🧑‍🚀', 'Страница не найдена'), ('500', '🤖', 'Ошибка сервера'),
+                                                            ('403', '😼', 'Нет доступа'), ('400', '🧩', 'Неверный запрос'),
+                                                            ('csrf', '⏳', 'Страница устарела')]})
+
+
 @staff_member_required
 def teacher_dashboard(request):
     """Кабинет преподавателя: очередь на проверку и последние проверенные."""

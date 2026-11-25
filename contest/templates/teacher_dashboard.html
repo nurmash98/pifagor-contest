@@ -7,6 +7,7 @@
     <div class="col-12 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <h2 class="fw-bold mb-0" style="color: #1a1a4b;">👨‍🏫 Кабинет преподавателя</h2>
+            {% if user.is_superuser %}<a href="{% url 'error_preview' %}" class="badge rounded-pill text-bg-light border fw-semibold fs-6 px-3 py-2 text-decoration-none" title="Посмотреть, как выглядят страницы ошибок">🧪 Ошибки</a>{% endif %}
             <details class="online-box position-relative">
                 <summary class="badge rounded-pill text-bg-light border fw-semibold fs-6 px-3 py-2" style="cursor:pointer;list-style:none" title="Ученики на сайте за последние 5 минут — {{ online_title }}"><span style="color:#22c55e">●</span> {{ online_count|default:0 }} онлайн</summary>
                 <div class="card shadow-sm rounded-4 p-3 position-absolute mt-2" style="z-index:20;min-width:260px;max-height:360px;overflow-y:auto">

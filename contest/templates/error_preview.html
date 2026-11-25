@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Страницы ошибок — предпросмотр{% endblock %}
+{% block content %}
+<div class="mt-4" style="max-width:760px">
+    <h3 class="fw-bold" style="color:#1a1a4b">🧪 Как ученики видят ошибки</h3>
+    <p class="text-muted">Сайт работает — здесь можно посмотреть каждую ошибку и сыграть в «Баг-раннер». Эта страница видна только админу.</p>
+
+    <h6 class="fw-bold mt-4">Страницы ошибок <span class="text-muted fw-normal small">(откроются в новой вкладке)</span></h6>
+    <div class="d-flex flex-wrap gap-2">
+        {% for code, art, name in kinds %}
+        <a class="btn btn-outline-dark rounded-pill" target="_blank" href="{% url 'error_preview_kind' code %}">{{ art }} {% if code == 'csrf' %}403 CSRF{% else %}{{ code }}{% endif %} — {{ name }}</a>
+        {% endfor %}
+    </div>
+
+    <h6 class="fw-bold mt-4">Окна поверх страницы</h6>
+    <p class="text-muted small mb-2">Показываются сами, когда что-то идёт не так. После просмотра нажмите «Обновить» в окне.</p>
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-danger rounded-pill" onclick="pfGuardDemo('offline')">🔌 Сайт не отвечает</button>
+        <button class="btn btn-outline-secondary rounded-pill" onclick="pfGuardDemo('gone')">👻 Страница пропала</button>
+        <button class="btn btn-outline-primary rounded-pill" onclick="pfGuardDemo('loop')">🌀 Страница зациклилась</button>
+    </div>
+    <p class="text-muted small mt-3">«Сайт не отвечает» раз в 15 секунд проверяет связь — так как сайт работает, через ~15 с там появится ✅ «Сайт снова работает».</p>
+</div>
+{% endblock %}

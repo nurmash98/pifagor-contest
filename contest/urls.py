@@ -118,6 +118,8 @@ urlpatterns = [
     path('analytics/', dashboard.admin_dashboard, name='admin_dashboard'),
     path('analytics/sor-soch/', exam_report.exam_report, name='exam_report'),
     path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
+    path('teacher/errors/', views.error_preview, name='error_preview'),
+    path('teacher/errors/<str:kind>/', views.error_preview, name='error_preview_kind'),
     path('teacher/grade/<int:submission_id>/', views.grade_submission, name='grade_submission'),
 
     # Управление курсами учителем (без Django admin)
