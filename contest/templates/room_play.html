@@ -123,6 +123,8 @@
                        padding: 3px 9px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
         .ibx { border: 1px solid var(--line, #e5e7ef); background: var(--card, #fff); color: inherit; border-radius: 999px; padding: 4px 12px; font-weight: 700; cursor: pointer; }
         #chat-msgs .m.bot { white-space: pre-line; }
+        #chat-msgs pre.hx { white-space: pre; margin: 4px 0 6px; padding: 6px 10px; border-radius: 8px; background: #0f172a; color: #e2e8f0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; }
+        #chat-msgs .hx-l { display: block; font-size: 11px; font-weight: 700; opacity: .7; margin-top: 4px; }
         .plab .passt { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pagai { background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
         .plab .pbot { background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #fff; font-weight: 800; padding: 3px 10px; border-radius: 9px; box-shadow: 0 3px 10px rgba(0,0,0,.25); zoom: .8; }
@@ -1340,12 +1342,16 @@
             post({a: 'hint'}).then(function (d) {
                 if (d.error) { botSay(TXT.go_boss); return; }
                 var n = hintStep[d.task] = ((hintStep[d.task] || 0) % 3) + 1, more = asstBtn('ahint', '💡 ' + esc(TXT.asst_more));
-                if (n === 1) { botSay((d.tip ? TXT.asst_tip + ' ' + d.tip + '\n\n' : '') + TXT.asst_ex.replace('{i}', '«' + d.ex_in.replace(/\n/g, ' ⏎ ') + '»').replace('{o}', '«' + d.ex_out.replace(/\n/g, ' ⏎ ') + '»'), more); }
+                if (n === 1) {
+                    var ex = TXT.asst_ex, i1 = ex.indexOf('{i}'), o1 = ex.indexOf('{o}');
+                    botSayHtml((d.tip ? esc(TXT.asst_tip + ' ' + d.tip) + '<br><br>' : '') + esc(ex.slice(0, i1).replace(/[\s:]*(ввод|енгізу|кіріс|input)?\s*$/i, '')) + ':' +
+                        codeBox(TXT.ex_in, d.ex_in) + codeBox(TXT.ex_out, d.ex_out) + esc(ex.slice(o1 + 3).replace(/^[.\s]+/, '')), more);
+                }
                 else if (n === 2) {
                     var f = d.fail;
                     if (!f) { botSay(TXT.asst_nosub, more); }
                     else if (!f.n) { botSay(TXT.asst_ok.replace('{p}', f.passed).replace('{n}', f.total), more); }
-                    else { botSay(TXT.asst_fail.replace('{p}', f.passed).replace('{n}', f.total).replace('{k}', f.n) + (f.input ? ' (' + TXT.asst_fail_in + ' «' + f.input.replace(/\n/g, ' ⏎ ') + '»)' : '') + '. ' + f.why, more); }
+                    else { botSayHtml(esc(TXT.asst_fail.replace('{p}', f.passed).replace('{n}', f.total).replace('{k}', f.n) + '.') + (f.input ? codeBox(TXT.ex_in, f.input) : '') + esc(f.why), more); }
                 }
                 else { botSay('📖 ' + TXT.asst_theory + ':', THEORY.length ? THEORY.map(function (it) { return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.kind === 'text' ? TXT.notes : it.title) + '</button>'; }).join('') : ' ' + TXT.asst_th_none); }
             });
@@ -1353,9 +1359,12 @@
     });
     function agaiOf(uid) { return AGAI.filter(function (a) { return a.uid === +uid; })[0]; }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
+    // пример/тест — отдельными строками, как в редакторе (без значков ⏎)
+    function codeBox(label, s) { return '<span class="hx-l">' + esc(label) + '</span><pre class="hx">' + esc(String(s).replace(/\s+$/, '')) + '</pre>'; }
+    function botSayHtml(html, extra) { botConv.push({bot: true, html: html, extra: extra || ''}); renderBot(); }
     function renderBot() {
         var box = $('chat-msgs');
-        box.innerHTML = botConv.map(function (m) { return '<div class="m' + (m.bot ? ' bot' : ' mine') + '">' + esc(m.text) + (m.extra || '') + '</div>'; }).join('');
+        box.innerHTML = botConv.map(function (m) { return '<div class="m' + (m.bot ? ' bot' : ' mine') + '">' + (m.html || esc(m.text)) + (m.extra || '') + '</div>'; }).join('');
         box.scrollTop = box.scrollHeight;
     }
     var BOTQ = [['x2', COIN], ['cab', '🚪'], ['top', '🏆'], ['earn', '💰'], ['advice', '🎯'], ['theory', '📖'], ['rules', '❓']];
