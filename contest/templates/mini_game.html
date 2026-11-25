@@ -1,0 +1,83 @@
+{% comment %}
+Мини-игра «Баг-раннер» для страниц ошибок и окна «Сайт не отвечает» (как динозаврик в Chrome).
+Всё встроено в страницу — работает даже без интернета. Запуск: pfMiniGame(canvasElement).
+{% endcomment %}
+<style>
+    .pf-game { margin: 18px auto 4px; width: 100%; max-width: 460px; }
+    .pf-game canvas { display: block; width: 100%; height: auto; border-radius: 14px; background: #0b0d17; border: 1px solid #2c3150; cursor: pointer; touch-action: manipulation; }
+    .pf-game .pf-game-hint { color: #8d92b5; font-size: 12px; margin: 6px 0 14px; text-align: center; }
+</style>
+<script>
+window.pfMiniGame = window.pfMiniGame || function (cv) {
+    if (!cv || cv.dataset.on) { return; }
+    cv.dataset.on = '1';
+    var W = 460, H = 160, GY = 128, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = W * dpr; cv.height = H * dpr;
+    var c = cv.getContext('2d'); c.scale(dpr, dpr);
+    var best = 0; try { best = +localStorage.getItem('pf-game-best') || 0; } catch (e) {}
+    var st, raf = 0, last = 0;
+    var stars = []; for (var i = 0; i < 28; i++) { stars.push([Math.random() * W, Math.random() * (GY - 20), Math.random() * 1.5 + .3]); }
+    function reset() {
+        st = { mode: st ? 'play' : 'ready', y: 0, vy: 0, speed: 260, dist: 0, coins: 0, obs: [], next: 0.9, t: 0, flash: 0 };
+    }
+    function jump() {
+        if (st.mode === 'ready') { st.mode = 'play'; }
+        else if (st.mode === 'over') { if (st.t > 0.4) { reset(); st.mode = 'play'; } return; }
+        if (st.y === 0) { st.vy = 520; }
+    }
+    function spawn() {
+        var r = Math.random();
+        if (r < 0.62) { st.obs.push({ k: 'bug', x: W + 20, y: 0, e: Math.random() < .5 ? '🐛' : '🪲' }); }
+        else if (r < 0.82) { st.obs.push({ k: 'bug', x: W + 20, y: 0, e: '🐛' }, { k: 'bug', x: W + 46, y: 0, e: '🐛' }); }
+        else { st.obs.push({ k: 'coin', x: W + 20, y: 46 + Math.random() * 30, e: '🪙' }); }
+        st.next = Math.max(0.55, 1.25 - st.speed / 900) + Math.random() * 0.7;
+    }
+    function step(dt) {
+        st.t += dt;
+        if (st.mode !== 'play') { return; }
+        st.speed += dt * 9; st.dist += dt * st.speed;
+        st.vy -= 1500 * dt; st.y = Math.max(0, st.y + st.vy * dt); if (st.y === 0) { st.vy = 0; }
+        st.next -= dt; if (st.next <= 0) { spawn(); }
+        for (var i = st.obs.length - 1; i >= 0; i--) {
+            var o = st.obs[i]; o.x -= st.speed * dt;
+            if (o.x < -30) { st.obs.splice(i, 1); continue; }
+            var px = 62, py = GY - st.y, oy = GY - o.y;
+            if (Math.abs(o.x - px) < (o.k === 'coin' ? 22 : 17) && Math.abs(oy - py) < (o.k === 'coin' ? 26 : 18)) {
+                if (o.k === 'coin') { st.coins++; st.flash = 0.25; st.obs.splice(i, 1); }
+                else { st.mode = 'over'; st.t = 0; var s = score(); if (s > best) { best = s; try { localStorage.setItem('pf-game-best', s); } catch (e) {} } }
+            }
+        }
+        if (st.flash > 0) { st.flash -= dt; }
+    }
+    function score() { return Math.floor(st.dist / 40) + st.coins * 10; }
+    function txt(s, x, y, size, color, align) { c.font = size + 'px -apple-system, "Segoe UI", Roboto, Arial, sans-serif'; c.fillStyle = color; c.textAlign = align || 'left'; c.fillText(s, x, y); }
+    function draw() {
+        c.clearRect(0, 0, W, H);
+        stars.forEach(function (s) { var x = ((s[0] - st.dist * s[2] * 0.05) % W + W) % W; c.fillStyle = 'rgba(200,205,255,' + (0.25 + s[2] / 3) + ')'; c.fillRect(x, s[1], s[2], s[2]); });
+        c.strokeStyle = '#2c3150'; c.setLineDash([10, 8]); c.lineDashOffset = st.dist % 18; c.beginPath(); c.moveTo(0, GY + 6); c.lineTo(W, GY + 6); c.stroke(); c.setLineDash([]);
+        c.textBaseline = 'alphabetic';
+        st.obs.forEach(function (o) { txt(o.e, o.x, GY - o.y + 2, o.k === 'coin' ? 22 : 24, '#fff', 'center'); });
+        var bob = st.mode === 'play' && st.y === 0 ? Math.sin(st.dist / 14) * 1.5 : 0;
+        txt(st.mode === 'over' ? '😵' : '🧑‍💻', 62, GY - st.y + 2 + bob, 28, '#fff', 'center');
+        txt('⭐ ' + score(), W - 12, 22, 15, st.flash > 0 ? '#ffd76a' : '#e7e8f5', 'right');
+        txt('🏆 ' + best, W - 12, 42, 12, '#8d92b5', 'right');
+        txt('🪙 ' + st.coins, 12, 22, 14, '#ffd76a');
+        if (st.mode === 'ready') { txt('Нажми пробел или коснись — прыжок', W / 2, 70, 15, '#e7e8f5', 'center'); txt('Бос орын немесе түрту — секіру', W / 2, 90, 12, '#8d92b5', 'center'); }
+        if (st.mode === 'over') { txt('Баг победил! 🐛  Счёт: ' + score(), W / 2, 66, 17, '#ff7a8a', 'center'); txt('Нажми, чтобы сыграть снова · Қайта ойнау', W / 2, 88, 12, '#8d92b5', 'center'); }
+    }
+    function loop(ts) {
+        var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0; last = ts;
+        step(dt); draw();
+        raf = requestAnimationFrame(loop);
+    }
+    reset();
+    cv.addEventListener('pointerdown', function (e) { e.preventDefault(); jump(); });
+    document.addEventListener('keydown', function (e) {
+        if (!cv.offsetParent) { return; }   // игра не на экране
+        var tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) { return; }
+        if (e.code === 'Space' || e.key === 'ArrowUp' || e.key === 'w') { e.preventDefault(); jump(); }
+    });
+    raf = requestAnimationFrame(loop);
+};
+</script>

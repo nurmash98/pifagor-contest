@@ -5,10 +5,11 @@
  • 10 запросов подряд получили 404 — страница/матч/СОР исчезли: опросы останавливаются, окно «Этого больше нет»;
  • страница перезагрузилась больше 10 раз за 20 секунд — это зацикливание: всё останавливается, окно «Страница зациклилась».
 {% endcomment %}
+{% include "mini_game.html" %}
 <style>
     #pf-guard { position: fixed; inset: 0; z-index: 2147483000; display: none; align-items: center; justify-content: center; padding: 20px;
                 background: rgba(9, 10, 20, .82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
-    #pf-guard .g-card { width: min(460px, 100%); background: #1b1e30; color: #e7e8f5; border: 1px solid #2c3150; border-radius: 24px; padding: 28px 24px; text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,.55); animation: pfg-pop .35s cubic-bezier(.2,1.4,.4,1); }
+    #pf-guard .g-card { width: min(460px, 100%); max-height: 100%; overflow-y: auto; background: #1b1e30; color: #e7e8f5; border: 1px solid #2c3150; border-radius: 24px; padding: 28px 24px; text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,.55); animation: pfg-pop .35s cubic-bezier(.2,1.4,.4,1); }
     #pf-guard .g-art { font-size: 72px; line-height: 1; } #pf-guard h3 { margin: 10px 0 4px; font-size: 22px; } #pf-guard .g-kk { color: #8d92b5; font-size: 14px; margin: 0 0 12px; }
     #pf-guard pre { text-align: left; background: #0b0d17; border: 1px solid #2c3150; border-radius: 12px; padding: 10px 12px; margin: 10px 0 14px; color: #cfd3f5; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
     #pf-guard pre b { color: #ff7a8a; } #pf-guard .g-st { color: #8d92b5; font-size: 13px; min-height: 18px; margin-bottom: 12px; }
@@ -21,6 +22,7 @@
     <div class="g-art"><span class="g-anim" id="pfg-art">🔌</span></div>
     <h3 id="pfg-title"></h3><p class="g-kk" id="pfg-kk"></p>
     <pre id="pfg-code"></pre><div class="g-st" id="pfg-st"></div>
+    <div class="pf-game"><canvas id="pfg-game" width="460" height="160"></canvas><div class="pf-game-hint">Пока ждём — сыграй в «Баг-раннер» 🐛</div></div>
     <button type="button" id="pfg-btn">🔄 Обновить</button><button type="button" class="ghost" id="pfg-home">🏠 На главную</button>
 </div></div>
 <script>
@@ -44,6 +46,7 @@
         $('pfg-art').textContent = v.art; $('pfg-title').textContent = v.t; $('pfg-kk').textContent = v.kk;
         $('pfg-code').innerHTML = v.code.replace(/&(?!lt|gt|amp)/g, '&amp;'); $('pfg-st').textContent = '';
         box.style.display = 'flex';
+        try { window.pfMiniGame($('pfg-game')); } catch (e) {}
         if (kind === 'offline' && origFetch) {
             $('pfg-st').textContent = '⏳ Ждём, когда сайт снова ответит…';
             recheck = setInterval(function () {

@@ -50,6 +50,8 @@
     <p class="kk">{% block heading_kk %}Бірдеңе дұрыс болмады{% endblock %}</p>
     <div class="term"><div class="bar"><i></i><i></i><i></i></div><pre>{% block terminal %}{% endblock %}<span class="cursor"></span></pre></div>
     <p class="tip">{% block tip %}{% endblock %}</p>
+    <div class="pf-game"><canvas id="err-game" width="460" height="160"></canvas><div class="pf-game-hint">Пока ты здесь — сыграй в «Баг-раннер»: прыгай через баги, собирай монеты 🪙</div></div>
+    <script>pfMiniGame(document.getElementById('err-game'));</script>
     <div class="btns">{% block buttons %}<a class="btn main" href="/">🏠 На главную</a><a class="btn" href="javascript:history.back()">← Назад</a>{% endblock %}</div>
 </div>
 </body>
