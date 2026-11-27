@@ -246,12 +246,14 @@ def company(room, fresh=False):
         d['salary'] -= f['amount']
         d['fines'] = d.get('fines', 0) + f['amount']
         d['fine_last'] = [f['amount'], f['reason']]
+    from .hints import apply_pct, pct_map
+    hint_pct = pct_map(f'room:{room.id}')            # платные подсказки снижают зарплату за задачу
     for r in rows:
         d = data.setdefault(r['student_id'], {'salary': 0, 'done': [], 'cur': None})
         if r['done_at'] is None:
             d['cur'] = r['task_id']
         else:
-            d['salary'] += r['pay']
+            d['salary'] += apply_pct(r['pay'], hint_pct.get((r['student_id'], r['task_id']), 0))
             d['done'].append(r['task_id'])
     cache.set(key, data, 10)
     return data

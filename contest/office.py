@@ -276,6 +276,8 @@ def collect(day, now=None):
                .values_list('student_id', 'task_id'))
     first = dict(Attempt.objects.filter(submission__in=subs, score=10).values('submission_id')
                  .annotate(t=Min('submitted_at')).values_list('submission_id', 't'))
+    from .hints import apply_pct, pct_map
+    hint_pct = pct_map(f'office:{day}', joined)          # платные подсказки снижают зарплату за задачу
     for s in subs:
         if (s.student_id, s.task_id) in have:
             continue
@@ -290,7 +292,8 @@ def collect(day, now=None):
             with transaction.atomic():
                 OfficeDay.objects.get_or_create(day=day)
                 OfficeSolve.objects.create(day=day, student_id=s.student_id, task=s.task, grade=grade.get(s.student_id, ''),
-                                           money=rm.PAY.get(s.task.level, rm.PAY['A']), coins=coins, at=when)
+                                           money=apply_pct(rm.PAY.get(s.task.level, rm.PAY['A']), hint_pct.get((s.student_id, s.task_id), 0)),
+                                           coins=coins, at=when)
                 CoinTransaction.objects.get_or_create(student_id=s.student_id, key=f'office:{s.task_id}',
                                                       defaults=dict(kind='office', amount=coins, at=when,
                                                                     note=f'x2 в офисе: {s.task.title}'[:200]))

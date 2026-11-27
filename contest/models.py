@@ -729,6 +729,22 @@ class RoomAssignment(models.Model):
         ordering = ['assigned_at']
 
 
+class HintUse(models.Model):
+    """Платная подсказка (разбор кода / ИИ), открытая учеником в «Компании» или «Офисе» — снижает зарплату за задачу.
+    ctx: 'room:<id>' или 'office:<дата>'. Один уровень на задачу оплачивается один раз."""
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='hint_uses')
+    task = models.ForeignKey('Task', on_delete=models.CASCADE)
+    ctx = models.CharField(max_length=24)
+    level = models.PositiveSmallIntegerField()
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Платная подсказка"
+        verbose_name_plural = "Платные подсказки"
+        constraints = [models.UniqueConstraint(fields=['student', 'task', 'ctx', 'level'], name='uniq_hint_use')]
+        indexes = [models.Index(fields=['ctx', 'student'])]
+
+
 class RoomFine(models.Model):
     """«Компания Пифагор»: штраф, который руководитель (учитель) выписал сотруднику — вычитается из зарплаты."""
     room = models.ForeignKey(StudyRoom, on_delete=models.CASCADE, related_name='fines')

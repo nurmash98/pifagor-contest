@@ -9,6 +9,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from . import hints as hints_mod
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -319,6 +320,17 @@ ROOM_TEXTS = {
     'asst_nosub': 'Вы ещё не отправляли решение. Отправьте — и я подскажу, на каком тесте ошибка.',
     'asst_more': 'Ещё подсказка',
     'asst_th_none': 'К этому уроку теории нет — спросите руководителя.',
+    'h_btn': 'Подсказка', 'h_l1': 'Тема и пример', 'h_l2': 'Где ошибка', 'h_l3': 'Разбор кода', 'h_l4': 'Спросить ИИ',
+    'h_free': 'бесплатно', 'h_yes': 'Да, показать',
+    'h_confirm': 'Эта подсказка снизит зарплату за задачу на {p}%. Снимается, только если подсказка что-то нашла. Показать?',
+    'h_pay_now': 'Зарплата за эту задачу сейчас:',
+    'h_issues': 'Что я заметил в вашем коде:',
+    'h_no_issues': 'Типичных ошибок в коде не нашёл — зарплата не снята. Посмотрите «Где ошибка» или спросите ИИ / руководителя.',
+    'h_ai': 'Подсказка ИИ:', 'h_ai_nocode': 'Сначала напишите код — ИИ посмотрит его. Зарплата не снята.',
+    'h_ai_limit': 'По этой задаче ИИ-подсказки на сегодня закончились (3 в день).',
+    'h_ai_fail': 'ИИ сейчас не отвечает — зарплата не снята. Попробуйте чуть позже.',
+    'h_ai_off': 'ИИ-подсказки пока не подключены.',
+    'h_yours': 'Ваш вывод', 'h_expected': 'Ожидалось', 'h_wait': 'Думаю…', 'h_open_first': 'Сначала откройте задачу.',
     'asst_go': 'Иду к ассистенту…',
     'go_asst': 'Подойдите к ассистенту (🧑\u200d💼 в коридоре) — он даст задание',
     'to_asst': 'К ассистенту',
@@ -380,6 +392,7 @@ def room_play(request, room_id):
         'state_url': reverse('room_state', args=[room.id]), 'act_url': reverse('room_act', args=[room.id]),
         'lang_url': reverse('room_lang', args=[room.id]),
         'layout': json.dumps(rm.layout(n)), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
+        'hint_max': hints_mod.max_level(),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': json.dumps(_theory_items(room), ensure_ascii=False), 'texts': json.dumps(dict(_texts(lang), fs_title=f'{_texts(lang)["company"]} «{room.school_class}»'), ensure_ascii=False),
     })
 
@@ -515,11 +528,23 @@ def room_act(request, room_id):
         rm.log_event(room.id, st.full_name, f'🔄 поменял задание «{old_t.title if old_t else "?"}» → «{task.title}» ({task.level})')
         return JsonResponse({'ok': True, 'task': task.id})
     if act == 'hint' and not teacher:
-        cur = rm.company(room).get(st.id, {}).get('cur')
-        task = room.tasks.filter(id=cur).prefetch_related('tags').first() if cur else None
+        from .hints import build
+        from .models import RoomAssignment
+        asg = None
+        if (request.POST.get('task') or '').isdigit():   # задача, открытая справа (текущая или уже сданная)
+            asg = RoomAssignment.objects.filter(room=room, student=st, task_id=int(request.POST['task']), skipped_at__isnull=True).first()
+        if asg is None:
+            cur = rm.company(room).get(st.id, {}).get('cur')
+            asg = RoomAssignment.objects.filter(room=room, student=st, task_id=cur, skipped_at__isnull=True).first() if cur else None
+        if asg is None:
+            return JsonResponse({'error': 'no_task'})
+        task = room.tasks.filter(id=asg.task_id).prefetch_related('tags').first()
         if task is None:
             return JsonResponse({'error': 'no_task'})
-        return JsonResponse(dict(rm.hint(task, st, _lang(request)), task=task.id))
+        d = build(task, st, request.POST.get('level'), f'room:{room.id}', asg.pay, _lang(request))
+        if d.get('paid') and int(d['level']) in d['paid']:
+            cache.delete(f'room:{room.id}:co')          # зарплата пересчитается с учётом подсказки
+        return JsonResponse(d)
     if act == 'exit' and not teacher:
         rm.add_exit(room.id, me)
         return JsonResponse({'ok': True})

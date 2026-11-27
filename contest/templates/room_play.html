@@ -73,6 +73,16 @@
         #drawer { position: absolute; inset: 0; z-index: 8; background: var(--panel); display: none; flex-direction: column; }
         #drawer .hd { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 800; }
         #drawer iframe { flex: 1; border: 0; width: 100%; }
+        #d-hint { max-height: 45%; overflow-y: auto; padding: 10px 14px; border-bottom: 1px solid var(--line); background: rgba(20,184,166,.08); font-size: 13px; line-height: 1.45; }
+        #d-hint pre.hx, .hbox pre.hx { white-space: pre; margin: 4px 0 6px; padding: 6px 10px; border-radius: 8px; background: #0f172a; color: #e2e8f0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; }
+        #d-hint .hx-l { display: block; font-size: 11px; font-weight: 700; opacity: .7; margin-top: 4px; }
+        .hlv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .hlv button { border: 1px solid rgba(20,184,166,.5); background: transparent; color: inherit; border-radius: 999px; padding: 4px 10px; font-weight: 700; font-size: 12px; cursor: pointer; }
+        .hlv button.on { background: #14b8a6; color: #fff; border-color: #14b8a6; }
+        .hlv button small { font-weight: 600; opacity: .75; }
+        .hiss { margin: 4px 0 0 18px; padding: 0; } .hiss li { margin: 3px 0; }
+        .hbad { color: #e11d48; } .hok { color: #059669; }
+        .hconf { margin-top: 6px; } .hconf button { border: 0; background: #f59e0b; color: #fff; border-radius: 999px; padding: 4px 12px; font-weight: 800; font-size: 12px; cursor: pointer; margin-left: 6px; }
         #closed { position: fixed; inset: 0; z-index: 50; background: rgba(15,23,42,.85); color: #fff; display: none; align-items: center; justify-content: center; text-align: center; }
         #earned { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; pointer-events: none; text-align: center;
                    background: linear-gradient(135deg, #064e3b, #15803d); color: #fff; border-radius: 14px; padding: 6px 22px 8px; box-shadow: 0 6px 20px rgba(21,128,61,.35); }
@@ -185,7 +195,7 @@
             <div id="chat-quick"></div>
             <form id="chat-form" autocomplete="off"><input id="chat-in" maxlength="200" data-trp="Написать сообщение…" placeholder="{% t "Написать сообщение…" %}"><button class="btn" type="submit">➤</button></form></div>
         <div id="fx"></div><div id="rain"></div><div id="chat-list"></div>
-        <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span><button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><iframe id="d-frame"></iframe></div>
+        <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span>{% if not teacher %}<button class="btn" id="d-hint-btn" type="button">💡 <span data-tr="Подсказка">{% t "Подсказка" %}</span></button>{% endif %}<button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><div id="d-hint" style="display:none"></div><iframe id="d-frame"></iframe></div>
     </div>
     <aside id="side">
         {% if teacher %}
@@ -778,7 +788,7 @@
             openTask(taskById(+el.getAttribute('data-id')));
         });
     }
-    function openTask(t) { if (!t) { return; } lastTask = t.id; $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex'; }
+    function openTask(t) { if (!t) { return; } if (lastTask !== t.id && $('d-hint')) { $('d-hint').style.display = 'none'; } lastTask = t.id; $('d-title').textContent = t.title; $('d-frame').src = t.url; $('drawer').style.display = 'flex'; }
     function tasksPanel() {
         if (OFFICE) { officePanel(); return; }
         if (TEACHER) {
@@ -915,7 +925,7 @@
         var end = rainEnd(); if (end === null) { return; }
         var t = nowS(), since = t - (end - RAIN_W);
         if (since < 0 || since > RAIN_W + RAIN_FALL) { return; }
-        if (!rainToast) { rainToast = true; toast('🪙 ' + TXT.rain); }
+        if (!rainToast) { rainToast = true; toast(COIN + ' ' + esc(TXT.rain), true); }
         for (var n = 0; n < RAIN_N; n++) {
             var at = n * RAIN_W / RAIN_N, age = since - at;
             if (age < 0) { break; }
@@ -937,7 +947,7 @@
         rainPend[n] = true; RAIN_TAKEN[n] = true;
         var tr = getComputedStyle(el).transform; el.style.transform = tr; el.classList.add('got');
         setTimeout(function () { el.remove(); }, 400);
-        post({a: 'coin', n: n}).then(function (d) { toast(d.ok ? '🪙 +1 · ' + TXT.rain_got : (d.error === 'taken' ? TXT.rain_taken : '')); });
+        post({a: 'coin', n: n}).then(function (d) { toast(d.ok ? COIN + ' +1 · ' + esc(TXT.rain_got) : esc(d.error === 'taken' ? TXT.rain_taken : ''), true); });
     });
 
     // чат сверху: кто написал (даже если уже ушёл) и с кем недавно переписывались
@@ -1339,25 +1349,73 @@
             if (!THEORY.length) { botSay(TXT.asst_th_none); return; }
             botSay('📖', THEORY.map(function (it, i) { return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.kind === 'text' ? TXT.notes : it.title) + '</button>'; }).join(''));
         }
-        if (act === 'ahint') {
-            post({a: 'hint'}).then(function (d) {
-                if (d.error) { botSay(TXT.go_boss); return; }
-                var n = hintStep[d.task] = ((hintStep[d.task] || 0) % 3) + 1, more = asstBtn('ahint', '💡 ' + esc(TXT.asst_more));
-                if (n === 1) {
-                    var ex = TXT.asst_ex, i1 = ex.indexOf('{i}'), o1 = ex.indexOf('{o}');
-                    botSayHtml((d.tip ? esc(TXT.asst_tip + ' ' + d.tip) + '<br><br>' : '') + esc(ex.slice(0, i1).replace(/[\s:]*(ввод|енгізу|кіріс|input)?\s*$/i, '')) + ':' +
-                        codeBox(TXT.ex_in, d.ex_in) + codeBox(TXT.ex_out, d.ex_out) + esc(ex.slice(o1 + 3).replace(/^[.\s]+/, '')), more);
-                }
-                else if (n === 2) {
-                    var f = d.fail;
-                    if (!f) { botSay(TXT.asst_nosub, more); }
-                    else if (!f.n) { botSay(TXT.asst_ok.replace('{p}', f.passed).replace('{n}', f.total), more); }
-                    else { botSayHtml(esc(TXT.asst_fail.replace('{p}', f.passed).replace('{n}', f.total).replace('{k}', f.n) + '.') + (f.input ? codeBox(TXT.ex_in, f.input) : '') + esc(f.why), more); }
-                }
-                else { botSay('📖 ' + TXT.asst_theory + ':', THEORY.length ? THEORY.map(function (it) { return ' <button class="go" type="button" data-act="url" data-url="' + esc(it.url) + '" data-title="' + esc(it.title) + '">📖 ' + esc(it.kind === 'text' ? TXT.notes : it.title) + '</button>'; }).join('') : ' ' + TXT.asst_th_none); }
-            });
-        }
+        if (act === 'ahint') { askHint(CO.cur, (hintLv[CO.cur] || 0) % HMAX + 1, chatOut); }
+        if (act === 'hlv') { askHint(+b.getAttribute('data-t'), +b.getAttribute('data-l'), chatOut, b.hasAttribute('data-ok')); }
     });
+    // ---------------------------------------------------------------- подсказки (ассистент и кнопка «💡» над задачей)
+    var HMAX = {{ hint_max|default:3 }}, HCOST = {3: 10, 4: 20}, hintLv = {}, hintPaid = {}, hintPay = {};
+    var chatOut = function (html) { botSayHtml(html); };
+    function hintLevels(tid, cur) {
+        var h = '<div class="hlv">';
+        for (var l = 1; l <= HMAX; l++) {
+            var paid = (hintPaid[tid] || []).indexOf(l) >= 0;
+            h += '<button type="button" data-act="hlv" data-t="' + tid + '" data-l="' + l + '" class="' + (l === cur ? 'on' : '') + '">' +
+                 ['', '💡', '🧪', '🔍', '🤖'][l] + ' ' + esc(TXT['h_l' + l]) + ' <small>' + (HCOST[l] ? (paid ? '✓' : '−' + HCOST[l] + '%') : esc(TXT.h_free)) + '</small></button>';
+        }
+        return h + '</div>';
+    }
+    function hintBody(d) {
+        var h = '';
+        if (d.level === 1) {
+            var ex = TXT.asst_ex, i1 = ex.indexOf('{i}'), o1 = ex.indexOf('{o}');
+            h = (d.tip ? '💡 ' + esc(TXT.asst_tip + ' ' + d.tip) + '<br><br>' : '') + esc(ex.slice(0, i1).replace(/[\s:]*(ввод|енгізу|кіріс|input)?\s*$/i, '')) + ':' +
+                codeBox(TXT.ex_in, d.ex_in) + codeBox(TXT.ex_out, d.ex_out) + esc(ex.slice(o1 + 3).replace(/^[.\s]+/, ''));
+        } else if (d.level === 2) {
+            var f = d.fail;
+            if (!f) { h = esc(TXT.asst_nosub); }
+            else if (!f.n) { h = '<span class="hok">✅ ' + esc(TXT.asst_ok.replace('{p}', f.passed).replace('{n}', f.total)) + '</span>'; }
+            else {
+                h = '<b class="hbad">' + esc(TXT.asst_fail.replace('{p}', f.passed).replace('{n}', f.total).replace('{k}', f.n)) + '</b>' +
+                    (f.input ? codeBox(TXT.ex_in, f.input) : '');
+                if (!f.error) { h += codeBox(TXT.h_yours, f.actual || '—') + codeBox(TXT.h_expected, f.expected); }
+                h += esc(f.why);
+            }
+        } else if (d.level === 3) {
+            h = d.issues && d.issues.length ? '🔍 <b>' + esc(TXT.h_issues) + '</b><ul class="hiss">' + d.issues.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'
+                                             : esc(TXT.h_no_issues);
+        } else {
+            h = d.ai ? '🤖 <b>' + esc(TXT.h_ai) + '</b><br>' + esc(d.ai).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>') : esc(TXT['h_ai_' + (d.ai_err || 'fail')] || TXT.h_ai_fail);
+        }
+        if (d.pct) { h += '<div class="hx-l">💰 ' + esc(TXT.h_pay_now) + ' ' + money(d.pay_now) + ' (−' + d.pct + '%)</div>'; }
+        return h;
+    }
+    function askHint(tid, level, out, ok) {
+        if (!tid) { out(esc(TXT.h_open_first)); return; }
+        hintLv[tid] = level;
+        if (HCOST[level] && (hintPaid[tid] || []).indexOf(level) < 0 && !ok) {
+            out('<div class="hconf">💰 ' + esc(TXT.h_confirm.replace('{p}', HCOST[level])) + '<button type="button" data-act="hlv" data-t="' + tid + '" data-l="' + level + '" data-ok="1">' + esc(TXT.h_yes) + '</button></div>' + hintLevels(tid, level));
+            return;
+        }
+        if (level === 4) { out('🤖 ' + esc(TXT.h_wait)); }
+        post({a: 'hint', level: level, task: tid}).then(function (d) {
+            if (d.error) { out(esc(d.error === 'no_task' ? (OFFICE ? TXT.h_open_first : TXT.go_boss) : (TXT[d.error] || d.error))); return; }
+            hintPaid[d.task] = d.paid || []; hintPay[d.task] = d.pay; HMAX = d.max || HMAX;
+            out(hintBody(d) + hintLevels(d.task, d.level));
+            if (d.pct && !OFFICE) { poll(true); }
+        });
+    }
+    var drawerOut = function (html) { var box = $('d-hint'); box.innerHTML = html; box.style.display = 'block'; box.scrollTop = 0; };
+    if ($('d-hint-btn')) {
+        $('d-hint-btn').addEventListener('click', function () {
+            var box = $('d-hint');
+            if (box.style.display === 'block') { box.style.display = 'none'; return; }
+            askHint(lastTask, hintLv[lastTask] || 1, drawerOut);
+        });
+        $('d-hint').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-act="hlv"]'); if (!b) { return; }
+            askHint(+b.getAttribute('data-t'), +b.getAttribute('data-l'), drawerOut, b.hasAttribute('data-ok'));
+        });
+    }
     function agaiOf(uid) { return AGAI.filter(function (a) { return a.uid === +uid; })[0]; }
     function botSay(text, extra) { botConv.push({bot: true, text: text, extra: extra || ''}); renderBot(); }
     // пример/тест — отдельными строками, как в редакторе (без значков ⏎)

@@ -5406,12 +5406,51 @@ class StudyRoomTests(TestCase):
         self.assertEqual(self.client.post(act, {'a': 'hint'}).json()['error'], 'no_task')
         tid = self.client.post(act, {'a': 'take'}).json()['task']                     # подходить к руководителю не нужно
         h = self.client.post(act, {'a': 'hint'}).json()
-        self.assertEqual(h['task'], tid); self.assertIsNone(h['fail'])
+        self.assertEqual((h['task'], h['level']), (tid, 1)); self.assertIn('ex_out', h)
+        h = self.client.post(act, {'a': 'hint', 'level': 2}).json()
+        self.assertIsNone(h['fail'])
         t = Task.objects.get(id=tid)
         Submission.objects.create(student=a, task=t, status='DONE', autotest_passed=1, autotest_total=2,
                                   autotest_results=[{'ok': True}, {'ok': False, 'error': 'NameError: name x', 'input': '5'}])
-        f = self.client.post(act, {'a': 'hint'}).json()['fail']
+        f = self.client.post(act, {'a': 'hint', 'level': 2}).json()['fail']
         self.assertEqual((f['n'], f['input'], f['passed']), (2, '5', 1)); self.assertIn('переменная', f['why'])
+
+    def test_paid_hints_cut_salary_and_code_analysis(self):
+        from .models import HintUse, RoomAssignment
+        from . import room as rm
+        t = Task.objects.create(title='Сумма', level='A', description='d', input_example='2 3', output_example='5',
+                                test_cases=[{'input': '2 3', 'output': '5'}])
+        room = self._post_open([t], [t])
+        a = self.sts[0]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.post(act, {'a': 'take'})
+        sub = Submission.objects.create(student=a, task=t, status='TODO', code='a = input("Введите a")\nb = input()\nprint("Ответ:", a + b)')
+        h = self.client.post(act, {'a': 'hint', 'level': 3}).json()
+        text = ' '.join(h['issues'])
+        self.assertIn('input("…")', text); self.assertIn('int(input())', text); self.assertIn('split', text)
+        self.assertEqual((h['pct'], h['pay_now'], h['paid']), (10, 9000, [3]))
+        self.client.post(act, {'a': 'hint', 'level': 3})                         # повторно — бесплатно
+        self.assertEqual(HintUse.objects.count(), 1)
+        sub.code = 'a, b = map(int, input().split())\nprint(a + b)'; sub.save()
+        self.assertEqual(self.client.post(act, {'a': 'hint', 'level': 3}).json()['issues'], [])
+        with self.settings():                                                       # ИИ без ключа — недоступен, ничего не снимается
+            self.assertEqual(self.client.post(act, {'a': 'hint', 'level': 4}).json()['level'], 3)
+        sub.status, sub.is_graded, sub.score = 'DONE', True, 10; sub.save()
+        self.assertEqual(rm.company(room, fresh=True)[a.id]['salary'], 9000)      # 10 000 − 10%
+
+    def test_code_analysis_rules(self):
+        from .hints import analyze
+        t = Task(input_example='7\n2', output_example='3', description='d')
+        self.assertIn('Синтаксическая', analyze('if a > 1\n    print(a)', t)[0])
+        self.assertIn('двоеточия', analyze('a = int(input())\nif a > 1\n    print(a)', t)[0])
+        r = ' '.join(analyze('a = int(input())\nb = int(input())\nprint(a / b)', t))
+        self.assertIn('//', r)
+        r = ' '.join(analyze('print(3)', t))
+        self.assertIn('не читает', r); self.assertIn('вписан', r)
+        r = ' '.join(analyze('i = 0\nwhile i < 5:\n    print(i)', Task(input_example='', output_example='0', description='d')))
+        self.assertIn('бесконечным', r)
 
     def test_company_skips_tasks_solved_before_and_all_done(self):
         a = self.sts[0]
@@ -5570,6 +5609,23 @@ class WeekendOfficeTests(TestCase):
         self.assertFalse(office.is_open(self.sat.replace(hour=8, minute=59)))
         self.assertFalse(office.is_open(self.sat - timedelta(days=1)))                       # пятница
         self.assertTrue(office.is_open(self.sat + timedelta(days=1)))                        # воскресенье
+
+    def test_office_hint_costs_salary(self):
+        from . import office
+        from .models import OfficeSolve
+        st = self.sts[0]
+        Submission.objects.create(student=st, task=self.tC, status='TODO', code='print("Ответ: 1")')
+        with self._at(self.sat):
+            self.client.force_login(st.user)
+            self.client.get(reverse('office_play'))
+            self.assertEqual(self.client.post(reverse('office_act'), {'a': 'hint', 'level': 3}).json()['error'], 'no_task')
+            h = self.client.post(reverse('office_act'), {'a': 'hint', 'level': 3, 'task': self.tC.id}).json()
+            self.assertTrue(h['issues']); self.assertEqual(h['pay_now'], 27000)
+        later = self.sat + timedelta(minutes=5)
+        Submission.objects.filter(student=st, task=self.tC).update(status='DONE', is_graded=True, score=10, updated_at=later)
+        with self._at(later):
+            office.collect(self.sat.date())
+        self.assertEqual(OfficeSolve.objects.get(student=st).money, 27000)
 
     def test_solve_in_office_gives_double_coins_money_and_top3(self):
         from . import office

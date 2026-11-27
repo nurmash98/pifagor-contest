@@ -1,4 +1,4 @@
-{% comment %}
+{% load static %}{% comment %}
 Мини-игра «Баг-раннер» для страниц ошибок и окна «Сайт не отвечает» (как динозаврик в Chrome).
 Всё встроено в страницу — работает даже без интернета. Запуск: pfMiniGame(canvasElement).
 {% endcomment %}
@@ -14,6 +14,11 @@ window.pfMiniGame = window.pfMiniGame || function (cv) {
     var W = 460, H = 160, GY = 128, dpr = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = W * dpr; cv.height = H * dpr;
     var c = cv.getContext('2d'); c.scale(dpr, dpr);
+    var coinImg = new Image(); coinImg.src = '{% static "icons/coin-64.png" %}';
+    function coin(x, y, r) {   // монета сайта; пока картинка не загрузилась (нет сети) — золотой кружок
+        if (coinImg.complete && coinImg.naturalWidth) { c.drawImage(coinImg, x - r, y - r, r * 2, r * 2); return; }
+        c.fillStyle = '#f5c542'; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.strokeStyle = '#b8860b'; c.lineWidth = 2; c.stroke();
+    }
     var best = 0; try { best = +localStorage.getItem('pf-game-best') || 0; } catch (e) {}
     var st, raf = 0, last = 0;
     var stars = []; for (var i = 0; i < 28; i++) { stars.push([Math.random() * W, Math.random() * (GY - 20), Math.random() * 1.5 + .3]); }
@@ -29,7 +34,7 @@ window.pfMiniGame = window.pfMiniGame || function (cv) {
         var r = Math.random();
         if (r < 0.62) { st.obs.push({ k: 'bug', x: W + 20, y: 0, e: Math.random() < .5 ? '🐛' : '🪲' }); }
         else if (r < 0.82) { st.obs.push({ k: 'bug', x: W + 20, y: 0, e: '🐛' }, { k: 'bug', x: W + 46, y: 0, e: '🐛' }); }
-        else { st.obs.push({ k: 'coin', x: W + 20, y: 46 + Math.random() * 30, e: '🪙' }); }
+        else { st.obs.push({ k: 'coin', x: W + 20, y: 46 + Math.random() * 30, e: '' }); }
         st.next = Math.max(0.55, 1.25 - st.speed / 900) + Math.random() * 0.7;
     }
     function step(dt) {
@@ -56,12 +61,12 @@ window.pfMiniGame = window.pfMiniGame || function (cv) {
         stars.forEach(function (s) { var x = ((s[0] - st.dist * s[2] * 0.05) % W + W) % W; c.fillStyle = 'rgba(200,205,255,' + (0.25 + s[2] / 3) + ')'; c.fillRect(x, s[1], s[2], s[2]); });
         c.strokeStyle = '#2c3150'; c.setLineDash([10, 8]); c.lineDashOffset = st.dist % 18; c.beginPath(); c.moveTo(0, GY + 6); c.lineTo(W, GY + 6); c.stroke(); c.setLineDash([]);
         c.textBaseline = 'alphabetic';
-        st.obs.forEach(function (o) { txt(o.e, o.x, GY - o.y + 2, o.k === 'coin' ? 22 : 24, '#fff', 'center'); });
+        st.obs.forEach(function (o) { if (o.k === 'coin') { coin(o.x, GY - o.y - 7, 10); } else { txt(o.e, o.x, GY - o.y + 2, 24, '#fff', 'center'); } });
         var bob = st.mode === 'play' && st.y === 0 ? Math.sin(st.dist / 14) * 1.5 : 0;
         txt(st.mode === 'over' ? '😵' : '🧑‍💻', 62, GY - st.y + 2 + bob, 28, '#fff', 'center');
         txt('⭐ ' + score(), W - 12, 22, 15, st.flash > 0 ? '#ffd76a' : '#e7e8f5', 'right');
         txt('🏆 ' + best, W - 12, 42, 12, '#8d92b5', 'right');
-        txt('🪙 ' + st.coins, 12, 22, 14, '#ffd76a');
+        coin(20, 17, 8); txt(String(st.coins), 33, 22, 14, '#ffd76a');
         if (st.mode === 'ready') { txt('Нажми пробел или коснись — прыжок', W / 2, 70, 15, '#e7e8f5', 'center'); txt('Бос орын немесе түрту — секіру', W / 2, 90, 12, '#8d92b5', 'center'); }
         if (st.mode === 'over') { txt('Баг победил! 🐛  Счёт: ' + score(), W / 2, 66, 17, '#ff7a8a', 'center'); txt('Нажми, чтобы сыграть снова · Қайта ойнау', W / 2, 88, 12, '#8d92b5', 'center'); }
     }

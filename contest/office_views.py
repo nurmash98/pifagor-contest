@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from . import office as of
 from . import room as rm
 from .models import SPECIAL_TAGS, Student, Task
+from . import hints as hints_mod
 from .room_views import COLORS, _label, _lang, _texts
 
 
@@ -197,6 +198,7 @@ def office_play(request):
         'state_url': reverse('office_state'), 'act_url': reverse('office_act'), 'lang_url': reverse('office_lang'),
         'layout': json.dumps(of.layout(of.grades())), 'tasks_json': json.dumps(tasks, ensure_ascii=False),
         'tags_json': json.dumps(tags, ensure_ascii=False), 'solved_json': json.dumps(solved), 'grades_json': json.dumps(of.grades()),
+        'hint_max': hints_mod.max_level(),
         'colors': json.dumps(COLORS), 'say_max': rm.SAY_MAX, 'theory': '[]', 'texts': json.dumps(_office_texts(lang), ensure_ascii=False),
         'agai_json': json.dumps(of.agai_list(st.school_class if st else ''), ensure_ascii=False), 'my_ag': my_ag['key'] if my_ag else '',
     })
@@ -294,6 +296,15 @@ def office_act(request):
     me = request.user.id
     base = _base(request, st, grade, teacher)
     act = request.POST.get('a')
+    if act == 'hint' and not teacher:
+        from .hints import build
+        from .models import Task
+        tid = request.POST.get('task') or ''
+        task = Task.objects.filter(id=int(tid), hidden=False).prefetch_related('tags').first() if tid.isdigit() else None
+        if task is None:
+            return JsonResponse({'error': 'no_task'})
+        return JsonResponse(build(task, st, request.POST.get('level'), f'office:{timezone.localdate()}',
+                                  rm.PAY.get(task.level, rm.PAY['A']), _lang(request)))
     if act == 'move':
         try:
             x = max(0.0, min(80.0, float(request.POST.get('x'))))
