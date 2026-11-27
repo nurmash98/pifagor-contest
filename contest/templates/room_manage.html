@@ -13,6 +13,10 @@
     .tagchip { border: 1px solid rgba(108,92,231,.35); background: transparent; color: inherit; border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .tagchip .n { opacity: .55; font-weight: 500; margin-left: 3px; }
     .tagchip.on { background: #6c5ce7; border-color: #6c5ce7; color: #fff; }
+    .ctree { max-height: 260px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 12px; padding: 8px 12px; background: #fff; }
+    .ctree-t { padding: 4px 0; border-bottom: 1px dashed #eee; } .ctree-t:last-child { border-bottom: 0; }
+    .ctree label { cursor: pointer; font-size: 14px; display: block; padding: 2px 0; }
+    .ctree-s { margin-left: 22px; }
 </style>
 <div class="mb-3"><a href="{% url 'games_hub' %}" class="text-decoration-none text-muted small">← Игры</a></div>
 <h2 class="fw-bold mb-1" style="color:#1a1a4b">🏢 Компания «Пифагор»</h2>
@@ -51,9 +55,9 @@
     </div>
     <h6 class="fw-bold mt-1 mb-2">📚 Задачи из курса</h6>
     <div class="row g-3 mb-2">
-        <div class="col-md-4"><label class="form-label small fw-semibold">Курс</label><select name="course" id="c-course" class="form-select rounded-3"></select></div>
-        <div class="col-md-4"><label class="form-label small fw-semibold">Тема</label><select name="topic" id="c-topic" class="form-select rounded-3"></select></div>
-        <div class="col-md-4" id="c-sub-box"><label class="form-label small fw-semibold">Подтема</label><select name="subtopic" id="c-sub" class="form-select rounded-3"></select></div>
+        <div class="col-md-4"><label class="form-label small fw-semibold">Курс</label><select id="c-course" class="form-select rounded-3"></select></div>
+        <div class="col-md-8"><label class="form-label small fw-semibold">Темы и подтемы <span class="text-muted fw-normal">(можно отметить несколько)</span></label>
+            <div id="c-tree" class="ctree"></div></div>
     </div>
     <div class="small text-muted mb-3" id="c-info"></div>
     <details class="mb-3"><summary class="small fw-semibold" style="cursor:pointer">✋ Или выбрать задачи вручную</summary>
@@ -159,26 +163,43 @@
     });
     list.addEventListener('change', count);
     // курс → тема → подтема
-    var TREE = {{ tree_json|default:"[]"|safe }}, cs = document.getElementById('c-course'), ts = document.getElementById('c-topic'),
-        ss = document.getElementById('c-sub'), sbox = document.getElementById('c-sub-box'), info = document.getElementById('c-info');
+    var TREE = {{ tree_json|default:"[]"|safe }}, cs = document.getElementById('c-course'), box = document.getElementById('c-tree'),
+        info = document.getElementById('c-info');
     function opt(v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; return o; }
-    function fillCourses() { cs.innerHTML = ''; if (!TREE.length) { cs.appendChild(opt('', '— в курсах нет задач —')); } TREE.forEach(function (c) { cs.appendChild(opt(c.id, c.name)); }); fillTopics(); }
-    function course() { return TREE.filter(function (c) { return String(c.id) === cs.value; })[0]; }
-    function topic() { var c = course(); return c ? c.topics.filter(function (t) { return String(t.id) === ts.value; })[0] : null; }
-    function fillTopics() { ts.innerHTML = ''; var c = course(); (c ? c.topics : []).forEach(function (t) { ts.appendChild(opt(t.id, t.name)); }); fillSubs(); }
-    function fillSubs() {
-        ss.innerHTML = ''; var t = topic();
-        if (!t || !t.subs.length) { sbox.style.display = 'none'; ss.appendChild(opt('', '')); }
-        else { sbox.style.display = ''; t.subs.forEach(function (x) { ss.appendChild(opt(x.id, x.name + ' (' + x.n + ')')); }); if (t.n) { ss.appendChild(opt('', '— вся тема (' + t.n + ') —')); } }
-        showInfo();
-    }
+    function esc(x) { var d = document.createElement('div'); d.textContent = x; return d.innerHTML; }
+    if (!TREE.length) { cs.appendChild(opt('', '— в курсах нет задач —')); }
+    // галочки всех курсов рисуем сразу (скрытые тоже отправятся) — выбор не теряется при смене курса
+    TREE.forEach(function (c) {
+        cs.appendChild(opt(c.id, c.name));
+        var h = '<div class="ctree-c" data-c="' + c.id + '">';
+        c.topics.forEach(function (t) {
+            var all = t.n + t.subs.reduce(function (a, x) { return a + x.n; }, 0);
+            h += '<div class="ctree-t"><label><input type="checkbox" name="topics" value="' + t.id + '" data-n="' + all + '"> <b>' + esc(t.name) + '</b> <span class="text-muted">· вся тема, ' + all + '</span></label>';
+            if (t.subs.length) {
+                h += '<div class="ctree-s">';
+                t.subs.forEach(function (x) { h += '<label><input type="checkbox" name="subtopics" value="' + x.id + '" data-n="' + x.n + '" data-t="' + t.id + '"> ' + esc(x.name) + ' <span class="text-muted">' + x.n + ' · ' + x.lv.split('').join('') + '</span></label>'; });
+                h += '</div>';
+            }
+            h += '</div>';
+        });
+        box.insertAdjacentHTML('beforeend', h + '</div>');
+    });
+    function showCourse() { box.querySelectorAll('.ctree-c').forEach(function (d) { d.style.display = d.getAttribute('data-c') === cs.value ? '' : 'none'; }); }
     function showInfo() {
-        var t = topic(); if (!t) { info.textContent = ''; return; }
-        var x = t.subs.filter(function (y) { return String(y.id) === ss.value; })[0];
-        info.textContent = x ? '✓ Задач в подтеме: ' + x.n + ' (уровни ' + x.lv.split('').join(', ') + '). Ассистенты выдадут их по порядку A → B → C.' : '✓ Задач в теме: ' + t.n + '.';
+        var nt = 0, nn = 0, whole = {};
+        box.querySelectorAll('input[name="topics"]:checked').forEach(function (i) { whole[i.value] = 1; nt++; nn += +i.getAttribute('data-n'); });
+        box.querySelectorAll('input[name="subtopics"]').forEach(function (i) {
+            var w = !!whole[i.getAttribute('data-t')];
+            i.disabled = w; if (w) { i.checked = false; }                       // вся тема уже включает подтемы
+            i.parentNode.style.opacity = w ? .45 : 1;
+            if (i.checked) { nt++; nn += +i.getAttribute('data-n'); }
+        });
+        info.textContent = nt ? '✓ Выбрано: ' + nt + ' (задач ≈ ' + nn + '). Ассистенты выдадут их по порядку A → B → C.' : 'Отметьте одну или несколько тем / подтем.';
     }
-    cs.addEventListener('change', fillTopics); ts.addEventListener('change', fillSubs); ss.addEventListener('change', showInfo);
-    fillCourses();
+    cs.addEventListener('change', showCourse); box.addEventListener('change', showInfo);
+    // по умолчанию — первая подтема (как раньше)
+    var first = box.querySelector('input[name="subtopics"], input[name="topics"]'); if (first) { first.checked = true; }
+    showCourse(); showInfo();
 })();
 </script>
 {% endblock %}

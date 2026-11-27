@@ -132,14 +132,27 @@ def room_manage(request):
             messages.error(request, 'Выберите свой класс.')
             return redirect('room_manage')
         from .models import Subtopic, Topic
-        sub = Subtopic.objects.select_related('topic').filter(id=request.POST.get('subtopic') or 0).first()
-        topic = sub.topic if sub else Topic.objects.filter(id=request.POST.get('topic') or 0).first()
+        # несколько тем / подтем курса (галочки); старые формы присылают одну topic / subtopic
+        sub_ids = [int(x) for x in request.POST.getlist('subtopics') + [request.POST.get('subtopic') or ''] if str(x).isdigit()]
+        top_ids = [int(x) for x in request.POST.getlist('topics') + [request.POST.get('topic') or ''] if str(x).isdigit()]
+        subs = list(Subtopic.objects.select_related('topic').filter(id__in=sub_ids).order_by('topic__order', 'order', 'id'))
+        if request.POST.get('subtopic') and not request.POST.getlist('topics'):
+            top_ids = [i for i in top_ids if i not in {x.topic_id for x in subs}]   # одна подтема = только она, не вся тема
+        tops = list(Topic.objects.filter(id__in=top_ids).order_by('order', 'id'))
+        sub = subs[0] if len(subs) == 1 and not tops else None
+        topic = sub.topic if sub else (tops[0] if tops else (subs[0].topic if subs else None))
         ids = [int(x) for x in request.POST.getlist('tasks') if x.isdigit()]
         if ids:                                            # старый способ: задачи отмечены вручную
             tasks = list(Task.objects.filter(id__in=ids, hidden=False))
-        else:                                              # задачи подтемы (или темы) курса
-            src = sub or topic
-            tasks = list(src.tasks.filter(hidden=False)) if src else []
+        else:                                              # задачи выбранных подтем и тем курса
+            seen, tasks = set(), []
+            srcs = []
+            for tp in tops:                                # «вся тема» = её задачи + задачи всех подтем
+                srcs += [tp] + list(tp.subtopics.all())
+            for src in subs + srcs:
+                for t in src.tasks.filter(hidden=False):
+                    if t.id not in seen:
+                        seen.add(t.id); tasks.append(t)
         if not tasks:
             messages.error(request, 'Выберите хотя бы одну задачу на урок.')
             return redirect('room_manage')
@@ -153,7 +166,8 @@ def room_manage(request):
             rm.award_top(prev)
         if topic is None:
             topic = Topic.objects.filter(id=request.POST.get('theory_topic') or 0).first()
-        title = (request.POST.get('title') or '').strip()[:120] or (sub.name if sub else topic.name if topic else '')
+        names = [x.name for x in subs if x.topic_id not in {t.id for t in tops}] + [t.name for t in tops]
+        title = (request.POST.get('title') or '').strip()[:120] or ' + '.join(names) or (topic.name if topic else '')
         room = StudyRoom.objects.create(school_class=cls, owner=request.user, title=title[:120],
                                         ends_at=now + timedelta(minutes=minutes), theory_topic=topic, theory_subtopic=sub,
                                         theory_text=(request.POST.get('theory_text') or '').strip()[:20000])

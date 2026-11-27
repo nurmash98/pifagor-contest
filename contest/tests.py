@@ -5375,6 +5375,24 @@ class StudyRoomTests(TestCase):
         self.client.force_login(self.tu)
         self.assertIn('взял задание', self.client.get(reverse('room_state', args=[room.id])).json()['log'][-1][2])
 
+    def test_company_from_several_topics(self):
+        """Можно отметить несколько тем и подтем: задачи объединяются, «вся тема» включает задачи подтем."""
+        from .models import Course, Subtopic, Topic
+        c = Course.objects.create(name='Python')
+        t1, t2, t3 = (Topic.objects.create(course=c, name=n, order=i) for i, n in enumerate(['Ввод', 'Циклы', 'Списки']))
+        s1 = Subtopic.objects.create(topic=t1, name='input()')
+        s2 = Subtopic.objects.create(topic=t2, name='for')
+        s3 = Subtopic.objects.create(topic=t3, name='append')
+        x, y, z, w = (make_task(f'T{i}', 'AB'[i % 2], Tag.objects.get(name='Циклы')) for i in range(4))
+        s1.tasks.set([x]); s2.tasks.set([y, x]); s3.tasks.set([z]); t3.tasks.set([w])
+        self.client.force_login(self.tu)
+        self.assertContains(self.client.get(reverse('room_manage')), 'name="subtopics"')
+        self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'subtopics': [s1.id, s2.id], 'topics': [t3.id]})
+        room = StudyRoom.objects.get()
+        self.assertEqual(set(room.tasks.all()), {x, y, z, w})
+        self.assertEqual(room.title, 'input() + for + Списки')
+        self.assertEqual([Task.objects.get(id=i).level for i in room.task_order], ['A', 'A', 'B', 'B'])
+
     def test_company_from_course_subtopic_assistants_and_hints(self):
         """Учитель выбирает курс → тему → подтему: задачи подтемы, название компании — класс, ассистенты подсказывают."""
         from .models import Course, Subtopic, Topic
