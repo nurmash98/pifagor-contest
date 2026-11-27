@@ -5397,7 +5397,7 @@ class StudyRoomTests(TestCase):
         room = StudyRoom.objects.get()
         self.assertEqual(set(room.tasks.all()), {x, y, z, w})
         self.assertEqual(room.title, 'input() + for + Списки')
-        self.assertEqual([Task.objects.get(id=i).level for i in room.task_order], ['A', 'A', 'B', 'B'])
+        self.assertEqual(room.task_order, [x.id, y.id, z.id, w.id])     # сначала тема «Ввод», потом «Циклы», потом «Списки» (A → B)
 
     def test_company_from_course_subtopic_assistants_and_hints(self):
         """Учитель выбирает курс → тему → подтему: задачи подтемы, название компании — класс, ассистенты подсказывают."""

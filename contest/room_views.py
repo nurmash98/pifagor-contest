@@ -144,15 +144,26 @@ def room_manage(request):
         ids = [int(x) for x in request.POST.getlist('tasks') if x.isdigit()]
         if ids:                                            # старый способ: задачи отмечены вручную
             tasks = list(Task.objects.filter(id__in=ids, hidden=False))
+            by_level = True
         else:                                              # задачи выбранных подтем и тем курса
             seen, tasks = set(), []
+            # порядок как в курсе: сначала вся первая тема (A → B → C), потом вторая и т.д.
             srcs = []
             for tp in tops:                                # «вся тема» = её задачи + задачи всех подтем
-                srcs += [tp] + list(tp.subtopics.all())
-            for src in subs + srcs:
+                srcs.append(((tp.course_id, tp.order, tp.id, -1, 0), tp))
+                srcs += [((tp.course_id, tp.order, tp.id, x.order, x.id), x) for x in tp.subtopics.all()]
+            srcs += [((x.topic.course_id, x.topic.order, x.topic_id, x.order, x.id), x) for x in subs]
+            srcs.sort(key=lambda p: p[0])
+            by_topic = []                                  # [(ключ темы, [задачи])]
+            for key, src in srcs:
+                if not by_topic or by_topic[-1][0] != key[:3]:
+                    by_topic.append((key[:3], []))
                 for t in src.tasks.filter(hidden=False):
                     if t.id not in seen:
-                        seen.add(t.id); tasks.append(t)
+                        seen.add(t.id); by_topic[-1][1].append(t)
+            for _, group in by_topic:
+                tasks += sorted(group, key=lambda t: (t.level, t.id))
+            by_level = False
         if not tasks:
             messages.error(request, 'Выберите хотя бы одну задачу на урок.')
             return redirect('room_manage')
@@ -177,7 +188,7 @@ def room_manage(request):
         for x in (request.POST.get('order') or '').split(','):
             if x.strip().isdigit() and int(x) in valid and int(x) not in order:
                 order.append(int(x))
-        room.task_order = order + [t.id for t in sorted(tasks, key=lambda t: (t.level, t.id)) if t.id not in order]
+        room.task_order = order + [t.id for t in (sorted(tasks, key=lambda t: (t.level, t.id)) if by_level else tasks) if t.id not in order]
         room.save(update_fields=['task_order'])
         _forget_open(cls)
         return redirect('room_play', room_id=room.id)

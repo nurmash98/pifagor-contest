@@ -194,7 +194,7 @@
             i.parentNode.style.opacity = w ? .45 : 1;
             if (i.checked) { nt++; nn += +i.getAttribute('data-n'); }
         });
-        info.textContent = nt ? '✓ Выбрано: ' + nt + ' (задач ≈ ' + nn + '). Ассистенты выдадут их по порядку A → B → C.' : 'Отметьте одну или несколько тем / подтем.';
+        info.textContent = nt ? '✓ Выбрано: ' + nt + ' (задач ≈ ' + nn + '). Ассистенты выдадут их по темам: сначала первая тема (A → B → C), потом следующая.' : 'Отметьте одну или несколько тем / подтем.';
     }
     cs.addEventListener('change', showCourse); box.addEventListener('change', showInfo);
     // по умолчанию — первая подтема (как раньше)
