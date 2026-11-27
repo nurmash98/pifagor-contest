@@ -201,7 +201,7 @@ def room_manage(request):
             topics.append({'id': tp.id, 'title': f'{tp.course.name} — {tp.name}', 'tasks': [t.id for t in tp.tasks.all()]})
     from .models import Course
     tree = []                                          # курс → темы → подтемы (только с задачами)
-    for c in Course.objects.prefetch_related('topics__tasks', 'topics__subtopics__tasks').order_by('name'):
+    for c in Course.objects.select_related('created_by').prefetch_related('topics__tasks', 'topics__subtopics__tasks').order_by('name'):
         tps = []
         for tp in c.topics.all():
             subs = [{'id': st.id, 'name': st.name, 'n': sum(1 for t in st.tasks.all() if not t.hidden),
@@ -211,7 +211,9 @@ def room_manage(request):
             if subs or n:
                 tps.append({'id': tp.id, 'name': tp.name, 'n': n, 'subs': subs})
         if tps:
-            tree.append({'id': c.id, 'name': c.name, 'topics': tps})
+            mine_c = bool(c.created_by_id) and c.created_by.user_id == request.user.id
+            tree.append({'id': c.id, 'name': ('⭐ ' if mine_c else '') + c.name, 'topics': tps, 'mine': mine_c})
+    tree.sort(key=lambda x: not x['mine'])                 # свои курсы учителя — первыми и выбраны по умолчанию
     return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'tasks': tasks, 'tags': tags,
                                                 'topics': topics, 'topics_json': json.dumps({t['id']: t['tasks'] for t in topics}),
                                                 'tree_json': json.dumps(tree, ensure_ascii=False)})

@@ -198,8 +198,10 @@
     }
     cs.addEventListener('change', showCourse); box.addEventListener('change', showInfo);
     // по умолчанию — первая подтема (как раньше)
-    var first = box.querySelector('input[name="subtopics"], input[name="topics"]'); if (first) { first.checked = true; }
-    showCourse(); showInfo();
+    showCourse();
+    var first = box.querySelector('.ctree-c[data-c="' + cs.value + '"] input[name="subtopics"], .ctree-c[data-c="' + cs.value + '"] input[name="topics"]');
+    if (first) { first.checked = true; }
+    showInfo();
 })();
 </script>
 {% endblock %}

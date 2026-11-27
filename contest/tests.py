@@ -5385,8 +5385,14 @@ class StudyRoomTests(TestCase):
         s3 = Subtopic.objects.create(topic=t3, name='append')
         x, y, z, w = (make_task(f'T{i}', 'AB'[i % 2], Tag.objects.get(name='Циклы')) for i in range(4))
         s1.tasks.set([x]); s2.tasks.set([y, x]); s3.tasks.set([z]); t3.tasks.set([w])
+        from .models import Teacher
+        own = Course.objects.create(name='Мой курс', created_by=Teacher.objects.get_or_create(user=self.tu)[0])
+        Subtopic.objects.create(topic=Topic.objects.create(course=own, name='Моя тема'), name='моя').tasks.set([x])
         self.client.force_login(self.tu)
-        self.assertContains(self.client.get(reverse('room_manage')), 'name="subtopics"')
+        page = self.client.get(reverse('room_manage')).content.decode()
+        self.assertIn('name="subtopics"', page)
+        self.assertLess(page.find('⭐ Мой курс'), page.find('"name": "Python"'))         # свой курс — первым
+        self.assertNotEqual(page.find('⭐ Мой курс'), -1)
         self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'subtopics': [s1.id, s2.id], 'topics': [t3.id]})
         room = StudyRoom.objects.get()
         self.assertEqual(set(room.tasks.all()), {x, y, z, w})
