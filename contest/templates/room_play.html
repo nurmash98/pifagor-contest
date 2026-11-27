@@ -73,6 +73,7 @@
         #drawer { position: absolute; inset: 0; z-index: 8; background: var(--panel); display: none; flex-direction: column; }
         #drawer .hd { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 800; }
         #drawer iframe { flex: 1; border: 0; width: 100%; }
+        #d-stress { position: absolute; inset: 48px 0 0 0; z-index: 5; background: rgba(15,23,42,.88); color: #fff; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 24px; font-size: 15px; backdrop-filter: blur(3px); }
         #d-hint { max-height: 45%; overflow-y: auto; padding: 10px 14px; border-bottom: 1px solid var(--line); background: rgba(20,184,166,.08); font-size: 13px; line-height: 1.45; }
         #d-hint pre.hx, .hbox pre.hx { white-space: pre; margin: 4px 0 6px; padding: 6px 10px; border-radius: 8px; background: #0f172a; color: #e2e8f0; font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; }
         #d-hint .hx-l { display: block; font-size: 11px; font-weight: 700; opacity: .7; margin-top: 4px; }
@@ -195,7 +196,7 @@
             <div id="chat-quick"></div>
             <form id="chat-form" autocomplete="off"><input id="chat-in" maxlength="200" data-trp="Написать сообщение…" placeholder="{% t "Написать сообщение…" %}"><button class="btn" type="submit">➤</button></form></div>
         <div id="fx"></div><div id="rain"></div><div id="chat-list"></div>
-        <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span>{% if not teacher %}<button class="btn" id="d-hint-btn" type="button">💡 <span data-tr="Подсказка">{% t "Подсказка" %}</span></button>{% endif %}<button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><div id="d-hint" style="display:none"></div><iframe id="d-frame"></iframe></div>
+        <div id="drawer"><div class="hd"><span id="d-title" style="flex:1"></span>{% if not teacher %}<button class="btn" id="d-hint-btn" type="button">💡 <span data-tr="Подсказка">{% t "Подсказка" %}</span></button>{% endif %}<button class="btn ghost" id="d-close" type="button">✕ <span data-tr="Закрыть">{% t "Закрыть" %}</span></button></div><div id="d-hint" style="display:none"></div><div id="d-stress" style="display:none"><div style="font-size:54px">😵</div><b>😰 <span id="d-stress-n">100%</span></b><div>{% t "Стресс 100% — работать невозможно! Выпейте кофе ☕ или посидите с котиками 🐈, пока стресс не упадёт до 80%" %}</div></div><iframe id="d-frame"></iframe></div>
     </div>
     <aside id="side">
         {% if teacher %}
@@ -798,6 +799,7 @@
             return;
         }
         var h = '<div class="mycard"><div class="lbl">' + TXT.salary + '</div><div class="sal">' + money(CO.salary) + '</div></div>';
+        if (!OFFICE && CO.wallet !== undefined) { h += '<div class="small" style="margin:-4px 0 10px;opacity:.8">💼 ' + esc(TXT.wallet) + ': <b>' + money(CO.wallet) + '</b></div>'; }
         var cur = CO.cur ? taskById(CO.cur) : null;
         h += '<div class="lbl hint" style="font-weight:700">' + TXT.cur + '</div>';
         if (cur) {
@@ -858,12 +860,22 @@
 
     // ---------------- стресс, кофе, котики, события, дождь из монет, чат ----------------
     var SKEY = 'pf-stress:' + U.act, STRESS = 0, coffeeAt = 0, nearSince = 0, srvOff = 0, EV = null, evShown = null;
-    var catMsg = false, coffeeMsg = false, hiWarned = false, RAIN_TAKEN = {}, rainPend = {}, rainToast = false;
+    var catMsg = false, coffeeMsg = false, coffeeBusy = false, lastTry = null, hiWarned = false, RAIN_TAKEN = {}, rainPend = {}, rainToast = false;
     try { var sv = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (sv) { STRESS = +sv[0] || 0; coffeeAt = +sv[1] || 0; } } catch (e) {}
     function nowS() { return Date.now() / 1000 + srvOff; }
     var COFFEE = L.objs.filter(function (o) { return o.t === 'coffee'; }), CATS = L.objs.filter(function (o) { return o.t === 'cat'; });
     function near(list, me) { var b = 1e9; list.forEach(function (o) { var dx = o.x + .5 - me.rx, dy = o.y + .5 - me.ry; b = Math.min(b, Math.sqrt(dx * dx + dy * dy)); }); return b; }
     function myMul() { return (TEACHER ? 1 : STRESS >= 85 ? .5 : STRESS >= 60 ? .7 : 1) * (EV && EV.k === 'snow' ? .6 : 1); }
+    var blocked = false;
+    function stressBlock() {                            // стресс 100% — задачу решать нельзя, пока не опустится до 80%
+        if (TEACHER || OFFICE) { return; }
+        if (STRESS >= 100) { blocked = true; } else if (STRESS <= 80) { blocked = false; }
+        var cov = $('d-stress');
+        if (!cov) { return; }
+        cov.style.display = blocked ? 'flex' : 'none';
+        $('d-stress-n').textContent = Math.round(STRESS) + '%';
+    }
+    function stressHit(n, why) { STRESS = Math.min(100, STRESS + n); paintStress(); stressBlock(); if (why) { toast('😣 ' + why); } }
     function paintStress() {
         if (!$('stress-v')) { return; }
         $('stress-v').style.width = Math.round(STRESS) + '%';
@@ -874,18 +886,28 @@
         if (TEACHER) { return; }
         var me = people[ME]; if (!me || me.rx === null) { return; }
         var t = nowS(), calm = EV && EV.k === 'cats';
-        if (seated && !calm) { STRESS = Math.min(100, STRESS + 1 / 6); }      // ~10 минут за столом — шкала полная
+        if (seated && !calm) { STRESS = Math.min(100, STRESS + 1 / 24); }     // умеренно: ~40 минут за столом — шкала полная
         if (near(CATS, me) <= 2.2) { STRESS = Math.max(0, STRESS - 4); if (!catMsg) { toast('🐈 ' + TXT.cats_pet); catMsg = true; } } else { catMsg = false; }
         if (near(COFFEE, me) <= 2.4 && !me.route.length) {
             nearSince = nearSince || t;
             if (t - nearSince >= 2) {
-                if (t - coffeeAt >= 120) { coffeeAt = t; STRESS = Math.max(0, STRESS - 40); toast('☕ ' + TXT.coffee_ok); }
-                else if (!coffeeMsg) { toast('☕ ' + TXT.coffee_wait.replace('{s}', Math.ceil(120 - (t - coffeeAt)))); coffeeMsg = true; }
+                if (t - coffeeAt >= 60 && !coffeeBusy) {
+                    if (OFFICE) { coffeeAt = t; STRESS = Math.max(0, STRESS - 40); toast('☕ ' + TXT.coffee_ok.replace(' {p}', '').replace('{p}', '')); }
+                    else {
+                        coffeeBusy = true; coffeeAt = t;                         // кофе платный: 2 000 ₸ со счёта
+                        post({a: 'coffee'}).then(function (d) {
+                            coffeeBusy = false;
+                            if (d.ok) { STRESS = Math.max(0, STRESS - 40); paintStress(); toast('☕ ' + TXT.coffee_ok.replace('{p}', money(d.price))); if (CO) { CO.wallet = d.wallet; tasksPanel(); } }
+                            else if (d.error === 'coffee_money') { toast('💸 ' + TXT.coffee_money.replace('{p}', money(d.price))); }
+                        }, function () { coffeeBusy = false; });
+                    }
+                }
+                else if (!coffeeMsg && !coffeeBusy) { toast('☕ ' + TXT.coffee_wait.replace('{s}', Math.ceil(60 - (t - coffeeAt)))); coffeeMsg = true; }
             }
         } else { nearSince = 0; coffeeMsg = false; }
         if (STRESS >= 85 && !hiWarned) { toast('😵 ' + TXT.stress_hi); hiWarned = true; } if (STRESS < 70) { hiWarned = false; }
         try { localStorage.setItem(SKEY, JSON.stringify([Math.round(STRESS * 10) / 10, coffeeAt])); } catch (e) {}
-        paintStress();
+        paintStress(); stressBlock();
     }, 1000);
     paintStress();
 
@@ -1037,6 +1059,11 @@
             }
             var prev = CO.cur, sig = JSON.stringify(CO);
             if (prev && !d.me.cur && d.me.done.indexOf(prev) >= 0) { var t = taskById(prev); toast('🎉 ' + TXT.paid + ' +' + money(t ? t.pay : 0)); }
+            if (d.me.try && !TEACHER) {                         // неверная отправка → стресс +10%
+                var tk = d.me.cur + ':' + d.me.try[0];
+                if (lastTry !== null && tk !== lastTry && d.me.try[1]) { stressHit(10, TXT.stress_bad); }
+                lastTry = tk;
+            }
             CO = d.me; if (CO.cur) { allDone = false; }
             if (sig !== JSON.stringify(CO)) { tasksPanel(); }
         }

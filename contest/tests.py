@@ -5266,7 +5266,7 @@ class StudyRoomTests(TestCase):
         self.client.force_login(self.tu)
         self.client.post(reverse('room_manage'), {'school_class': '8A', 'minutes': 45, 'tasks': [t.id for t in tasks],
                                                   'order': ','.join(str(t.id) for t in order)})
-        return StudyRoom.objects.get()
+        return StudyRoom.objects.order_by('-id').first()
 
     def test_company_swap_task_and_teacher_fine(self):
         from .models import RoomAssignment, RoomFine
@@ -5363,17 +5363,57 @@ class StudyRoomTests(TestCase):
         self.assertEqual(self.client.post(act, {'a': 'take'}).json(), {'ok': True, 'task': b.id})
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['error'], 'busy')     # пока не выполнил — нового нет
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
-        self.assertEqual(st['me'], {'cur': b.id, 'done': [], 'salary': 0, 'fines': 0, 'fine_last': None})
+        self.assertEqual(st['me'], {'cur': b.id, 'done': [], 'salary': 0, 'fines': 0, 'fine_last': None, 'wallet': 0})
         Submission.objects.create(student=a, task=b, status='DONE', is_graded=True, score=10)
         cache.delete(f'room:fresh:{a.user_id}')
         st = self.client.get(reverse('room_state', args=[room.id]) + '?fresh=1').json()
-        self.assertEqual(st['me'], {'cur': None, 'done': [b.id], 'salary': 20000, 'fines': 0, 'fine_last': None})
+        self.assertEqual(st['me'], {'cur': None, 'done': [b.id], 'salary': 20000, 'fines': 0, 'fine_last': None, 'wallet': 20000})
         self.assertIsNotNone(RoomAssignment.objects.get(student=a, task=b).done_at)
         row = [r for r in st['stats'] if r[0] == a.user_id][0]
         self.assertEqual((row[2], row[3]), (20000, 1))
         self.assertEqual(self.client.post(act, {'a': 'take'}).json()['task'], self.tasks[0].id)
         self.client.force_login(self.tu)
         self.assertIn('взял задание', self.client.get(reverse('room_state', args=[room.id])).json()['log'][-1][2])
+
+    def test_wallet_continues_coffee_costs_and_one_company_per_class(self):
+        from .models import CompanyLedger
+        from . import room as rm
+        room = self._post_open(self.tasks[:2], self.tasks[:2])
+        a = self.sts[0]
+        act = reverse('room_act', args=[room.id])
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.post(act, {'a': 'take'})
+        tid = rm.company(room, fresh=True)[a.id]['cur']
+        self.assertEqual(self.client.post(act, {'a': 'coffee'}).json()['error'], 'coffee_money')   # денег ещё нет
+        Submission.objects.create(student=a, task_id=tid, status='DONE', is_graded=True, score=10)
+        rm.company(room, fresh=True)
+        st = self.client.get(reverse('room_state', args=[room.id])).json()['me']
+        self.assertGreater(st['wallet'], 0)
+        d = self.client.post(act, {'a': 'coffee'}).json()
+        self.assertTrue(d['ok']); self.assertEqual(d['wallet'], st['wallet'] - 2000)
+        self.assertEqual(self.client.post(act, {'a': 'coffee'}).json()['error'], 'coffee_wait')
+        StudyRoom.objects.filter(pk=room.pk).update(ends_at=timezone.now() - timedelta(minutes=1))
+        rm.award_top(StudyRoom.objects.get(pk=room.pk))
+        self.assertEqual(rm.wallet(a.id), st['wallet'] - 2000)            # зарплата осталась на счёте после урока
+        self.assertEqual(CompanyLedger.objects.filter(kind='salary').count(), 1)
+        room2 = self._post_open(self.tasks[:2], self.tasks[:2])           # новый день — продолжение
+        self.client.force_login(a.user)
+        self.assertEqual(self.client.get(reverse('room_state', args=[room2.id])).json()['me']['wallet'], st['wallet'] - 2000)
+        self.client.force_login(self.tu)
+        page = self.client.get(reverse('room_manage')).content.decode()
+        self.assertEqual(page.count('🏢 8A'), 1); self.assertIn('История (1)', page)
+
+    def test_wrong_try_signal(self):
+        room = self._post_open(self.tasks[:1], self.tasks[:1])
+        a = self.sts[0]
+        self.client.force_login(a.user)
+        self.client.get(reverse('room_play', args=[room.id]))
+        self.client.post(reverse('room_act', args=[room.id]), {'a': 'take'})
+        Submission.objects.create(student=a, task=self.tasks[0], status='TODO', autotest_passed=1, autotest_total=3,
+                                  last_submitted_at=timezone.now())
+        me = self.client.get(reverse('room_state', args=[room.id])).json()['me']
+        self.assertTrue(me['try'][1])
 
     def test_company_from_several_topics(self):
         """Можно отметить несколько тем и подтем: задачи объединяются, «вся тема» включает задачи подтем."""

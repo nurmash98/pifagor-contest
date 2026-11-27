@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import room as rm
-from .models import Student, StudyRoom, Task
+from .models import Student, StudyRoom, Submission, Task
 
 COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#0ea5e9', '#84cc16', '#f43f5e']
 
@@ -199,6 +199,19 @@ def room_manage(request):
         r.online = len(rm.people(r.id)) if r.open_now else 0
         if not r.open_now and not r.top_awarded:
             rm.award_top(r)
+    # одна компания на класс: последний урок + история (уроки продолжают друг друга)
+    from django.db.models import Count, Sum
+    from .models import CompanyLedger
+    kassa = dict(CompanyLedger.objects.filter(kind='salary', room__school_class__in=mine)
+                 .values_list('room__school_class').annotate(s=Sum('amount')))
+    lessons = dict(StudyRoom.objects.filter(school_class__in=mine).values_list('school_class').annotate(n=Count('id')))
+    companies = {}
+    for r in rooms:
+        c = companies.setdefault(r.school_class, {'cls': r.school_class, 'last': r, 'history': [],
+                                                   'kassa': kassa.get(r.school_class, 0), 'lessons': lessons.get(r.school_class, 0)})
+        if c['last'] is not r:
+            c['history'].append(r)
+    companies = sorted(companies.values(), key=lambda c: (not c['last'].open_now, -c['last'].started_at.timestamp()))
     tasks = list(Task.objects.filter(hidden=False).prefetch_related('tags').order_by('level', 'title'))
     from collections import Counter
     from .models import Topic
@@ -225,7 +238,7 @@ def room_manage(request):
             mine_c = bool(c.created_by_id) and c.created_by.user_id == request.user.id
             tree.append({'id': c.id, 'name': ('⭐ ' if mine_c else '') + c.name, 'topics': tps, 'mine': mine_c})
     tree.sort(key=lambda x: not x['mine'])                 # свои курсы учителя — первыми и выбраны по умолчанию
-    return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'tasks': tasks, 'tags': tags,
+    return render(request, 'room_manage.html', {'classes': classes, 'rooms': rooms, 'companies': companies, 'tasks': tasks, 'tags': tags,
                                                 'topics': topics, 'topics_json': json.dumps({t['id']: t['tasks'] for t in topics}),
                                                 'tree_json': json.dumps(tree, ensure_ascii=False)})
 
@@ -321,7 +334,9 @@ ROOM_TEXTS = {
     'fine': 'Штраф', 'fine_q': 'Штраф для {name}: сколько тенге вычесть из зарплаты?', 'fine_why': 'За что? (можно оставить пустым)',
     'fined': 'Руководитель выписал штраф',
     'stress': 'Стресс', 'stress_hi': 'Стресс зашкаливает — клавиши путаются! Выпейте кофе ☕ или посидите с котиками 🐈',
-    'coffee_ok': 'Кофе! Стресс −40', 'coffee_wait': 'Кофемашина ещё готовит — через {s} с',
+    'coffee_ok': 'Кофе за {p}! Стресс −40', 'coffee_wait': 'Кофемашина ещё готовит — через {s} с',
+    'coffee_money': 'Не хватает денег: кофе стоит {p}', 'wallet': 'На счёте', 'stress_bad': 'Неверно — стресс +10%',
+    'stress_block': 'Стресс 100% — работать невозможно! Выпейте кофе ☕ или посидите с котиками 🐈, пока стресс не упадёт до 80%',
     'cats_pet': 'Котики мурлычут — стресс уходит', 'ev_quake': 'Землетрясение! Держитесь за столы',
     'ev_storm': 'Гроза! В офисе мигает свет', 'ev_snow': 'Метель! Все ходят медленнее',
     'ev_cats': 'Радужные котики прилетели — стресс не растёт!', 'rain': 'Дождь из монет! Ходите по монетам и ловите',
@@ -462,7 +477,13 @@ def room_state(request, room_id):
     if st is not None:
         mine = co.get(st.id, {})
         out['me'] = {'cur': mine.get('cur'), 'done': mine.get('done', []), 'salary': mine.get('salary', 0),
-                     'fines': mine.get('fines', 0), 'fine_last': mine.get('fine_last')}
+                     'fines': mine.get('fines', 0), 'fine_last': mine.get('fine_last'),
+                     'wallet': rm.wallet(st.id) + (mine.get('salary', 0) if not room.top_awarded else 0)}
+        if mine.get('cur'):                            # последняя проверка текущей задачи: неверно → стресс +10%
+            sub = Submission.objects.filter(student=st, task_id=mine['cur']).values_list(
+                'last_submitted_at', 'autotest_passed', 'autotest_total').first()
+            if sub and sub[0] and sub[2] is not None:
+                out['me']['try'] = [sub[0].timestamp(), sub[1] < sub[2]]
     if teacher:
         out['log'] = rm.log(room.id)[-30:]
     if room.ends_at and out['left'] is not None and out['left'] <= rm.RAIN_WINDOW + 2:
@@ -554,6 +575,17 @@ def room_act(request, room_id):
         old_t = room.tasks.filter(id=old_cur).first()
         rm.log_event(room.id, st.full_name, f'🔄 поменял задание «{old_t.title if old_t else "?"}» → «{task.title}» ({task.level})')
         return JsonResponse({'ok': True, 'task': task.id})
+    if act == 'coffee' and not teacher:                  # кофе — 2 000 ₸ с личного счёта (включая зарплату этого урока)
+        from .models import CompanyLedger
+        if not cache.add(f'room:coffee:{room.id}:{st.id}', 1, 60):
+            return JsonResponse({'error': 'coffee_wait'})
+        sal = rm.company(room).get(st.id, {}).get('salary', 0) if not room.top_awarded else 0
+        if rm.wallet(st.id) + sal < rm.COFFEE_PRICE:
+            cache.delete(f'room:coffee:{room.id}:{st.id}')
+            return JsonResponse({'error': 'coffee_money', 'price': rm.COFFEE_PRICE})
+        CompanyLedger.objects.create(student=st, room=room, amount=-rm.COFFEE_PRICE, kind='coffee', note='☕ Кофе',
+                                     key=f'coffee:{room.id}:{int(timezone.now().timestamp() * 1000)}')
+        return JsonResponse({'ok': True, 'price': rm.COFFEE_PRICE, 'wallet': rm.wallet(st.id) + sal})
     if act == 'hint' and not teacher:
         from .hints import build
         from .models import RoomAssignment

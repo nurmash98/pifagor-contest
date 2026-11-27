@@ -451,10 +451,31 @@ def award_top(room):
                 student_id=sid, key=f'roomtop:{r.id}',
                 defaults=dict(kind='game', amount=TOP_N + 1 - place, at=when,
                               note=f'Компания «Пифагор» {r.school_class}: {place} место'))
+        credit_salaries(r, co)
         r.top_awarded = True
         r.save(update_fields=['top_awarded'])
     room.top_awarded = True
     return winners
+
+
+COFFEE_PRICE = 2000
+
+
+def credit_salaries(room, co=None):
+    """Зарплата за урок → на личный счёт сотрудника (один раз на урок)."""
+    from .models import CompanyLedger
+    co = co if co is not None else company(room, fresh=True)
+    for sid, d in co.items():
+        if d.get('salary'):
+            CompanyLedger.objects.get_or_create(student_id=sid, key=f'sal:{room.id}', defaults=dict(
+                room=room, amount=d['salary'], kind='salary', note=f'Зарплата: {room.title or room.school_class}'[:120]))
+
+
+def wallet(student_id):
+    """Сколько тенге на личном счёте (без зарплаты текущего урока)."""
+    from django.db.models import Sum
+    from .models import CompanyLedger
+    return CompanyLedger.objects.filter(student_id=student_id).aggregate(s=Sum('amount'))['s'] or 0
 
 
 RAIN_COINS, RAIN_WINDOW = 50, 60     # последняя минута урока — дождь из монет: всего 50 монет на класс

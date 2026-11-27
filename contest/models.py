@@ -729,6 +729,24 @@ class RoomAssignment(models.Model):
         ordering = ['assigned_at']
 
 
+class CompanyLedger(models.Model):
+    """Личный счёт сотрудника «Компании Пифагор» (тенге игры), продолжается из урока в урок.
+    + зарплата за урок (kind='salary', начисляется по окончании урока), − покупки (кофе и т.п.)."""
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='company_ledger')
+    room = models.ForeignKey('StudyRoom', null=True, blank=True, on_delete=models.SET_NULL)
+    amount = models.IntegerField()
+    kind = models.CharField(max_length=16)
+    note = models.CharField(max_length=120, blank=True)
+    key = models.CharField(max_length=40)
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Счёт сотрудника (операция)"
+        verbose_name_plural = "Счёт сотрудников компании"
+        constraints = [models.UniqueConstraint(fields=['student', 'key'], name='uniq_company_ledger_key')]
+        indexes = [models.Index(fields=['student', 'kind'])]
+
+
 class HintUse(models.Model):
     """Платная подсказка (разбор кода / ИИ), открытая учеником в «Компании» или «Офисе» — снижает зарплату за задачу.
     ctx: 'room:<id>' или 'office:<дата>'. Один уровень на задачу оплачивается один раз."""

@@ -27,23 +27,29 @@
 
 {% if rooms %}
 <div class="card border-0 shadow-sm rounded-4 p-3 mb-4">
-    <h5 class="fw-bold mb-2">Рабочие дни</h5>
-    {% for r in rooms %}
-    <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not forloop.last %}border-bottom{% endif %}">
-        <span class="badge {% if r.open_now %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{% if r.open_now %}идёт{% else %}закончен{% endif %}</span>
-        <b>{{ r.school_class }}</b> <span>{{ r.title|default:"—" }}</span>
-        <span class="text-muted small">{{ r.started_at|date:"d.m H:i" }} · задач: {{ r.tasks.all|length }}{% if r.open_now %} · в зале: {{ r.online }}{% endif %}</span>
-        <span class="ms-auto d-flex gap-2">
-            <a href="{% url 'room_play' r.id %}" class="btn btn-sm btn-pifagor-green rounded-pill px-3">{% if r.open_now %}▶ В офис{% else %}Итоги{% endif %}</a>
-            {% if r.open_now %}<form method="post" action="{% url 'room_close' r.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger rounded-pill px-3">Закончить день</button></form>{% endif %}
-        </span>
+    <h5 class="fw-bold mb-1">Компании классов</h5>
+    <p class="small text-muted mb-2">У каждого класса одна компания: новый рабочий день продолжает прошлый — деньги сотрудников и уровни сохраняются.</p>
+    {% for c in companies %}{% with r=c.last %}
+    <div class="py-2 {% if not forloop.last %}border-bottom{% endif %}">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge {% if r.open_now %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">{% if r.open_now %}идёт урок{% else %}перерыв{% endif %}</span>
+            <b>🏢 {{ c.cls }}</b>
+            <span class="text-muted small">уроков: {{ c.lessons }} · касса: {{ c.kassa|floatformat:0 }} ₸ · {% if r.open_now %}сейчас{% else %}последний{% endif %}: {{ r.title|default:"—" }} ({{ r.started_at|date:"d.m H:i" }}){% if r.open_now %} · в зале: {{ r.online }}{% endif %}</span>
+            <span class="ms-auto d-flex gap-2">
+                <a href="{% url 'room_play' r.id %}" class="btn btn-sm btn-pifagor-green rounded-pill px-3">{% if r.open_now %}▶ В офис{% else %}Итоги{% endif %}</a>
+                {% if r.open_now %}<form method="post" action="{% url 'room_close' r.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger rounded-pill px-3">Закончить день</button></form>{% endif %}
+            </span>
+        </div>
+        {% if c.history %}<details class="mt-1 ms-1"><summary class="small text-muted" style="cursor:pointer">История ({{ c.history|length }})</summary>
+            {% for h in c.history %}<div class="small d-flex gap-2 align-items-center py-1"><span class="text-muted">{{ h.started_at|date:"d.m H:i" }}</span> {{ h.title|default:"—" }} <span class="text-muted">· задач: {{ h.tasks.all|length }}</span> <a href="{% url 'room_play' h.id %}" class="ms-auto">Итоги</a></div>{% endfor %}
+        </details>{% endif %}
     </div>
-    {% endfor %}
+    {% endwith %}{% endfor %}
 </div>
 {% endif %}
 
 <form method="post" class="card border-0 shadow-sm rounded-4 p-4">{% csrf_token %}
-    <h5 class="fw-bold mb-3">Начать рабочий день</h5>
+    <h5 class="fw-bold mb-3">Начать рабочий день <span class="small text-muted fw-normal">(продолжение компании класса)</span></h5>
     {% if not classes %}<div class="alert alert-warning">У вас пока нет своих классов — укажите их в «Мои классы».</div>{% endif %}
     <div class="row g-3 mb-3">
         <div class="col-md-3"><label class="form-label small fw-semibold">Класс</label>
