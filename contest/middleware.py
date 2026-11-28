@@ -229,8 +229,6 @@ class DailyVisitCoinMiddleware:
             return
         CoinTransaction.objects.get_or_create(student=st, key=f'visit:{day}',
                                               defaults=dict(kind='login', amount=1, note='Вход на сайт', at=timezone.now()))
-        from .coins import award_streak
-        award_streak(st.id)
 
 
 class OnlineMiddleware:

@@ -1714,20 +1714,27 @@ class CoinsAndShopTests(TestCase):
                          ['10 задач за день', '5 задач за день'])
         self.assertEqual(coins.balance(self.st), 16 + 5 + 5 + 10)       # 16 задач A + 2 первых задачи дня + 2 × 5
 
-    def test_streak_fire_and_prizes(self):
+    def test_streak_fire_is_days_with_solved_tasks(self):
         from . import coins
         from .models import CoinTransaction
         import datetime
-        today = datetime.date(2026, 11, 28)
-        for k in [1, 2, 3, 5]:                                          # 27, 26, 25 и 23 ноября (24-го пропуск)
-            d = today - timedelta(days=k)
-            CoinTransaction.objects.create(student=self.st, key=f'visit:{d}', kind='login', amount=1, at=timezone.now())
-        self.assertEqual(coins.streak(self.st.id, today), (3, False))   # сегодня ещё не заходил — горит до полуночи
+        from django.core.cache import cache
+        cache.clear()
+        today = timezone.localdate()
+        def at(k):
+            return timezone.make_aware(datetime.datetime.combine(today - timedelta(days=k), datetime.time(12)))
+        for k in [1, 2, 3, 5]:                                          # вчера, позавчера, 3 дня назад; 4 дня назад — пропуск
+            self.solve('A', at(k))
+        self.assertEqual(coins.streak(self.st.id, today), (3, False))   # сегодня ещё не решал — горит до полуночи
+        self.solve('A', at(0))
+        from django.core.cache import cache; cache.delete(f'solvedays:{self.st.id}')
+        self.assertEqual(coins.streak(self.st.id, today), (4, True))
         CoinTransaction.objects.create(student=self.st, key=f'visit:{today}', kind='login', amount=1, at=timezone.now())
-        self.assertEqual(coins.award_streak(self.st.id, today), (4, 0))
-        CoinTransaction.objects.filter(key=f'visit:{today - timedelta(days=1)}').delete()
-        self.assertEqual(coins.streak(self.st.id, today), (1, True))    # пропустил вчера — огонёк погас и заново
-        self.assertEqual([coins.streak_prize(n) for n in (3, 7, 14, 30, 45, 60)], [3, 10, 15, 30, 0, 30])
+        self.assertEqual([coins.streak_prize(n) for n in (3, 7, 14, 30, 45, 50, 60, 100, 150, 200, 300)], [3, 10, 15, 30, 0, 50, 0, 100, 0, 200, 300])
+        coins.sync(self.st)
+        fire = CoinTransaction.objects.filter(student=self.st, kind='streak')
+        if (today - timedelta(days=1)).isoformat() >= coins.FIVE_FROM:     # 3-й день подряд — вчера → +3
+            self.assertEqual(list(fire.values_list('amount', flat=True)), [3])
         html = self.client.get('/').content.decode()
         self.assertIn('fire-chip', html); self.assertIn('gift-chip', html)
 

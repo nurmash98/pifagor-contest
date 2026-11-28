@@ -190,7 +190,7 @@
                             {% endif %}
                             {% if coin_balance is not None %}
                             <li class="nav-item d-flex align-items-center gap-1">
-                                <a class="fire-chip{% if not fire_lit %} fire-off{% endif %}" href="{% url 'courses' %}" title="{% t "Огонёк — дней подряд на сайте. Заходите каждый день, иначе он погаснет!" %} {% t "До приза:" %} {{ fire_next_in }}">🔥<span>{{ fire_days }}</span></a>
+                                <a class="fire-chip{% if not fire_lit %} fire-off{% endif %}" href="{% url 'courses' %}" title="{% t "Огонёк — дней подряд с решённой задачей. Решайте хотя бы одну задачу каждый день, иначе он погаснет!" %} {% t "До приза:" %} {{ fire_next_in }}">🔥<span>{{ fire_days }}</span></a>
                                 {% if gift_waiting %}<a class="gift-chip" href="{% url 'courses' %}" title="{% t "Подарок дня: +5 монет — заберите на странице «Курсы»" %}">🎁</a>{% endif %}
                             </li>
                             <li class="nav-item">
