@@ -86,7 +86,11 @@ def coins(request):
             gain = bal - seen
         if seen != bal:
             session['coin_seen'] = bal
-    return {'coin_balance': bal, 'my_solved': solved, 'coin_gain': gain}
+    from .coins import STREAK_PRIZES, gift_ready, streak
+    fire, lit = streak(student.id)
+    nxt = next((d for d in sorted(STREAK_PRIZES) if d > fire), (fire // 30 + 1) * 30)
+    return {'coin_balance': bal, 'my_solved': solved, 'coin_gain': gain, 'fire_days': fire, 'fire_lit': lit,
+            'fire_next': nxt, 'fire_next_in': nxt - fire, 'gift_waiting': gift_ready(student)}
 
 
 def notices(request):

@@ -123,6 +123,9 @@
                 {% elif tx.kind == 'gift' %}🎁 {% if kk == 'kk' %}Күн сыйлығы{% else %}Подарок дня{% endif %}
                 {% elif tx.kind == 'grant' %}👩‍🏫 {{ tx.note }}
                 {% elif tx.kind == 'game' %}💣 {{ tx.note }}
+                {% elif tx.kind == 'five' %}🖐 {% if kk == 'kk' %}Бір күнде шешілген есептер:{% else %}Задач за день:{% endif %} {{ tx.note|cut:" задач за день" }}
+                {% elif tx.kind == 'streak' %}🔥 {% if kk == 'kk' %}Қатарынан күндер{% else %}Огонёк — дней подряд{% endif %}: {{ tx.note|cut:"🔥 Огонёк: "|cut:" дней подряд" }}
+                {% elif tx.kind == 'login' %}👋 {% if kk == 'kk' %}Сайтқа кіру{% else %}Вход на сайт{% endif %}
                 {% else %}🛒 {{ tx.note }}{% endif %}
                 <span class="text-muted ms-1">{{ tx.at|date:"d.m.Y" }}</span>
             </span>

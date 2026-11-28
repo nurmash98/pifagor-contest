@@ -4,6 +4,9 @@
   • задача решена на 10/10: уровень A — 1, B — 2, C — 3 монеты;
   • первая задача дня, решённая на 10/10: ещё +5 монет (без коэффициента уровня);
   • каждые 50 решённых задач (50, 100, 150, …): +25 монет;
+  • каждые 5 задач, решённых за один день (5, 10, 15 …): +5 монет (с 28.11.2026);
+  • огонёк 🔥 — заходить на сайт каждый день подряд: 3 дня +3, 7 дней +10, 14 дней +15, 30 дней +30
+    (и дальше каждые 30 дней +30); пропустил день — огонёк гаснет и считается заново;
   • СОР/СОЧ на 10/10 (экзамен или пересдача): +50 монет за каждый экзамен.
 Тратятся монеты в магазине (баннеры под именем, позже — аватары).
 sync(student) пересчитывает всё по данным и досоздаёт недостающие начисления — его можно
@@ -20,6 +23,9 @@ MILESTONE_EVERY = 50
 MILESTONE_COINS = 25
 EXAM_TEN_COINS = 50
 DAILY_GIFT = 5          # подарок 🎁 на странице «Курсы» — раз в день
+FIVE_EVERY, FIVE_COINS = 5, 5                    # каждые 5 задач за день — +5 монет
+FIVE_FROM = '2026-11-28'                          # раньше этого дня не начисляем (без «подарка» за прошлое)
+STREAK_PRIZES = {3: 3, 7: 10, 14: 15, 30: 30}     # дней подряд → монет; после 30 — каждые 30 дней +30
 
 
 def balance(student):
@@ -41,11 +47,15 @@ def _solved(student):
 def _entries(student):
     out = []
     solved = _solved(student)
-    seen_days = set()
+    seen_days, per_day = set(), {}
     for n, (when, task) in enumerate(solved, 1):
         out.append(dict(key=f'task:{task.id}', kind='task', amount=LEVEL_COINS.get(task.level, 1),
                         note=task.title[:200], at=when))
         day = timezone.localtime(when).date().isoformat()
+        per_day[day] = per_day.get(day, 0) + 1
+        if day >= FIVE_FROM and per_day[day] % FIVE_EVERY == 0:
+            out.append(dict(key=f'five:{day}:{per_day[day]}', kind='five', amount=FIVE_COINS,
+                            note=f'{per_day[day]} задач за день', at=when))
         if day not in seen_days:
             seen_days.add(day)
             out.append(dict(key=f'day:{day}', kind='day', amount=DAILY_BONUS, note=task.title[:200], at=when))
@@ -103,3 +113,38 @@ def spend(student, key, amount, note=''):
             return True
     except IntegrityError:
         return False
+
+
+def streak(student_id, today=None):
+    """Огонёк: сколько дней подряд ученик заходил на сайт (по начислениям за вход).
+    Если сегодня ещё не заходил — считаем до вчера (огонёк ещё горит, но погаснет в полночь)."""
+    from datetime import date, timedelta
+    today = today or timezone.localdate()
+    days = set()
+    for k in CoinTransaction.objects.filter(student_id=student_id, key__startswith='visit:',
+                                            at__gte=timezone.now() - timedelta(days=400)).values_list('key', flat=True):
+        try:
+            days.add(date.fromisoformat(k[6:]))
+        except ValueError:
+            pass
+    d = today if today in days else today - timedelta(days=1)
+    n = 0
+    while d in days:
+        n += 1
+        d -= timedelta(days=1)
+    return n, today in days
+
+
+def streak_prize(n):
+    return STREAK_PRIZES.get(n) or (30 if n > 30 and n % 30 == 0 else 0)
+
+
+def award_streak(student_id, today=None):
+    """После входа за день: приз за огонёк, если сегодня круглое число дней подряд."""
+    today = today or timezone.localdate()
+    n, _ = streak(student_id, today)
+    prize = streak_prize(n)
+    if prize:
+        CoinTransaction.objects.get_or_create(student_id=student_id, key=f'streak:{today.isoformat()}', defaults=dict(
+            kind='streak', amount=prize, note=f'🔥 Огонёк: {n} дней подряд', at=timezone.now()))
+    return n, prize

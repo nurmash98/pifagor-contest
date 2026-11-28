@@ -1699,6 +1699,38 @@ class CoinsAndShopTests(TestCase):
         Attempt.objects.create(submission=s, number=1, submitted_at=when, score=10)
         return t
 
+    def test_five_tasks_a_day_bonus_from_launch_day(self):
+        from . import coins
+        from .models import CoinTransaction
+        import datetime
+        old = timezone.make_aware(datetime.datetime(2026, 11, 20, 10))
+        new = timezone.make_aware(datetime.datetime(2026, 11, 28, 10))
+        for i in range(5):
+            self.solve('A', old + timedelta(minutes=i))                # до запуска — без бонуса
+        for i in range(11):
+            self.solve('A', new + timedelta(minutes=i))
+        coins.sync(self.st); coins.sync(self.st)
+        self.assertEqual(sorted(CoinTransaction.objects.filter(student=self.st, kind='five').values_list('note', flat=True)),
+                         ['10 задач за день', '5 задач за день'])
+        self.assertEqual(coins.balance(self.st), 16 + 5 + 5 + 10)       # 16 задач A + 2 первых задачи дня + 2 × 5
+
+    def test_streak_fire_and_prizes(self):
+        from . import coins
+        from .models import CoinTransaction
+        import datetime
+        today = datetime.date(2026, 11, 28)
+        for k in [1, 2, 3, 5]:                                          # 27, 26, 25 и 23 ноября (24-го пропуск)
+            d = today - timedelta(days=k)
+            CoinTransaction.objects.create(student=self.st, key=f'visit:{d}', kind='login', amount=1, at=timezone.now())
+        self.assertEqual(coins.streak(self.st.id, today), (3, False))   # сегодня ещё не заходил — горит до полуночи
+        CoinTransaction.objects.create(student=self.st, key=f'visit:{today}', kind='login', amount=1, at=timezone.now())
+        self.assertEqual(coins.award_streak(self.st.id, today), (4, 0))
+        CoinTransaction.objects.filter(key=f'visit:{today - timedelta(days=1)}').delete()
+        self.assertEqual(coins.streak(self.st.id, today), (1, True))    # пропустил вчера — огонёк погас и заново
+        self.assertEqual([coins.streak_prize(n) for n in (3, 7, 14, 30, 45, 60)], [3, 10, 15, 30, 0, 30])
+        html = self.client.get('/').content.decode()
+        self.assertIn('fire-chip', html); self.assertIn('gift-chip', html)
+
     def test_level_coins_daily_bonus_and_idempotent(self):
         from . import coins
         import datetime
